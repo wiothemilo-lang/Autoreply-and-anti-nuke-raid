@@ -12,18 +12,33 @@ import { spawnSync } from "node:child_process";
 // (base64 "{\"v\":\"v2\",...}") → bundle mang giá trị rác → URL đăng nhập
 // Discord bị từ chối “Invalid Form Body” ngay trang Discord. Giá trị sai bị bỏ
 // qua để runtime fallback về Convex (botApplicationId) thay vì phá nút đăng nhập.
-const rawConvexUrl = process.env.CONVEX_URL || process.env.VITE_CONVEX_URL || "";
-const trimmedConvexUrl = rawConvexUrl.trim().replace(/\/+$/, "");
-if (rawConvexUrl) {
+// Chọn biến URL Convex ĐẦU TIÊN HỢP LỆ — không phải biến đầu tiên bất kể sai.
+// Bug thật 26/09: env production chứa blob 1104 ký tự KHÔNG có scheme dán nhầm
+// vào CONVEX_URL (giống vụ blob dán nhầm vào DISCORD_CLIENT_ID 18/09) che mất
+// VITE_CONVEX_URL đúng → build fail "Invalid URL" mà không rõ nguyên nhân.
+// Chuẩn như nhau cho mọi biến: HTTPS + host *.convex.cloud, không
+// path/query/hash/credentials, không localhost. Fail-closed khi KHÔNG có biến
+// nào hợp lệ (không fallback âm thầm sang deployment khác).
+const CONVEX_HOST_RE = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.convex\.cloud$/i;
+const CONVEX_URL_VARS = ["CONVEX_URL", "VITE_CONVEX_URL"];
+const rejectedShapes = [];
+let trimmedConvexUrl = "";
+
+for (const name of CONVEX_URL_VARS) {
+  const raw = (process.env[name] ?? "").trim().replace(/\/+$/, "");
+  if (!raw) {
+    rejectedShapes.push(`${name}: rỗng/không có`);
+    continue;
+  }
   try {
-    const parsedConvexUrl = new URL(trimmedConvexUrl);
+    const parsedConvexUrl = new URL(raw);
     const isLocal = /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(parsedConvexUrl.hostname);
-    const isConvexHost = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.convex\.cloud$/i.test(
-      parsedConvexUrl.hostname,
-    );
     if (isLocal) {
-      throw new Error("production build không được dùng CONVEX_URL localhost");
-    } else if (parsedConvexUrl.protocol !== "https:" || !isConvexHost) {
+      throw new Error("localhost không được dùng cho production build");
+    } else if (
+      parsedConvexUrl.protocol !== "https:" ||
+      !CONVEX_HOST_RE.test(parsedConvexUrl.hostname)
+    ) {
       throw new Error("production phải là HTTPS với host *.convex.cloud");
     }
     if (
@@ -33,24 +48,25 @@ if (rawConvexUrl) {
       parsedConvexUrl.hash ||
       (parsedConvexUrl.pathname && parsedConvexUrl.pathname !== "/")
     ) {
-      throw new Error("CONVEX_URL không được có path, query, hash hoặc credentials");
+      throw new Error("không được có path, query, hash hoặc credentials");
     }
+    trimmedConvexUrl = raw;
+    break;
   } catch (error) {
-    // Không in nội dung giá trị (có thể ai đó dán nhầm secret vào env) — chỉ in
-    // DẠNG giá trị để chẩn đoán: độ dài, khoảng trắng trong, có scheme không.
-    const trimmed = rawConvexUrl.trim();
+    // Không in nội dung giá trị (phòng khi ai đó dán nhầm secret vào env) — chỉ
+    // in DẠNG giá trị để chẩn đoán: độ dài, khoảng trắng trong, scheme gì.
     const shape =
-      `length=${rawConvexUrl.length}, khoảng trắng trong=${/\s/.test(trimmed)}, ` +
-      `scheme=${trimmed.startsWith("https://") ? "https" : trimmed.startsWith("http://") ? "http" : "không có"}, ` +
-      `nguồn=${process.env.CONVEX_URL ? "CONVEX_URL" : process.env.VITE_CONVEX_URL ? "VITE_CONVEX_URL" : "không rõ"}`;
-    console.error(`[build] CONVEX_URL không hợp lệ: ${error.message} (dạng: ${shape})`);
-    process.exit(1);
+      `length=${raw.length}, khoảng trắng trong=${/\s/.test(raw)}, ` +
+      `scheme=${raw.startsWith("https://") ? "https" : raw.startsWith("http://") ? "http" : "không có"}`;
+    rejectedShapes.push(`${name}: ${error.message} (dạng: ${shape})`);
   }
 }
-if (!rawConvexUrl) {
+
+if (!trimmedConvexUrl) {
   console.error(
-    "[build] Thiếu CONVEX_URL/VITE_CONVEX_URL — production build phải trỏ tường minh tới deployment, không dùng fallback âm thầm.",
+    "[build] Không có CONVEX_URL/VITE_CONVEX_URL hợp lệ — production build phải trỏ tường minh tới deployment, không dùng fallback âm thầm. Nguyên nhân từng biến:",
   );
+  for (const line of rejectedShapes) console.error(`[build]   · ${line}`);
   process.exit(1);
 }
 process.env.VITE_CONVEX_URL = trimmedConvexUrl;
