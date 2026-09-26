@@ -99,4 +99,11 @@ const res = spawnSync("vite", ["build"], {
   stdio: "inherit",
   shell: process.platform === "win32",
 });
+// Lỗi spawn (ENOENT…) không đi qua stdio "inherit" — không in thì chết exit 1
+// im lặng, gây mù chẩn đoán (xảy ra thật 26/09 khi shim chạy trực tiếp bằng node
+// không có node_modules/.bin trên PATH). In ra để biết gốc rễ thay vì đoán.
+if (res.error) {
+  console.error(`[build] Không chạy được vite: ${res.error.message}`);
+  process.exit(res.status ?? 1);
+}
 process.exit(res.status ?? 1);
