@@ -34,6 +34,7 @@ import { usePublicConfig } from "../lib/usePublicConfig";
 import { isHeartbeatFresh, timeAgo } from "../lib/utils";
 import type { GuildData } from "../lib/types";
 import OverviewPanel from "../components/dashboard/OverviewPanel";
+import OnboardingChecklist from "../components/dashboard/OnboardingChecklist";
 
 import LangSwitch from "../components/LangSwitch";
 
@@ -326,6 +327,15 @@ export default function GuildPage() {
                 Ở ĐÂY (không để bubble lên App) để fallback chỉ thay vùng panel,
                 header/sidebar giữ nguyên khi đang tải chunk. */}
             <div className="min-w-0">
+              {/* Onboarding: chỉ ở tab Tổng quan — người mới vào thấy ngay cần làm gì. */}
+              {section === "overview" && (
+                <div className="mb-4">
+                  <OnboardingChecklist
+                    data={data}
+                    onOpenSection={(key) => setSection(key as SectionKey)}
+                  />
+                </div>
+              )}
               <PanelErrorBoundary key={`${section}:${data.guild.discordId}`}>
                 <Suspense fallback={<PanelFallback />}>
                   {section === "overview" && <OverviewPanel data={data} />}

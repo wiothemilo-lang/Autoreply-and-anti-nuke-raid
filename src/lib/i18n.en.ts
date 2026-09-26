@@ -944,6 +944,30 @@ export const EN: Record<string, string> = {
   Xóa: "Remove",
   "CONVEX_URL không hợp lệ hoặc không nằm trong allowlist":
     "CONVEX_URL is invalid or is not allowlisted",
+  /* ==== onboarding checklist (W1) ==== */
+  "Ch\u1ecdn k\u00eanh nh\u1eadn log s\u1ef1 ki\u1ec7n": "Pick an event log channel",
+  "M\u1ecdi c\u1ea3nh b\u00e1o nuke/raid, h\u00ecnh ph\u1ea1t v\u00e0 backup \u0111\u1ec1u c\u1ea7n k\u00eanh log \u0111\u1ec3 b\u1ea1n nh\u00ecn th\u1ea5y.":
+    "Nuke/raid alerts, punishments and backups all need a log channel so you can see them.",
+  "B\u1eadt l\u1eddi ch\u00e0o th\u00e0nh vi\u00ean m\u1edbi": "Turn on member greetings",
+  "Bot t\u1ef1 ch\u00e0o ng\u01b0\u1eddi v\u00e0o server \u2014 l\u00e0m server th\u00e2n thi\u1ec7n ngay t\u1eeb gi\u00e2y \u0111\u1ea7u.":
+    "The bot greets newcomers automatically \u2014 a friendly server from the first second.",
+  "T\u1ea1o rule auto reply \u0111\u1ea7u ti\u00ean": "Create your first auto-reply rule",
+  'Th\u1eed kh\u1ed1i "Th\u1eed rule" ngay trong panel \u0111\u1ec3 xem bot s\u1ebd tr\u1ea3 l\u1eddi g\u00ec tr\u01b0\u1edbc khi l\u01b0u.':
+    "Use the \u201cTry rules\u201d box in the panel to see what the bot will reply before saving.",
+  "B\u1eadt Join Gate ch\u1ed1ng acc \u1ea3o": "Turn on Join Gate to stop fake accounts",
+  "L\u1ecdc acc m\u1edbi l\u1eadp b\u1eb1ng tu\u1ed5i t\u00e0i kho\u1ea3n / avatar tr\u01b0\u1edbc khi v\u00e0o \u0111\u01b0\u1ee3c server.":
+    "Filter freshly-made accounts by account age / avatar before they can join.",
+  "B\u1eadt backup t\u1ef1 \u0111\u1ed9ng \u0111\u1ec3 ch\u1ed1ng nuke":
+    "Enable automatic backups against nukes",
+  "Snapshot role/k\u00eanh \u0111\u1ecbnh k\u1ef3 \u2014 b\u1ecb nuke l\u00e0 kh\u00f4i ph\u1ee5c l\u1ea1i trong v\u00e0i ph\u00fat.":
+    "Periodic role/channel snapshots \u2014 after a nuke, restore takes minutes.",
+  "Thi\u1ebft l\u1eadp server trong 5 b\u01b0\u1edbc": "Set up your server in 5 steps",
+  "L\u00e0m xong m\u1ed7i b\u01b0\u1edbc l\u00e0 t\u1ef1 chuy\u1ec3n xanh \u2014 bot s\u1eb5n s\u00e0ng canh server.":
+    "Each step turns green automatically once done \u2014 then your bot is on guard.",
+  "Ti\u1ebfn \u0111\u1ed9 thi\u1ebft l\u1eadp": "Setup progress",
+  "C\u1ea5u h\u00ecnh": "Set up",
+  "C\u1ea5u h\u00ecnh m\u1edbi t\u1edbi bot sau kho\u1ea3ng 1 ph\u00fat qua Convex.":
+    "New settings reach the bot within about a minute via Convex.",
   /* ==== autoreply try-out (W3) ==== */
   "Th\u1eed rule \u2014 g\u00f5 tin nh\u1eafn m\u1eabu": "Try rules \u2014 type a sample message",
   "v\u00ed d\u1ee5: m\u1ecdi ng\u01b0\u1eddi \u01a1i hello!": "e.g. hey everyone, hello!",
