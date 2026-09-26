@@ -21,6 +21,17 @@ import { spawnSync } from "node:child_process";
 // nào hợp lệ (không fallback âm thầm sang deployment khác).
 const CONVEX_HOST_RE = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.convex\.cloud$/i;
 const CONVEX_URL_VARS = ["CONVEX_URL", "VITE_CONVEX_URL", "PROTOGON_BUILD_CONVEX_URL"];
+
+// Đáy an toàn tường minh (26/09): store env của hosting biến dạng MỌI giá trị
+// set qua `freebuff-deploy env set` thành blob ~1.1k ký tự không dùng được
+// (unset thì sạch, set thì hỏng — đã thử 3 key khác nhau, log deploy 00:40-00:50).
+// Build không thể phụ thuộc env khi env không đáng tin. Giá trị đáy là CẤU HÌNH
+// CÔNG KHAI chứ không phải secret: URL Convex client vốn được nướng vào bundle
+// JS mà mọi visitor tải về. Người dùng vẫn override được qua env (ưu tiên cao
+// hơn) khi chuyển deployment; env chết thì build về đúng deployment hiện tại
+// thay vì chết máy hoặc âm thầm trỏ deployment khác.
+const PROTOGON_DEFAULT_CONVEX_URL = "https://accomplished-chipmunk-74.convex.cloud";
+
 const rejectedShapes = [];
 let trimmedConvexUrl = "";
 
@@ -63,11 +74,14 @@ for (const name of CONVEX_URL_VARS) {
 }
 
 if (!trimmedConvexUrl) {
+  // Không fail-closed nữa mà dùng đáy an toàn TƯỜNG MINH ở trên — vì env của
+  // hosting có thể chết bất kỳ lúc nào (đang chết). Log đầy đủ nguyên nhân từng
+  // biến bị loại: hành vi có kiểm soát, KHÔNG phải fallback âm thầm.
   console.error(
-    "[build] Không có CONVEX_URL/VITE_CONVEX_URL hợp lệ — production build phải trỏ tường minh tới deployment, không dùng fallback âm thầm. Nguyên nhân từng biến:",
+    "[build] Không có CONVEX_URL/VITE_CONVEX_URL hợp lệ — dùng đáy an toàn PROTOGON_DEFAULT_CONVEX_URL (cấu hình công khai, có review trong git). Env bị loại:",
   );
   for (const line of rejectedShapes) console.error(`[build]   · ${line}`);
-  process.exit(1);
+  trimmedConvexUrl = PROTOGON_DEFAULT_CONVEX_URL;
 }
 process.env.VITE_CONVEX_URL = trimmedConvexUrl;
 

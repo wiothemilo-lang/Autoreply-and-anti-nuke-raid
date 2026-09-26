@@ -343,14 +343,16 @@ check(
 const buildShim = fs.readFileSync(path.join(ROOT, "scripts", "build.mjs"), "utf8");
 const dockerfile = fs.readFileSync(path.join(ROOT, "Dockerfile.web"), "utf8");
 check(
-  "production build thiếu CONVEX_URL hợp lệ phải fail, không fallback im lặng",
-  /if \(!trimmedConvexUrl\) \{[\s\S]*?process\.exit\(1\);/.test(buildShim) &&
+  "build shim: env hợp lệ thắng, không có env thì dùng đáy an toàn TƯỜNG MINH (không âm thầm, không chết máy)",
+  /for \(const name of CONVEX_URL_VARS\)/.test(buildShim) &&
+    /PROTOGON_DEFAULT_CONVEX_URL\s*=\s*"https:\/\/[a-z0-9-]+\.convex\.cloud"/.test(buildShim) &&
+    /trimmedConvexUrl\s*=\s*PROTOGON_DEFAULT_CONVEX_URL/.test(buildShim) &&
     !/VITE_CONVEX_URL\s*=\s*trimmedConvexUrl\s*\|\|/.test(buildShim),
 );
 check(
   "build shim chọn biến URL Convex HỢP LỆ đầu tiên (blob rác không che biến đúng — bug 26/09)",
   /for \(const name of CONVEX_URL_VARS\)/.test(buildShim) &&
-    /CONVEX_URL_VARS\s*=\s*\["CONVEX_URL", "VITE_CONVEX_URL"\]/.test(buildShim),
+    /CONVEX_URL_VARS\s*=\s*\["CONVEX_URL", "VITE_CONVEX_URL"/.test(buildShim),
 );
 check(
   "Docker noindex chỉ áp route private và có branded 404",
