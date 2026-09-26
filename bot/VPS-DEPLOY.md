@@ -4,6 +4,10 @@
 
 # Hoặc: 1-2 VPS (1 vCPU, 2GB RAM) — 75.000đ/tháng
 
+> 🔁 **Đang chuyển sang VPS node khác (không phải cài lần đầu)?** Xem runbook
+> chuyên biệt: [`docs/migrate-node.md`](../docs/migrate-node.md) — giữ session
+> Discord, checklist cutover + rollback.
+
 ## Yêu cầu
 
 - VPS chạy Ubuntu 22.04/24.04 hoặc Debian 12

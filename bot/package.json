@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",
-    "convex": "^1.17.4",
-    "discord.js": "^14.16.3"
+    "convex": "^1.46.0",
+    "discord.js": "^14.27.0"
   }
 }
