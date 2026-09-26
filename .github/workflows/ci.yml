@@ -32,7 +32,7 @@ jobs:
         # gitleaks trực tiếp (không gọi GitHub API): vẫn quét full lịch sử,
         # thiếu hẳn phần affiliate/check-for-leaks của action.
         if: github.actor != 'dependabot[bot]'
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Gitleaks (CLI) — quét secret cho PR Dependabot
