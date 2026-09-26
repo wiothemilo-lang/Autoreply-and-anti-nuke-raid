@@ -334,11 +334,14 @@ check(
     /!configured\) throw new Error/.test(convexUrl),
 );
 check(
-  "Convex validator nhận regional .convex.cloud và từ chối .convex.site",
-  convexUrl.includes("convex") &&
-    convexUrl.includes(".cloud") &&
-    convexUrl.includes("[a-z0-9-]+") &&
-    !convexUrl.includes("convex.site"),
+  "Convex validator nhận regional .convex.cloud cho API client",
+  convexUrl.includes("convex") && convexUrl.includes(".cloud") && convexUrl.includes("[a-z0-9-]+"),
+);
+// Convex phục vụ HTTP actions (httpRouter) ở .convex.site — helper đổi suffix
+// đúng chỗ, không đụng URL API .convex.cloud của ConvexReactClient.
+check(
+  "convexSiteUrl đổi suffix .convex.cloud → .convex.site cho HTTP actions",
+  /replace\(\/\\.convex\\.cloud\$\/i, ".convex.site"\)/.test(convexUrl),
 );
 const buildShim = fs.readFileSync(path.join(ROOT, "scripts", "build.mjs"), "utf8");
 const dockerfile = fs.readFileSync(path.join(ROOT, "Dockerfile.web"), "utf8");
@@ -394,8 +397,15 @@ check(
   "i18n.tsx có detectLangByIp gọi /geo_lang qua Convex (không fetch API ngoài trực tiếp)",
   /export async function detectLangByIp/.test(i18nSrc) &&
     /\/geo_lang/.test(i18nSrc) &&
-    /resolveConvexUrl\(\)/.test(i18nSrc) &&
+    /convexSiteUrl\(\)/.test(i18nSrc) &&
     !/fetch\("https:\/\/api\.country/.test(i18nSrc),
+);
+// Bug thật 26/09: HTTP actions của Convex phục vụ ở .convex.site — fetch nhầm
+// .convex.cloud → 404 âm thầm (catch → null) → geo-detect chết dù test xanh.
+check(
+  "detectLangByIp gọi qua helper convexSiteUrl (không fetch .cloud trực tiếp)",
+  /convexSiteUrl\(\)/.test(i18nSrc) &&
+    !/resolveConvexUrl\(\)\s*;[\s\S]{0,120}\/geo_lang/.test(i18nSrc),
 );
 check(
   "IP-detect chỉ áp dụng khi CHƯA có lựa chọn lưu, không ghi localStorage",

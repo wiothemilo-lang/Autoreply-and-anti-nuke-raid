@@ -13,7 +13,7 @@ import { EN_LABELS } from "./i18n.en.labels";
 import { DE } from "./i18n.de";
 import { DE_PANELS } from "./i18n.de.panels";
 import { DE_LABELS } from "./i18n.de.labels";
-import { resolveConvexUrl } from "./convexUrl";
+import { convexSiteUrl } from "./convexUrl";
 
 /**
  * Đa ngôn ngữ kiểu gettext: chuỗi tiếng Việt trong code là KEY —
@@ -62,7 +62,8 @@ function readInitialLang(): Lang {
  */
 export async function detectLangByIp(): Promise<Lang | null> {
   try {
-    const url = resolveConvexUrl();
+    // HTTP actions phục vụ ở .convex.site (KHÔNG phải .convex.cloud — bug 26/09).
+    const url = convexSiteUrl();
     const res = await fetch(`${url}/geo_lang`, {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(4000),

@@ -47,3 +47,16 @@ export function resolveConvexUrl(
 export function convexPingUrl(raw?: string | null): string {
   return `${resolveConvexUrl(raw)}/api/query`;
 }
+
+/**
+ * URL gốc của HTTP actions (httpRouter). LƯU Ý BẮT LỖI: Convex phục vụ HTTP
+ * actions (routes trong convex/http.ts) ở domain `.convex.site`, KHÔNG phải
+ * `.convex.cloud` — domain đó chỉ phục vụ query/mutation/action API (paths
+ * `/api/*`). Bug thật 26/09: web fetch `${cloud}/geo_lang` → 404 âm thầm
+ * (catch → null) → geo-detect chết hoàn toàn dù endpoint sống và test xanh.
+ * localhost (convex dev) phục vụ CẢ API và HTTP actions trên cùng cổng nên
+ * giữ nguyên, chỉ đổi suffix `.convex.cloud` → `.convex.site` ở production.
+ */
+export function convexSiteUrl(raw: string | null | undefined = resolveConvexUrl()): string {
+  return resolveConvexUrl(raw).replace(/\.convex\.cloud$/i, ".convex.site");
+}

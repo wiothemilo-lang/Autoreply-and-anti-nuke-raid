@@ -45,7 +45,7 @@ FROM nginx:1.27-alpine
 # thư viện UI (sonner/radix) chèn <style> runtime. connect-src mở cho Convex
 # (https + wss) và discord.com (form-action OAuth).
 RUN printf '%s\n' \
-  "add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://discord.com; object-src 'none'; base-uri 'self'; form-action 'self' https://discord.com; frame-ancestors 'none'; worker-src 'self' blob:; manifest-src 'self'\" always;" \
+  "add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.convex.cloud https://*.convex.site wss://*.convex.cloud wss://*.convex.site https://discord.com; object-src 'none'; base-uri 'self'; form-action 'self' https://discord.com; frame-ancestors 'none'; worker-src 'self' blob:; manifest-src 'self'\" always;" \
   "add_header X-Content-Type-Options \"nosniff\" always;" \
   "add_header X-Frame-Options \"DENY\" always;" \
   "add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;" \
