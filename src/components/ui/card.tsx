@@ -7,7 +7,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
       ref={ref}
       className={cn(
         /* Vercel: card = viền phẳng, không bóng — tách lớp bằng contrast viền. */
-        "rounded-lg border border-border bg-card text-card-foreground",
+        "rounded-lg border border-border bg-card text-card-foreground transition-colors duration-150",
         className,
       )}
       {...props}

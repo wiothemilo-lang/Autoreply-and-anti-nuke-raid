@@ -1,7 +1,18 @@
 import { useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
-import { AtSign, KeyRound, Pencil, Plus, Timer, Trash2 } from "lucide-react";
+import {
+  AtSign,
+  Bot,
+  KeyRound,
+  Loader2,
+  MessageSquareQuote,
+  Pencil,
+  Plus,
+  Sparkles,
+  Timer,
+  Trash2,
+} from "lucide-react";
 import { simulateAutoReply, type SimRule } from "../../lib/autoreplySim";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
@@ -166,16 +177,40 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
     }
   }
 
+  const totalRules = data.autoReplies.length;
+  const activeRules = useMemo(
+    () => data.autoReplies.filter((r) => r.enabled).length,
+    [data.autoReplies],
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display text-lg font-semibold">Auto Reply</h2>
-          <p className="text-sm text-muted-foreground">
-            {translate("Bot tự trả lời khi tin nhắn chứa từ khóa hoặc tag @bot")}{" "}
-          </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <MessageSquareQuote className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-display text-lg font-semibold tracking-tight">Auto Reply</h2>
+              <Badge variant="outline" className="font-mono text-xs">
+                {totalRules} rules
+              </Badge>
+              {totalRules > 0 && (
+                <Badge variant={activeRules > 0 ? "secondary" : "outline"} className="text-xs">
+                  {activeRules}/{totalRules} {translate(activeRules > 0 ? "Đang bật" : "Đã tắt")}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {translate("Bot tự trả lời khi tin nhắn chứa từ khóa hoặc tag @bot")}{" "}
+            </p>
+          </div>
         </div>
-        <Button onClick={openCreate}>
+        <Button
+          onClick={openCreate}
+          className="gap-2 shadow-sm transition-all duration-200 hover:shadow"
+        >
           <Plus className="h-4 w-4" /> {translate("Thêm rule")}{" "}
         </Button>
       </div>
@@ -183,36 +218,46 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
       {/* ── "Thử rule": gõ tin nhắn mẫu → thấy ngay bot sẽ trả lời gì ──
           Logic mô phỏng nằm ở lib/autoreplySim.ts (khớp messageCreate.js);
           cooldown là trạng thái in-memory của bot nên không mô phỏng được. */}
-      <Card>
+      <Card className="overflow-hidden border border-border/70 bg-card/60 backdrop-blur-sm shadow-sm transition-all duration-200 hover:border-border">
+        <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-4 py-2.5 sm:px-5">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {translate("Thử rule — gõ tin nhắn mẫu")}
+          </span>
+        </div>
         <CardContent className="p-4 sm:p-5">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[12rem] flex-1">
-              <Label htmlFor="test-message">{translate("Thử rule — gõ tin nhắn mẫu")}</Label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
+            <div className="sm:col-span-6 lg:col-span-7">
+              <Label htmlFor="test-message" className="text-xs font-medium text-muted-foreground">
+                {translate("Thử rule — gõ tin nhắn mẫu")}
+              </Label>
               <Input
                 id="test-message"
                 placeholder={translate("ví dụ: mọi người ơi hello!")}
                 value={testMessage}
                 onChange={(e) => setTestMessage(e.target.value)}
-                className="mt-1.5"
+                className="mt-1.5 transition-colors duration-150"
               />
             </div>
-            <div className="flex items-center gap-2 pb-2">
+            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/50 px-3 py-2 transition-all duration-150 hover:bg-accent/40 sm:col-span-3 sm:justify-start sm:gap-2.5">
               <Switch
                 id="test-mention"
                 checked={testMentioned}
                 onCheckedChange={setTestMentioned}
               />
-              <Label htmlFor="test-mention" className="cursor-pointer text-sm font-normal">
+              <Label htmlFor="test-mention" className="cursor-pointer text-xs font-normal">
                 {translate("Tin nhắn có tag bot")}
               </Label>
             </div>
-            <div className="min-w-[10rem] pb-0">
-              <Label className="mb-1.5 block">{translate("Kênh")}</Label>
+            <div className="sm:col-span-3 lg:col-span-2">
+              <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                {translate("Kênh")}
+              </Label>
               <Select
                 value={testChannelId || "all"}
                 onValueChange={(v) => setTestChannelId(v === "all" ? "" : v)}
               >
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -227,19 +272,27 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
             </div>
           </div>
 
-          <div className="mt-3 rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-sm">
+          <div className="mt-4 rounded-xl border border-border/80 bg-secondary/30 p-3.5 sm:p-4 transition-all duration-200">
             {!testMessage.trim() && !testMentioned ? (
-              <p className="text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {translate("Bot sẽ không trả lời (không có nội dung).")}
               </p>
             ) : winner ? (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">
-                  {translate('Bot trả lời bằng rule "{p0}":', { p0: winner.rule.name })}
-                </p>
-                <p className="mt-1 text-foreground/95">{winner.response}</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-primary">
+                    <Bot className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">Protogon</span>
+                  <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
+                    {translate('Bot trả lời bằng rule "{p0}":', { p0: winner.rule.name })}
+                  </Badge>
+                </div>
+                <div className="ml-8 rounded-lg border border-border/60 bg-background/80 p-3 text-sm text-foreground shadow-sm">
+                  <p className="whitespace-pre-wrap">{winner.response}</p>
+                </div>
                 {simMatches.length > 1 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="ml-8 text-xs text-muted-foreground">
                     {translate("{p0} rule khác cũng khớp — bot chỉ trả lời rule đầu tiên.", {
                       p0: simMatches.length - 1,
                     })}
@@ -247,12 +300,12 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
                 )}
               </div>
             ) : (
-              <p className="text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {translate("Không rule nào khớp — bot im lặng.")}
               </p>
             )}
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2.5 text-xs text-muted-foreground">
             {translate(
               "Giãn cách (cooldown) áp dụng trên Discord thật nên không tính trong bản thử này.",
             )}
@@ -261,9 +314,9 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
       </Card>
 
       {data.autoReplies.length === 0 ? (
-        <Card className="border-dashed">
+        <Card className="border-dashed border-border/80 bg-card/40 backdrop-blur-sm">
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-8 ring-primary/5 transition-transform duration-200 hover:scale-105">
               <AtSign className="h-6 w-6" />
             </span>
             <p className="max-w-sm text-sm text-muted-foreground">
@@ -271,73 +324,112 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
                 "Chưa có rule nào. Tạo rule đầu tiên để bot tự trả lời khi ai đó gõ từ khóa hoặc tag bot.",
               )}{" "}
             </p>
+            <Button
+              onClick={openCreate}
+              className="mt-2 gap-2 shadow-sm transition-all duration-200 hover:shadow"
+            >
+              <Plus className="h-4 w-4" /> {translate("Thêm rule")}{" "}
+            </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {data.autoReplies.map((rule) => (
             <Card
               key={rule._id}
-              className={`transition-opacity ${rule.enabled ? "" : "opacity-60"}`}
+              className={`group flex flex-col justify-between overflow-hidden border border-border/70 bg-card/70 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${
+                rule.enabled ? "" : "opacity-65"
+              }`}
             >
-              <CardContent className="p-4 sm:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-display font-semibold">{rule.name}</p>
-                      <Badge variant={rule.triggerType === "mention" ? "default" : "secondary"}>
-                        {rule.triggerType === "mention" ? (
-                          <>
-                            <AtSign className="h-3 w-3" /> @mention
-                          </>
-                        ) : (
-                          <>
-                            <KeyRound className="h-3 w-3" /> {translate("từ khóa")}{" "}
-                          </>
-                        )}
-                      </Badge>
-                      <Badge variant={rule.enabled ? "success" : "secondary"}>
-                        {translate(rule.enabled ? "Đang bật" : "Đã tắt")}
-                      </Badge>
-                      <Badge variant="outline" className="gap-1">
-                        <Timer className="h-3 w-3" /> {rule.cooldownSeconds}s
-                      </Badge>
-                    </div>
-                    {rule.triggerType === "keyword" && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {rule.keywords.map((k) => (
-                          <span
-                            key={k}
-                            className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-primary"
-                          >
-                            {k}
-                          </span>
-                        ))}
+              <CardContent className="flex flex-1 flex-col justify-between p-4 sm:p-5">
+                <div className="space-y-3">
+                  {/* Card Header: Title + Trigger Badge + Controls */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="truncate font-display font-semibold text-foreground">
+                          {rule.name}
+                        </p>
+                        <Badge
+                          variant={rule.triggerType === "mention" ? "default" : "secondary"}
+                          className="gap-1 text-[11px] font-normal"
+                        >
+                          {rule.triggerType === "mention" ? (
+                            <>
+                              <AtSign className="h-3 w-3" /> @mention
+                            </>
+                          ) : (
+                            <>
+                              <KeyRound className="h-3 w-3" /> {translate("từ khóa")}{" "}
+                            </>
+                          )}
+                        </Badge>
+                        <Badge
+                          variant={rule.enabled ? "success" : "secondary"}
+                          className="px-1.5 py-0 text-[10px]"
+                        >
+                          {translate(rule.enabled ? "Đang bật" : "Đã tắt")}
+                        </Badge>
                       </div>
-                    )}
-                    <p className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm text-foreground/90">
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Switch
+                        checked={rule.enabled}
+                        onCheckedChange={(v) => toggleRule(rule, v)}
+                        className="transition-transform duration-150"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => openEdit(rule)}
+                        className="h-8 w-8 text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-8 w-8 text-muted-foreground transition-colors duration-150 hover:bg-destructive/10 hover:text-danger"
+                        onClick={() => handleDelete(rule)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Keywords list */}
+                  {rule.triggerType === "keyword" && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {rule.keywords.map((k) => (
+                        <span
+                          key={k}
+                          className="rounded-md border border-border/50 bg-secondary/60 px-2 py-0.5 font-mono text-xs text-primary transition-colors duration-150 hover:bg-secondary"
+                        >
+                          {k}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Response bubble */}
+                  <div className="rounded-lg border border-border/70 bg-secondary/30 p-3 text-sm text-foreground/90 transition-colors duration-150 group-hover:border-border">
+                    <p className="line-clamp-4 whitespace-pre-wrap text-xs sm:text-sm">
                       {rule.response}
                     </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {rule.channels.length === 0
-                        ? translate("Áp dụng mọi kênh")
-                        : translate("{p0} kênh được chọn", { p0: rule.channels.length })}
-                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch checked={rule.enabled} onCheckedChange={(v) => toggleRule(rule, v)} />
-                    <Button variant="ghost" size="icon-sm" onClick={() => openEdit(rule)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-danger hover:text-danger"
-                      onClick={() => handleDelete(rule)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                </div>
+
+                {/* Card Footer: Metadata */}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1 font-mono text-[11px]">
+                    <Timer className="h-3 w-3" /> {rule.cooldownSeconds}s
+                  </span>
+                  <span className="truncate text-[11px]">
+                    {rule.channels.length === 0
+                      ? translate("Áp dụng mọi kênh")
+                      : translate("{p0} kênh được chọn", { p0: rule.channels.length })}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -450,11 +542,20 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="ghost"
+              onClick={() => setDialogOpen(false)}
+              className="transition-colors duration-150"
+            >
               {translate("Hủy")}{" "}
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="gap-2 transition-all duration-150"
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {translate(saving ? "Đang lưu…" : editing ? "Lưu thay đổi" : "Tạo rule")}
             </Button>
           </DialogFooter>

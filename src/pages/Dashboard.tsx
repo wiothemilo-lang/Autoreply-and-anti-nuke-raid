@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
-import { Bot, Loader2, LogOut, Plus, RefreshCw, Server, ShieldAlert, Users } from "lucide-react";
+import { Bot, LogOut, Plus, RefreshCw, Server, ShieldAlert, Users } from "lucide-react";
+import PageSplash from "../components/PageSplash";
 import { LogoMark } from "../components/BotLogo";
 import { api } from "../../convex/_generated/api";
 import HaimiyaChat from "../components/HaimiyaChat";
@@ -83,7 +84,7 @@ export default function Dashboard() {
   if (me === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <PageSplash minHeight="min-h-screen" />
       </div>
     );
   }

@@ -10,7 +10,6 @@ import {
   ExternalLink,
   Gavel,
   LayoutDashboard,
-  Loader2,
   Lock,
   Megaphone,
   PartyPopper,
@@ -23,6 +22,7 @@ import {
 } from "lucide-react";
 import { DEFAULT_THEME, SERVER_THEMES } from "../lib/constants";
 import PanelErrorBoundary from "../components/PanelErrorBoundary";
+import PageSplash, { PanelSkeleton } from "../components/PageSplash";
 import BotLogo from "../components/BotLogo";
 import HaimiyaChat from "../components/HaimiyaChat";
 import UnlockPanel, { hiddenUnlockKey } from "../components/dashboard/UnlockPanel";
@@ -93,11 +93,7 @@ const NAV_ITEMS: { key: SectionKey; label: string; icon: typeof LayoutDashboard 
 
 /** Loader nhỏ giữ bố cục khi chunk panel đang tải (lần đầu mở tab). */
 function PanelFallback() {
-  return (
-    <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-      <Loader2 className="h-4 w-4 animate-spin" /> {translate("Đang tải…")}{" "}
-    </div>
-  );
+  return <PanelSkeleton />;
 }
 
 export default function GuildPage() {
@@ -113,7 +109,7 @@ export default function GuildPage() {
   if (data === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <PageSplash minHeight="min-h-screen" />
       </div>
     );
   }
