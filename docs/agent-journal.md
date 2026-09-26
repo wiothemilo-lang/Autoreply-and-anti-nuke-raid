@@ -81,6 +81,26 @@
 
 ---
 
+## 2026-09-25 — Deploy production: pull `b1f70ba` → `3b3697b` + merge journal
+
+- Xong: pull vấp conflict `docs/agent-journal.md` (2 bên cùng chèn mục sau
+  dòng 34) → commit mục journal cũ của phiên trước (`0d78846`) rồi merge, gộp
+  theo quy tắc "mới nhất trên cùng" (2 mục 25/09 lên trước, mục 24/09 xuống
+  sau) → `3616376`.
+- Dependency: `bun.lock` + `bot/bun.lock` đều đổi → `bun install
+--frozen-lockfile` ở cả root lẫn `bot/` (34 + 3 package).
+- Kiểm chứng: `61/61` suites CJS · tsc · lint · format:check **đều XANH**.
+- Convex: pull mang 20 file `convex/` → `npx convex deploy` OK (production
+  `accomplished-chipmunk-74`, không có index bị xoá).
+- Bot: `pm2 restart protogon-bot` → `online`, `↺ 1`, uptime 2m+; log
+  `✅ Protogon đã online: Protogon#8933 — 9 server` + `16 slash commands`,
+  `[convex] prewarm config: 9/9 guild`, không Error mới (error.log cũ nhất
+  vẫn là 24/09).
+- Tiếp theo: push các commit lokal lên `main` (CI sẽ deploy Convex lại —
+  idempotent).
+
+---
+
 ## 2026-09-25 — Sự cố #2: đĩa RO tái diễn → staff xác nhận host storage đầy
 
 - 🚨 **Diễn biến (~14:30)**: sau deploy compose (thêm `hostname: t3-devbox`,
@@ -128,6 +148,15 @@
 - 🧠 Ghi chú kỹ thuật: `ps aux` trên host thấy `t3 serve --host 0.0.0.0
 --port 3773` (node wrapper + native binary) là **process của devbox
   container** — bình thường, đừng nhầm với T3 host cũ.
+
+---
+
+## 2026-09-24 — Deploy production bot lên commit b1f70ba
+
+- Xong: pull fast-forward `cac6e0c` → `b1f70ba`; `bun.lock` không đổi; Convex production đã deploy; `protogon-bot` restart và ổn định.
+- File đụng: không có file mã nguồn cục bộ; chỉ cập nhật `docs/agent-journal.md`.
+- Kiểm chứng: `61/61` CJS · `11/11` TS · tsc/lint/format OK · Convex deploy OK · PM2 `online`, `↺ 15`, uptime 70s.
+- Tiếp theo: không có, chờ yêu cầu mới.
 
 ---
 
