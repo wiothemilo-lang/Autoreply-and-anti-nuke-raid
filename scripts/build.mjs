@@ -36,7 +36,14 @@ if (rawConvexUrl) {
       throw new Error("CONVEX_URL không được có path, query, hash hoặc credentials");
     }
   } catch (error) {
-    console.error(`[build] CONVEX_URL không hợp lệ: ${error.message}`);
+    // Không in nội dung giá trị (có thể ai đó dán nhầm secret vào env) — chỉ in
+    // DẠNG giá trị để chẩn đoán: độ dài, khoảng trắng trong, có scheme không.
+    const trimmed = rawConvexUrl.trim();
+    const shape =
+      `length=${rawConvexUrl.length}, khoảng trắng trong=${/\s/.test(trimmed)}, ` +
+      `scheme=${trimmed.startsWith("https://") ? "https" : trimmed.startsWith("http://") ? "http" : "không có"}, ` +
+      `nguồn=${process.env.CONVEX_URL ? "CONVEX_URL" : process.env.VITE_CONVEX_URL ? "VITE_CONVEX_URL" : "không rõ"}`;
+    console.error(`[build] CONVEX_URL không hợp lệ: ${error.message} (dạng: ${shape})`);
     process.exit(1);
   }
 }
