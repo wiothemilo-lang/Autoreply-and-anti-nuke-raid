@@ -565,6 +565,7 @@ export const EN: Record<string, string> = {
   Thêm: "Add",
   "Thêm cặp emoji/role": "Add emoji/role pairs",
   "Thêm rule": "Add rule",
+  rule: "rule",
   "Thêm server": "Add server",
   "Thống kê nhiệt độ 🔥": "Heat statistics 🔥",
   "Thời gian": "Time",

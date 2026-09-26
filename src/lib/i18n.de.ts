@@ -562,6 +562,7 @@ export const DE: Record<string, string> = {
   "Thêm server": "Server hinzufügen",
   "Thống kê nhiệt độ 🔥": "Heat-Statistiken 🔥",
   "Thời gian": "Zeit",
+  rule: "Regel",
   "Thời gian khóa (phút)": "Sperrdauer (Minuten)",
   "Thời lượng": "Dauer",
   "Thử lại": "Erneut versuchen",

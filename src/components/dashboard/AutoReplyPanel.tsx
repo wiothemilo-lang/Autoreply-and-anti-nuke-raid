@@ -194,7 +194,7 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-display text-lg font-semibold tracking-tight">Auto Reply</h2>
               <Badge variant="outline" className="font-mono text-xs">
-                {totalRules} rules
+                {totalRules} {translate("rule")}
               </Badge>
               {totalRules > 0 && (
                 <Badge variant={activeRules > 0 ? "secondary" : "outline"} className="text-xs">
