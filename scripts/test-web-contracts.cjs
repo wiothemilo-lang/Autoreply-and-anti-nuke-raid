@@ -441,31 +441,6 @@ check(
     /path: "\/geo_lang", method: "OPTIONS"/.test(httpSrc),
 );
 
-// ─── N. Endpoint chẩn đoán OAuth (tạm, cho bug đăng nhập 24/09) ──────
-// Endpoint chẩn đoán được phép đọc env OAuth NHƯNG TUYỆT ĐỐI không được trả
-// giá trị gốc ra ngoài (chỉ boolean + URI đã chuẩn hoá) — nếu ai đó vô tình
-// trả thẳng process.env.* thì phải bị test chặn ngay.
-check(
-  "/oauth_env_check chỉ trả boolean env + URI chuẩn hoá, không lộ giá trị env gốc",
-  /hasOauthRedirectUri: !!process\.env\.OAUTH_REDIRECT_URI/.test(httpSrc) &&
-    /hasDashboardUrl: !!process\.env\.DASHBOARD_URL/.test(httpSrc) &&
-    /allowedUris: allowed,/.test(httpSrc) &&
-    !/OAUTH_REDIRECT_URI:\s*process/.test(httpSrc) &&
-    !/DASHBOARD_URL:\s*process/.test(httpSrc),
-);
-check(
-  "/oauth_env_check dựng ALLOWED y hệt sessionAuth (OAUTH_REDIRECT_URI + DASHBOARD_URL/discord/callback)",
-  httpSrc.includes("process.env.OAUTH_REDIRECT_URI,") &&
-    httpSrc.includes('`${process.env.DASHBOARD_URL.replace(/\\/+$/, "")}/discord/callback`'),
-);
-check(
-  "/oauth_env_check hỗ trợ ?uri= ứng viên + đăng ký đủ GET + OPTIONS",
-  /searchParams\.get\("uri"\)/.test(httpSrc) &&
-    /recognized: candidate !== null && allowed\.includes\(candidate\)/.test(httpSrc) &&
-    /path: "\/oauth_env_check", method: "GET"/.test(httpSrc) &&
-    /path: "\/oauth_env_check", method: "OPTIONS"/.test(httpSrc),
-);
-
 // ─── O. Trang /features — SEO quốc tế ────────────────────────────────
 // Bug lớp cần chặn: thêm trang công khai mà quên meta/sitemap/link thì trang
 // "tồn tại" nhưng không ai tìm thấy — chết y nhánh SEO im lặng.
