@@ -377,5 +377,52 @@ check(
   /setInterval[\s\S]{0,180}setNow/.test(files.get("lib/useBotStatus.ts") ?? ""),
 );
 
+// ─── N. IP-detect ngôn ngữ ban đầu (không persist) ─────────────────────────
+// Bug thực tế: người quốc tế mở landing lần đầu vẫn đọc tiếng Việt vì web chỉ
+// theo navigator.language. Dò theo IP qua endpoint Convex /geo_lang (CSP chỉ
+// cho *.convex.cloud) — chỉ khi CHƯA có lựa chọn lưu, và KHÔNG ghi
+// localStorage (người dùng chưa từng chọn thì lần sau vẫn dò lại).
+const i18nSrc = files.get("lib/i18n.tsx") ?? "";
+check(
+  "i18n.tsx có detectLangByIp gọi /geo_lang qua Convex (không fetch API ngoài trực tiếp)",
+  /export async function detectLangByIp/.test(i18nSrc) &&
+    /\/geo_lang/.test(i18nSrc) &&
+    /resolveConvexUrl\(\)/.test(i18nSrc) &&
+    !/fetch\("https:\/\/api\.country/.test(i18nSrc),
+);
+check(
+  "IP-detect chỉ áp dụng khi CHƯA có lựa chọn lưu, không ghi localStorage",
+  /if \(saved\) return;/.test(i18nSrc) &&
+    /setLangState\(detected\)/.test(i18nSrc) &&
+    !/localStorage\.setItem\(LANG_KEY, detected\)/.test(i18nSrc),
+);
+check(
+  "IP-detect chỉ ảnh hưởng ngôn ngữ hỗ trợ (VN→vi, DE/AT/CH/LI→de), còn lại giữ nguyên",
+  /country === "VN"/.test(i18nSrc) &&
+    /"AT"/.test(i18nSrc) &&
+    /"CH"/.test(i18nSrc) &&
+    /return null;/.test(i18nSrc),
+);
+const httpSrc = fs.readFileSync(path.join(ROOT, "convex", "http.ts"), "utf8");
+check(
+  "convex/http.ts route /geo_lang: đọc x-forwarded-for, fail-open về country rỗng",
+  /x-forwarded-for/.test(httpSrc) &&
+    /api\.country\.is/.test(httpSrc) &&
+    /httpRouter\(\)/.test(httpSrc) &&
+    /country: ""/.test(httpSrc),
+);
+check(
+  "/geo_lang không lưu DB hay IP (chỉ pass-through), có CORS + cache",
+  !/ctx\.db/.test(httpSrc) &&
+    /access-control-allow-origin/.test(httpSrc) &&
+    /cache-control/.test(httpSrc),
+);
+// Route phải được đăng ký đúng method — codegenConvex không chặn việc quên route.
+check(
+  "/geo_lang đăng ký đủ GET + OPTIONS",
+  /path: "\/geo_lang", method: "GET"/.test(httpSrc) &&
+    /path: "\/geo_lang", method: "OPTIONS"/.test(httpSrc),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

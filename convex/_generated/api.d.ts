@@ -24,6 +24,7 @@ import type * as bot_writes from "../bot_writes.js";
 import type * as guilds from "../guilds.js";
 import type * as haimiya from "../haimiya.js";
 import type * as hidden from "../hidden.js";
+import type * as http from "../http.js";
 import type * as modules from "../modules.js";
 import type * as presets from "../presets.js";
 import type * as public_ from "../public.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   guilds: typeof guilds;
   haimiya: typeof haimiya;
   hidden: typeof hidden;
+  http: typeof http;
   modules: typeof modules;
   presets: typeof presets;
   public: typeof public_;

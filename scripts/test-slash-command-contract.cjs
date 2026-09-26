@@ -60,5 +60,53 @@ check(
   unhandled.map((n) => `/${n}`).join(", "),
 );
 
+// 5) Localizations (en-US/de) phải phủ MỌI lệnh + subcommand + choice —
+//    mô tả mặc định là tiếng Việt nên thiếu bản dịch là người quốc tế (và
+//    Discord App Discovery) đọc tiếng Việt nguyên bản (bug đa ngôn ngữ 25/09).
+const LOCALE_LIMIT = 100;
+const locOk = (loc) =>
+  loc &&
+  typeof loc["en-US"] === "string" &&
+  typeof loc.de === "string" &&
+  loc["en-US"].length <= LOCALE_LIMIT &&
+  loc.de.length <= LOCALE_LIMIT;
+const missingLoc = [];
+const overLimit = [];
+for (const cmd of commands) {
+  if (!locOk(cmd.description_localizations)) missingLoc.push(`/${cmd.name}`);
+  const walk = (node, path) => {
+    if (node.description && node.description.length > LOCALE_LIMIT)
+      overLimit.push(`${path} (mặc định ${node.description.length} ký tự)`);
+    for (const opt of node.options ?? []) {
+      if (opt.type !== 1 && opt.type !== undefined && !opt.choices) {
+        // option thường: chỉ kiểm giới hạn ký tự mô tả mặc định ở trên.
+      }
+      if (!locOk(opt.description_localizations)) missingLoc.push(`${path}/${opt.name}`);
+      for (const ch of opt.choices ?? []) {
+        if (!locOk(ch.name_localizations))
+          missingLoc.push(`${path}/${opt.name}#choice:${ch.value}`);
+      }
+      walk(opt, `${path}/${opt.name}`);
+    }
+  };
+  walk(cmd, `/${cmd.name}`);
+}
+check(
+  "mọi lệnh + option + choice đều có description/name_localizations (en-US, de)",
+  missingLoc.length === 0,
+  missingLoc.slice(0, 8).join(", "),
+);
+check(
+  "mô tả (mặc định + localized) không vượt 100 ký tự của Discord API",
+  overLimit.length === 0,
+  overLimit.slice(0, 5).join("; "),
+);
+check(
+  "slash.js áp applyLocalizations từ commands/localizations.js",
+  fs
+    .readFileSync(path.join(root, "bot", "src", "commands", "slash.js"), "utf8")
+    .includes('require("./localizations")'),
+);
+
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);

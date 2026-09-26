@@ -84,6 +84,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `backup_github.ts`                                                | Backup lên GitHub (kèm `backup.ts`)                                                   |
 | `rateGuard.ts`                                                    | Giới hạn tần suất gọi API từ bot                                                      |
 | `public.ts`, `hidden.ts`                                          | API công khai landing + endpoint ẩn                                                   |
+| `http.ts`                                                         | httpRouter `/geo_lang`: dò quốc gia theo IP cho web tự chọn ngôn ngữ                  |
 | `selfDiagnose.ts`                                                 | Tự chẩn đoán bot báo về dashboard                                                     |
 | `sha256.ts`                                                       | Hash dùng chung (botKey, session)                                                     |
 | `audit.ts`, `reports.ts`, `status.ts`                             | Log/sự kiện/trạng thái; getAiHealth chỉ owner đọc                                     |

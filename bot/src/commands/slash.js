@@ -1,5 +1,9 @@
 /** Slash command definitions (JSON shape for the Discord REST API). */
-const commands = [
+// Mô tả mặc định là tiếng Việt (sản phẩm gốc). applyLocalizations thêm
+// description_localizations (en-US/de) — Discord tự hiển thị theo ngôn ngữ
+// client người dùng (interaction.locale), ví dụ trong App Discovery.
+const { applyLocalizations } = require("./localizations");
+const commands = applyLocalizations([
   {
     name: "help",
     description: "Xem danh sách lệnh của bot",
@@ -621,6 +625,6 @@ const commands = [
       },
     ],
   },
-];
+]);
 
-module.exports = { commands };
+module.exports = { commands, applyLocalizations };

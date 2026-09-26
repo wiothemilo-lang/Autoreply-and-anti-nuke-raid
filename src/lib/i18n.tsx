@@ -13,6 +13,7 @@ import { EN_LABELS } from "./i18n.en.labels";
 import { DE } from "./i18n.de";
 import { DE_PANELS } from "./i18n.de.panels";
 import { DE_LABELS } from "./i18n.de.labels";
+import { resolveConvexUrl } from "./convexUrl";
 
 /**
  * Đa ngôn ngữ kiểu gettext: chuỗi tiếng Việt trong code là KEY —
@@ -47,6 +48,36 @@ function readInitialLang(): Lang {
     return nav.startsWith("vi") ? "vi" : "en";
   } catch {
     return "vi";
+  }
+}
+
+/**
+ * Dò quốc gia theo IP qua endpoint Convex `/geo_lang` (convex/http.ts — CSP
+ * connect-src chỉ cho *.convex.cloud nên phải proxy qua đây). Chạy MỘT LẦN khi
+ * người dùng CHƯA có lựa chọn ngôn ngữ lưu: người VN mở web thấy tiếng Việt,
+ * người DE thấy tiếng Đức kể cả khi trình duyệt đang tiếng Anh — điều mà
+ * navigator.language không làm được. KHÔNG persist: chỉ áp dụng cho phiên;
+ * người dùng bấm công tắc ngôn ngữ thì setLang() mới ghi localStorage.
+ * Trả null khi không dò được (lỗi mạng, ngôn ngữ không hỗ trợ) → giữ nguyên.
+ */
+export async function detectLangByIp(): Promise<Lang | null> {
+  try {
+    const url = resolveConvexUrl();
+    const res = await fetch(`${url}/geo_lang`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const data: unknown = await res.json();
+    const country =
+      typeof data === "object" && data !== null && "country" in data
+        ? String((data as { country: unknown }).country ?? "").toUpperCase()
+        : "";
+    if (country === "VN") return "vi";
+    if (country === "DE" || country === "AT" || country === "CH" || country === "LI") return "de";
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -95,6 +126,31 @@ const LangContext = createContext<LangContextValue>({
 
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(currentLang);
+
+  // IP-detect CHỈ khi chưa có lựa chọn lưu (điều kiện theo currentLang đồng
+  // bộ vì readInitialLang đã đọc localStorage). setLangInMemory = không ghi
+  // localStorage — lần sau vào vẫn dò lại, tới khi người dùng tự chọn.
+  useEffect(() => {
+    let alive = true;
+    const saved = (() => {
+      try {
+        return localStorage.getItem(LANG_KEY);
+      } catch {
+        // localStorage chặn (private mode) — coi như chưa có lựa chọn lưu:
+        // vẫn dò theo IP (không persist được cũng không sao).
+        return null;
+      }
+    })();
+    if (saved) return;
+    detectLangByIp().then((detected) => {
+      if (!alive || !detected) return;
+      currentLang = detected;
+      setLangState(detected);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const setLang = useCallback((l: Lang) => {
     currentLang = l;
