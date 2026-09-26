@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { AtSign, KeyRound, Pencil, Plus, Timer, Trash2 } from "lucide-react";
+import { simulateAutoReply, type SimRule } from "../../lib/autoreplySim";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -54,6 +55,22 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
   const [editing, setEditing] = useState<AutoReply | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  // ── "Thử rule": mô phỏng bot trả lời ngay trên web trước khi lưu ──
+  const [testMessage, setTestMessage] = useState("");
+  const [testMentioned, setTestMentioned] = useState(false);
+  const [testChannelId, setTestChannelId] = useState<string>("");
+  const simMatches = useMemo(
+    () =>
+      simulateAutoReply(data.autoReplies as SimRule[], {
+        content: testMessage,
+        mentioned: testMentioned,
+        channelId: testChannelId || null,
+        username: "Minh",
+      }),
+    [data.autoReplies, testMessage, testMentioned, testChannelId],
+  );
+  const winner = simMatches[0];
 
   const textChannels = data.channels.filter((c) => c.type === 0 || c.type === 5);
   const channelOptions = textChannels.map((c) => ({
@@ -162,6 +179,86 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
           <Plus className="h-4 w-4" /> {translate("Thêm rule")}{" "}
         </Button>
       </div>
+
+      {/* ── "Thử rule": gõ tin nhắn mẫu → thấy ngay bot sẽ trả lời gì ──
+          Logic mô phỏng nằm ở lib/autoreplySim.ts (khớp messageCreate.js);
+          cooldown là trạng thái in-memory của bot nên không mô phỏng được. */}
+      <Card>
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[12rem] flex-1">
+              <Label htmlFor="test-message">{translate("Thử rule — gõ tin nhắn mẫu")}</Label>
+              <Input
+                id="test-message"
+                placeholder={translate("ví dụ: mọi người ơi hello!")}
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div className="flex items-center gap-2 pb-2">
+              <Switch
+                id="test-mention"
+                checked={testMentioned}
+                onCheckedChange={setTestMentioned}
+              />
+              <Label htmlFor="test-mention" className="cursor-pointer text-sm font-normal">
+                {translate("Tin nhắn có tag bot")}
+              </Label>
+            </div>
+            <div className="min-w-[10rem] pb-0">
+              <Label className="mb-1.5 block">{translate("Kênh")}</Label>
+              <Select
+                value={testChannelId || "all"}
+                onValueChange={(v) => setTestChannelId(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{translate("Tất cả kênh")}</SelectItem>
+                  {textChannels.map((c) => (
+                    <SelectItem key={c.channelId} value={c.channelId}>
+                      #{c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-sm">
+            {!testMessage.trim() && !testMentioned ? (
+              <p className="text-muted-foreground">
+                {translate("Bot sẽ không trả lời (không có nội dung).")}
+              </p>
+            ) : winner ? (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {translate('Bot trả lời bằng rule "{p0}":', { p0: winner.rule.name })}
+                </p>
+                <p className="mt-1 text-foreground/95">{winner.response}</p>
+                {simMatches.length > 1 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {translate("{p0} rule khác cũng khớp — bot chỉ trả lời rule đầu tiên.", {
+                      p0: simMatches.length - 1,
+                    })}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">
+                {translate("Không rule nào khớp — bot im lặng.")}
+              </p>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {translate(
+              "Giãn cách (cooldown) áp dụng trên Discord thật nên không tính trong bản thử này.",
+            )}
+          </p>
+        </CardContent>
+      </Card>
 
       {data.autoReplies.length === 0 ? (
         <Card className="border-dashed">

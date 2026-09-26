@@ -944,6 +944,20 @@ export const EN: Record<string, string> = {
   Xóa: "Remove",
   "CONVEX_URL không hợp lệ hoặc không nằm trong allowlist":
     "CONVEX_URL is invalid or is not allowlisted",
+  /* ==== autoreply try-out (W3) ==== */
+  "Th\u1eed rule \u2014 g\u00f5 tin nh\u1eafn m\u1eabu": "Try rules \u2014 type a sample message",
+  "v\u00ed d\u1ee5: m\u1ecdi ng\u01b0\u1eddi \u01a1i hello!": "e.g. hey everyone, hello!",
+  "Tin nh\u1eafn c\u00f3 tag bot": "Message mentions the bot",
+  "K\u00eanh": "Channel",
+  "Bot s\u1ebd kh\u00f4ng tr\u1ea3 l\u1eddi (kh\u00f4ng c\u00f3 n\u1ed9i dung).":
+    "The bot will not reply (no content).",
+  'Bot tr\u1ea3 l\u1eddi b\u1eb1ng rule "{p0}":': 'The bot replies with rule "{p0}":',
+  "{p0} rule kh\u00e1c c\u0169ng kh\u1edbp \u2014 bot ch\u1ec9 tr\u1ea3 l\u1eddi rule \u0111\u1ea7u ti\u00ean.":
+    "{p0} other rule(s) also match \u2014 the bot only replies with the first one.",
+  "Kh\u00f4ng rule n\u00e0o kh\u1edbp \u2014 bot im l\u1eb7ng.":
+    "No rule matches \u2014 the bot stays silent.",
+  "Gi\u00e3n c\u00e1ch (cooldown) \u00e1p d\u1ee5ng tr\u00ean Discord th\u1eadt n\u00ean kh\u00f4ng t\u00ednh trong b\u1ea3n th\u1eed n\u00e0y.":
+    "Cooldowns apply on real Discord and are not simulated in this preview.",
   /* ==== features page (/features) ==== */
   "Bot th\u00f4ng th\u01b0\u1eddng": "Typical bots",
   "T\u00ednh n\u0103ng \u2014 Protogon: bot Discord t\u1ef1 tr\u1ea3 l\u1eddi & ch\u1ed1ng nuke/raid":

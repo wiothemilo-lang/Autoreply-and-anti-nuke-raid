@@ -46,9 +46,18 @@ function unescapeJs(raw) {
  * Key từ điển → chuỗi thật. PHẢI giải escape ở CẢ hai kiểu nháy: bản cũ lấy
  * nguyên văn nhánh nháy đơn nên key chứa escape (`\n`, dấu " bên trong) không
  * bao giờ khớp key trong code — bản dịch đã có mà vẫn báo "THIẾU EN".
+ *
+ * Bug thật 26/09: key nháy đơn chứa dấu " literal (JS hợp lệ) làm JSON.parse
+ * chết giữa chuỗi → catch → trả raw có `\uXXXX` chưa giải → so khớp FAIL dù
+ * bản dịch có mặt. Chuỗi JS nháy đơn cần escape dấu " thành \" trước khi
+ * JSON.parse (JSON không biết chuỗi nháy đơn).
  */
 function dictKey(raw, quote) {
-  return quote === "'" ? unescapeJs(raw.replace(/\\'/g, "'")) : unescapeJs(raw);
+  if (quote === "'") {
+    const normalized = raw.replace(/\\'/g, "'").replace(/"/g, '\\"');
+    return unescapeJs(normalized);
+  }
+  return unescapeJs(raw);
 }
 
 /** Một dòng định nghĩa trong từ điển: `  "key": "value",` (key nháy đơn/kép/không nháy). */
