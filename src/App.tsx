@@ -18,6 +18,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const GuildPage = lazy(() => import("./pages/GuildPage"));
 const GuildHistory = lazy(() => import("./pages/GuildHistory"));
 const Monitor = lazy(() => import("./pages/Monitor"));
+const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
 const Admin = lazy(() => import("./pages/Admin"));
 const StatsPage = lazy(() => import("./pages/StatsPage"));
 // Trang pháp lý: 3 văn bản dùng CHUNG một component (khác tham số slug) — nội
@@ -76,6 +77,8 @@ export default function App() {
             <Route path="/privacy" element={<LegalPage slug="privacy" />} />
             <Route path="/data-deletion" element={<LegalPage slug="data-deletion" />} />
             <Route path="/monitor" element={<Monitor />} />
+            {/* Trang tính năng công khai (SEO quốc tế, nội dung 3 thứ tiếng). */}
+            <Route path="/features" element={<FeaturesPage />} />
             {/* Alias dễ nhớ của trang giám sát — không nhân bản component: cùng
                 1 trang Monitor, 2 đường vào (/status dùng cho status page công
                 khai, /monitor là tên gọi gốc trong dashboard link cũ). */}

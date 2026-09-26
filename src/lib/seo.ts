@@ -16,6 +16,7 @@ export function activeSiteUrl(): string {
 
 type RouteKind =
   | "home"
+  | "features"
   | "terms"
   | "privacy"
   | "data-deletion"
@@ -35,6 +36,11 @@ const COPY: Record<Lang, Copy> = {
       title: "Protogon — Bot Discord tự trả lời & chống nuke/raid",
       description:
         "Protogon giúp bảo vệ server Discord với auto-reply, hệ thống nhiệt độ 4 giai đoạn, Join Gate chống selfbot, chặn link độc hại và 32 module chống nuke/raid.",
+    },
+    features: {
+      title: "Tính năng — Protogon: bot Discord tự trả lời & chống nuke/raid",
+      description:
+        "Toàn bộ tính năng của bot Discord Protogon: tự trả lời theo từ khoá, hệ thống nhiệt độ 4 giai đoạn, Join Gate, 32 module chống nuke/raid và backup server.",
     },
     terms: {
       title: "Điều khoản sử dụng — Protogon",
@@ -80,6 +86,11 @@ const COPY: Record<Lang, Copy> = {
       description:
         "Protogon protects Discord servers with auto-replies, a four-stage heat system, Join Gate anti-selfbot, malicious-link blocking, and 32 anti-nuke/raid modules.",
     },
+    features: {
+      title: "Features — Protogon: Discord auto-reply & anti-nuke bot",
+      description:
+        "Every Protogon Discord bot feature: keyword auto-replies, a four-stage heat system, Join Gate, 32 anti-nuke/raid modules, and full server backup & restore.",
+    },
     terms: {
       title: "Terms of Service — Protogon",
       description: "Terms for using the Protogon Discord bot and web dashboard.",
@@ -122,6 +133,11 @@ const COPY: Record<Lang, Copy> = {
       title: "Protogon — Discord-Bot mit Auto-Antworten & Anti-Nuke/Raid",
       description:
         "Protogon schützt Discord-Server mit Auto-Antworten, einem vierstufigen Heat-System, Join Gate gegen Selfbots, schädlichen Links und 32 Anti-Nuke/Raid-Modulen.",
+    },
+    features: {
+      title: "Funktionen — Protogon: Discord-Bot mit Auto-Antworten & Anti-Nuke",
+      description:
+        "Alle Funktionen des Protogon-Discord-Bots: Auto-Antworten nach Schlüsselwörtern, vierstufiges Heat-System, Join Gate, 32 Anti-Nuke/Raid-Module und Server-Backup.",
     },
     terms: {
       title: "Nutzungsbedingungen — Protogon",
@@ -166,6 +182,7 @@ const COPY: Record<Lang, Copy> = {
 function routeKind(pathname: string): RouteKind {
   const path = pathname !== "/" ? pathname.replace(/\/+$/, "") || "/" : "/";
   if (path === "/") return "home";
+  if (path === "/features") return "features";
   if (path === "/terms") return "terms";
   if (path === "/privacy") return "privacy";
   if (path === "/data-deletion") return "data-deletion";
@@ -206,7 +223,9 @@ function setCanonical(href: string | null): void {
 export function syncRouteMetadata(pathname: string, lang: Lang): void {
   const kind = routeKind(pathname);
   const copy = kind === "not-found" ? COPY[lang].home : COPY[lang][kind];
-  const indexed = ["home", "terms", "privacy", "data-deletion", "monitor"].includes(kind);
+  const indexed = ["home", "features", "terms", "privacy", "data-deletion", "monitor"].includes(
+    kind,
+  );
   const normalized = pathname !== "/" ? pathname.replace(/\/+$/, "") || "/" : "/";
   const siteUrl = activeSiteUrl();
   const ogImage = `${siteUrl}/og-image.png`;

@@ -431,5 +431,37 @@ check(
     /path: "\/geo_lang", method: "OPTIONS"/.test(httpSrc),
 );
 
+// ─── O. Trang /features — SEO quốc tế ────────────────────────────────
+// Bug lớp cần chặn: thêm trang công khai mà quên meta/sitemap/link thì trang
+// "tồn tại" nhưng không ai tìm thấy — chết y nhánh SEO im lặng.
+const featuresPageSrc = fs.readFileSync(
+  path.join(ROOT, "src", "pages", "FeaturesPage.tsx"),
+  "utf8",
+);
+const featuresContentSrc = fs.readFileSync(
+  path.join(ROOT, "src", "lib", "featuresContent.ts"),
+  "utf8",
+);
+check(
+  "/features có route công khai + nội dung 3 thứ tiếng tự chứa (@i18n-content)",
+  /path="\/features"/.test(appSrc) &&
+    /@i18n-content/.test(featuresContentSrc) &&
+    /\bvi:\s*\{/.test(featuresContentSrc) &&
+    /\ben:\s*\{/.test(featuresContentSrc) &&
+    /\bde:\s*\{/.test(featuresContentSrc),
+);
+check(
+  "/features được index: seo.ts có kind features + sitemap + meta robots",
+  /"features"/.test(seo) &&
+    /path === "\/features"/.test(seo) &&
+    fs.readFileSync(path.join(ROOT, "public", "sitemap.xml"), "utf8").includes("/features"),
+);
+check(
+  "/features render nhãn đa ngữ qua translate() (không render trực tiếp từ doc)",
+  /translate\(doc\.hero\.title\)/.test(featuresPageSrc) &&
+    /translate\(block\.description\)/.test(featuresPageSrc) &&
+    /translate\(step\)/.test(featuresPageSrc),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

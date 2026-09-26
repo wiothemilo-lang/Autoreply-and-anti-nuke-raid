@@ -945,4 +945,10 @@ export const DE: Record<string, string> = {
   Xóa: "Entfernen",
   "CONVEX_URL không hợp lệ hoặc không nằm trong allowlist":
     "CONVEX_URL ist ungültig oder nicht auf der Allowlist",
+  /* ==== features page (/features) ==== */
+  "Bot th\u00f4ng th\u01b0\u1eddng": "Typische Bots",
+  "T\u00ednh n\u0103ng \u2014 Protogon: bot Discord t\u1ef1 tr\u1ea3 l\u1eddi & ch\u1ed1ng nuke/raid":
+    "Funktionen \u2014 Protogon: Discord-Bot mit Auto-Antworten & Anti-Nuke",
+  "To\u00e0n b\u1ed9 t\u00ednh n\u0103ng c\u1ee7a bot Discord Protogon: t\u1ef1 tr\u1ea3 l\u1eddi theo t\u1eeb kho\u00e1, h\u1ec7 th\u1ed1ng nhi\u1ec7t \u0111\u1ed9 4 giai \u0111o\u1ea1n, Join Gate, 32 module ch\u1ed1ng nuke/raid v\u00e0 backup server.":
+    "Alle Funktionen des Protogon-Discord-Bots: Auto-Antworten nach Schl\u00fcsselw\u00f6rtern, vierstufiges Heat-System, Join Gate, 32 Anti-Nuke/Raid-Module und Server-Backup.",
 };

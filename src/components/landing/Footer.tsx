@@ -77,6 +77,9 @@ export default function Footer({
           className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground"
         >
           <span className="font-semibold text-foreground">{translate("Văn bản pháp lý")}</span>
+          <Link to="/features" className="transition-colors hover:text-foreground">
+            {translate("Tính năng")}
+          </Link>
           <Link to="/terms" className="transition-colors hover:text-foreground">
             {translate("Điều khoản sử dụng")}
           </Link>

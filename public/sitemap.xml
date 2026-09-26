@@ -5,6 +5,12 @@
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
+  <!-- Trang tính năng: nội dung EN/DE cho người tìm kiếm quốc tế. -->
+  <url>
+    <loc>https://protogon.freebuff.app/features</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
   <url>
     <loc>https://protogon.freebuff.app/auth</loc>
     <changefreq>monthly</changefreq>
