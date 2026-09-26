@@ -132,7 +132,7 @@ jobs:
           fi
       - name: Upload báo cáo HTML (xem local bằng artifact)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
