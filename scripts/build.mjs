@@ -20,7 +20,7 @@ import { spawnSync } from "node:child_process";
 // path/query/hash/credentials, không localhost. Fail-closed khi KHÔNG có biến
 // nào hợp lệ (không fallback âm thầm sang deployment khác).
 const CONVEX_HOST_RE = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.convex\.cloud$/i;
-const CONVEX_URL_VARS = ["CONVEX_URL", "VITE_CONVEX_URL"];
+const CONVEX_URL_VARS = ["CONVEX_URL", "VITE_CONVEX_URL", "PROTOGON_BUILD_CONVEX_URL"];
 const rejectedShapes = [];
 let trimmedConvexUrl = "";
 
