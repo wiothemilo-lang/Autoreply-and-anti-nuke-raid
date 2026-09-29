@@ -363,6 +363,21 @@ module.exports = function createAntiNukeLayer({
       action = res.action;
       caseNumber = res.caseNumber;
       await maybeLockdown(message.guild, config);
+      // AI xác nhận raid → CẢNH BÁO KHẨN cho server (fire-and-forget), giống
+      // nhánh pattern ở handleMessagePatterns. Trước đây chỉ nhánh pattern
+      // gọi: spam là đường raid phổ biến nhất lại im lặng — server bị ban +
+      // khoá kênh mà không ai trong đó được báo. Hàm tự chặn trùng 5 phút và
+      // tôn trọng tắt `emergencyAlertEnabled`, nên gọi thêm ở đây không gây spam.
+      emergencyRaidAlert(client, store, message.guild, {
+        summary:
+          "AI xác nhận raid (spam) — " +
+          fresh.length +
+          " tin trong " +
+          moduleCfg.windowSeconds +
+          "s",
+        reason,
+        lockdownActive: isLocked(message.guild.id),
+      }).catch(() => {});
       // Threat Relay (Đợt 6): đóng góp signature raid spam (fire-and-forget).
       relayClient.reportSignatureBatch(message.guild.id, "spam-text", samples);
     } else if (isBenign) {

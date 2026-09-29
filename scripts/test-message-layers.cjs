@@ -50,6 +50,7 @@ module.exports = {
     caseLogs: [],
     mutations: [],
     threatNotes: [],
+    emergencyAlerts: [],
   };
 
   function baseConfig(overrides = {}) {
@@ -137,6 +138,17 @@ module.exports = {
   const createState = require("../bot/src/handlers/antinuke/state");
   const createAi = require("../bot/src/handlers/antinuke/ai");
   const createEnforce = require("../bot/src/handlers/antinuke/enforce");
+
+  // Bọc emergencyRaidAlert PHẢI TRƯỚC khi nạp messages.js: module đó giữ hàm
+  // bằng destructuring lúc require, bọc sau thì nó đã giữ bản gốc rồi.
+  // `clear()` xoá mảng nên mỗi kịch bản đếm độc lập.
+  const incidentReport = require("../bot/src/handlers/incidentReport");
+  const realEmergencyAlert = incidentReport.emergencyRaidAlert;
+  incidentReport.emergencyRaidAlert = (client_, store_, guild_, info) => {
+    calls.emergencyAlerts.push(info);
+    return realEmergencyAlert(client_, store_, guild_, info);
+  };
+
   const createMessages = require("../bot/src/handlers/antinuke/messages");
 
   const state = createState({ client, store });
@@ -366,6 +378,14 @@ module.exports = {
       "AI raid → ghi mẫu huấn luyện kèm verdict",
       calls.raidSamples.some((s) => s.module === "spam" && s.aiClassification === "raid"),
     );
+    // Spam là đường raid phổ biến nhất nên phải CÓ cảnh báo khẩn cho server
+    // (nếu không: bị ban + khoá kênh mà không ai trong server được báo).
+    check("AI raid → bot gọi cảnh báo khẩn cho server", calls.emergencyAlerts.length === 1);
+    check(
+      "AI raid → cảnh báo khẩn nêu đúng số tin + trạng thái khoá kênh",
+      String(calls.emergencyAlerts[0]?.summary ?? "").includes("5 tin") &&
+        calls.emergencyAlerts[0]?.lockdownActive === true,
+    );
     configs.set("g-msg", baseConfig());
   }
 
@@ -396,6 +416,10 @@ module.exports = {
       ),
     );
     check("AI benign → không ghi mẫu raid", calls.raidSamples.length === 0);
+    check(
+      "AI benign → KHÔNG gọi cảnh báo khẩn (im lặng vì dương tính giả)",
+      calls.emergencyAlerts.length === 0,
+    );
   }
 
   // ── 5. AI raid nhưng tin cậy thấp (< 0.6) → KHÔNG leo thang ban ──
@@ -406,6 +430,11 @@ module.exports = {
     check(
       "AI raid confidence 0.3 → không ban (chỉ heat)",
       calls.memberBans.length === 0 && calls.heatAdds.length === 1,
+    );
+    for (let i = 0; i < 3; i++) await new Promise((r) => setImmediate(r));
+    check(
+      "AI raid conf thấp → KHÔNG gọi cảnh báo khẩn (chưa đủ tự tin)",
+      calls.emergencyAlerts.length === 0,
     );
   }
 
