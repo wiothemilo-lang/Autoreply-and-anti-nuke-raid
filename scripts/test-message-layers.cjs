@@ -136,6 +136,7 @@ module.exports = {
 
   let client = { user: { id: "bot-self" }, guilds: { cache: new Map() }, on: () => {} };
   const createState = require("../bot/src/handlers/antinuke/state");
+  const { MODULE_LABELS } = require("../bot/src/handlers/antinuke/shared");
   const createAi = require("../bot/src/handlers/antinuke/ai");
   const createEnforce = require("../bot/src/handlers/antinuke/enforce");
 
@@ -381,6 +382,13 @@ module.exports = {
     // Spam là đường raid phổ biến nhất nên phải CÓ cảnh báo khẩn cho server
     // (nếu không: bị ban + khoá kênh mà không ai trong server được báo).
     check("AI raid → bot gọi cảnh báo khẩn cho server", calls.emergencyAlerts.length === 1);
+    // Cảnh báo phải nêu đúng module đang bắn. Trước đây nhánh pattern
+    // hardcode "(spam)" cho mọi module → tin giả blank cũng bị ghi là spam.
+    check(
+      "AI raid → cảnh báo khẩn nêu đúng module spam",
+      calls.emergencyAlerts[0]?.summary ===
+        `AI xác nhận raid (${MODULE_LABELS.spam}) — 5 tin trong 10s`,
+    );
     check(
       "AI raid → cảnh báo khẩn nêu đúng số tin + trạng thái khoá kênh",
       String(calls.emergencyAlerts[0]?.summary ?? "").includes("5 tin") &&
@@ -510,6 +518,17 @@ module.exports = {
       "massMessage AI raid → ghi mẫu huấn luyện kèm verdict",
       calls.raidSamples.some((s) => s.module === "massMessage" && s.aiClassification === "raid"),
     );
+    // Không được ghi "(spam)" cho module này — chủ server cần biết đúng loại
+    // hành vi nào đang bắn để xử lý.
+    check(
+      "massMessage AI raid → cảnh báo khẩn nêu đúng module massMessage",
+      calls.emergencyAlerts[0]?.summary ===
+        `AI xác nhận raid (${MODULE_LABELS.massMessage}) — 3 tin trong 10s`,
+    );
+    check(
+      "massMessage AI raid → cảnh báo khẩn KHÔNG ghi nhầm module spam",
+      calls.emergencyAlerts.length === 1 && !calls.emergencyAlerts[0].summary.includes("(spam)"),
+    );
     configs.set("g-msg", baseConfig());
   }
 
@@ -529,6 +548,11 @@ module.exports = {
       calls.events.some(
         (e) => e.module === "blankNoise" && String(e.action).includes("(AI: raid)"),
       ),
+    );
+    check(
+      "blankNoise AI raid → cảnh báo khẩn nêu đúng module blankNoise",
+      calls.emergencyAlerts[0]?.summary ===
+        `AI xác nhận raid (${MODULE_LABELS.blankNoise}) — 3 tin trong 10s`,
     );
     configs.set("g-msg", baseConfig());
   }
