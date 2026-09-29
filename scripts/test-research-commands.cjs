@@ -238,6 +238,47 @@ function makeSource({ canManage = true, sub = "status", isSlash = true, args = [
     research.learnNow = realLearnNow;
   }
 
+  // 9. Nhánh PREFIX của !research learn khi source cụt hàm trả lời
+  // Block 8 mới phủ lệnh lỗi nhưng source luôn có `reply`. Ở đây bỏ hẳn
+  // `reply` / `channel` để chắc chắn các `?.()` phòng thủ giữ được: lệnh
+  // không được ném lỗi ra ngoài dù không gửi được tin nhắn nào.
+  {
+    const realLearnNow = research.learnNow;
+    research.learnNow = async () => {
+      throw new Error("provider AI không phản hồi");
+    };
+    const bare = makeSource({ isSlash: false, args: ["learn"] });
+    delete bare.reply;
+    let threw1 = null;
+    try {
+      await handleResearch({}, store, bare);
+    } catch (e) {
+      threw1 = e;
+    }
+    check("learn lỗi + source không có reply → không ném ra ngoài", threw1 === null);
+
+    // Nhánh thành công của prefix gửi embed qua channel.send — cũng phải chịu
+    // được khi channel vắng.
+    research.learnNow = async () => ({
+      sources: ["a"],
+      newKeywords: 1,
+      newPhrases: 0,
+      totalKeywords: 5,
+      aiUsed: false,
+    });
+    const bare2 = makeSource({ isSlash: false, args: ["learn"] });
+    delete bare2.reply;
+    delete bare2.channel;
+    let threw2 = null;
+    try {
+      await handleResearch({}, store, bare2);
+    } catch (e) {
+      threw2 = e;
+    }
+    check("learn OK + source không có channel → không ném ra ngoài", threw2 === null);
+    research.learnNow = realLearnNow;
+  }
+
   console.log(`\nKết quả research commands: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

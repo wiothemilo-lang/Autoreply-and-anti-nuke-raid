@@ -4,7 +4,7 @@
 
 Bot Discord tự động trả lời tin nhắn thành viên theo **từ khóa** hoặc khi bị **tag @mention** (nội dung do bạn tùy chỉnh), hỗ trợ đầy đủ **prefix (`!`) + slash commands**, kèm hệ thống **chống nuke/raid** bật tắt từng phần theo ý mod & owner — tất cả quản lý qua một **dashboard web** tùy chỉnh.
 
-> **Chất lượng**: 81 CJS + 18 TS test suites · coverage c8 (93,2% dòng / 96,3% hàm / 78,5% nhánh — toàn bộ engine chống nuke + alt detection + ticket + lớp dẫn log được phủ test trực tiếp, **không còn file nào dưới 80%**, **sàn coverage theo file** chặn engine bảo vệ tụt) · **mutation score 100%** (`bun run test:mutation`) · property-based + fuzz test · **memGuard sweeper bộ nhớ tập trung** · ESLint sạch · typecheck sạch · smoke test VPS · CI 4 job (lint + security + test → deploy): gitleaks chặn secret lộ, bun audit chặn CVE critical (`bun run test` để chạy local).
+> **Chất lượng**: 81 CJS + 18 TS test suites · coverage c8 (93,3% dòng / 96,3% hàm / 78,7% nhánh — toàn bộ engine chống nuke + alt detection + ticket + lớp dẫn log được phủ test trực tiếp, **không còn file nào dưới 80%**, **sàn coverage theo file** chặn engine bảo vệ tụt) · **mutation score 100%** (`bun run test:mutation`) · property-based + fuzz test · **memGuard sweeper bộ nhớ tập trung** · ESLint sạch · typecheck sạch · smoke test VPS · CI 4 job (lint + security + test → deploy): gitleaks chặn secret lộ, bun audit chặn CVE critical (`bun run test` để chạy local).
 >
 > **Hệ sinh thái**: threat relay liên server (chia sẻ signature raid ẩn danh, opt-in từng chiều) · preset bảo mật 1 chạm (server nhỏ / cộng đồng / rủi ro cao) — bật trên dashboard, tab Chống nuke.
 

@@ -319,6 +319,55 @@ Giữ nguyên phạt, bật join gate.`;
     aiThrows = false;
   }
 
+  // ── 4b. Nhánh PREFIX của !report — chưa từng được chạy trong test nào ──────
+  // Mọi test trên đều là slash (có deferReply). Lệnh `!report` đi đường khác:
+  // reply "đang quét" trước, gửi kết quả qua channel.send, lỗi thì reply.
+  // Ở đây source còn thiếu luôn `reply` + `channel.send` để chắc chắn các
+  // `?.()` phòng thủ giữ được hàm viên: hợp đồng "không bao giờ throw về caller"
+  // ghi ở đầu incidentReport.js phải đúng cả khi nguồn gọi cụt.
+  {
+    const chBare = { ...makeChannel("c3b", [makeMessage("hello", "u1")]), send: undefined };
+    const storeBare = makeStore({ config: {} });
+    // Nhánh prefix (không deferReply) + KHÔNG reply + KHÔNG channel.send.
+    const bare = {
+      channel: chBare,
+      user: { id: "m", username: "m" },
+      options: { getString: () => null },
+    };
+
+    aiOnline = true;
+    aiThrows = true; // đi vào khối catch → nhánh báo lỗi qua reply
+    let threw1 = null;
+    try {
+      await reportInteractive({}, storeBare, {
+        ...bare,
+        guild: makeGuild({ id: "g-prefix-err", channels: [chBare] }),
+      });
+    } catch (e) {
+      threw1 = e;
+    }
+    check("prefix + AI lỗi → không ném ra ngoài (hợp đồng file)", threw1 === null);
+    check(
+      "prefix + AI lỗi → vẫn chạy tới khối catch (đã đọc dữ liệu Convex)",
+      storeBare._queries.length === 2,
+    );
+
+    aiThrows = false;
+    aiReply = AI_REPORT;
+    const storeOk = makeStore({ config: {} });
+    let threw2 = null;
+    try {
+      await reportInteractive({}, storeOk, {
+        ...bare,
+        guild: makeGuild({ id: "g-prefix-ok", channels: [chBare] }),
+      });
+    } catch (e) {
+      threw2 = e;
+    }
+    check("prefix + AI OK → không ném ra ngoài", threw2 === null);
+    check("prefix + AI OK → quét trọn pipeline (2 query Convex)", storeOk._queries.length === 2);
+  }
+
   // ── 5. AI offline → embed dùng fallback + nhãn "chế độ offline" ───────────
   {
     aiOnline = false;
