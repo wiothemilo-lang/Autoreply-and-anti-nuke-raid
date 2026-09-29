@@ -1291,4 +1291,29 @@ export const DE: Record<string, string> = {
   "Bắt buộc nhập": "Pflichtfeld",
   "Ô nhiều dòng": "Mehrzeiliges Feld",
   "Xoá ô này": "Dieses Feld entfernen",
+  "Mẫu kênh ticket": "Vorlage für Ticket-Kanäle",
+  "Mỗi kênh ticket mở ra sẽ theo mẫu này. Bỏ trống mọi ô thì bot dùng cách cũ: tên ticket-<số>, chỉ staff và người mở nhìn thấy.":
+    "Jeder Ticket-Kanal folgt dieser Vorlage. Alles leer lassen behält das alte Verhalten: Name ticket-<Nummer>, sichtbar nur für Staff und Ersteller.",
+  "Mẫu tên kênh": "Namensvorlage für Kanäle",
+  "Dùng được:": "Verfügbar:",
+  "số ticket,": "Ticket-Nummer,",
+  "tên người mở,": "Name des Erstellers,",
+  "loại. Tự động bỏ dấu và ký tự lạ.":
+    "Typ. Umlaute und Sonderzeichen werden automatisch entfernt.",
+  "Slowmode trong kênh ticket (giây)": "Slowmode in Ticket-Kanälen (Sekunden)",
+  "0 = không có. Tối đa 21600 giây (6 giờ).": "0 = aus. Maximal 21600 Sekunden (6 Stunden).",
+  "Ngân sách tin nhắn mỗi kênh": "Nachrichtenbudget pro Kanal",
+  "Vượt thì bot tự đóng kênh (nội dung đã lưu trước). 0 = không giới hạn. Dùng để chặn 1 người spam rồi bỏ mặc.":
+    "Bei Überschreitung schließt der Bot den Kanal (das Transkript wird zuvor gespeichert). 0 = unbegrenzt. Verhindert, dass jemand einen Kanal zumüllt und verschwindet.",
+  "Cho @everyone nhìn thấy kênh ticket": "@everyone soll Ticket-Kanäle sehen können",
+  "Tắt (mặc định) là chỉ staff và người mở thấy — khiếu nại mà ai đọc được thì người dùng không dám kêu. Bật nếu server muốn ticket công khai kiểu diễn đàn.":
+    "Aus (Standard) heißt: nur Staff und Ersteller sehen den Kanal — eine Beschwerde, die jeder lesen kann, meldet niemand. Einschalten für ein öffentliches Forum.",
+  "Tạo danh mục con riêng cho từng loại ticket": "Eigene Kategorie pro Ticket-Typ anlegen",
+  "Kênh ticket sẽ nằm trong danh mục con theo loại, thay vì dồn thẳng vào danh mục đã chọn.":
+    "Ticket-Kanäle liegen in einer Unterkategorie je Typ, statt alles in die gewählte Kategorie zu werfen.",
+  "Đã lưu mẫu tên kênh": "Namensvorlage gespeichert",
+  "Đã lưu slowmode": "Slowmode gespeichert",
+  "Đã lưu ngân sách tin nhắn": "Nachrichtenbudget gespeichert",
+  "Đã lưu quyền xem kênh ticket": "Sichtbarkeit der Ticket-Kanäle gespeichert",
+  "Đã lưu cách chia danh mục": "Kategorie-Layout gespeichert",
 };

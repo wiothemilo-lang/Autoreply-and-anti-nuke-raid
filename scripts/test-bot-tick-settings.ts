@@ -241,6 +241,70 @@ const status = { _id: "st", kind: "status", botKeySeed: computeBotKey(BOT_KEY), 
     check("botKey sai → bị từ chối", threw.includes("botKey") || threw.includes("Chìa khóa bot"));
   }
 
+  // ═══ Ngân sách tin nhắn (phương án D — 29/09/2026) ═══
+  console.log("\n── job đóng vì chạm ngân sách tin nhắn ──");
+  {
+    // ⚠️ Ngân sách tin phải kiểm TRƯỚC đồng hồ im lặng: kênh đang bị spam
+    // thì lastActivityAt cứ được đẩy lùi, nhánh idle không bao giờ chạm
+    // ngưỡng — tức hàng rào chống spam chỉ có tác dụng khi im lặng.
+    const mk = (ticketOver: Row, guildOver: Row = {}) =>
+      makeCtx({
+        botStatus: [status],
+        guilds: [
+          {
+            _id: "g1",
+            discordId: "g-tk",
+            botInGuild: true,
+            name: "Ticket",
+            ticketEnabled: true,
+            ticketIdleHours: 24,
+            ticketCloseGraceHours: 24,
+            ticketMessageBudget: 5,
+            ...guildOver,
+          },
+        ],
+        tickets: [
+          {
+            _id: "t1",
+            guildId: "g-tk",
+            channelId: "ch-1",
+            number: 1,
+            kind: "support",
+            openerId: "u1",
+            status: "open",
+            createdAt: NOW - 60_000,
+            // VỪA có tin vừa gần đây → nhánh im lặng KHÔNG chạm ngưỡng.
+            lastActivityAt: NOW - 1_000,
+            ...ticketOver,
+          },
+        ],
+      });
+    const jobsOf = (out: any) => (out.tickets ?? []).filter((j: Row) => j.ticketId === "t1");
+
+    const busy = await handler(mk({ messageCount: 5 }), { botKey: BOT_KEY });
+    check("chạm ngân sách → có job đóng dù vừa có tin", jobsOf(busy).length === 1);
+    check(
+      "job ghi lý do budget để bot đóng đúng câu chữ",
+      jobsOf(busy)[0]?.closeCause === "budget",
+    );
+
+    const chua = await handler(mk({ messageCount: 4 }), { botKey: BOT_KEY });
+    check("chưa chạm ngân sách → KHÔNG sinh job", jobsOf(chua).length === 0);
+
+    // Tắt ngân sách (0) → hành vi y như cũ: chỉ đóng khi im lặng.
+    const tat = await handler(mk({ messageCount: 9999 }, { ticketMessageBudget: 0 }), {
+      botKey: BOT_KEY,
+    });
+    check("ngân sách 0 = tắt, tin nhắn nhiều không sinh job", jobsOf(tat).length === 0);
+
+    // Vẫn phải đóng vì IM LẶNG khi chưa chạm ngân sách.
+    const imLang = await handler(mk({ messageCount: 1, lastActivityAt: NOW - 40 * 3_600_000 }), {
+      botKey: BOT_KEY,
+    });
+    check("chưa chạm ngân sách nhưng im lặng lâu → vẫn đóng", jobsOf(imLang).length === 1);
+    check("job do im lặng không gắn cờ budget", jobsOf(imLang)[0]?.closeCause === undefined);
+  }
+
   console.log(`\n${pass}/${pass + fail} ✅`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

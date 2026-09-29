@@ -1358,4 +1358,29 @@ export const EN: Record<string, string> = {
   "Bắt buộc nhập": "Required",
   "Ô nhiều dòng": "Multi-line field",
   "Xoá ô này": "Remove this field",
+  "Mẫu kênh ticket": "Ticket channel template",
+  "Mỗi kênh ticket mở ra sẽ theo mẫu này. Bỏ trống mọi ô thì bot dùng cách cũ: tên ticket-<số>, chỉ staff và người mở nhìn thấy.":
+    "Every ticket channel follows this template. Leave everything blank to keep the old behaviour: named ticket-<number>, visible only to staff and the opener.",
+  "Mẫu tên kênh": "Channel name template",
+  "Dùng được:": "Available:",
+  "số ticket,": "ticket number,",
+  "tên người mở,": "opener name,",
+  "loại. Tự động bỏ dấu và ký tự lạ.":
+    "type. Accents and odd characters are stripped automatically.",
+  "Slowmode trong kênh ticket (giây)": "Slowmode in ticket channels (seconds)",
+  "0 = không có. Tối đa 21600 giây (6 giờ).": "0 = off. Max 21600 seconds (6 hours).",
+  "Ngân sách tin nhắn mỗi kênh": "Message budget per channel",
+  "Vượt thì bot tự đóng kênh (nội dung đã lưu trước). 0 = không giới hạn. Dùng để chặn 1 người spam rồi bỏ mặc.":
+    "When exceeded the bot closes the channel (the transcript is saved first). 0 = unlimited. Stops one member from spamming a channel and walking away.",
+  "Cho @everyone nhìn thấy kênh ticket": "Let @everyone see ticket channels",
+  "Tắt (mặc định) là chỉ staff và người mở thấy — khiếu nại mà ai đọc được thì người dùng không dám kêu. Bật nếu server muốn ticket công khai kiểu diễn đàn.":
+    "Off (default) means only staff and the opener can see it — an appeal anyone can read is an appeal nobody files. Turn it on if you want a public forum-style ticket.",
+  "Tạo danh mục con riêng cho từng loại ticket": "Create a separate category per ticket type",
+  "Kênh ticket sẽ nằm trong danh mục con theo loại, thay vì dồn thẳng vào danh mục đã chọn.":
+    "Ticket channels go into a per-type sub-category instead of piling into the category you picked.",
+  "Đã lưu mẫu tên kênh": "Channel name template saved",
+  "Đã lưu slowmode": "Slowmode saved",
+  "Đã lưu ngân sách tin nhắn": "Message budget saved",
+  "Đã lưu quyền xem kênh ticket": "Ticket channel visibility saved",
+  "Đã lưu cách chia danh mục": "Category layout saved",
 };

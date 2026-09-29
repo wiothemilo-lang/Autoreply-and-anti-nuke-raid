@@ -366,6 +366,40 @@ export default defineSchema({
      * Danh sách id, tối đa 3 — tag nhiều làm loạn kênh khác.
      */
     ticketPingRoleIds: v.optional(v.array(v.string())),
+
+    /* ═══ MẪU KÊNH TICKET (29/09/2026) ═══
+     *
+     * Trước đây mọi kênh ticket sinh ra GIỐNG NHAU: tên `ticket-<số>`, chỉ
+     * staff + người mở nhìn thấy, không slowmode, không giới hạn tin. Chủ
+     * server lớn không có cách nào vừa cho thành viên tự xem vừa vẫn giữ
+     * kín đáo — 5 field dưới đây mở ra đúng chỗ đó. */
+    /**
+     * Mẫu tên kênh. Hỗ trợ {number} {user} {kind}. Rỗng → `ticket-{number}`
+     * (đúng hành vi cũ). Chủ server soạn text này nên nó phải đi qua
+     * `ticketCore.buildChannelName` — hàm đó bỏ dấu + chống ký tự lạ.
+     */
+    ticketChannelTemplate: v.optional(v.string()),
+    /**
+     * Kênh có cho @everyone nhìn thấy không.
+     *
+     * `false` (mặc định) = chỉ staff + người mở. Ticket khiếu nại nhạy cảm,
+     * ai cũng đọc được thì người dùng không dám kêu. `true` dành cho server
+     * muốn ticket công khai kiểu diễn đàn hỏi đáp.
+     */
+    ticketChannelPublic: v.optional(v.boolean()),
+    /** Slowmode kênh ticket (giây, 0–21600). 0 = tắt. */
+    ticketSlowmodeSec: v.optional(v.number()),
+    /**
+     * Ngân sách tin nhắn mỗi kênh ticket; vượt thì bot tự đóng — chặn 1
+     * thành viên spam 1 kênh rồi bỏ mặc. 0 = không giới hạn (mặc định).
+     */
+    ticketMessageBudget: v.optional(v.number()),
+    /**
+     * Tạo category CON theo từng loại ticket, đặt trong category cha
+     * `ticketCategoryId`. Tắt (mặc định) thì tạo kênh thẳng dưới category
+     * cha như trước.
+     */
+    ticketCategoryPerKind: v.optional(v.boolean()),
     /**
      * Mốc LẦN CUỐI dashboard ghi cấu hình (updateSettings). Khác `updatedAt` —
      * `updatedAt` bị chính bot bump mỗi lượt sync/heartbeat nên không dùng làm tín
@@ -1035,6 +1069,15 @@ export default defineSchema({
     claimedById: v.optional(v.string()),
     claimedByName: v.optional(v.string()),
     claimedAt: v.optional(v.number()),
+    /**
+     * Số tin nhắn của thành viên đã gửi trong kênh này.
+     *
+     * Cơ sở cho `ticketMessageBudget`: vượt ngân sách thì bot tự đóng —
+     * đây là cách chặn 1 người spam 1 kênh rồi bỏ mặc, đối lập với
+     * `ticketIdleHours` (đồng hồ im lặng, không có người thì kênh vẫn treo).
+     * Tin của bot không tính.
+     */
+    messageCount: v.optional(v.number()),
     /**
      * Lần cuối có ai chat trong kênh (mọi tin nhắn, kể cả của bot trừ chính
      * nó). Bot tự đóng khi `now - lastActivityAt > idleHours`. null = chưa

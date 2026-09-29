@@ -654,5 +654,55 @@ check(
     .fields.some((f) => f.name.includes(String.fromCharCode(0x200b))),
 );
 
+// ═══ 14. MẪU KÊNH TICKET — tên theo mẫu + ngân sách tin nhắn (D) ═══
+console.log("\n── mẫu kênh ticket ──");
+
+const tpl = (template, over = {}) =>
+  core.buildChannelNameFromTemplate({ template, username: "Minh", number: 7, ...over });
+
+check(
+  "không đặt mẫu → giữ đúng tên cũ",
+  tpl("") === core.buildChannelName({ username: "Minh", number: 7 }),
+);
+check(
+  "mẫu rỗng/thừa khoảng trắng cũng rơi về tên cũ",
+  tpl("   ") === core.buildChannelName({ username: "Minh", number: 7 }),
+);
+check("{number} lấy đúng số ticket", tpl("{number}") === "7");
+check("{user} tự bỏ dấu", tpl("{user}", { username: "Minh Nguyễn" }) === "minh-nguyen");
+check("{kind} và {number} ghép lại", tpl("{kind}-{number}", { kind: "billing" }) === "billing-7");
+check("placeholder lạ bị bỏ, không lọt dấu {} vào tên kênh", tpl("{abc}-{number}") === "7");
+check(
+  "mẫu rút gọn đường dẫn bị vệ sinh (không tạo được kênh ngoài ý muốn)",
+  tpl("../../etc") === "etc",
+  tpl("../../etc"),
+);
+check(
+  "mẫu chỉ toàn ký tự lạ → rơi về tên có số, không phải 3 kênh trùng tên",
+  tpl("@@@") === "ticket-minh-7",
+  tpl("@@@"),
+);
+check(
+  "mẫu dài bị cắt theo trần tên kênh Discord",
+  core.buildChannelNameFromTemplate({ template: "a".repeat(300), username: "M", number: 1 })
+    .length <= 100,
+);
+
+check(
+  "ngân sách 0 = tắt, không bao giờ đóng vì tin nhắn",
+  core.isBudgetExceeded({ messageCount: 9999, budget: 0 }) === false,
+);
+check("chưa chạm ngân sách", core.isBudgetExceeded({ messageCount: 4, budget: 5 }) === false);
+check("chạm đúng ngân sách → đóng", core.isBudgetExceeded({ messageCount: 5, budget: 5 }) === true);
+check("vượt ngân sách → đóng", core.isBudgetExceeded({ messageCount: 9, budget: 5 }) === true);
+check(
+  "ngân sách rác (NaN) → tắt chứ không đóng oan",
+  core.isBudgetExceeded({ messageCount: 9, budget: "rac" }) === false,
+);
+check(
+  "số tin rác → coi như 0",
+  core.isBudgetExceeded({ messageCount: undefined, budget: 5 }) === false,
+);
+
 console.log(`\nKết quả tickets: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

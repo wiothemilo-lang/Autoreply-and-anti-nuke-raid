@@ -135,6 +135,11 @@ export const getPendingJobs = query({
       status: string;
       idleHours: number;
       closeGraceHours: number;
+      /**
+       * Lý do đóng khi status = "autoClose": `idle` = hết giờ im lặng,
+       * `budget` = chạm ngân sách tin nhắn. Bot dùng để đóng đúng câu chữ.
+       */
+      closeCause?: string;
       lastActivityAt: number;
       closedAt: number;
       closeReason?: string;
@@ -145,15 +150,37 @@ export const getPendingJobs = query({
       if (!g.ticketEnabled) continue;
       const idleHours = g.ticketIdleHours ?? 24;
       const closeGraceHours = g.ticketCloseGraceHours ?? 24;
+      const messageBudget = g.ticketMessageBudget ?? 0;
       const rows = await ctx.db
         .query("tickets")
         .withIndex("by_guildId", (q) => q.eq("guildId", g.discordId))
         .collect();
       for (const t of rows) {
         if (t.status === "open") {
-          if (idleHours <= 0) continue;
-          const last = t.lastActivityAt ?? t.createdAt;
-          if (nowMs - last < idleHours * 3_600_000) continue;
+          // ⚠️ Kiểm NGÂN SÁCH TIN TRƯỚC đồng hồ im lặng: kênh đang bị spam thì
+          // `lastActivityAt` cứ được đẩy lùi nên nhánh idle KHÔNG BAO GIỜ
+          // chạm ngưỡng — tức hành rào chống spam chỉ có tác dụng khi im lặng,
+          // đúng cái người spam không bao giờ làm.
+          const overBudget = messageBudget > 0 && (t.messageCount ?? 0) >= messageBudget;
+          if (!overBudget) {
+            if (idleHours <= 0) continue;
+            const last = t.lastActivityAt ?? t.createdAt;
+            if (nowMs - last < idleHours * 3_600_000) continue;
+            tickets.push({
+              guildId: g.discordId,
+              ticketId: t._id,
+              channelId: t.channelId,
+              number: t.number ?? 0,
+              kind: t.kind,
+              openerId: t.openerId,
+              status: "autoClose",
+              idleHours,
+              closeGraceHours,
+              lastActivityAt: t.lastActivityAt ?? t.createdAt,
+              closedAt: 0,
+            });
+            continue;
+          }
           tickets.push({
             guildId: g.discordId,
             ticketId: t._id,
@@ -162,9 +189,10 @@ export const getPendingJobs = query({
             kind: t.kind,
             openerId: t.openerId,
             status: "autoClose",
+            closeCause: "budget",
             idleHours,
             closeGraceHours,
-            lastActivityAt: last,
+            lastActivityAt: t.lastActivityAt ?? t.createdAt,
             closedAt: 0,
           });
         } else if (t.status === "closed") {

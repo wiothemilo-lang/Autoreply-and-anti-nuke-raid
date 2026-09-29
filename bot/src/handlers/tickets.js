@@ -136,11 +136,16 @@ async function createTicketChannel({
   staffIds,
   openerOnly,
   closeNote,
+  slowmodeSec = 0,
+  isPublic = false,
 }) {
   const channel = await guild.channels.create({
     name: channelName.slice(0, CHANNEL_NAME_MAX),
     type: ChannelType.GuildText,
     parent: category,
+    // Slowmode set NGAY LÚC TẠO: sửa sau cũng tốn 1 lượt API, mà bot có thể
+    // không giữ quyền đặt slowmode trên kênh vừa tạo → cấu hình im lặng hỏng.
+    rateLimitPerUser: Math.max(0, Math.min(21600, Math.floor(slowmodeSec) || 0)),
     // Topic = chỗ duy nhất luôn hiện khi ai đó mở kênh. `ticketCloseNote` là
     // ghi chú chủ server dán cho người gửi ("Ticket đã xử lý…") — không đổ
     // vào đây thì nó chỉ là ô text lưu vào DB rồi không ai đọc (đã tồn tại
@@ -154,7 +159,13 @@ async function createTicketChannel({
 
   // @everyone = guild.roles.everyone — phải CHẶN trước rồi mới mở cho từng
   // role, vì Discord tính quyền theo thứ tự deny ưu tiên.
-  await channel.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: false });
+  //
+  // `isPublic`: chủ server CHỌN kênh ticket công khai (diễn đàn hỏi đáp).
+  // Mặc định vẫn kín — ticket khiếu nại mà ai cũng đọc được thì người dùng
+  // không dám kêu.
+  await channel.permissionOverwrites.edit(guild.roles.everyone, {
+    ViewChannel: isPublic ? true : false,
+  });
 
   for (const roleId of staffIds) {
     const role = guild.roles.cache.get(roleId);
@@ -270,8 +281,32 @@ async function openTicket({
     return { ok: false, code: "errNoPerm" };
   }
 
-  const category = guild.channels.cache.get(categoryId);
-  if (!category) return { ok: false, code: "errNoCategory" };
+  const rootCategory = guild.channels.cache.get(categoryId);
+  if (!rootCategory) return { ok: false, code: "errNoCategory" };
+
+  // Category CON theo loại (chủ server bật). Server nhiều loại không muốn tất
+  // cả kênh dồn chung 1 chỗ.
+  //
+  // Lỗi tạo category → dùng luôn category cha thay vì hỏng cả lượt mở
+  // ticket: người dùng đã bấm nút rồi, mất ticket tệ hơn là kênh nằm chỗ
+  // kém đẹp.
+  let category = rootCategory;
+  if (config?.ticketCategoryPerKind === true) {
+    try {
+      category =
+        (await guild.channels.create({
+          name: core.sanitizeChannelName(
+            `tk-${(kinds.find((k) => k.key === kindKey)?.label ?? kindKey).toLowerCase()}`,
+          ),
+          type: ChannelType.GuildCategory,
+          parent: rootCategory,
+          reason: `Phân loại ticket ${kindKey}`,
+        })) ?? rootCategory;
+    } catch (e) {
+      console.error(`[tickets] tạo category con thất bại ${guild.id}:`, e.message);
+      category = rootCategory;
+    }
+  }
 
   // Số thứ tự: dùng chung bộ đếm mod case (một dãy số duy nhất trong server).
   // Ghi bản ghi TRƯỚC khi tạo kênh để lấy số, rồi tạo kênh, rồi cập nhật
@@ -305,7 +340,14 @@ async function openTicket({
     return { ok: false, code: "errNoPerm" };
   }
 
-  const channelName = core.buildChannelName({ username: user.username, number });
+  // Tên kênh theo MẪU của chủ server ({number} {user} {kind}); không đặt
+  // mẫu thì rơi về `ticket-<số>` như trước.
+  const channelName = core.buildChannelNameFromTemplate({
+    template: config?.ticketChannelTemplate,
+    username: user.username,
+    number,
+    kind: kindKey,
+  });
   let channel;
   try {
     channel = await createTicketChannel({
@@ -316,6 +358,8 @@ async function openTicket({
       staffIds,
       openerOnly: Boolean(openerOnly),
       closeNote: config?.ticketCloseNote,
+      slowmodeSec: config?.ticketSlowmodeSec,
+      isPublic: config?.ticketChannelPublic === true,
     });
   } catch (e) {
     const kindErr = describeGuildError(e);

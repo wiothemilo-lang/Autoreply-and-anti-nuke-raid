@@ -208,6 +208,9 @@ const TICKET_TEXT = {
     closedWithReason: "🔒 Đã đóng: {reason}",
     notStaff: "Chỉ staff mới được dùng các nút này.",
     autoClosedTitle: "Đã tự đóng",
+    budgetClosedTitle: "Đã đóng vì quá nhiều tin",
+    budgetClosedBody:
+      "Kênh này đã chạm giới hạn tin nhắn nên bot đóng lại. Nội dung đã được lưu đầy đủ.",
     autoClosedBody:
       "Kênh không có hoạt động nào trong {h} giờ nên bot tự đóng. Kênh sẽ bị xoá sau {g} giờ — nội dung được lưu lại để staff tra cứu.",
     deletedTitle: "Đã lưu và xoá kênh",
@@ -310,6 +313,9 @@ const TICKET_TEXT = {
     closedWithReason: "🔒 Closed: {reason}",
     notStaff: "Only staff can use these buttons.",
     autoClosedTitle: "Closed automatically",
+    budgetClosedTitle: "Closed — message limit reached",
+    budgetClosedBody:
+      "This channel hit the message limit, so the bot closed it. Everything has been saved.",
     autoClosedBody:
       "No activity for {h} hours, so the bot closed this channel. It will be deleted after {g} hours — the conversation is saved for staff.",
     deletedTitle: "Saved and deleted",
@@ -415,6 +421,9 @@ const TICKET_TEXT = {
     closedWithReason: "🔒 Geschlossen: {reason}",
     notStaff: "Nur das Team darf diese Schaltflächen nutzen.",
     autoClosedTitle: "Automatisch geschlossen",
+    budgetClosedTitle: "Geschlossen — Nachrichtenlimit erreicht",
+    budgetClosedBody:
+      "Dieser Kanal hat das Nachrichtenlimit erreicht, daher wurde er geschlossen. Alles wurde gespeichert.",
     autoClosedBody:
       "{h} Stunden ohne Aktivität, deshalb hat der Bot den Kanal geschlossen. Er wird nach {g} Stunden gelöscht — das Gespräch bleibt für das Team gespeichert.",
     deletedTitle: "Gesichert und gelöscht",

@@ -287,6 +287,11 @@ export const getGuild = query({
         ticketCloseGraceHours: guild.ticketCloseGraceHours ?? 24,
         ticketPanelText: guild.ticketPanelText ?? "",
         ticketPingRoleIds: guild.ticketPingRoleIds ?? [],
+        ticketChannelTemplate: guild.ticketChannelTemplate ?? "",
+        ticketChannelPublic: guild.ticketChannelPublic ?? false,
+        ticketSlowmodeSec: guild.ticketSlowmodeSec ?? 0,
+        ticketMessageBudget: guild.ticketMessageBudget ?? 0,
+        ticketCategoryPerKind: guild.ticketCategoryPerKind ?? false,
       },
       heatStates,
       modules: modules.map((m) => ({
@@ -614,6 +619,11 @@ export const getBotConfig = query({
        * Vị trí cũng phải TRƯỚC khối `modules:` (script cắt tới đó).
        */
       ticketKinds: kinds,
+      ticketChannelTemplate: guild.ticketChannelTemplate ?? "",
+      ticketChannelPublic: guild.ticketChannelPublic ?? false,
+      ticketSlowmodeSec: guild.ticketSlowmodeSec ?? 0,
+      ticketMessageBudget: guild.ticketMessageBudget ?? 0,
+      ticketCategoryPerKind: guild.ticketCategoryPerKind ?? false,
       modules: modules.map((m) => ({
         module: m.module,
         enabled: m.enabled,
@@ -738,6 +748,12 @@ export const updateSettings = mutation({
     ticketCloseGraceHours: v.optional(v.number()),
     ticketPanelText: v.optional(v.string()),
     ticketPingRoleIds: v.optional(v.array(v.string())),
+    // ── Mẫu kênh ticket (29/09/2026) ──
+    ticketChannelTemplate: v.optional(v.string()),
+    ticketChannelPublic: v.optional(v.boolean()),
+    ticketSlowmodeSec: v.optional(v.number()),
+    ticketMessageBudget: v.optional(v.number()),
+    ticketCategoryPerKind: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await getUserByToken(ctx, args.token);
@@ -964,6 +980,29 @@ export const updateSettings = mutation({
       patch.ticketPingRoleIds = (args.ticketPingRoleIds ?? [])
         .filter((r) => /^\d{15,22}$/.test(String(r ?? "")))
         .slice(0, 3);
+
+    // ── Mẫu kênh ticket (29/09/2026) ──
+    // Mẫu tên do chủ server soạn → cắt theo trần tên kênh Discord (100) và
+    // bỏ khoảng trắng thừa. Placeholder thiếu thì `buildChannelName` bỏ
+    // qua, không ném lỗi — lỗi cấu hình không được chặn mở ticket.
+    if (args.ticketChannelTemplate !== undefined)
+      patch.ticketChannelTemplate = args.ticketChannelTemplate.trim().slice(0, 100) || "";
+    if (args.ticketChannelPublic !== undefined)
+      patch.ticketChannelPublic = !!args.ticketChannelPublic;
+    // Slowmode của Discord tối đa 21600 giây (6 giờ) — vượt là API từ chối
+    // lúc tạo kênh, tức mất luôn kênh ticket.
+    if (args.ticketSlowmodeSec !== undefined)
+      patch.ticketSlowmodeSec = Math.max(
+        0,
+        Math.min(21600, Math.floor(args.ticketSlowmodeSec) || 0),
+      );
+    if (args.ticketMessageBudget !== undefined)
+      patch.ticketMessageBudget = Math.max(
+        0,
+        Math.min(1000, Math.floor(args.ticketMessageBudget) || 0),
+      );
+    if (args.ticketCategoryPerKind !== undefined)
+      patch.ticketCategoryPerKind = !!args.ticketCategoryPerKind;
     if (args.raidHuntBanSuspects !== undefined)
       patch.raidHuntBanSuspects = args.raidHuntBanSuspects;
     if (args.rollbackEnabled !== undefined) patch.rollbackEnabled = !!args.rollbackEnabled;

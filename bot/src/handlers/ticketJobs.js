@@ -39,11 +39,16 @@ async function runAutoClose(client, store, job, T) {
     }
     return true;
   }
+  // `closeCause = "budget"` = đóng vì chạm ngân sách tin nhắn, không phải
+  // vì im lặng. Dùng chung 1 đường đóng (thu quyền + lưu transcript + ghi
+  // trạng thái) vì khác nhau duy nhất là câu chữ báo cho người dùng.
+  const byBudget = job.closeCause === "budget";
+  const title = byBudget ? T.budgetClosedTitle : T.autoClosedTitle;
   const embed = new EmbedBuilder()
     .setColor(Colors.Grey)
-    .setTitle(T.autoClosedTitle)
+    .setTitle(title)
     .setDescription(
-      String(T.autoClosedBody)
+      String(byBudget ? T.budgetClosedBody : T.autoClosedBody)
         .replace("{h}", String(job.idleHours))
         .replace("{g}", String(job.closeGraceHours)),
     )
@@ -59,14 +64,16 @@ async function runAutoClose(client, store, job, T) {
       guildId: job.guildId,
       ticketId: job.ticketId,
       status: "closed",
-      closeReason: String(T.autoClosedTitle),
+      closeReason: String(title),
     });
   } catch (e) {
     console.error(`[tickets:auto] ghi trạng thái thất bại ${job.guildId}:`, e.message);
     return false;
   }
   console.log(
-    `[tickets:auto] ${job.guildId}: đóng ticket #${job.number} sau ${job.idleHours}h im lặng`,
+    byBudget
+      ? `[tickets:auto] ${job.guildId}: đóng ticket #${job.number} vì chạm ngân sách tin nhắn`
+      : `[tickets:auto] ${job.guildId}: đóng ticket #${job.number} sau ${job.idleHours}h im lặng`,
   );
   return true;
 }

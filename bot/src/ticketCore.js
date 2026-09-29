@@ -107,6 +107,43 @@ function sanitizeChannelName(name, max = CHANNEL_NAME_MAX) {
   return out;
 }
 
+/**
+ * Dựng tên kênh từ MẪU của chủ server.
+ *
+ * Placeholder hỗ trợ: {number} {user} {kind}. Placeholder lạ → bỏ (không
+ * để lọt ký tự `{}` vào tên kênh — Discord từ chối).
+ *
+ * Rỗng → rơi về `buildChannelName` (đúng hành vi cũ: `ticket-<số>`).
+ *
+ * ⚠️ Mẫu do CHỦ SERVER soạn nên đi qua `sanitizeChannelName` như mọi tên
+ * kênh khác: gõ `../../../` hoặc 200 ký tự mới không làm tạo kênh hỏng.
+ */
+function buildChannelNameFromTemplate({ template, username, number, kind }) {
+  const src = String(template ?? "").trim();
+  if (!src) return buildChannelName({ username, number });
+  const filled = src
+    .replace(/\{number\}/g, () => String(number ?? "1"))
+    .replace(/\{user\}/g, () => sanitizeChannelName(username || ""))
+    .replace(/\{kind\}/g, () => sanitizeChannelName(kind || ""))
+    .replace(/\{\w+\}/g, "");
+  const out = sanitizeChannelName(filled);
+  // Mẫu chỉ chứa ký tự bị loại (vd "@@@") → sanitize rơi về "ticket"; thay bằng
+  // tên mặc định có số để kênh vẫn phân biệt được, thay vì 3 kênh trùng tên.
+  return out === "ticket" ? buildChannelName({ username, number }) : out;
+}
+
+/**
+ * Ngân sách tin nhắn của 1 kênh ticket đã vượt chưa.
+ *
+ * `messageCount` là số tin của CHÍNH kênh đó (không phải cả server): ngân
+ * sách bảo vệ kênh, không phải bảo vệ bot. 0 = tắt, nên luôn trả false.
+ */
+function isBudgetExceeded({ messageCount, budget }) {
+  const cap = Math.floor(Number(budget));
+  if (!Number.isFinite(cap) || cap <= 0) return false;
+  return (Number(messageCount) || 0) >= cap;
+}
+
 /** Tên kênh ticket: `ticket-<số>` hoặc `<tên user đã bỏ dấu>-<số>`. */
 function buildChannelName({ username, number, prefix = "ticket" }) {
   // KHÔNG dùng fallback "ticket" của sanitizeChannelName làm `who`: nếu
@@ -701,6 +738,8 @@ module.exports = {
   stripDiacritics,
   sanitizeChannelName,
   buildChannelName,
+  buildChannelNameFromTemplate,
+  isBudgetExceeded,
   decideOpen,
   normalizeLimit,
   MAX_TICKET_KINDS,

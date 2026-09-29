@@ -1577,9 +1577,15 @@ export const botTouchTickets = mutation({
     for (const channelId of args.channelIds) {
       const t = byChannel.get(channelId);
       if (!t || t.status !== "open") continue;
-      if ((t.lastActivityAt ?? t.createdAt) >= now) continue;
-      await ctx.db.patch(t._id, { lastActivityAt: now });
-      touched++;
+      const forward = (t.lastActivityAt ?? t.createdAt) < now;
+      // Bộ đếm tin nhắn tăng Ở MỌI lượt, kể cả lượt mà đồng hồ im lặng KHÔNG
+      // lùi được (2 tin gửi trong cùng mili-giây). Gộp vào nhánh `continue`
+      // cũ thì ngân sách tin nhắn đếm thiếu → người spam không bao giờ bị chặn.
+      await ctx.db.patch(t._id, {
+        ...(forward ? { lastActivityAt: now } : {}),
+        messageCount: (t.messageCount ?? 0) + 1,
+      });
+      if (forward) touched++;
     }
     return { touched };
   },

@@ -749,6 +749,124 @@ export default function TicketPanel({ data }: { data: GuildData }) {
               </div>
             </CardContent>
           </Card>
+          {/* ═══ Mẫu kênh ticket (29/09/2026) ═══ */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{translate("Mẫu kênh ticket")}</CardTitle>
+              <CardDescription>
+                {translate(
+                  "Mỗi kênh ticket mở ra sẽ theo mẫu này. Bỏ trống mọi ô thì bot dùng cách cũ: tên ticket-<số>, chỉ staff và người mở nhìn thấy.",
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5 sm:col-span-2">
+                <Label htmlFor="ticket-channel-template">{translate("Mẫu tên kênh")}</Label>
+                <Input
+                  id="ticket-channel-template"
+                  placeholder="{kind}-{number}"
+                  defaultValue={g.ticketChannelTemplate ?? ""}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim().slice(0, 100);
+                    if (v === (g.ticketChannelTemplate ?? "")) return;
+                    patch({ ticketChannelTemplate: v }, translate("Đã lưu mẫu tên kênh"));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {translate("Dùng được:")} <code className="font-mono">{"{number}"}</code>{" "}
+                  {translate("số ticket,")} <code className="font-mono">{"{user}"}</code>{" "}
+                  {translate("tên người mở,")} <code className="font-mono">{"{kind}"}</code>{" "}
+                  {translate("loại. Tự động bỏ dấu và ký tự lạ.")}
+                </p>
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="ticket-slowmode">
+                  {translate("Slowmode trong kênh ticket (giây)")}
+                </Label>
+                <Input
+                  id="ticket-slowmode"
+                  type="number"
+                  min={0}
+                  max={21600}
+                  defaultValue={g.ticketSlowmodeSec ?? 0}
+                  onBlur={(e) => {
+                    const n = Math.max(0, Math.min(21600, Math.floor(Number(e.target.value)) || 0));
+                    if (n === (g.ticketSlowmodeSec ?? 0)) return;
+                    patch({ ticketSlowmodeSec: n }, translate("Đã lưu slowmode"));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {translate("0 = không có. Tối đa 21600 giây (6 giờ).")}
+                </p>
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="ticket-budget">{translate("Ngân sách tin nhắn mỗi kênh")}</Label>
+                <Input
+                  id="ticket-budget"
+                  type="number"
+                  min={0}
+                  max={1000}
+                  defaultValue={g.ticketMessageBudget ?? 0}
+                  onBlur={(e) => {
+                    const n = Math.max(0, Math.min(1000, Math.floor(Number(e.target.value)) || 0));
+                    if (n === (g.ticketMessageBudget ?? 0)) return;
+                    patch({ ticketMessageBudget: n }, translate("Đã lưu ngân sách tin nhắn"));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {translate(
+                    "Vượt thì bot tự đóng kênh (nội dung đã lưu trước). 0 = không giới hạn. Dùng để chặn 1 người spam rồi bỏ mặc.",
+                  )}
+                </p>
+              </div>
+
+              <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={g.ticketChannelPublic === true}
+                  onChange={(e) =>
+                    patch(
+                      { ticketChannelPublic: e.target.checked },
+                      translate("Đã lưu quyền xem kênh ticket"),
+                    )
+                  }
+                />
+                <span>
+                  {translate("Cho @everyone nhìn thấy kênh ticket")}
+                  <span className="block text-xs text-muted-foreground">
+                    {translate(
+                      "Tắt (mặc định) là chỉ staff và người mở thấy — khiếu nại mà ai đọc được thì người dùng không dám kêu. Bật nếu server muốn ticket công khai kiểu diễn đàn.",
+                    )}
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={g.ticketCategoryPerKind === true}
+                  onChange={(e) =>
+                    patch(
+                      { ticketCategoryPerKind: e.target.checked },
+                      translate("Đã lưu cách chia danh mục"),
+                    )
+                  }
+                />
+                <span>
+                  {translate("Tạo danh mục con riêng cho từng loại ticket")}
+                  <span className="block text-xs text-muted-foreground">
+                    {translate(
+                      "Kênh ticket sẽ nằm trong danh mục con theo loại, thay vì dồn thẳng vào danh mục đã chọn.",
+                    )}
+                  </span>
+                </span>
+              </label>
+            </CardContent>
+          </Card>
         </>
       )}
 

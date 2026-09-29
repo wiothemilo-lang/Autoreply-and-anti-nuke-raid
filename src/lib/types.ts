@@ -269,6 +269,18 @@ export interface GuildData {
     ticketDmOnOpen: boolean;
     /** Lời dặn dán ở đầu kênh ticket ({user} {number} {server}); rỗng = không dán. */
     ticketOpenNote: string | null;
+
+    /* ═══ Mẫu kênh ticket (29/09/2026) ═══ */
+    /** Mẫu tên kênh: {number} {user} {kind}. Rỗng = "ticket-{number}" như cũ. */
+    ticketChannelTemplate: string;
+    /** true = @everyone nhìn thấy kênh ticket (mặc định false = chỉ staff + người mở). */
+    ticketChannelPublic: boolean;
+    /** Slowmode kênh ticket (giây). 0 = tắt. */
+    ticketSlowmodeSec: number;
+    /** Ngân sách tin nhắn mỗi kênh; vượt thì bot tự đóng. 0 = không giới hạn. */
+    ticketMessageBudget: number;
+    /** Tạo danh mục con theo từng loại ticket thay vì dồn vào danh mục cha. */
+    ticketCategoryPerKind: boolean;
   };
   heatStates: HeatState[];
   autoReplies: AutoReply[];
