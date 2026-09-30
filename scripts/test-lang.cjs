@@ -8,6 +8,9 @@
 
 const lang = require("../bot/src/handlers/lang");
 
+// /language + resolveUserLang dùng await ở cấp top-level → bọc toàn khối
+// trong async IIFE để không làm hỏng CommonJS require.
+
 let pass = 0,
   fail = 0;
 function check(label, cond) {
@@ -79,5 +82,114 @@ for (const [code, tpl] of Object.entries({
 // ── SUPPORTED khớp số bản dịch template ──
 check("SUPPORTED = vi,en,de", [...lang.SUPPORTED].sort().join(",") === "de,en,vi");
 
-console.log(`\nKết quả lang: ${pass} PASS, ${fail} FAIL`);
-process.exit(fail === 0 ? 0 : 1);
+// ── resolveUserLang + /language ──
+// Lý do cần: hai hàm này chạy ở MỌI tin nhắn và ở /language, nhưng chưa có
+// test nào chạm tới → một nhánh hỏng ở đây chỉ lộ ra trên production.
+// Ưu tiên lựa chọn đã lưu là điều kiện cốt lõi: người dùng đã nói rõ
+// "tôi muốn tiếng Việt" thì đổi client sang English KHÔNG được lật ngược.
+void (async () => {
+  const mkStore = (savedLang) => ({
+    client: {
+      query: async () => (savedLang ? { lang: savedLang } : null),
+      mutation: async () => ({ ok: true }),
+    },
+  });
+  const mkInteraction = (opts = {}) => ({
+    user: { id: "u1", locale: opts.locale ?? "en-US" },
+    guild: opts.guild === null ? null : { id: "g1", preferredLocale: opts.guildLocale ?? "vi" },
+    options: {
+      getString: (name) => (name === "ngon_ngu" ? (opts.option ?? null) : null),
+    },
+    replies: [],
+    reply: async function (r) {
+      this.replies.push(r);
+      return r;
+    },
+  });
+
+  // 1) Lựa chọn đã lưu thắng locale client VÀ locale guild.
+  check(
+    "resolveUserLang: lựa chọn đã lưu thắng mọi thứ",
+    (await lang.resolveUserLang(mkStore("de"), mkInteraction({ locale: "en-US" }), {})) === "de",
+  );
+  // 2) Chưa lưu → tự nhận ra từ locale client.
+  check(
+    "resolveUserLang: chưa lưu → locale client",
+    (await lang.resolveUserLang(mkStore(null), mkInteraction({ locale: "de-AT" }), {})) === "de",
+  );
+  // 3) Lưu ngôn ngữ KHÔNG hỗ trợ (rác trong DB) → bỏ qua, tự nhận ra.
+  check(
+    "resolveUserLang: giá trị rác trong DB bị bỏ qua",
+    (await lang.resolveUserLang(mkStore("xx"), mkInteraction({ locale: "en-US" }), {})) === "en",
+  );
+  // 4) Mất mạng (query throw) → fail-open sang tự nhận ra, không crash.
+  const brokenStore = {
+    client: {
+      query: async () => {
+        throw new Error("mạng chết");
+      },
+      mutation: async () => ({ ok: true }),
+    },
+  };
+  check(
+    "resolveUserLang: query lỗi → fail-open, không throw",
+    (await lang.resolveUserLang(brokenStore, mkInteraction({ locale: "vi" }), {})) === "vi",
+  );
+
+  // 5) /language không có option → báo ngôn ngữ hiện tại, ephemeral.
+  const i1 = mkInteraction();
+  const r1 = await lang.languageCommand(mkStore("de"), i1);
+  check("/language: không option → báo hiện tại", /Deutsch/.test(r1.content));
+  check("/language: không option → ephemeral", r1.ephemeral === true);
+
+  // 6) /language có option hợp lệ → GHI xuống DB, trả lời bằng ngôn ngữ MỚI.
+  const written = [];
+  const store2 = {
+    client: {
+      query: async () => ({ lang: "vi" }),
+      mutation: async (name, args) => {
+        written.push([name, args]);
+        return { ok: true };
+      },
+    },
+  };
+  const r2 = await lang.languageCommand(store2, mkInteraction({ option: "en" }));
+  check(
+    "/language: đổi ngôn ngữ → gọi botSetUserLang",
+    written.length === 1 && written[0][0] === "bot_writes:botSetUserLang",
+  );
+  check(
+    "/language: đổi ngôn ngữ → lưu đúng mã",
+    written[0]?.[1]?.lang === "en" && written[0]?.[1]?.userId === "u1",
+  );
+  check("/language: đổi ngôn ngữ → trả lời bằng ngôn ngữ mới", /English/i.test(r2.content));
+
+  // 7) Option rác (choices ở client nhưng dữ liệu cũ/script có thể gửi) →
+  //    KHÔNG ghi, báo lại ngôn ngữ hiện tại.
+  const r3 = await lang.languageCommand(
+    { client: { query: async () => ({ lang: "vi" }), mutation: async () => ({ ok: true }) } },
+    mkInteraction({ option: "fr" }),
+  );
+  check(
+    "/language: option lạ → báo lại hiện tại, không báo đã đặt",
+    !/đã đặt|set/i.test(r3.content),
+  );
+
+  // 8) Ghi lỗi → vẫn trả lời (người dùng không phải biết lỗi kỹ thuật).
+  const failStore = {
+    client: {
+      query: async () => ({ lang: "vi" }),
+      mutation: async () => {
+        throw new Error("convex down");
+      },
+    },
+  };
+  const r4 = await lang.languageCommand(failStore, mkInteraction({ option: "de" }));
+  check(
+    "/language: ghi lỗi → vẫn trả lời cho người dùng",
+    typeof r4.content === "string" && r4.content.length > 0,
+  );
+
+  console.log(`\nKết quả lang: ${pass} PASS, ${fail} FAIL`);
+  process.exit(fail === 0 ? 0 : 1);
+})();

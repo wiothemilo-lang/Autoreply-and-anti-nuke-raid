@@ -137,6 +137,64 @@ const shared = require("../bot/src/handlers/antinuke/shared");
     check("S4: hết hạn → gỡ role", released === 1 && calls.removes.some((r) => r.id === "bad1"));
     check("S4: sau khi gỡ, state sạch", v._budget.get("g1:bad1")?.isolated === undefined);
 
+    // Role bị admin XOÁ sau khi đã cache: phải tạo lại, không gắn id chết.
+    // (Nhánh này hỏng thì bot âm thầm gọi roles.add với id không tồn tại → mọi
+    // lần cách ly sau đều vô hiệu mà không có log nào cảnh báo.)
+    {
+      const v2 = createVandalBudget();
+      const g2 = {
+        id: "g2",
+        ownerId: "owner-1",
+        roles: { cache: new Map() },
+        members: { fetch: async () => null },
+      };
+      let created2 = 0;
+      g2.roles.cache.find = (fn) => [...g2.roles.cache.values()].find(fn);
+      g2.roles.create = async (o) => {
+        created2++;
+        return { id: `iso-${created2}`, name: o.name };
+      };
+      const mkM = (id) => ({
+        id,
+        permissions: { has: () => false },
+        roles: { add: async () => {} },
+      });
+      // Hai member KHÁC id: cùng id thì nhánh "đang cách ly" chặn trước và
+      // không tới đoạn cần kiểm.
+      const a = await v2.maybeIsolate(g2, mkM("x1"), 11);
+      g2.roles.cache = new Map(); // admin xoá role
+      const b = await v2.maybeIsolate(g2, mkM("x2"), 11);
+      check("S4: role bị xoá → tạo lại role mới", created2 === 2 && b.roleId === "iso-2");
+      check("S4: roleId mới khác roleId cũ", a.roleId === "iso-1" && b.roleId !== a.roleId);
+
+      // Guild ĐÃ có sẵn role cách ly từ trước khi bot restart (RAM mất cache):
+      // phải dùng lại, không tạo role trùng — server này sẽ đầy role rác.
+      const v3 = createVandalBudget();
+      const g3 = {
+        id: "g3",
+        ownerId: "owner-1",
+        roles: {
+          cache: new Map([["pre", { id: "pre", name: "🔒 Protogon Cách Ly" }]]),
+        },
+        members: { fetch: async () => null },
+      };
+      g3.roles.cache.find = (fn) => [...g3.roles.cache.values()].find(fn);
+      let created3 = 0;
+      g3.roles.create = async (o) => {
+        created3++;
+        return { id: "dup", name: o.name };
+      };
+      const c = await v3.maybeIsolate(
+        g3,
+        { id: "x2", permissions: { has: () => false }, roles: { add: async () => {} } },
+        11,
+      );
+      check(
+        "S4: guild đã có role cách ly → dùng lại, không tạo trùng",
+        created3 === 0 && c.roleId === "pre",
+      );
+    }
+
     v.reset();
     check("S4: reset dọn state", v._budget.size === 0 && v._roleCache.size === 0);
   }

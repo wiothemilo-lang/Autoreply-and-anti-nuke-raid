@@ -185,6 +185,25 @@ function check(label, cond) {
     );
     budget.recordPunish(null);
     check("recordPunish(null) không ném", true);
+
+    // ── 5b. Chống phình RAM: >500 guild thì dọn guild NGUỘI ──
+    // Đây là ranh giới rò rỉ bộ nhớ khi bot ở hàng trăm server; nhánh này
+    // hỏng thì RAM bot tăng đều theo số server đã từng phục vụ và không bao
+    // giờ giảm. RẤT QUAN TRỌNG: chỉ dọn entry đã nguội — xoá cả entry còn
+    // trong cửa sổ nghĩa là mất lịch sử phạt và mở lại cửa cho kẻ đang raid.
+    {
+      const T = 10 * 60_000;
+      for (let i = 0; i < 600; i++) budget.recordPunish(`old${i}`, 0);
+      budget.recordPunish("fresh", T);
+      check(">500 guild → dọn entry đã nguội ngoài cửa sổ", budget.usage("old0", T) === 0);
+      check("entry mới ghi vẫn còn", budget.usage("fresh", T) === 1);
+      for (let i = 0; i < 600; i++) budget.recordPunish(`hot${i}`, T);
+      budget.recordPunish("hot600", T);
+      check(
+        "KHÔNG dọn nhầm entry còn trong cửa sổ (giữ lịch sử phạt)",
+        budget.usage("hot0", T) === 1,
+      );
+    }
   }
 
   // ════════ NHÓM 2: AI lỗi giữa trận raid ════════

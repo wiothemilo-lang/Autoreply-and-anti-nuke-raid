@@ -931,8 +931,11 @@ async function scanGuildForAltsAsync(
   const deadline = Date.now() + deadlineMs;
   let hitDeadline = false;
   let sinceYield = 0;
+  // Số thành viên đã quét trọn — khai báo ngoài vòng lặp để `return` báo cáo
+  // được con số thật khi chạm deadline (dừng giữa chừng).
+  let i = 0;
 
-  for (let i = 0; i < members.length && !hitDeadline; i++) {
+  for (; i < members.length && !hitDeadline; i++) {
     for (let j = i + 1; j < members.length; j++) {
       compareAltPair(members[i], members[j], threshold, results);
       // Nhường event loop: tin nhắn/gateway vẫn xử lý được giữa lúc quét.
@@ -948,7 +951,14 @@ async function scanGuildForAltsAsync(
   }
   return {
     links: finalizeAltLinks(results, members, guild),
-    scanned: hitDeadline ? members.length : members.length,
+    // Số thành viên THỰC SỰ đã quét. Trước đây dòng này là
+    // `hitDeadline ? members.length : members.length` — hai nhánh giống hệt,
+    // nên khi chạm deadline bot vẫn log "quét 2000/2000" dù chỉ mới đi tới
+    // thành viên thứ 400. Chủ server đọc log tưởng đã quét trọn server và
+    // không biết cặp nào còn bị bỏ sót (điều mà cả comment bên trên hứa là
+    // không im lặng bỏ sót). `i` là chỉ số thành viên đang xét lúc vòng lặp
+    // dừng → đã quét trọn các thành viên 0..i-1.
+    scanned: hitDeadline ? i : members.length,
     total,
     truncated: total > maxMembers || hitDeadline,
     hitDeadline,

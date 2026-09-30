@@ -305,6 +305,94 @@ const status = { _id: "st", kind: "status", botKeySeed: computeBotKey(BOT_KEY), 
     check("job do im lặng không gắn cờ budget", jobsOf(imLang)[0]?.closeCause === undefined);
   }
 
+  console.log("\n── Job restore: backup tách chunk phải được ghép lại ──");
+  {
+    // Bug thật 30/09/2026: `bot_tick.getPendingJobs` đẩy thẳng `b.backupJson`
+    // cho bot, KHÔNG qua `reassembleBackupJsonForRead`. Bản backup >700KB được
+    // tách chunk nên `backupJson` chỉ là ký hiệu "chunked:N" — bot sẽ khôi
+    // phục từ chuỗi đó và báo "thành công" trong khi thực tế không có server
+    // nào được khôi phục. Đường cũ (`backup:botGetPending`) đã làm đúng: ghép
+    // lại + THIẾU CHUNK thì KHÔNG gửi job (bỏ cờ restore để thấy lỗi rõ).
+    const mkRestoreCtx = (backupRow: any, chunks: any[] = []) => {
+      const ctx = makeCtx({
+        botStatus: [status],
+        guilds: [
+          {
+            _id: "g1",
+            discordId: "g-restore",
+            botInGuild: true,
+            name: "Cần khôi phục",
+            restoreRequested: true,
+            restoreBackupId: "b1",
+          },
+        ],
+        guildBackups: [backupRow],
+        backupChunks: chunks,
+        reactionRolePanels: [],
+        giveaways: [],
+        guildWebhooks: [],
+      });
+      return ctx;
+    };
+
+    // 1) Bản nhỏ (không tách chunk) → trả nguyên văn.
+    const small = await handler(
+      mkRestoreCtx({ _id: "b1", guildId: "g-restore", guildName: "S", backupJson: "z:AAAA" }),
+      { botKey: BOT_KEY },
+    );
+    const smallJob = small.backups.find((b: any) => b.kind === "restore");
+    check(
+      "bản không tách chunk → backupJson nguyên vẹn",
+      !!smallJob && smallJob.backupJson === "z:AAAA",
+    );
+
+    // 2) Bản TÁCH CHUNK, chunk đủ → phải GHÉP LẠI trước khi gửi bot.
+    const payload = "z:" + "X".repeat(1_200_000);
+    const full = await handler(
+      mkRestoreCtx(
+        {
+          _id: "b1",
+          guildId: "g-restore",
+          guildName: "S",
+          backupJson: "chunked:2",
+          backupChunkCount: 2,
+        },
+        [
+          { _id: "c0", backupId: "b1", index: 0, data: payload.slice(0, 600_000) },
+          { _id: "c1", backupId: "b1", index: 1, data: payload.slice(600_000) },
+        ],
+      ),
+      { botKey: BOT_KEY },
+    );
+    const fullJob = full.backups.find((b: any) => b.kind === "restore");
+    check(
+      "bản tách chunk (chunk đủ) → ghép lại, KHÔNG gửi ký hiệu chunked:N cho bot",
+      !!fullJob && fullJob.backupJson === payload,
+    );
+
+    // 3) Thiếu chunk → KHÔNG được gửi job (bot sẽ khôi phục từ dữ liệu cụt).
+    const missing = await handler(
+      mkRestoreCtx(
+        {
+          _id: "b1",
+          guildId: "g-restore",
+          guildName: "S",
+          backupJson: "chunked:3",
+          backupChunkCount: 3,
+        },
+        [
+          { _id: "c0", backupId: "b1", index: 0, data: payload.slice(0, 600_000) },
+          { _id: "c1", backupId: "b1", index: 1, data: payload.slice(600_000) },
+        ],
+      ),
+      { botKey: BOT_KEY },
+    );
+    check(
+      "thiếu chunk → KHÔNG sinh job restore (dữ liệu cụt còn tệ hơn thất bại)",
+      !missing.backups.some((b: any) => b.kind === "restore"),
+    );
+  }
+
   console.log(`\n${pass}/${pass + fail} ✅`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

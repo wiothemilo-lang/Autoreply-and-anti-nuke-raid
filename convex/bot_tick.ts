@@ -2,6 +2,7 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { buildHiddenJobs, getBotStatus } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
+import { reassembleBackupJsonForRead } from "./backupChunks";
 
 /**
  * Batch TỔNG HỢP cho vòng quét định kỳ của bot (gọi mỗi 2 phút thay vì 3 query
@@ -64,6 +65,8 @@ export const getPendingJobs = query({
       fileName?: string;
       importStorageId?: string;
       importFileUrl?: string;
+      // Số chunk của bản backup (chỉ có khi payload bị tách) — dùng để ghép lại.
+      backupChunkCount?: number;
     }[] = [];
     for (const g of guilds) {
       if (g.backupRequested) {
@@ -78,13 +81,27 @@ export const getPendingJobs = query({
       if (g.restoreRequested && g.restoreBackupId) {
         const b = await ctx.db.get(g.restoreBackupId);
         if (b) {
-          backups.push({
-            kind: "restore",
-            guildId: g.discordId,
-            backupId: b._id,
-            backupJson: b.backupJson,
-            guildName: b.guildName,
-          });
+          // Bản backup >700KB được tách thành nhiều document `backupChunks`,
+          // còn `backupJson` trên bản cha chỉ là ký hiệu "chunked:N". Gửi thẳng
+          // ký hiệu đó cho bot ⇒ bot khôi phục từ chuỗi rác rồi báo "thành công"
+          // trong khi không server nào được khôi phục. Đường cũ
+          // (`backup:botGetPending`) đã làm đúng: ghép lại, và hỏng/thiếu chunk
+          // thì KHÔNG sinh job để người dùng thấy cờ treo thay vì mất dữ liệu.
+          const backupJson = await reassembleBackupJsonForRead(
+            ctx,
+            b._id,
+            b.backupJson,
+            b.backupChunkCount,
+          );
+          if (backupJson !== null) {
+            backups.push({
+              kind: "restore",
+              guildId: g.discordId,
+              backupId: b._id,
+              backupJson,
+              guildName: b.guildName,
+            });
+          }
         }
       }
       if (g.importRestoreRequested && g.importStorageId) {

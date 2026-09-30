@@ -475,6 +475,27 @@ module.exports = {
       `chạm deadline → báo cắt (hitDeadline=${deadline.hitDeadline})`,
       deadline.hitDeadline === true && deadline.truncated === true,
     );
+    // 4b) `scanned` phải là SỐ THẬT đã quét, không phải tổng của tập đang xét.
+    // Bug 30/09: dòng return viết
+    //   scanned: hitDeadline ? members.length : members.length
+    // — hai nhánh giống hệt → khi chạm deadline bot log "quét 400/400" dù
+    // chỉ mới đi tới vài chục thành viên, chủ server tưởng đã quét trọn.
+    check(
+      `scanned phản ánh thật khi chạm deadline (${deadline.scanned}/${deadline.total})`,
+      deadline.hitDeadline === true && deadline.scanned < deadline.total,
+    );
+    // Không chạm deadline thì scanned == tổng của tập đang xét (không cắt quy mô).
+    const fullScan = await alt.scanGuildForAltsAsync(mkGuild(40), {}, { deadlineMs: 60_000 });
+    check(
+      `quét trọn thì scanned == tổng (${fullScan.scanned}/${fullScan.total})`,
+      fullScan.scanned === 40 && fullScan.total === 40 && fullScan.hitDeadline === false,
+    );
+    // Chạm trần quy mô (không phải deadline): scanned = số trong trần, total = thật.
+    const cappedScan = await alt.scanGuildForAltsAsync(mkGuild(300), {}, { maxMembers: 50 });
+    check(
+      `chạm trần quy mô: scanned = số trong trần (${cappedScan.scanned}/${cappedScan.total})`,
+      cappedScan.scanned === 50 && cappedScan.total === 300 && cappedScan.hitDeadline === false,
+    );
   }
 
   {
