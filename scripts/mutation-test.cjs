@@ -178,6 +178,128 @@ function assertBudget(mod) {
   return true;
 }
 
+/**
+ * backupAudit.classifyBackup — quyết định bản backup bị XOÁ (--fix) hay giữ.
+ * Mutant sống sót ở đây = có thể xoá nhầm backup thật của khách server, nên
+ * assertion soi CẢ hai chiều: bản hỏng phải "fake", bản tốt phải "real".
+ */
+function assertClassifyBackup(mod) {
+  const { classifyBackup, computeChecksum, unpackBackupJson } = mod;
+  const zlib = require("node:zlib");
+  const pack = (obj) =>
+    "z:" + zlib.deflateSync(Buffer.from(JSON.stringify(obj))).toString("base64");
+  const good = { version: 4, guildId: "g1", roles: [{ id: "r1" }], channels: [{ id: "c1" }] };
+
+  // Bản tốt, checksum khớp → real
+  if (
+    classifyBackup({
+      backupJson: pack(good),
+      source: "backup",
+      roleCount: 1,
+      channelCount: 1,
+      backupChecksum: computeChecksum(JSON.stringify(good)),
+    }).verdict !== "real"
+  )
+    return false;
+  // Bản tốt KHÔNG có checksum → vẫn real (bản cũ)
+  if (
+    classifyBackup({ backupJson: pack(good), source: "backup", roleCount: 1, channelCount: 1 })
+      .verdict !== "real"
+  )
+    return false;
+  // JSON hỏng → fake
+  if (classifyBackup({ backupJson: "z:không-phải-zlib" }).verdict !== "fake") return false;
+  // Rỗng → fake
+  if (classifyBackup({ backupJson: "" }).verdict !== "fake") return false;
+  if (classifyBackup({}).verdict !== "fake") return false;
+  // Thiếu mảng roles/channels → fake (không khôi phục được)
+  if (
+    classifyBackup({
+      backupJson: pack({ version: 4, guildId: "g1", channels: [] }),
+      roleCount: 0,
+      channelCount: 0,
+    }).verdict !== "fake"
+  )
+    return false;
+  if (
+    classifyBackup({
+      backupJson: pack({ version: 4, guildId: "g1", roles: [] }),
+      roleCount: 0,
+      channelCount: 0,
+    }).verdict !== "fake"
+  )
+    return false;
+  // Checksum LỆCH → suspect (không xoá tự động — cần xem tay)
+  if (
+    classifyBackup({
+      backupJson: pack(good),
+      roleCount: 1,
+      channelCount: 1,
+      backupChecksum: "sai-ham",
+    }).verdict !== "suspect"
+  )
+    return false;
+  // roleCount lệch → suspect
+  if (
+    classifyBackup({ backupJson: pack(good), roleCount: 99, channelCount: 1 }).verdict !== "suspect"
+  )
+    return false;
+  // channelCount lệch → suspect (mutant đảo phép so số metadata chết ở đây)
+  if (
+    classifyBackup({ backupJson: pack(good), roleCount: 1, channelCount: 99 }).verdict !== "suspect"
+  )
+    return false;
+  // Thiếu guildId trong snapshot → suspect, KHÔNG phải fake (file import .msc
+  // hợp lệ thường không có guildId; xếp fake sẽ khiến --fix XOÁ NHẦM)
+  const noGuildId = classifyBackup({
+    backupJson: pack({ version: 4, roles: [{ id: "r1" }], channels: [{ id: "c1" }] }),
+    roleCount: 1,
+    channelCount: 1,
+  });
+  if (noGuildId.verdict === "fake") return false;
+  if (!noGuildId.reasons.some((r) => r.includes("guildId"))) return false;
+  // Nguồn lạ → suspect, KHÔNG phải fake
+  if (
+    classifyBackup({ backupJson: pack(good), source: "kẻ-lạ", roleCount: 1, channelCount: 1 })
+      .verdict === "fake"
+  )
+    return false;
+  // unpackBackupJson: rỗng / hỏng / hợp lệ
+  if (unpackBackupJson("").json !== null) return false;
+  if (unpackBackupJson("z:xx").json !== null) return false;
+  if (JSON.stringify(unpackBackupJson(pack({ a: 1 })).json) !== JSON.stringify({ a: 1 }))
+    return false;
+  return true;
+}
+
+/**
+ * util.canManageWithConfig — CỔNG QUYỀN. Cho qua = thành viên thường điều
+ * khiển được bot; chặn nhầm = chủ server mất toàn bộ lệnh. Phải kiểm tra
+ * đủ 4 đường: quyền thật, admin, role đã cấu hình, và mặc định là KHÔNG.
+ */
+function assertManageWithConfig(mod) {
+  const { canManageWithConfig, canManageGuild, isAdmin } = mod;
+  const perms = (...has) => ({ permissions: { has: () => has } });
+  const roles = (...ids) => ({ roles: { cache: new Set(ids) } });
+  const withPerms = { ...perms(true), roles: { cache: new Set() } };
+
+  if (canManageWithConfig(null, {}) !== false) return false; // không có member → KHÔNG
+  if (canManageWithConfig(withPerms, null) !== true) return false; // quyền thật, không cần config
+  if (canManageWithConfig({ ...perms(false, true), roles: { cache: new Set() } }, {}) !== true)
+    return false; // administrator
+  if (canManageWithConfig(roles("mod-1"), { modRoles: ["mod-1"] }) !== true) return false;
+  if (canManageWithConfig(roles("mod-1"), { adminRoles: ["mod-1"] }) !== true) return false;
+  // Role KHÔNG nằm trong cấu hình → phải chặn (mutant "bỏ check config" sống ở đây)
+  if (canManageWithConfig(roles("mod-1"), { modRoles: ["khác"] }) !== false) return false;
+  if (canManageWithConfig(roles("mod-1"), { modRoles: [] }) !== false) return false;
+  if (canManageWithConfig(roles("mod-1"), {}) !== false) return false;
+  // Hàm gốc phải nhất quán với hàm cấp quyền
+  if (canManageGuild(withPerms) !== true) return false;
+  if (canManageGuild(null) !== false) return false;
+  if (isAdmin({ ...perms(false, true), roles: { cache: new Set() } }) !== true) return false;
+  return true;
+}
+
 /** Danh sách mutant: [file, from, to, assertFn, mô tả]. */
 const MUTANTS = [
   // usernameSimilarity (altDetection.js)
@@ -272,6 +394,58 @@ const MUTANTS = [
 
 const FULL = [
   ...MUTANTS,
+  // backupAudit.classifyBackup — quyết định xoá bản backup. Chặn nhầm ở đây
+  // là mất dữ liệu thật của khách server, nên bộ mutant soi cả 2 chiều.
+  [
+    "bot/src/backupAudit.js",
+    "if (missingRoles || missingChannels) {",
+    "if (missingRoles) {",
+    "audit-chỉ-so-roles",
+    assertClassifyBackup,
+  ],
+  [
+    "bot/src/backupAudit.js",
+    'if (row.source && !VALID_SOURCES.has(row.source)) {\n    reasons.push(`nguồn lạ: "${row.source}"`);\n  }',
+    'if (row.source && !VALID_SOURCES.has(row.source)) {\n    return { verdict: "fake", reasons: [`nguồn lạ: "${row.source}"`] };\n  }',
+    "audit-nguồn-lạ-xoá-hẳn",
+    assertClassifyBackup,
+  ],
+  [
+    "bot/src/backupAudit.js",
+    "if (recomputed && recomputed !== row.backupChecksum) {",
+    "if (recomputed && recomputed === row.backupChecksum) {",
+    "audit-checksum-đảo",
+    assertClassifyBackup,
+  ],
+  [
+    "bot/src/backupAudit.js",
+    "if (Array.isArray(json.roles) && row.roleCount !== json.roles.length) {",
+    "if (Array.isArray(json.roles) && row.roleCount === json.roles.length) {",
+    "audit-đảo-so-roleCount",
+    assertClassifyBackup,
+  ],
+  [
+    "bot/src/backupAudit.js",
+    'if (!json.guildId) reasons.push("thiếu guildId trong snapshot");',
+    "// mutant: bỏ cảnh báo thiếu guildId",
+    "audit-bỏ-cảnh-báo-thiếu-guildId",
+    assertClassifyBackup,
+  ],
+  // util.canManageWithConfig — cổng quyền.
+  [
+    "bot/src/util.js",
+    "if (!config || !member) return false;\n  const ids = [...(config.modRoles || []), ...(config.adminRoles || [])];",
+    "if (!config || !member) return true;\n  const ids = [...(config.modRoles || []), ...(config.adminRoles || [])];",
+    "quyền-không-có-config-vẫn-cho",
+    assertManageWithConfig,
+  ],
+  [
+    "bot/src/util.js",
+    "return ids.some((id) => member.roles.cache.has(id));",
+    "return ids.length > 0;",
+    "quyền-role-sai-vẫn-cho",
+    assertManageWithConfig,
+  ],
   [
     "bot/src/actionBudget.js",
     "const list = hits.get(guildId);\n    if (!list) return true;",

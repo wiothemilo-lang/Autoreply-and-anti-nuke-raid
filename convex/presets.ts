@@ -207,8 +207,12 @@ export const applyPreset = mutation({
       updatedAt: now,
       settingsChangedAt: Date.now(),
     };
-    for (const [k, v] of Object.entries(def.global)) {
-      globalPatch[k] = v;
+    // TÊN BIẾN CỐ Ý KHÁC `v`: ở đây khai báo `v` sẽ CHE MẤT `v` validator của
+    // convex/values trong phạm vi toàn thân hàm. Hiện tại vẫn chạy (không có
+    // `v.xxx()` nào sau đó), nhưng chỉ cần ai thêm một dòng validator là nổ
+    // TypeError lúc runtime — lỗi chỉ lộ trên production.
+    for (const [key, value] of Object.entries(def.global)) {
+      globalPatch[key] = value;
     }
     await ctx.db.patch(guild._id, globalPatch);
 
