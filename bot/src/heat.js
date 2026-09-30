@@ -246,8 +246,17 @@ class HeatTracker {
     if (!entry) return 0;
     const heat = this._decay(entry, s);
     if (heat <= 0) {
-      this.states.delete(key);
       this.warned.delete(key);
+      // Nhiệt nguội về 0 NHƯNG còn trong cửa sổ tái phạm → GIỮ entry: đây là
+      // chỗ DUY NHẤT nhớ `lastPunishedAt`, xoá đi là mất luôn hệ số nhân tái
+      // phạm (bug thật: `add()` gọi `getHeat()` trước khi đọc entry, nên mọi
+      // lần tái phạm sau khi nhiệt đã nguội về 0 đều không được nhân — trong
+      // khi cả `flushGuild` lẫn `sweepCold` đều cố ý giữ entry cho mục đích
+      // này, tức phần giữ đó trước giờ vô hiệu). Hết cửa sổ thì dọn ngay tại
+      // đây, nên không rò rỉ RAM.
+      const withinRepeat =
+        !!entry.lastPunishedAt && Date.now() - entry.lastPunishedAt < s.repeatWindowMin * MIN_MS;
+      if (!withinRepeat) this.states.delete(key);
     } else if (heat < s.warnAt) {
       this.warned.delete(key); // nguội xuống dưới ngưỡng → có thể cảnh báo lại lần sau
     }

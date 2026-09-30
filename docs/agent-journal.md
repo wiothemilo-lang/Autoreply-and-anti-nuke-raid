@@ -4,6 +4,38 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 30/09/2026 — Test tầng bot `heat.js` + sửa lỗi mất mốc tái phạm
+
+- 🐛 **BUG THẬT (đã sửa)**: `HeatTracker.getHeat()` xoá entry khi nhiệt nguội về 0
+  **bất kể** `lastPunishedAt`. Nhưng `add()` gọi `getHeat()` TRƯỚC khi đọc entry, mà
+  entry là chỗ DUY NHẤT nhớ mốc vừa bị phạt → mọi lần tái phạm sau khi nhiệt đã nguội
+  về 0 đều **không được nhân `heatRepeatMultiplier`**, dù `flushGuild` (`keepPunished`)
+  lẫn `sweepCold` đều cố ý giữ entry cho đúng mục đích này (tức phần giữ đó vô hiệu).
+  Đây là ca BÌNH THƯỜNG, không phải hiếm: điểm warn nhỏ + decay mặc định 3/phút → nhiệt
+  về 0 sau vài phút, ngắn hơn hẳn cửa sổ tái phạm 30 phút. Sửa: `getHeat` giữ entry khi
+  `lastPunishedAt` còn trong `heatRepeatWindowMin`, hết cửa sổ thì dọn ngay tại đó →
+  vẫn không rò rỉ RAM.
+- ✅ Mở rộng `scripts/test-heat.cjs` (30 → 81 check): ranh giới 10 mốc `tierFor` · cổng
+  chặn điểm rác của `add` (0/âm/`heatEnabled=false`) · **hồi quy tái phạm** (nhiệt nguội
+  về 0 vẫn nhân x2 rồi x3, ca bị phạt khi chưa có nhiệt, đường flush → add) · ra khỏi
+  cửa sổ → dọn RAM + hết nhân · DM cảnh báo `_maybeWarn` (1 lần/chu kỳ, cảnh báo lại khi
+  nguội xuống dưới ngưỡng, fetch lỗi/DM đóng/guild lạ không ném) · `heatSnapshot` (sắp
+  giảm dần, cap 15, bỏ nhiệt 0, tên trống) · `flushAll` + gộp lịch flush · user chỉ có
+  warn strike · `getConfig` lỗi → dùng defaults · config riêng của guild (decay 0) ·
+  tăng cấp strike + `warnStrikeLimit=0` · `resetGuild` xoá warn tích luỹ · `heatSummary`.
+- 🧪 Chứng minh test bắt bug: đảo nhánh giữ entry về `false` → **5 FAIL đúng các check
+  tái phạm** (76/81); áp lại fix → 81/81.
+- 📁 File đụng: `bot/src/heat.js`, `scripts/test-heat.cjs`, `docs/agent-journal.md`,
+  `docs/decision-log.md`
+- 🧪 Kiểm chứng: format OK · lint OK · tsc OK · 81/81 suites CJS · 20/20 suites TS ·
+  coverage floor OK (`heat.js` 92.6% → **99.06%** dòng, nhánh 93.5%, hàm 100%) · toàn cục
+  95.04% stmts · mutation 20/20 · repo-map / convex-contract / i18n / settings-signal OK
+- ▶️ Tiếp theo: `sweepCold()` giả định decay **1 điểm/phút** cho mọi guild trong khi
+  `heatDecayPerMin` cấu hình được (kể cả 0) → guild đặt decay < 1 sẽ bị dọn MẤT nhiệt còn
+  hiệu lực sau ~10 phút im lặng (mất trí nhớ leo thang). Cần truyền decay thật vào sweeper
+  (đổi API `sweepCold` + wiring `index.js`) hoặc bỏ nhánh ước lượng. Chưa sửa trong lượt
+  này vì ngoài phạm vi "test tầng bot" — cần test riêng cho sweeper.
+
 ## 30/09/2026 — Test `botRecordHeatBatch` + sửa lỗi bịa nhiệt độ 0
 
 - 🐛 **BUG THẬT (đã sửa)**: `botRecordHeatBatch` và `botRecordHeat` ép nhiệt tối thiểu 1
