@@ -21,6 +21,22 @@ const ALLOWED_ACTIONS = [
 const ACTION_STRENGTH: Record<string, number> = { warn: 1, timeout: 2, kick: 3, ban: 4 };
 const BACKUP_CLAIM_TTL_MS = 600_000;
 
+/**
+ * Chuẩn hoá nhiệt độ trước khi ghi vào bảng `heatStates`.
+ *
+ * Nhiệt là số lần vi phạm đã bị trừ dần theo thời gian, nên 0 là trạng thái hợp lệ:
+ * người dùng hết nhiệt nhưng vẫn còn warn tích luỹ trong cửa sổ tái phạm (bot flush
+ * gửi `heat: Math.max(0, heat)` + `warnStrikes` riêng → `0` kèm warn là tình huống thật).
+ * Trước đây ta ép tối thiểu 1 (`Math.max(1, …)`) → bịa thêm 1 lần vi phạm cho hàng đó,
+ * lệch với mọi nơi đọc: `reports.ts` đã lọc `heat > 0`, `guilds.ts` tính an toàn theo
+ * `100 - heat`, lệnh `/heat top` xếp hạng theo nhiệt. Nay chỉ chặn trên [0, 100],
+ * bot gửi 0 thì nhận đúng 0.
+ */
+function clampHeat(raw: number): number {
+  if (!Number.isFinite(raw)) return 0;
+  return Math.min(100, Math.max(0, Math.round(raw)));
+}
+
 function claimIsActive(claimedAt: number | undefined, leaseUntil?: number): boolean {
   if (claimedAt === undefined) return false;
   return leaseUntil !== undefined
@@ -420,7 +436,7 @@ export const botRecordHeatBatch = mutation({
       if (existing) {
         await ctx.db.patch(existing._id, {
           username: e.username ?? existing.username,
-          heat: Math.max(1, Math.min(100, Math.round(e.heat))),
+          heat: clampHeat(e.heat),
           updatedAt: e.updatedAt,
           warnStrikes: strikes,
         });
@@ -429,7 +445,7 @@ export const botRecordHeatBatch = mutation({
           guildId: args.guildId,
           userId: e.userId,
           username: e.username ?? "",
-          heat: Math.max(1, Math.min(100, Math.round(e.heat))),
+          heat: clampHeat(e.heat),
           updatedAt: e.updatedAt,
           warnStrikes: strikes,
         });
@@ -571,7 +587,7 @@ export const botRecordHeat = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         username: args.username ?? existing.username,
-        heat: Math.max(1, Math.min(100, Math.round(args.heat))),
+        heat: clampHeat(args.heat),
         updatedAt: args.updatedAt,
         warnStrikes: strikes,
       });
@@ -580,7 +596,7 @@ export const botRecordHeat = mutation({
         guildId: args.guildId,
         userId: args.userId,
         username: args.username ?? "",
-        heat: Math.max(1, Math.min(100, Math.round(args.heat))),
+        heat: clampHeat(args.heat),
         updatedAt: args.updatedAt,
         warnStrikes: strikes,
       });

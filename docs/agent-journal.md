@@ -4,6 +4,30 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 30/09/2026 — Test `botRecordHeatBatch` + sửa lỗi bịa nhiệt độ 0
+
+- 🐛 **BUG THẬT (đã sửa)**: `botRecordHeatBatch` và `botRecordHeat` ép nhiệt tối thiểu 1
+  (`Math.max(1, Math.min(100, Math.round(x)))`). Nhưng nhiệt là số vi phạm bị trừ dần
+  theo thời gian, và bot flush gửi `heat: Math.max(0, heat)` + `warnStrikes` RIÊNG →
+  tình huống **nhiệt 0 nhưng còn warn tích luỹ** là thật. Hàng đó bị ghi thành
+  `heat: 1` = bịa 1 lần vi phạm cho người không có vi phạm. Lệch với mọi nơi đọc:
+  `reports.ts` đã lọc `heat > 0`, `guilds.ts` tính `% an toàn = 100 - heat`, lệnh
+  `/heat top` xếp hạng theo nhiệt → người bị đẩy lên top-heat oan. Sửa: tách helper
+  `clampHeat()` chặn `[0, 100]` + chặn `NaN/Infinity` → 0, dùng chung cho cả 4 chỗ
+  ghi `heatStates` (patch/insert của cả hai mutation).
+- ✅ Thêm `scripts/test-bot-record-heat-batch.ts` — 36 check, ctx giả trong bộ nhớ:
+  cổng botKey (sai/thiếu → từ chối và 0 dòng ghi) · ghi mới · batch 3 người · upsert
+  (patch không tạo trùng, thiếu `username` → giữ tên cũ) · dọn hàng 0/0 · chặn rác
+  (âm, >100, phân thập, `warnStrikes` âm) · `userId` lặp trong 1 batch (entry cuối
+  thắng) · batch rỗng · tách guild. **Chứng minh bắt bug**: đảo `clampHeat` về
+  công thức cũ → 33/36 (3 ❌ đúng chỗ nhiệt 0 bị làm thành 1); áp lại fix → 36/36.
+- 📁 File đụng: `convex/bot_writes.ts`, `scripts/test-bot-record-heat-batch.ts`,
+  `AGENTS.md` (suite TS 19 → 20), `docs/agent-journal.md`
+- 🧪 Kiểm chứng: convex codegen OK · tsc OK · lint OK · format OK · 81/81 suites CJS ·
+  **20/20 suites TS** · repo-map OK · convex-contract OK · i18n + settings-signal
+  self-test OK · web-contracts 231 PASS · mutation 20/20 · coverage 94.88% stmts
+- ▶️ Tiếp theo: không có — chờ yêu cầu mới
+
 ## 28/09/2026 — Đợt "cửa trước production + desloppify" (session polish)
 
 - 🔴 **BUG THẢM HOẠ ĐÃ SỬA (đo bằng trình duyệt thật)**: CSP production cả
