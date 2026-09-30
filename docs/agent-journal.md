@@ -4,6 +4,31 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 30/09/2026 — Sweeper nhiệt dùng decay thật của guild (bug dọn mất nhiệt còn sống)
+
+- 🐛 **BUG THẬT (đã sửa)**: `HeatTracker.sweepCold()` (memGuard gọi mỗi 10 phút) giả
+  định MỌI guild giảm **1 điểm/phút**, trong khi `heatDecayPerMin` cấu hình được
+  (`Math.max(0, …)`, kể cả 0 = không bao giờ giảm). Guild đặt decay < 1 vì thế bị coi là
+  "đã nguội" → dọn **MẤT nhiệt còn sống** sau ~10 phút im lặng: bot quên leo thang
+  (timeout/kick/ban) trong khi hàng `heatStates` trên Convex vẫn còn nhiệt → dashboard
+  và bot nói hai chuyện khác nhau (đúng kiểu lệch RAM ⇄ DB).
+- ✅ Sửa: `add()` ghi kèm `decayPerMin` của guild lên entry · `markPunished()` giữ
+  nguyên · `getHeat()` cập nhật lại theo config mới nhất (mỗi vi phạm, mỗi lượt
+  `/heat status`) · `sweepCold()` dùng đúng decay đó (entry cũ thiếu field → giữ nguyên
+  hành vi 1 điểm/phút, không đổi dữ liệu cũ).
+- 🧪 Thêm 7 check vào `scripts/test-heat.cjs` (81 → **88**): `add` ghi decay · decay 0 →
+  sweeper KHÔNG dọn · decay 0.5 → giữ nhiệt còn sống · decay 3 → vẫn dọn khi nguội thật
+  (không rò rỉ RAM) · `getHeat` cập nhật decay mới · đổi config sang decay 0 → giữ nhiệt
+  · `markPunished` không làm mất decay.
+- 🧪 Chứng minh test bắt bug: trả `sweepCold` về hardcode 1 điểm/phút → **3 FAIL**
+  (85/88); áp lại fix → 88/88.
+- 📁 File đụng: `bot/src/heat.js`, `scripts/test-heat.cjs`, `docs/agent-journal.md`,
+  `docs/decision-log.md`
+- 🧪 Kiểm chứng: format OK · lint OK · tsc OK · 81/81 suites CJS · 20/20 suites TS ·
+  coverage floor OK (`heat.js` 99.09% dòng, hàm 100%) · mutation 20/20 · repo-map /
+  convex-contract / i18n / settings-signal OK
+- ▶️ Tiếp theo: không có — chờ yêu cầu mới
+
 ## 30/09/2026 — Test tầng bot `heat.js` + sửa lỗi mất mốc tái phạm
 
 - 🐛 **BUG THẬT (đã sửa)**: `HeatTracker.getHeat()` xoá entry khi nhiệt nguội về 0
@@ -30,11 +55,8 @@
 - 🧪 Kiểm chứng: format OK · lint OK · tsc OK · 81/81 suites CJS · 20/20 suites TS ·
   coverage floor OK (`heat.js` 92.6% → **99.06%** dòng, nhánh 93.5%, hàm 100%) · toàn cục
   95.04% stmts · mutation 20/20 · repo-map / convex-contract / i18n / settings-signal OK
-- ▶️ Tiếp theo: `sweepCold()` giả định decay **1 điểm/phút** cho mọi guild trong khi
-  `heatDecayPerMin` cấu hình được (kể cả 0) → guild đặt decay < 1 sẽ bị dọn MẤT nhiệt còn
-  hiệu lực sau ~10 phút im lặng (mất trí nhớ leo thang). Cần truyền decay thật vào sweeper
-  (đổi API `sweepCold` + wiring `index.js`) hoặc bỏ nhánh ước lượng. Chưa sửa trong lượt
-  này vì ngoài phạm vi "test tầng bot" — cần test riêng cho sweeper.
+- ▶️ Tiếp theo (đã xử lý trong entry mới nhất phía trên): `sweepCold()` hardcode decay
+  1 điểm/phút cho mọi guild → guild đặt decay < 1 bị dọn mất nhiệt còn hiệu lực.
 
 ## 30/09/2026 — Test `botRecordHeatBatch` + sửa lỗi bịa nhiệt độ 0
 

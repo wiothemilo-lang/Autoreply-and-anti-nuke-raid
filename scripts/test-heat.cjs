@@ -569,6 +569,66 @@ function mkTracker(opts = {}) {
     );
   }
 
+  console.log("\n── sweepCold: tôn trọng tốc độ giảm thật của guild ──");
+  {
+    // ⚠️ Bug thật đã sửa: sweeper hardcode 1 điểm/phút cho MỌI guild. Guild cấu
+    // hình heatDecayPerMin < 1 (kể cả 0 = không bao giờ giảm) vì thế bị coi là
+    // "đã nguội" và dọn MẤT nhiệt còn sống sau ~10 phút im lặng → mất trí nhớ
+    // leo thang, lệch với hàng heatStates vẫn còn nguyên bên Convex.
+    const { tracker } = mkTracker();
+    const s0 = heatSettings({ heatDecayPerMin: 0 });
+    await tracker.add("g1", "u1", "A", 50, s0);
+    check(
+      "add ghi kèm decay của guild lên entry",
+      tracker.states.get("g1:u1").decayPerMin === 0,
+      String(tracker.states.get("g1:u1").decayPerMin),
+    );
+    tracker.states.get("g1:u1").updatedAt = Date.now() - 180 * MIN; // 3 tiếng im lặng
+    check(
+      "decay 0 (không giảm) → sweeper KHÔNG dọn nhiệt còn sống",
+      tracker.sweepCold() === 0 && tracker.states.has("g1:u1"),
+    );
+
+    const s05 = heatSettings({ heatDecayPerMin: 0.5 });
+    await tracker.add("g2", "u2", "B", 5, s05);
+    tracker.states.get("g2:u2").updatedAt = Date.now() - 6 * MIN; // còn 2 nhiệt
+    check(
+      "decay 0.5 → nhiệt còn sống thì giữ",
+      tracker.sweepCold() === 0 && tracker.states.has("g2:u2"),
+    );
+
+    // Ngược lại: entry đã nguội thật thì vẫn phải dọn (không rò rỉ RAM).
+    const s3 = heatSettings({ heatDecayPerMin: 3 });
+    await tracker.add("g3", "u3", "C", 5, s3);
+    tracker.states.get("g3:u3").updatedAt = Date.now() - 10 * MIN;
+    check(
+      "decay 3 → hết nhiệt thì vẫn dọn khỏi RAM",
+      tracker.sweepCold() === 1 && !tracker.states.has("g3:u3"),
+    );
+
+    // Guild đổi heatDecayPerMin sau khi entry đã tạo → lần đọc nhiệt cập nhật lại.
+    const { tracker: t2 } = mkTracker();
+    await t2.add("g4", "u4", "D", 40, s3);
+    t2.getHeat("g4", "u4", s0); // guild đổi sang decay 0
+    check(
+      "getHeat cập nhật decay mới lên entry",
+      t2.states.get("g4:u4").decayPerMin === 0,
+      String(t2.states.get("g4:u4").decayPerMin),
+    );
+    t2.states.get("g4:u4").updatedAt = Date.now() - 30 * MIN;
+    check(
+      "đổi config sang decay 0 → sweeper giữ nhiệt",
+      t2.sweepCold() === 0 && t2.states.has("g4:u4"),
+    );
+
+    tracker.markPunished("g2", "u2");
+    check(
+      "markPunished giữ nguyên decay của entry",
+      tracker.states.get("g2:u2").decayPerMin === 0.5,
+      String(tracker.states.get("g2:u2").decayPerMin),
+    );
+  }
+
   console.log("\n── heatSummary: dòng log cho mod ──");
   {
     check("không có kết quả nhiệt → chuỗi rỗng", heatSummary(null) === "");
