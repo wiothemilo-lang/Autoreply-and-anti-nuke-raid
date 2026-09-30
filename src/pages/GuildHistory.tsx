@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import PageReveal from "../components/PageReveal";
+import PageSplash from "../components/PageSplash";
 import {
   ArrowLeft,
   CalendarDays,
@@ -84,7 +85,7 @@ export default function GuildHistory() {
   if (guild === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <PageSplash minHeight="min-h-screen" />
       </div>
     );
   }

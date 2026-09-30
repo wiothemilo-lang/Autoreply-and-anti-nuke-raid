@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAction } from "convex/react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "../components/ui/button";
 import SkipLink from "../components/SkipLink";
+import PageSplash from "../components/PageSplash";
 import {
   OAUTH_STATE_KEY,
   OAUTH_VERIFIER_KEY,
@@ -171,8 +172,7 @@ export default function DiscordCallback() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm">{translate("Đang xác thực với Discord…")}</p>
+            <PageSplash minHeight="min-h-0" label={translate("Đang xác thực với Discord…")} />
           </div>
         )}
       </div>

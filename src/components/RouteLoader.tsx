@@ -1,4 +1,5 @@
 import { translate } from "../lib/i18n";
+import LoadingRipple from "./LoadingRipple";
 
 /**
  * RouteLoader — màn chờ toàn màn hình khi React đang tải chunk của route mới.
@@ -19,10 +20,11 @@ import { translate } from "../lib/i18n";
  *   · chữ ở ĐÁY màn   → preloader đặt chữ ngay dưới logo ở giữa
  *
  * ── VÌ SAO KHÔNG DÙNG LẠI PageSplash ──────────────────────────────────────
- * PageSplash (dùng khi dashboard đổi server) là logo cá voi + thanh tiến
- * trình — cùng hệ với preloader, nên tái dùng nó sẽ tái tạo đúng cảm giác
- * "load lần nữa" mà ở trên đã cố tránh. RouteLoader là màn riêng cho chuyển
- * route.
+ * PageSplash (dùng khi dashboard đổi server) trước đây là logo cá voi + thanh
+ * tiến trình — cùng hệ với preloader, nên tái dùng nó sẽ tái tạo đúng cảm
+ * giác "load lần nữa" mà ở trên đã cố tránh. Nay cả hai cùng dùng chung
+ * `LoadingRipple`: RouteLoader phủ toàn màn, PageSplash nằm trong bố cục
+ * trang, nhưng hình ảnh là MỘT — không còn màn nào trùng preloader.
  *
  * ── ACCESSIBILITY ──────────────────────────────────────────────────────────
  * `role="status"` + `aria-live="polite"`: trình đọc màn hình đọc "Đang tải…"
@@ -52,25 +54,7 @@ export default function RouteLoader() {
       />
 
       {/* Vòng sóng: 2 vòng nở ra lệch pha nhau quanh một chấm ở giữa. */}
-      <div aria-hidden className="relative flex h-44 w-44 items-center justify-center">
-        {/* Vòng xoay nét đứt — chuyển động LIÊN TỤC để màn không bao giờ
-            trông "đứng hình" giữa hai nhịp nở của vòng sóng.
-
-            Dùng `animate-[spin_9s_linear_infinite]` (shorthand animation trong
-            arbitrary value) CHỨ KHÔNG dùng `animate-spin` + `[animation-duration:9s]`:
-            `animate-spin` phát ra shorthand `animation: spin 1s ...` và đặt nó
-            SAU trong stylesheet nên nó ghi đè animation-duration → vòng quay
-            1s, quá nhanh, gây nhoáng. Một khai báo shorthand duy nhất thì không
-            ai ghi đè ai. (Đo được trên Chromium: 1s trước khi sửa.) */}
-        <span className="absolute inset-0 rounded-full border border-dashed border-foreground/15 motion-safe:animate-[spin_9s_linear_infinite]" />
-
-        <span className="absolute inset-6 rounded-full border border-foreground/20 motion-safe:animate-pulse-ring" />
-        <span className="absolute inset-6 rounded-full border border-foreground/20 motion-safe:animate-pulse-ring [animation-delay:0.6s]" />
-
-        {/* Chấm nguồn — neo mắt, đồng thời là chi tiết duy nhất "chạy" khi
-            tắt chuyển động. */}
-        <span className="relative h-2.5 w-2.5 rounded-full bg-foreground motion-safe:animate-pulse-fade" />
-      </div>
+      <LoadingRipple className="h-44 w-44" />
 
       {/* Chữ đặt ở ĐÁY màn, tracking rộng, chữ nhỏ — khác hẳn preloader đặt
           chữ ngay dưới logo ở giữa màn. */}

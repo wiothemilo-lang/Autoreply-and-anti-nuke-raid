@@ -15,6 +15,7 @@ import { useMutation, useQuery } from "convex/react";
 import { ArrowLeft, Check, CircleDot, Loader2, ShieldAlert, Undo2 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import PageReveal from "../components/PageReveal";
+import PageSplash from "../components/PageSplash";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -50,7 +51,7 @@ export default function GuildIncidents() {
   if (guild === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <PageSplash minHeight="min-h-screen" />
       </div>
     );
   }
@@ -133,9 +134,7 @@ export default function GuildIncidents() {
           )}{" "}
         </p>
         {incidents === undefined ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
+          <PageSplash className="py-16" minHeight="min-h-0" />
         ) : list.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center gap-3 py-14 text-center">

@@ -1185,6 +1185,91 @@ check("logo cá voi có trong BotLogo.tsx (web)", botLogoSrc.includes("/logo-mar
 const routeLoaderPath = path.join(SRC, "components", "RouteLoader.tsx");
 check("có component RouteLoader riêng", fs.existsSync(routeLoaderPath));
 const loaderSrc = fs.existsSync(routeLoaderPath) ? fs.readFileSync(routeLoaderPath, "utf8") : "";
+
+// ── MỘT NGÔN NGỮ HÌNH ẢNH DUY NHẤT CHO MỌI MÀN CHỜ ──
+// Preloader #boot giữ quyền độc quyền về logo + thanh tiến trình + số %. Trước
+// đây PageSplash dựng y hệt preloader (logo cá voi + thanh 140px) nên người
+// dùng thấy màn đó lặp lại ngay sau khi thoát màn khởi động → tưởng "load 2
+// lần" (báo cáo 30/09/2026). Nay cả RouteLoader lẫn PageSplash cùng dùng
+// LoadingRipple; luật ở đây chốt: không component nào khác được dựng lại
+// danh tính preloader, và không tự vẽ vòng sóng riêng.
+const ripplePath = path.join(SRC, "components", "LoadingRipple.tsx");
+check("có component LoadingRipple dùng chung", fs.existsSync(ripplePath));
+const rippleSrc = fs.existsSync(ripplePath) ? fs.readFileSync(ripplePath, "utf8") : "";
+const pageSplashPath = path.join(SRC, "components", "PageSplash.tsx");
+check("có component PageSplash", fs.existsSync(pageSplashPath));
+const pageSplashSrc = fs.existsSync(pageSplashPath) ? fs.readFileSync(pageSplashPath, "utf8") : "";
+check(
+  "PageSplash dùng chung LoadingRipple (không tự vẽ màn chờ riêng)",
+  /import LoadingRipple from "\.\/LoadingRipple"/.test(pageSplashSrc) &&
+    /<LoadingRipple/.test(pageSplashSrc) &&
+    !/animate-route-progress/.test(pageSplashSrc),
+);
+check(
+  "RouteLoader dùng chung LoadingRipple (một ngôn ngữ hình ảnh)",
+  /import LoadingRipple from "\.\/LoadingRipple"/.test(loaderSrc) &&
+    /<LoadingRipple/.test(loaderSrc),
+);
+check(
+  "PageSplash KHÔNG mạo danh preloader (logo / thanh tiến trình)",
+  // Chỉ soi code thật, KHÔNG soi chữ trong ghi chú — file này cố tình giải
+  // thích "vì sao bỏ logo" nên tên ảnh có thể xuất hiện trong comment.
+  !/import\s*\{\s*WhaleIcon/.test(pageSplashSrc) &&
+    !/<WhaleIcon/.test(pageSplashSrc) &&
+    !/src="\/logo-mark\.png"/.test(pageSplashSrc) &&
+    !/id="boot"/.test(pageSplashSrc) &&
+    !/boot-fill|boot-pct|boot-track/.test(pageSplashSrc),
+);
+check(
+  "PageSplash thông báo cho trình đọc màn hình (sr-only + translate)",
+  /role="status"/.test(pageSplashSrc) &&
+    /aria-live="polite"/.test(pageSplashSrc) &&
+    /sr-only/.test(pageSplashSrc) &&
+    /translate\("Đang tải…"\)/.test(pageSplashSrc),
+);
+check(
+  "LoadingRipple tôn trọng prefers-reduced-motion (motion-safe:)",
+  /motion-safe:animate-/.test(rippleSrc) && /motion-safe:animate-pulse-fade/.test(rippleSrc),
+);
+check(
+  "KHÔNG component nào khác dựng lại vòng sóng (chỉ LoadingRipple được vẽ)",
+  // Soi thuộc tính JSX thật, KHÔNG soi chữ trong ghi chú.
+  (() => {
+    const compDir = path.join(SRC, "components");
+    const offenders = [];
+    for (const f of fs.readdirSync(compDir)) {
+      if (!f.endsWith(".tsx") || f === "LoadingRipple.tsx") continue;
+      const s = fs.readFileSync(path.join(compDir, f), "utf8");
+      if (/animate-pulse-ring|animate-pulse-fade/.test(s)) offenders.push(f);
+    }
+    return offenders.length === 0;
+  })(),
+);
+check(
+  "MỌI màn chờ toàn trang dùng PageSplash, không tự vẽ Loader2",
+  // Mẫu cấm: thẻ `min-h-screen` (màn chờ phủ trang) đi cùng `animate-spin`.
+  // Loại trừ các spinner NHỎ nằm trong nút/panel (h-3.5/h-4/w-4…) — đó là
+  // trạng thái nút, không phải màn chờ.
+  (() => {
+    const roots = [path.join(SRC, "components"), path.join(SRC, "pages")];
+    const offenders = [];
+    for (const dir of roots) {
+      for (const f of fs.readdirSync(dir)) {
+        if (!f.endsWith(".tsx")) continue;
+        const p = path.join(dir, f);
+        const s = fs.readFileSync(p, "utf8");
+        if (!/min-h-screen/.test(s)) continue;
+        // Chỉ soi JSX thật: bỏ qua phần comment.
+        const code = s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+        for (const m of code.matchAll(/animate-spin[^"]*/g)) {
+          const frag = code.slice(Math.max(0, m.index - 260), m.index);
+          if (/min-h-screen/.test(frag)) offenders.push(`${f}: ${m[0]}`);
+        }
+      }
+    }
+    return offenders.length === 0 ? true : false;
+  })(),
+);
 check(
   "RouteLoader được dùng làm fallback của <Suspense> trong App.tsx",
   /import RouteLoader from "\.\/components\/RouteLoader"/.test(appSrc) &&
@@ -1217,8 +1302,8 @@ check(
     !/boot-fill|boot-pct|boot-track/.test(loaderSrc),
 );
 check(
-  "RouteLoader tôn trọng prefers-reduced-motion (motion-safe:)",
-  /motion-safe:animate-/.test(loaderSrc),
+  "RouteLoader tôn trọng prefers-reduced-motion (motion-safe: qua LoadingRipple)",
+  /motion-safe:animate-/.test(loaderSrc) || /<LoadingRipple/.test(loaderSrc),
 );
 check(
   "RouteLoader KHÔNG tự khai báo lớp phủ preloader thứ hai",

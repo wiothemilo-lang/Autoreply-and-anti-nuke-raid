@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
 import PageReveal from "../components/PageReveal";
+import PageSplash from "../components/PageSplash";
 import {
   ArrowLeft,
   Flame,
@@ -135,7 +136,7 @@ export default function StatsPage() {
   if (me === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <PageSplash minHeight="min-h-screen" />
       </div>
     );
   }

@@ -25,6 +25,7 @@ import { cn } from "../lib/utils";
 
 import LangSwitch from "../components/LangSwitch";
 import SkipLink from "../components/SkipLink";
+import PageSplash from "../components/PageSplash";
 
 import { dateLocale, translate } from "../lib/i18n";
 function AdminContent() {
@@ -45,7 +46,7 @@ function AdminContent() {
   if (isOwner === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <PageSplash minHeight="min-h-screen" />
       </div>
     );
   }

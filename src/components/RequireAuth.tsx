@@ -2,7 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { getSessionToken } from "../lib/discord";
-import { Loader2 } from "lucide-react";
+import PageSplash from "./PageSplash";
 
 import { translate } from "../lib/i18n";
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -22,15 +22,11 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
         className="flex min-h-screen items-center justify-center bg-background"
         aria-busy="true"
       >
-        <div
-          className="flex flex-col items-center gap-3 text-muted-foreground"
-          role="status"
-          aria-live="polite"
-        >
-          <h1 className="sr-only">{translate("Đang kiểm tra phiên đăng nhập")}</h1>
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-sm">{translate("Đang kiểm tra phiên đăng nhập…")}</span>
-        </div>
+        {/* Dùng chung PageSplash (vòng sóng) chứ không tự dựng Loader2: mở
+            dashboard là đi qua màn này TRƯỚC PageSplash của trang, hai màn
+            liền nhau phải trông như một. */}
+        <h1 className="sr-only">{translate("Đang kiểm tra phiên đăng nhập")}</h1>
+        <PageSplash minHeight="min-h-screen" label={translate("Đang kiểm tra phiên đăng nhập…")} />
       </main>
     );
   }
