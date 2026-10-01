@@ -408,7 +408,11 @@ export default function ReactionRolesPanel({ data }: { data: GuildData }) {
                   </p>
                   {p.postError && (
                     <p className="mt-1 rounded-md border border-danger/30 bg-danger/10 px-2 py-1 text-xs text-danger">
-                      ⚠️ {p.postError}
+                      {/* translate() là an toàn với mọi chuỗi: không có key thì trả
+                          nguyên bản, nên lỗi từ Discord/Convex hiện như cũ — nhưng
+                          lỗi do backend tự sinh ("Lỗi không xác định") sẽ được dịch
+                          thay vì lọt tiếng Việt ra giao diện EN/DE. */}
+                      ⚠️ {translate(p.postError)}
                     </p>
                   )}
                   <p className="mt-0.5 text-xs text-muted-foreground">

@@ -149,7 +149,9 @@ export default function GiveawayPanel({ data }: { data: GuildData }) {
                   </p>
                   {g.postError && (
                     <p className="mt-1 rounded-md border border-danger/30 bg-danger/10 px-2 py-1 text-xs text-danger">
-                      {translate("⚠️ Bot không gửi được giveaway:")} {g.postError}
+                      {/* xem ReactionRolesPanel: translate() giữ nguyên lỗi lạ,
+                          dịch lỗi do backend tự sinh. */}
+                      {translate("⚠️ Bot không gửi được giveaway:")} {translate(g.postError)}
                     </p>
                   )}
                   <p className="mt-0.5 text-xs text-muted-foreground">

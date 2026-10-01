@@ -9,8 +9,6 @@
  * Gộp trong src/lib/i18n.tsx: DICT = { ...EN, ...EN_PANELS }.
  */
 export const EN_PANELS: Record<string, string> = {
-  ": backend Convex production đang chạy bản cũ, chưa có các hàm mới. Chủ dự án cần chạy":
-    ": the Convex production backend is running an older build without the new functions. The project owner needs to run",
   "chưa có dữ liệu": "no data yet",
   "Bot tự đồng bộ dữ liệu (trạng thái, số server, chủ sở hữu) lên máy chủ":
     "The bot syncs data (status, server count, owner) to the backend",

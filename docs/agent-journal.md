@@ -4,6 +4,50 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 01/10/2026 (3) — Rà bản dịch: 1 lớp lọt tiếng Việt ra UI + 14 key chết
+
+- 🧭 **Cách làm**: chạy `check-i18n.cjs` (gate chính thức) rồi so **sâu hơn gate** vì gate
+  chỉ kiểm "key dùng có bản EN". Audit bổ sung bằng script tạm: parity placeholder
+  VI/EN/DE, bản dịch rỗng, EN/DE còn nguyên tiếng Việt, key chết, nhãn dữ liệu dựng
+  động (`constants.ts`/`navItems.ts`/`riskExplain.ts`), quét tay `toast`/`confirm`/
+  `throw`/thuộc tính JSX. Script tạm đã xoá sau khi dùng.
+- ✅ **Kết quả audit: bản dịch KHÔNG thiếu sót.** 2037 key, **0** lệch placeholder,
+  **0** bản dịch rỗng, **0** EN/DE còn tiếng Việt, **0** key DE mồ côi, **0** thuộc
+  tính JSX chưa bọc `translate()`, nhãn `riskExplain` dựng động đủ cả hai. Nội dung
+  tự chứa (`featuresContent`/`legalContent`) cân bằng vi/en/de.
+  - Hai cảnh báo ban đầu hoá ra **báo nhầm**: "DE trùng EN" 19 mục đều là từ đồng
+    văn Đức (Forum, Online, Text, Status, Name, Dashboard…); "placeholder lạ" là
+    placeholder có tên hợp lệ (`{user}`, `{number}`…). `convexUrl.ts` có 2 chuỗi
+    tiếng Việt trong `throw` nhưng là guard fail-closed cho **dev**, không lên UI.
+- 🔴 **1. Lớp lọt thật: lỗi từ backend hiện THÔ, không qua `translate()`** —
+  `convex/hidden.ts` ghi chuỗi fallback `"Lỗi không xác định"` vào DB (`postError` /
+  `dmError`), còn `ReactionRolesPanel` / `GiveawayPanel` / `DmPanel` render giá trị
+  thô → khi backend rơi về fallback, người dùng EN/DE đọc **tiếng Việt giữa giao
+  diện đã dịch**. Nhãn xung quanh thì có dịch, nên lỗi này rất dễ lọt. Nay bọc
+  `translate()` ở cả ba; an toàn với **mọi** chuỗi vì `translate()` trả nguyên bản
+  khi không có key, nên lỗi tiếng Anh/kỹ thuật từ Discord vẫn hiện như cũ.
+- 🧹 **Dọn 14 key dịch chết** (EN + DE, tàn dư của UI đã xoá: trang trạng thái hệ
+  thống, bảng đổi ngôn ngữ cũ, định dạng lỗi OAuth cũ). Cảnh báo "bản dịch không còn
+  xuất hiện trong code" của gate nay về 0.
+  - Bẫy suýt gây hại: key `"Lỗi không xác định"` **đã từng bị xoá nhầm** vì script
+    quét `src/` không thấy — nó đến từ `convex/`. Vì đã bọc `translate()` nên phải
+    **khôi phục** lại key. Đây cũng là lý do không nên xoá key hàng loạt bằng script
+    chỉ nhìn `src/`.
+  - Script phát hiện key chết cũng từng **báo nhầm 2 key** (`\n` trong key: code giữ
+    dạng escape, từ điển là newline thật) → phải thử cả hai dạng trước khi kết
+    luận chết.
+- 🧪 **Test chặn tái diễn**: 5 check mới trong `test-web-contracts.cjs` (245 PASS / 0
+  FAIL) — 3 panel phải bọc `translate()` cho lỗi backend, và key
+  `"Lỗi không xác định"` phải còn trong **cả hai** từ điển. **RED-PROOF**: đảo về hành
+  vi cũ → 2 FAIL đúng chỗ, rồi hoàn nguyên.
+- ✅ **Kiểm chứng**: `bun run test` **82/82** (118,9s) · `test:ts` **21/21** · `tsc -b
+--noEmit` exit 0 · `eslint` exit 0 · `prettier --check` OK · `check-i18n` 0 FAIL
+  (2023 key EN · 2023 DE) + `--self-test` PASS · repo-map · convex-contract ·
+  settings-signal --self-test. Từ điển rút 2037 → 2023 key.
+- 📁 File đụng (10): `src/lib/i18n.{en,de}{,.panels,.labels}.ts` ·
+  `src/components/dashboard/{DmPanel,GiveawayPanel,ReactionRolesPanel}.tsx` ·
+  `scripts/test-web-contracts.cjs` · `docs/agent-journal.md`.
+
 ## 01/10/2026 (2) — Quét web UI `src/`: 3 lỗi thật + dọn 11 mục chết
 
 - 🧭 **Cách làm**: đọc toàn bộ `src/` (142 file, 37.7k dòng), quét theo pattern lỗi React
