@@ -154,10 +154,19 @@ jobs:
       - name: Typecheck (web + convex)
         run: bun run typecheck
       - name: Chạy toàn bộ test suites + đo coverage (c8)
+        # Trần mặc định 120s/suite không đủ cho test-browser-contracts: suite
+        # này điều khiển Chromium thật nên thời gian phụ thuộc tốc độ runner.
+        # Đo thực tế trên ubuntu-latest: 87,3s · 91,2s · 98,2s · 100,5s (xanh)
+        # nhưng 2 lần vượt 120s (đỏ) → không có biên an toàn, chỉ chờ vận may.
+        # 300s vẫn dưới trần job (30 phút) và vẫn bắt được treo thật.
+        env:
+          TEST_SUITE_TIMEOUT_MS: "300000"
         run: bun run test:coverage
       # 5 suite tầng Convex/Haimiya viết bằng TypeScript — trước đây không
       # runner nào chạy (test có mà không bao giờ chạy).
       - name: Test tầng Convex/Haimiya (suite .ts)
+        env:
+          TEST_SUITE_TIMEOUT_MS: "300000"
         run: bun run test:ts
       - name: Sàn coverage theo file — engine bảo vệ không được tụt
         run: bun run coverage:floor

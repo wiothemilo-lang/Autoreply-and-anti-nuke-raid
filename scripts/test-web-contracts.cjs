@@ -1608,5 +1608,54 @@ for (const rel of ["lib/i18n.en.labels.ts", "lib/i18n.de.labels.ts"]) {
   );
 }
 
+// ─── Q. Cổng gitleaks + trần timeout CI: chặn việc "vô hiệu hoá" âm thầm ───
+//
+// (1) `useDefault = true` là BẮT BUỘC trong .gitleaks.toml. Đã thử bỏ: gitleaks
+// hiểu config là bộ rule HOÀN CHỈNH mới → chạy 0 rule → "no leaks found" dù có
+// secret thật trong repo. Chính vì vậy mọi lần gitleaks báo "sạch" phải kèm
+// check này, không tin mắt thường.
+const gitleaksPath = path.join(ROOT, ".gitleaks.toml");
+const gitleaksSrc = fs.existsSync(gitleaksPath) ? fs.readFileSync(gitleaksPath, "utf8") : "";
+check(
+  ".gitleaks.toml tồn tại và giữ useDefault = true (bỏ là mất SẠT mọi rule)",
+  /\[extend\]/.test(gitleaksSrc) && /useDefault\s*=\s*true/.test(gitleaksSrc),
+);
+// Allowlist theo đường dẫn phải HẸP: chỉ được phép trỏ tới tệp cụ thể đã
+// xác minh, không được phủ `scripts/` hay `src/` — nếu không thì lỡ dán
+// token thật vào file test thì gitleaks im lặng, đúng lỗi ta muốn chặn.
+const pathRules = [...gitleaksSrc.matchAll(/^\s*'''([^']+)''',?\s*$/gm)]
+  .map((m) => m[1])
+  .filter(
+    (p) => !p.includes("123456789012345678") && !p.includes("Zx7pQ2vL9nM4kR8wT1yH3uB6cD5aF0eG"),
+  );
+check(
+  ".gitleaks.toml KHÔNG allowlist rộng theo đường dẫn (không phủ scripts/ hay src/)",
+  pathRules.every((p) => /[.^$*+?()[\]{}|\\]/.test(p) || p.includes("flow-field")),
+);
+
+// (2) Trần timeout/suite mặc định là 120s nhưng test-browser-contracts điều
+// khiển Chromium thật nên phụ thuộc tốc độ runner: đo được 87–100,5s (xanh)
+// và 2 lần vượt 120s (đỏ). Job `test` phải nâng trần, nếu không thì CI đỏ theo
+// vận may và mỗi lần đỏ lại chặn luôn job deploy.
+const ciSrc = fs.readFileSync(path.join(ROOT, ".github", "workflows", "ci.yml"), "utf8");
+const timeoutMatches = [...ciSrc.matchAll(/TEST_SUITE_TIMEOUT_MS:\s*"?(\d+)"?/g)].map((m) =>
+  Number(m[1]),
+);
+check(
+  "ci.yml đặt TEST_SUITE_TIMEOUT_MS cho job test (Chromium thật cần biên an toàn)",
+  timeoutMatches.length > 0 && timeoutMatches.every((ms) => ms >= 240_000),
+);
+
+// Ghi chú thay đổi: test-browser-contracts vẫn phải FAIL (không im lặng xanh)
+// khi thiếu Chromium — nâng trần không được biến lỗi môi trường thành xanh.
+const browserSrc = fs.readFileSync(
+  path.join(ROOT, "scripts", "test-browser-contracts.cjs"),
+  "utf8",
+);
+check(
+  "test-browser-contracts vẫn báo lỗi khi thiếu Chromium (nâng trần không được che lỗi)",
+  /Chromium/.test(browserSrc) && /process\.exit|throw/.test(browserSrc),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);
