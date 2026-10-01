@@ -219,11 +219,6 @@ export function HaimiyaAvatar({
   );
 }
 
-/** Avatar bot (logo) — dùng ảnh tùy chỉnh nếu có, ngược lại mặc định là Haimiya. */
-export function BotAvatar({ className, src }: { className?: string; src?: string | null }) {
-  return <HaimiyaAvatar className={className} src={src} />;
-}
-
 function TypingDots() {
   return (
     <div className="flex items-center gap-1 px-1 py-2">

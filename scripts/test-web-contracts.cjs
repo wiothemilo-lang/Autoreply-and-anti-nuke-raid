@@ -1513,5 +1513,73 @@ check(
     /installStaleChunkRecovery\(\);/.test(mainSrc),
 );
 
+// ─── P. Bản nháp chưa lưu: mọi panel có nút "Lưu" phải ĐĂNG KÝ bẩn ──────────
+// Bug thật 01/10/2026: GuildPage.goToSection gọi confirmLeave() trước khi đổi
+// panel, nhưng CHỈ SettingsPanel gọi useUnsavedChanges → dirtyPanels luôn rỗng
+// với mọi panel khác → confirmLeave() trả true ngay → người dùng soạn tin
+// chào mừng/whitelist rồi bấm sang tab khác là MẤT SẠCH, không hề được hỏi.
+// Đúng lớp lỗi mà lib/useUnsavedChanges.ts sinh ra để chặn, nhưng chỉ nối
+// được một nút thay vì mọi panel.
+// Quy tắc: panel nào giữ bản nháp cục bộ (useState từ data.guild) + có nút
+// "Lưu" thì bắt buộc gọi useUnsavedChanges.
+const unsavedPanels = [
+  "components/dashboard/SettingsPanel.tsx",
+  "components/dashboard/WhitelistPanel.tsx",
+  "components/dashboard/WelcomePanel.tsx",
+];
+for (const rel of unsavedPanels) {
+  const src = files.get(rel) ?? "";
+  check(
+    `${rel} đăng ký useUnsavedChanges (đổi panel không mất thay đổi chưa lưu)`,
+    /useUnsavedChanges\(/.test(src) && /from "\.\.\/\.\.\/lib\/useUnsavedChanges"/.test(src),
+  );
+}
+
+// WelcomePanel có 3 ô nháp riêng (embed chào/tạm biệt, DM, autorole) → cả 3
+// phải bẩn, không chỉ một.
+const welcomeSrc = files.get("components/dashboard/WelcomePanel.tsx") ?? "";
+check(
+  "WelcomePanel đánh dấu bẩn cả 3 nhóm nháp (embed, DM, autorole)",
+  (welcomeSrc.match(/useUnsavedChanges\(/g) ?? []).length >= 3,
+);
+
+// Ô nhập số của AutoModPanel: thuộc tính max của <input> KHÔNG chặn gõ tay
+// (999 vẫn qua), và backend clamp về 99 → UI hiện 99 trong khi server lưu 99,
+// hai bên lệch nhau mà người dùng không có cách nào biết. Bắt buộc kiểm cả
+// trần khi commit chứ không chỉ kiểm min.
+const automodSrc = files.get("components/dashboard/AutoModPanel.tsx") ?? "";
+const numberInputFn = automodSrc.slice(
+  automodSrc.indexOf("onBlur={() => {"),
+  automodSrc.indexOf('e.key === "Enter"'),
+);
+check(
+  "AutoModPanel NumberInput kiểm cả trần `max` khi commit (không chỉ kiểm min)",
+  /max !== undefined && n > max/.test(numberInputFn),
+);
+
+// Cùng file: setTiers/setRepeat/setStrikes ghi TRƯỚC khi mutation xong và
+// nuốt lỗi trong patchHeatSettings → lưu hỏng thì ô nhập mãi hiện giá trị mà
+// server chưa nhận, người dùng tin là đã lưu trong khi bot vẫn chạy ngưỡng cũ.
+check(
+  "AutoModPanel hoàn nguyên ngưỡng khi lưu hỏng (setTiers/setRepeat/setStrikes có nhánh !ok)",
+  /const ok = await patchHeatSettings\(next\);\s*if \(!ok\) setTiers\(prev\);/.test(automodSrc) &&
+    /const ok = await patchHeatSettings\(\{[\s\S]*?if \(!ok\) setRepeat\(prev\);/.test(
+      automodSrc,
+    ) &&
+    /catch \(e\) \{\s*setStrikes\(prev\);/.test(automodSrc) &&
+    /patchHeatSettings\([\s\S]*?\): Promise<boolean>/.test(automodSrc),
+);
+
+// useCountUp: durationMs <= 0 làm (now - started) / 0 ra NaN khi hai lần gọi
+// trùng mili-giây → setValue(NaN) → màn hình hiện chữ "NaN" và vòng đếm không
+// bao giờ dừng (from === target không bao giờ đúng).
+const motionSrc = files.get("lib/motion.ts") ?? "";
+check(
+  "useCountUp không bao giờ set NaN khi durationMs <= 0 (chia cho 0 khi trùng ms)",
+  /const t = durationMs > 0 \? Math\.min\(1, \(now - started\) \/ durationMs\) : 1;/.test(
+    motionSrc,
+  ),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

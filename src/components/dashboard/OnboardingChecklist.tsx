@@ -28,7 +28,7 @@ interface Step {
   status: StepStatus;
 }
 
-export function onboardingSteps(data: GuildData): Step[] {
+function onboardingSteps(data: GuildData): Step[] {
   const g = data.guild;
   return [
     {

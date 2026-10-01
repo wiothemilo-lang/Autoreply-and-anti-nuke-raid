@@ -30,6 +30,7 @@ import { Textarea } from "../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import type { ChannelInfo, EmojiInfo, GuildData } from "../../lib/types";
 import { getSessionToken } from "../../lib/discord";
+import { useUnsavedChanges } from "../../lib/useUnsavedChanges";
 import GreetingPreview, { CardPreview, unknownCustomEmojis } from "./GreetingPreview";
 
 import { translate } from "../../lib/i18n";
@@ -566,6 +567,19 @@ function GreetingCard({
     lastServer.current = { channelId, message, random, title: embedTitle, color: embedColor };
   }, [channelId, message, random, embedTitle, embedColor]);
 
+  /**
+   * 5 ô này là bản nháp chỉ lên server khi bấm "Lưu cài đặt" → bấm sang panel
+   * khác phải hỏi trước, nếu không mất sạch. Xem lib/useUnsavedChanges.ts.
+   */
+  useUnsavedChanges(
+    `welcome-embed-${kind}`,
+    channel !== (channelId ?? "none") ||
+      msg !== (message ?? "") ||
+      randomMsg !== (random ?? "") ||
+      title !== (embedTitle ?? "") ||
+      color !== (embedColor ?? "#57f287"),
+  );
+
   const emojis = data.emojis ?? [];
   const channels = data.channels ?? [];
   const textChannels = channels.filter((c) => c.type === 0 || c.type === 5);
@@ -917,6 +931,7 @@ function DmCard({
   useEffect(() => {
     setMsg(g.welcomeDmMessage ?? "");
   }, [g.welcomeDmMessage]);
+  useUnsavedChanges("welcome-dm", msg !== (g.welcomeDmMessage ?? ""));
 
   return (
     <Card>
@@ -984,6 +999,7 @@ function AutoroleCard({
   useEffect(() => {
     setDelay(String(g.autoroleDelaySec ?? 0));
   }, [g.autoroleDelaySec]);
+  useUnsavedChanges("welcome-autorole", delay !== String(g.autoroleDelaySec ?? 0));
 
   return (
     <Card>

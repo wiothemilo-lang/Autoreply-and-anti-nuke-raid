@@ -4,6 +4,52 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 01/10/2026 (2) — Quét web UI `src/`: 3 lỗi thật + dọn 11 mục chết
+
+- 🧭 **Cách làm**: đọc toàn bộ `src/` (142 file, 37.7k dòng), quét theo pattern lỗi React
+  (effect phụ thuộc, rò timer, nuốt lỗi, thiếu validate), đo code chết bằng script đếm
+  export không ai import. Mỗi lỗi tái hiện bằng source thật trước khi sửa.
+- 🔴 **1. Mất sạch thay đổi chưa lưu khi bấm sang panel khác** — `GuildPage.goToSection`
+  gọi `confirmLeave()` trước khi đổi panel, nhưng **CHỈ `SettingsPanel`** gọi
+  `useUnsavedChanges` → `dirtyPanels` luôn rỗng với mọi panel khác → `confirmLeave()`
+  trả `true` ngay. Người dùng soạn tin chào mừng / danh sách trắng rồi bấm sang tab
+  khác là **mất trắng, không hề được hỏi** — đúng lớp lỗi mà `lib/useUnsavedChanges.ts`
+  sinh ra để chặn nhưng chỉ nối được một nút. Nay nối thêm `WhitelistPanel` +
+  3 nhóm nháp trong `WelcomePanel` (embed chào/tạm biệt, DM, autorole).
+- 🔴 **2. `AutoModPanel` lưu hỏng thì UI mãi hiện giá trị server chưa nhận** —
+  `setTiers`/`setRepeat`/`setStrikes` ghi **trước** khi mutation xong, còn
+  `patchHeatSettings` nuốt lỗi trong `try/catch`. Ô nhập không tự đồng bộ lại từ
+  `data.guild` nên lưu hỏng là người dùng tin là đã lưu trong khi bot vẫn chạy
+  ngưỡng cũ. Nay `patchHeatSettings` trả `boolean` + hoàn nguyên state ở cả 3 nơi.
+- 🟠 **3. `NumberInput` bỏ qua trần `max`** — thuộc tính `max` của `<input>` chỉ chặn
+  con trỏ/spinner, **gõ tay 999 vẫn qua**; backend clamp về 99 → ô nhập hiện 99 còn
+  server lưu 99, hai bên lệch nhau mà không có cách nào biết. Nay kiểm cả hai đầu.
+- 🟠 **4. `useCountUp` có thể render chữ "NaN"** — `durationMs <= 0` làm
+  `(now - started) / durationMs` ra `NaN` khi hai lần gọi trùng mili-giây →
+  `setValue(NaN)` và `from === target` không bao giờ đúng nên vòng đếm không dừng.
+- 🧹 **Dọn code chết (không ai import, xác minh bằng script + không test nào tham chiếu)**:
+  `newSessionToken` (dead — mà token giờ do server cấp trong `exchangeAndLogin`, để lại
+  dễ gây hiểu nhầm là client tự cấp token), `PERM_ADMINISTRATOR`, `BotAvatar`,
+  `PRODUCT_EASE`, `FEATURE_ORDER`, `MODULE_ACTION_OPTIONS`, `safetyFromHeat`, type
+  `TriggerType`, `subscribeDirty` + toàn bộ cơ chế `listeners`/`notify` chỉ phục vụ nó,
+  và bỏ `export` thừa ở `onboardingSteps`. Thêm: comment `/** Xóa token ở cả hai nơi. */`
+  trong `discord.ts` nằm SAI chỗ (mô tả `clearSessionToken` nhưng dán trên
+  `LEGACY_DISCORD_ACCESS_KEY`).
+- 🧪 **Test chặn tái diễn**: bổ sung 6 check vào `scripts/test-web-contracts.cjs` (240 PASS/0
+  FAIL). **RED-PROOF**: đảo về hành vi cũ → **3 FAIL đúng chỗ** (WhitelistPanel mất
+  hook, NumberInput mất `max`, useCountUp mất chặn 0), rồi hoàn nguyên.
+- ✅ **Kiểm chứng**: `bun run test` **82/82** (114,6s) · `test:ts` **21/21** · `tsc -b
+--noEmit` exit 0 · `eslint` exit 0 · `prettier --check` OK (sau `bun run format`) ·
+  `coverage` 95,09% stmts / 79,89% nhánh / 98,19% hàm, sàn theo file đạt · `mutation`
+  **20/20** · repo-map · convex-contract · i18n --self-test · settings-signal --self-test.
+- 📁 File đụng (11, toàn bộ trong `src/` + 1 suite): `src/lib/{useUnsavedChanges,motion,
+discord,constants,featuresContent}.ts`, `src/components/{HaimiyaChat.tsx,
+dashboard/{AutoModPanel,WelcomePanel,WhitelistPanel,OnboardingChecklist}.tsx}`,
+  `scripts/test-web-contracts.cjs`.
+- ⚠️ **Ghi chú**: số suite giữ nguyên 82 CJS / 21 TS (chỉ mở rộng suite có sẵn) nên không
+  phải sửa `AGENTS.md`/`guardrails.js`. `test-browser-contracts` bỏ qua bằng
+  `SKIP_BROWSER_TESTS=1` (sandbox không có Chromium, CI có).
+
 ## 01/10/2026 (1) — Quét toàn bộ module, sửa 7 bug thật (test ĐỎ trên code cũ)
 
 - 🧭 **Cách làm**: đọc `docs/repo-map.md` + backlog đã kiểm chứng ở entry 30/09 (3), grep từng
