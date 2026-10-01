@@ -79,7 +79,7 @@ export function setSessionToken(token: string): void {
   }
 }
 
-/** Xóa token ở cả hai nơi. */
+/** Key token OAuth cũ đã lưu nhầm trong trình duyệt sau khi chuyển sang server-side flow. */
 const LEGACY_DISCORD_ACCESS_KEY = "wio_discord_access";
 
 /** Xóa token OAuth cũ đã lưu nhầm trong trình duyệt sau khi chuyển sang server-side flow. */
@@ -87,13 +87,13 @@ export function clearLegacyDiscordAccess(): void {
   localStorage.removeItem(LEGACY_DISCORD_ACCESS_KEY);
 }
 
+/** Xóa token phiên ở cả hai nơi. */
 export function clearSessionToken(): void {
   localStorage.removeItem(SESSION_TOKEN_KEY);
   sessionStorage.removeItem(SESSION_TOKEN_KEY);
 }
 
 export const PERM_MANAGE_GUILD = 0x20n;
-export const PERM_ADMINISTRATOR = 0x8n;
 
 export function base64UrlEncode(bytes: Uint8Array): string {
   let bin = "";
@@ -246,10 +246,4 @@ export function buildBotInviteUrl(clientId: string): string {
     scope: "bot applications.commands",
   });
   return `https://discord.com/oauth2/authorize?${params.toString()}`;
-}
-
-export function newSessionToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return base64UrlEncode(bytes);
 }

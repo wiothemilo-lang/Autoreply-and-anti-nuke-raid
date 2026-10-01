@@ -17,19 +17,11 @@ import { useEffect } from "react";
 
 /** panelId → có thay đổi chưa lưu hay không. */
 const dirtyPanels = new Set<string>();
-const listeners = new Set<() => void>();
-
-function notify() {
-  for (const fn of listeners) fn();
-}
 
 /** Đánh dấu panel có (hoặc hết) thay đổi chưa lưu. */
 export function setPanelDirty(panelId: string, dirty: boolean): void {
-  const had = dirtyPanels.has(panelId);
-  if (dirty === had) return;
   if (dirty) dirtyPanels.add(panelId);
   else dirtyPanels.delete(panelId);
-  notify();
 }
 
 /** Đang có panel nào chưa lưu không. */
@@ -40,12 +32,6 @@ export function hasUnsavedChanges(): boolean {
 /** Danh sách panel đang chờ lưu (để hiện thông báo cho đúng tên). */
 export function unsavedPanelIds(): string[] {
   return [...dirtyPanels];
-}
-
-/** Đăng ký theo dõi thay đổi (dùng bởi UI cần vẽ lại khi có panel mới bẩn). */
-export function subscribeDirty(fn: () => void): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
 }
 
 /**

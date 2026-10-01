@@ -32,19 +32,6 @@ export interface FeaturesDoc {
   ctaBody: string;
 }
 
-/**
- * Bố cục cố định mọi ngôn ngữ phải có ĐÚNG 6 block theo cùng thứ tự — gate
- * kiểm cấu trúc dựa vào đây; đổi bố cục phải đổi cả 3 ngôn ngữ cùng commit.
- */
-export const FEATURE_ORDER = [
-  "autoReply",
-  "heatSystem",
-  "joinGate",
-  "antiNuke",
-  "linkFilter",
-  "backup",
-] as const;
-
 export function featuresDoc(lang: FeaturesLang): FeaturesDoc {
   return CONTENT[lang];
 }

@@ -9,6 +9,7 @@ import { Input } from "../ui/input";
 import { MultiSelect } from "../ui/multi-select";
 import type { GuildData } from "../../lib/types";
 import { getSessionToken } from "../../lib/discord";
+import { useUnsavedChanges } from "../../lib/useUnsavedChanges";
 
 import { translate } from "../../lib/i18n";
 const TOKEN = () => getSessionToken();
@@ -25,6 +26,25 @@ export default function WhitelistPanel({ data }: { data: GuildData }) {
   const [whitelistUsers, setWhitelistUsers] = useState<string[]>(data.guild.whitelistUsers);
   const [userInput, setUserInput] = useState("");
   const [saving, setSaving] = useState(false);
+
+  /**
+   * Hai danh sách này là BẢN NHÁP cục bộ — chỉ lên server khi bấm "Lưu". Bấm
+   * sang panel khác phải hỏi trước, nếu không người dùng mất sạch thay đổi mà
+   * không hiểu vì sao (xem lib/useUnsavedChanges.ts + GuildPage.confirmLeave).
+   * Ô nhập ID chỉ là con trỏ nhập liệu nên không tính vào "bẩn".
+   */
+  useUnsavedChanges(
+    "whitelist",
+    JSON.stringify(whitelistRoles) !== JSON.stringify(data.guild.whitelistRoles) ||
+      JSON.stringify(whitelistUsers) !== JSON.stringify(data.guild.whitelistUsers),
+  );
+
+  /**
+   * Hai danh sách này là BẢN NHÁP cục bộ — chỉ lên server khi bấm "Lưu". Bấm
+   * sang panel khác phải hỏi trước, nếu không người dùng mất sạch thay đổi mà
+   * không hiểu vì sao (xem lib/useUnsavedChanges.ts + GuildPage.confirmLeave).
+   * Ô nhập ID chỉ là con trỏ nhập liệu nên không tính vào "bẩn".
+   */
 
   const roleOptions = data.roles
     .filter((r) => r.name !== "@everyone")

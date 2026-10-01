@@ -52,7 +52,16 @@ function ModuleNumber({
       onBlur={() => {
         setFocused(false);
         const n = Number(v);
-        if (!Number.isNaN(n) && n >= min) onCommit(Math.round(n));
+        // Phải kiểm CẢ trần: thuộc tính max của <input> chỉ chặn con trỏ/spinner,
+        // gõ tay 999 vẫn qua. Trước đây chỉ kiểm min nên UI hiện 99 trong khi
+        // server đã clamp về 99 — hai bên lệch nhau, người dùng tưởng lưu sai.
+        // Ngoài miền → trả về giá trị server (effect dưới đây tự đồng bộ lại).
+        // Phải kiểm CẢ trần: thuộc tính max của <input> chỉ chặn con trỏ/spinner,
+        // gõ tay 999 vẫn qua. Trước đây chỉ kiểm min nên UI hiện 99 trong khi
+        // server đã clamp về 99 — hai bên lệch nhau, người dùng tưởng lưu sai.
+        // Ngoài miền → trả về giá trị server (effect dưới đây tự đồng bộ lại).
+        if (Number.isNaN(n) || n < min || (max !== undefined && n > max)) return;
+        onCommit(Math.round(n));
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -137,25 +146,32 @@ export default function ModerationPanel({ data }: { data: GuildData }) {
     heatBanAt?: number;
     heatRepeatMultiplier?: number;
     heatRepeatWindowMin?: number;
-  }) {
+  }): Promise<boolean> {
     try {
       await updateSettings({ token: TOKEN(), guildId: data.guild.discordId, ...patch });
       toast.success(translate("Đã lưu cài đặt hệ thống nhiệt độ"));
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false;
     }
   }
 
   async function commitRepeat(field: "multiplier" | "windowMin", n: number) {
+    const prev = repeat;
     const next = {
       multiplier: field === "multiplier" ? n : repeat.multiplier,
       windowMin: field === "windowMin" ? n : repeat.windowMin,
     };
     setRepeat(next);
-    await patchHeatSettings({
+    const ok = await patchHeatSettings({
       heatRepeatMultiplier: next.multiplier,
       heatRepeatWindowMin: next.windowMin,
     });
+    // Ô nhập KHÔNG tự đồng bộ lại từ server khi data.guild đổi, nên nếu lưu
+    // hỏng mà giữ số mới thì màn hình mãi hiện giá trị server chưa nhận —
+    // người dùng tin là đã lưu trong khi bot vẫn chạy ngưỡng cũ. Hoàn nguyên.
+    if (!ok) setRepeat(prev);
   }
 
   async function commitStrikes(patch: {
@@ -163,6 +179,7 @@ export default function ModerationPanel({ data }: { data: GuildData }) {
     warnStrikeWindowMin?: number;
     warnStrikePunish?: "timeout" | "kick" | "ban";
   }) {
+    const prev = strikes;
     const next = {
       limit: patch.warnStrikeLimit ?? strikes.limit,
       windowMin: patch.warnStrikeWindowMin ?? strikes.windowMin,
@@ -173,6 +190,7 @@ export default function ModerationPanel({ data }: { data: GuildData }) {
       await updateSettings({ token: TOKEN(), guildId: data.guild.discordId, ...patch });
       toast.success(translate("Đã lưu cài đặt warn tích lũy"));
     } catch (e) {
+      setStrikes(prev);
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
     }
   }
@@ -182,6 +200,7 @@ export default function ModerationPanel({ data }: { data: GuildData }) {
     field: "heatWarnAt" | "heatTimeoutAt" | "heatKickAt" | "heatBanAt",
     n: number,
   ) {
+    const prev = tiers;
     const next = {
       heatWarnAt: field === "heatWarnAt" ? n : tiers.warnAt,
       heatTimeoutAt: field === "heatTimeoutAt" ? n : tiers.timeoutAt,
@@ -194,7 +213,8 @@ export default function ModerationPanel({ data }: { data: GuildData }) {
       kickAt: next.heatKickAt,
       banAt: next.heatBanAt,
     });
-    await patchHeatSettings(next);
+    const ok = await patchHeatSettings(next);
+    if (!ok) setTiers(prev);
   }
 
   async function addBadWord() {

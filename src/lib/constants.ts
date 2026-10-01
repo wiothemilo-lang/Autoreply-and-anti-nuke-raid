@@ -6,8 +6,6 @@ import type { ModuleAction, PunishNoticeLevel } from "./types";
  */
 export const MIN_IMPORT_BOT_VERSION = 47;
 
-export type TriggerType = "keyword" | "mention";
-
 /**
  * Hình phạt thành viên — CHỌN 1 (bot dùng đúng hình phạt đã chọn).
  * Tách riêng khỏi nhóm dọn tin nhắn để tránh nhầm lẫn chọn ban + kick cùng lúc.
@@ -46,9 +44,6 @@ export const MESSAGE_CLEAN_OPTIONS: {
     hint: "Xóa hàng loạt mọi tin nhắn liên quan đến vụ vi phạm (ví dụ: toàn bộ tin spam trong cửa sổ phát hiện)",
   },
 ];
-
-/** Toàn bộ lựa chọn (hình phạt + dọn tin) — dùng để vẽ badge / kiểm tra nhanh. */
-export const MODULE_ACTION_OPTIONS = [...MEMBER_PUNISH_OPTIONS, ...MESSAGE_CLEAN_OPTIONS];
 
 /** Độ mạnh của hình phạt thành viên (ban > kick > timeout > warn). */
 export const ACTION_STRENGTH: Record<string, number> = {
@@ -632,11 +627,6 @@ export const HEAT_TIER_LABEL: Record<string, string> = {
   kick: "Kick",
   ban: "Ban",
 };
-
-/** Tính phần trăm an toàn (100 - nhiệt cao nhất). */
-export function safetyFromHeat(heat: number | undefined): number {
-  return Math.max(0, Math.min(100, 100 - (heat ?? 0)));
-}
 
 export const CHANNEL_TYPE_LABEL: Record<number, string> = {
   0: "Văn bản",

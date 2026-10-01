@@ -17,8 +17,6 @@ import { useReducedMotion, type Variants } from "framer-motion";
 /** cubic-bezier ra, cùng cảm giác với các `transition` trong `index.css`. */
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-export const PRODUCT_EASE = EASE_OUT;
-
 /** Thời lượng (giây) — ngắn, vì app là nơi thao tác liên tục. */
 export const DUR = {
   fast: 0.14,
@@ -99,7 +97,11 @@ export function useCountUp(target: number, durationMs = 520) {
 
     const started = performance.now();
     const tick = (now: number) => {
-      const t = Math.min(1, (now - started) / durationMs);
+      // durationMs <= 0 (hoặc rỗng) → bỏ qua nội suy, về thẳng giá trị đích.
+      // Trước đây (now - started) / 0 cho NaN khi hai lần gọi cùng mili-giây
+      // → setValue(NaN) → màn hình hiện chữ "NaN" và from === target không bao
+      // giờ đúng nên vòng đếm không bao giờ dừng.
+      const t = durationMs > 0 ? Math.min(1, (now - started) / durationMs) : 1;
       // easeOutCubic — chậm ở đầu, nhanh về cuối, đọc số dễ hơn ease-in.
       const eased = 1 - Math.pow(1 - t, 3);
       const next = Math.round(from + (target - from) * eased);
