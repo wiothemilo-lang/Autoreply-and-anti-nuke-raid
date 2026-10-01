@@ -1581,5 +1581,32 @@ check(
   ),
 );
 
+// Lỗi từ backend được GHI VÀO DB (convex/hidden.ts: postError/dmError) rồi
+// dashboard hiện ra. Trước đây 3 panel render giá trị thô → khi backend rơi
+// về fallback "Lỗi không xác định", người dùng EN/DE đọc tiếng Việt giữa
+// giao diện đã dịch. Nay bọc translate() — an toàn với mọi chuỗi vì không có
+// key thì trả nguyên bản.
+for (const rel of [
+  "components/dashboard/ReactionRolesPanel.tsx",
+  "components/dashboard/GiveawayPanel.tsx",
+  "components/dashboard/DmPanel.tsx",
+]) {
+  const src = files.get(rel) ?? "";
+  check(
+    `${rel} render lỗi backend qua translate() (không lọt tiếng Việt cho EN/DE)`,
+    /translate\(\s*(?:p\.postError|g\.postError|data\.guild\.dmError)\s*\)/.test(src),
+  );
+}
+
+// Key fallback mà backend ghi vào DB phải có mặt trong từ điển — xoá nhầm là
+// mất bản dịch mà không có gì báo.
+for (const rel of ["lib/i18n.en.labels.ts", "lib/i18n.de.labels.ts"]) {
+  const src = files.get(rel) ?? "";
+  check(
+    `${rel} còn key "Lỗi không xác định" (backend ghi vào DB)`,
+    src.includes("Lỗi không xác định"),
+  );
+}
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

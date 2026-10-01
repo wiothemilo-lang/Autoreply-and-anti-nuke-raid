@@ -86,7 +86,9 @@ export default function DmPanel({ data }: { data: GuildData }) {
           {data.guild.dmError && (
             <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
               <p className="font-semibold">{translate("⚠️ DM gần nhất thất bại")}</p>
-              <p className="mt-0.5 opacity-90">{data.guild.dmError}</p>
+              {/* xem ReactionRolesPanel: translate() giữ nguyên lỗi lạ (Discord/
+                  Convex), dịch lỗi do backend tự sinh. */}
+              <p className="mt-0.5 opacity-90">{translate(data.guild.dmError)}</p>
               {data.guild.dmErrorAt ? (
                 <p className="mt-0.5 opacity-70">
                   {new Date(data.guild.dmErrorAt).toLocaleString(dateLocale())}{" "}

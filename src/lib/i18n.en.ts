@@ -136,7 +136,6 @@ export const EN: Record<string, string> = {
      Chèn ở ĐẦU file theo bài học journal: str_replace không chạm được vùng
      cuối file từ điển lớn; alphabet chỉ là thói quen đọc, cổng i18n không đòi. */
   "Trạng thái hệ thống": "System status",
-  "Trạng thái hệ thống — Protogon": "System status — Protogon",
   "Trang web": "Website",
   "Trang bạn đang mở — tải được là web sống.":
     "The page you're viewing — if it loaded, the web is up.",
@@ -291,8 +290,6 @@ export const EN: Record<string, string> = {
     "⚠️ The AI server did not respond — {reason}. Answering from local knowledge for now.",
   "⚠️ AI trên máy chủ chưa phản hồi. Tạm trả lời bằng kiến thức cục bộ.":
     "⚠️ The AI server did not respond. Answering from local knowledge for now.",
-  "Vui lòng đăng nhập dashboard để trò chuyện với Haimiya":
-    "Please sign in to the dashboard to chat with Haimiya",
   /* ==== i18n-extra-haimiya ==== Phần giới thiệu + câu hỏi gợi ý của
      Haimiya (kiến thức cục bộ, dùng khi AI thật offline). */
   "Xin chào! Tôi là Haimiya, trợ lý ảo của Protogon — bot Discord bảo vệ server. Tôi có thể giúp bạn giải đáp về hệ thống nhiệt độ, Join Gate, chống nuke/raid, công cụ mod và nhiều hơn nữa. Bạn muốn hỏi điều gì?":
@@ -535,7 +532,6 @@ export const EN: Record<string, string> = {
   "Gửi thành công!": "Sent successfully!",
   "Gửi thông báo học tập vào kênh log các server (kết quả lượt học thủ công + digest tuần). MẶC ĐỊNH TẮT — bật khi muốn admin theo dõi bot học được gì ngay trên Discord thay vì mở web.":
     "Post learning notices to servers' log channels (manual-run results + weekly digest). OFF BY DEFAULT — enable it to follow what the bot learns right in Discord instead of opening the web.",
-  "Gửi tin nhắn DM trực tiếp": "Send a direct DM",
   "Gửi ảnh (jpg/png/webp) hoặc video ≤50MB — Haimiya sẽ xem giúp bạn":
     "Send an image (jpg/png/webp) or video ≤50MB — Haimiya will take a look",
   "Gửi ảnh hoặc video": "Send image or video",
@@ -898,8 +894,6 @@ export const EN: Record<string, string> = {
   "trước khi server sụp đổ": "before the server went down",
   "tăng cấp": "escalates",
   "tại server này": "on this server",
-  "tại thư mục gốc dự án để cập nhật backend (xem hướng dẫn trong README).":
-    "at the project root to update the backend (see the README).",
   "tạm khóa": "timeout",
   "tạm khóa 40": "timeout 40",
   "tạo lại emoji/sticker": "recreate emoji/stickers",
@@ -1052,7 +1046,6 @@ export const EN: Record<string, string> = {
   "💌 DM người thắng": "💌 Winner DM",
   "💡 Hướng dẫn nhanh:": "💡 Quick guide:",
   "💡 Lệnh nhanh:": "💡 Quick commands:",
-  "💡 Với mục": "💡 For the",
   "💡 Đây chính là embed": "💡 This is exactly the embed",
   "📌 Lưu ý quan trọng": "📌 Important note",
   "🔑 Captcha — nhập mã từ DM": "🔑 Captcha — enter the code from the DM",
@@ -1265,11 +1258,6 @@ export const EN: Record<string, string> = {
   "Đã có người nhận": "Claimed",
   "Chờ nhận": "Unclaimed",
   "Transcript đã lưu": "Transcript saved",
-  "Đổi ngôn ngữ của bạn": "Change your language",
-  "Ngôn ngữ của bạn đang được bot tự nhận ra khi chưa chọn.":
-    "Your language is auto-detected until you pick one.",
-  "Xem ngôn ngữ hiện tại của bạn (không chọn = chỉ xem).":
-    "See your current language (leave unset to only view it).",
 
   /* ==== ticket: tuy chinh panel mo + loi dan + DM ==== */
   "Tuỳ chỉnh panel mở ticket": "Customize the ticket panel",

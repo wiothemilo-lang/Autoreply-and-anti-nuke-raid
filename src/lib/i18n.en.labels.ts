@@ -398,21 +398,16 @@ export const EN_LABELS: Record<string, string> = {
   "Áp preset thất bại": "Failed to apply the preset",
 
   // ── Toast lỗi/thành công dựng trong callback (không phải JSX) ────────────
-  "Lỗi không xác định": "Unknown error",
   "Gửi thất bại": "Sending failed",
   "Tạo thất bại": "Creation failed",
   "Tải file thất bại": "File upload failed",
   "Mở khóa thất bại": "Unlock failed",
-  "Lỗi trao đổi mã OAuth ({p0})": "OAuth code exchange failed ({p0})",
-  "Không lấy được thông tin user ({p0})": "Couldn't fetch the user profile ({p0})",
-  "Không lấy được danh sách server ({p0})": "Couldn't fetch the server list ({p0})",
-  "Không thể kết nối tới máy chủ Protogon. Vui lòng thử lại sau.":
-    "Can't reach the Protogon server. Please try again later.",
   "Thiếu mã xác nhận từ Discord.": "Missing the confirmation code from Discord.",
-  "DISCORD_CLIENT_ID chưa được cấu hình trong API Keys.":
-    "DISCORD_CLIENT_ID is not configured in API Keys.",
   "Phiên đăng nhập không hợp lệ. Vui lòng thử lại.":
     "The sign-in session is invalid. Please try again.",
+  /* backend ghi vào DB (convex/hidden.ts: postError/dmError) rồi dashboard hiện
+     qua translate() — key phải ở đây, không phải chuỗi rời trong JSX. */
+  "Lỗi không xác định": "Unknown error",
   "Đã bật toàn bộ chống nuke": "All anti-nuke modules enabled",
   "Đã tắt toàn bộ chống nuke": "All anti-nuke modules disabled",
   "Đã bật chia sẻ threat relay": "Threat relay sharing enabled",

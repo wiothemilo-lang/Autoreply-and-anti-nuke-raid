@@ -393,21 +393,16 @@ export const DE_LABELS: Record<string, string> = {
   "Áp preset thất bại": "Preset konnte nicht angewendet werden",
 
   // ── Toasts, in Callbacks gebaut (nicht JSX) ─────────────────────────────
-  "Lỗi không xác định": "Unbekannter Fehler",
   "Gửi thất bại": "Senden fehlgeschlagen",
   "Tạo thất bại": "Erstellen fehlgeschlagen",
   "Tải file thất bại": "Datei-Upload fehlgeschlagen",
   "Mở khóa thất bại": "Entsperren fehlgeschlagen",
-  "Lỗi trao đổi mã OAuth ({p0})": "OAuth-Code-Austausch fehlgeschlagen ({p0})",
-  "Không lấy được thông tin user ({p0})": "Nutzerprofil konnte nicht geladen werden ({p0})",
-  "Không lấy được danh sách server ({p0})": "Serverliste konnte nicht geladen werden ({p0})",
-  "Không thể kết nối tới máy chủ Protogon. Vui lòng thử lại sau.":
-    "Protogon-Server nicht erreichbar. Bitte später erneut versuchen.",
   "Thiếu mã xác nhận từ Discord.": "Bestätigungscode von Discord fehlt.",
-  "DISCORD_CLIENT_ID chưa được cấu hình trong API Keys.":
-    "DISCORD_CLIENT_ID ist unter API-Schlüssel nicht konfiguriert.",
   "Phiên đăng nhập không hợp lệ. Vui lòng thử lại.":
     "Die Anmeldesitzung ist ungültig. Bitte erneut versuchen.",
+  /* backend ghi vào DB (convex/hidden.ts: postError/dmError) rồi dashboard hiện
+     qua translate() — key phải ở đây, không phải chuỗi rời trong JSX. */
+  "Lỗi không xác định": "Unbekannter Fehler",
   "Đã bật toàn bộ chống nuke": "Alle Anti-Nuke-Module aktiviert",
   "Đã tắt toàn bộ chống nuke": "Alle Anti-Nuke-Module deaktiviert",
   "Đã bật chia sẻ threat relay": "Threat-Relay-Freigabe aktiviert",

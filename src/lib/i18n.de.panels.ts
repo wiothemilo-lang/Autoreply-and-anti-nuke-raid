@@ -4,8 +4,6 @@
  * nhãn điều kiện trong {} và nhãn dữ liệu dịch lúc render.
  */
 export const DE_PANELS: Record<string, string> = {
-  ": backend Convex production đang chạy bản cũ, chưa có các hàm mới. Chủ dự án cần chạy":
-    ": das Convex-Production-Backend läuft auf einem älteren Stand ohne die neuen Funktionen. Der Projekteigner muss",
   "chưa có dữ liệu": "noch keine Daten",
   "Bot tự đồng bộ dữ liệu (trạng thái, số server, chủ sở hữu) lên máy chủ":
     "Der Bot synchronisiert Daten (Status, Serverzahl, Eigner) zum Backend",
