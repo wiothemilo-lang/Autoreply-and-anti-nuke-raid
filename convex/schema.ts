@@ -1204,7 +1204,17 @@ export default defineSchema({
     // mới biến mất khỏi dashboard (28/09/2026).
     .index("by_guildId_status_createdAt", ["guildId", "status", "createdAt"])
     .index("by_guildId_createdAt", ["guildId", "createdAt"])
-    .index("by_guildId_openerId", ["guildId", "openerId"]),
+    .index("by_guildId_openerId", ["guildId", "openerId"])
+    /**
+     * Tra ticket theo ĐÚNG kênh (mỗi kênh chỉ thuộc 1 ticket).
+     *
+     * Vì sao cần: `botTouchTickets` chạy MỖI tin nhắn trong kênh ticket và
+     * trước đây `collect()` TOÀN BỘ ticket của guild rồi tự `.find` — server
+     * 300 ticket thì mỗi tin nhắn tốn ~300 lượt đọc document (kèm `body` dài)
+     * chỉ để cập nhật 1 hàng, tức I/O Convex phình theo bình phương số ticket.
+     * Cùng index này còn dùng cho các lượt tra 1 ticket khi staff bấm nút.
+     */
+    .index("by_guildId_channelId", ["guildId", "channelId"]),
 
   /**
    * ═══ LOẠI TICKET TUỲ CHỈNH (29/09/2026) ═══

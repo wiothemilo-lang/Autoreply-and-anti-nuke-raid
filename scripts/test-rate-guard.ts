@@ -3,6 +3,15 @@
 // Gọi trực tiếp hàm guard + handler thật của publicConfig/aiStatus (mock ctx)
 // để xác minh: vượt trần → fallback NHẸ (không chạm DB) + hợp đồng no-throw.
 import { rateLimitPublicAction, __resetRateGuardForTest } from "../convex/rateGuard";
+import {
+  allowGeoRequest,
+  isPublicIp,
+  parseClientIp,
+  __resetGeoGuardForTest,
+  GEO_MAX_PER_IP_PER_MIN,
+  GEO_MAX_GLOBAL_PER_MIN,
+  GEO_WINDOW_MS,
+} from "../convex/geoGuard";
 import { publicConfig } from "../convex/public";
 import { aiStatus } from "../convex/haimiya";
 
@@ -186,6 +195,67 @@ check(
   "aiStatus fallback configured=false + model null",
   last?.configured === false && last?.model === null,
 );
+
+console.log("── geoGuard: /geo_lang chống đốt usage + DDoS ──");
+
+// 8. Chuẩn hoá x-forwarded-for: mục ĐẦU là IP client (Convex chạy sau proxy).
+check("xff nhiều mục → lấy mục đầu", parseClientIp("1.2.3.4, 10.0.0.1") === "1.2.3.4");
+check("xff IPv4 kèm cổng → cắt cổng", parseClientIp("1.2.3.4:5678") === "1.2.3.4");
+check(
+  "xff IPv6 trong ngoặc → bỏ ngoặc + cổng",
+  parseClientIp("[2001:db8::1]:443") === "2001:db8::1",
+);
+check("xff IPv6 kèm zone id → bỏ zone", parseClientIp("fe80::1%eth0") === "fe80::1");
+check("xff rỗng/null → ''", parseClientIp("") === "" && parseClientIp(null) === "");
+check("xff chuỗi dài bất thường → '' (không tốn gì)", parseClientIp("9".repeat(70)) === "");
+
+// 9. Chỉ gọi upstream cho IP CÔNG CỘNG — IP riêng tư/rác trả rỗng ngay.
+for (const bad of [
+  "",
+  "abc",
+  "999.1.1.1",
+  "1.2.3",
+  "127.0.0.1",
+  "10.1.2.3",
+  "172.16.0.1",
+  "192.168.1.5",
+  "169.254.1.1",
+  "100.64.0.1",
+  "::1",
+  "fd00::1",
+  "fe80::1",
+]) {
+  check(`isPublicIp từ chối "${bad}"`, !isPublicIp(bad));
+}
+for (const good of ["1.1.1.1", "8.8.8.8", "2001:4860:4860::8888"]) {
+  check(`isPublicIp nhận "${good}"`, isPublicIp(good));
+}
+
+// 10. Trần per-IP (script loop một IP) + trần toàn cục (botnet phân tán).
+__resetGeoGuardForTest();
+let geoAllOk = true;
+for (let i = 0; i < GEO_MAX_PER_IP_PER_MIN; i++) {
+  if (!allowGeoRequest("1.1.1.1", 1000)) geoAllOk = false;
+}
+check(`IP gọi ${GEO_MAX_PER_IP_PER_MIN} lượt trong cửa sổ → ok`, geoAllOk);
+check("lượt vượt trần của cùng IP → chặn", !allowGeoRequest("1.1.1.1", 1000));
+check("IP khác không bị ảnh hưởng (bucket tách riêng)", allowGeoRequest("2.2.2.2", 1000));
+check("qua cửa sổ 60s → IP được gọi lại", allowGeoRequest("1.1.1.1", 1000 + GEO_WINDOW_MS + 1));
+__resetGeoGuardForTest();
+let geoBlockedAt = -1;
+for (let i = 0; i <= GEO_MAX_GLOBAL_PER_MIN + 20; i++) {
+  const ip = `9.9.${Math.floor(i / 250)}.${i % 250}`;
+  if (!allowGeoRequest(ip, 2000)) {
+    geoBlockedAt = i;
+    break;
+  }
+}
+check(
+  "botnet nhiều IP khác nhau → chặn bằng trần toàn cục",
+  geoBlockedAt === GEO_MAX_GLOBAL_PER_MIN,
+  String(geoBlockedAt),
+);
+__resetGeoGuardForTest();
 
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);
 process.exit(fail > 0 ? 1 : 0);

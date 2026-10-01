@@ -9,6 +9,7 @@
 
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import { allowGeoRequest, isPublicIp, parseClientIp } from "./geoGuard";
 
 /**
  * Cache đáp án geo — PHẢI là `private`.
@@ -52,11 +53,12 @@ const geoLang = httpAction(async (_ctx, request) => {
   // GET đơn giản (không header tùy chỉnh) không cần preflight, nhưng vẫn trả
   // 204 + CORS ngay tại đây nếu trình duyệt hỏi OPTIONS.
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  // Chống đốt usage/DDoS (xem geoGuard.ts): IP rác, IP không công cộng hoặc vượt
+  // trần → trả rỗng NGAY, không gọi upstream. Không có lớp này thì `curl` loop
+  // biến deployment thành proxy geo-IP miễn phí và đốt hạn mức của mọi user thật.
+  const ip = parseClientIp(request.headers.get("x-forwarded-for"));
+  if (!isPublicIp(ip) || !allowGeoRequest(ip)) return json({ country: "" }, CACHE_MISS);
   try {
-    // Convex chạy sau proxy — IP client nằm trong x-forwarded-for (client đầu tiên).
-    const forwarded = request.headers.get("x-forwarded-for") ?? "";
-    const ip = forwarded.split(",")[0]?.trim() ?? "";
-    if (!ip) return json({ country: "" }, CACHE_MISS);
     const upstream = await fetch(`https://api.country.is/${encodeURIComponent(ip)}`, {
       headers: { "user-agent": "protogon-dashboard" },
       signal: AbortSignal.timeout(4000),

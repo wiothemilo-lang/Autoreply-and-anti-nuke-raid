@@ -112,6 +112,24 @@ function clampRetention(value: number | undefined, fallback: number, min: number
 }
 
 /**
+ * Tra 1 ticket theo id (chuỗi) mà bot gửi lên — CÓ kiểm guild.
+ *
+ * Vì sao cần: các mutation ticket trước đây `collect()` TOÀN BỘ ticket của guild
+ * rồi tự `.find` chỉ để sửa 1 hàng. Với `botTouchTickets` (chạy MỖI tin nhắn
+ * trong kênh ticket) là ~N lượt đọc document (kèm `body` dài) cho mỗi tin nhắn;
+ * với các nút staff bấm là N lượt đọc cho mỗi cú bấm — I/O phình theo bình
+ * phương số ticket của server. `normalizeId` xác nhận chuỗi đúng định dạng id
+ * của bảng `tickets` (sai → null, KHÔNG ném lỗi) rồi `get` đọc đúng 1 document;
+ * vẫn kiểm `guildId` nên guild này không đọc/ghi được ticket của guild khác.
+ */
+async function findGuildTicket(ctx: any, guildId: string, ticketId: string) {
+  const id = ctx.db.normalizeId("tickets", ticketId);
+  if (!id) return null;
+  const ticket = await ctx.db.get(id);
+  return ticket && ticket.guildId === guildId ? ticket : null;
+}
+
+/**
  * These mutations are called by the Discord bot process itself. The bot
  * validates the executor's Discord permissions before calling them, and only
  * the bot holds the Convex admin/deploy key, so no session token is checked.
@@ -1648,11 +1666,7 @@ export const botSetTicketChannel = mutation({
   },
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
-    const rows = await ctx.db
-      .query("tickets")
-      .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-      .collect();
-    const ticket = rows.find((t) => t._id === args.ticketId);
+    const ticket = await findGuildTicket(ctx, args.guildId, args.ticketId);
     if (!ticket) return { ok: true, found: false };
     await ctx.db.patch(ticket._id, {
       channelId: args.channelId,
@@ -1680,11 +1694,7 @@ export const botClaimTicket = mutation({
   },
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
-    const rows = await ctx.db
-      .query("tickets")
-      .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-      .collect();
-    const ticket = rows.find((t) => t._id === args.ticketId);
+    const ticket = await findGuildTicket(ctx, args.guildId, args.ticketId);
     if (!ticket) return { ok: false, reason: "not_found" };
 
     // Chặn ticket ĐÃ ĐÓNG: nút "Nhận việc" vẫn còn trong panel của kênh
@@ -1717,11 +1727,7 @@ export const botUnclaimTicket = mutation({
   },
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
-    const rows = await ctx.db
-      .query("tickets")
-      .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-      .collect();
-    const ticket = rows.find((t) => t._id === args.ticketId);
+    const ticket = await findGuildTicket(ctx, args.guildId, args.ticketId);
     if (!ticket) return { ok: true, found: false };
     await ctx.db.patch(ticket._id, {
       claimedById: undefined,
@@ -1750,11 +1756,7 @@ export const botMarkTicketChannelClosed = mutation({
   },
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
-    const rows = await ctx.db
-      .query("tickets")
-      .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-      .collect();
-    const ticket = rows.find((t) => t._id === args.ticketId);
+    const ticket = await findGuildTicket(ctx, args.guildId, args.ticketId);
     if (!ticket) return { ok: true, found: false };
     await ctx.db.patch(ticket._id, { channelClosedAt: Date.now() });
     return { ok: true, found: true };
@@ -1779,15 +1781,18 @@ export const botTouchTickets = mutation({
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
     const now = args.at ?? Date.now();
-    const rows = await ctx.db
-      .query("tickets")
-      .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-      .collect();
-    // Map để tra O(1) thay vì .find() cho từng kênh.
-    const byChannel = new Map(rows.map((t) => [t.channelId, t]));
     let touched = 0;
+    // Tra ĐÚNG kênh qua index (guildId, channelId). Hàm này chạy MỖI tin nhắn
+    // trong kênh ticket; bản cũ `collect()` toàn bộ ticket của guild rồi tự
+    // `.find` → server 300 ticket tốn ~300 lượt đọc document (kèm `body` dài)
+    // cho mỗi tin nhắn chỉ để sửa 1 hàng. Giờ đúng 1 document/kênh.
     for (const channelId of args.channelIds) {
-      const t = byChannel.get(channelId);
+      const t = await ctx.db
+        .query("tickets")
+        .withIndex("by_guildId_channelId", (q) =>
+          q.eq("guildId", args.guildId).eq("channelId", channelId),
+        )
+        .first();
       if (!t || t.status !== "open") continue;
       const forward = (t.lastActivityAt ?? t.createdAt) < now;
       // Bộ đếm tin nhắn tăng Ở MỌI lượt, kể cả lượt mà đồng hồ im lặng KHÔNG
@@ -1820,11 +1825,7 @@ export const botSaveTicketTranscript = mutation({
   },
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
-    const rows = await ctx.db
-      .query("tickets")
-      .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-      .collect();
-    const ticket = rows.find((t) => t._id === args.ticketId);
+    const ticket = await findGuildTicket(ctx, args.guildId, args.ticketId);
     if (!ticket) return { ok: true, found: false };
     await ctx.db.patch(ticket._id, {
       transcriptStorageId: args.storageId,
