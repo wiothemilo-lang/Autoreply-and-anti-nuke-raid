@@ -15,18 +15,18 @@
 //      vẫn xóa cờ + ghi log "đã tạo backup" → dashboard im lặng — bug thật 23/09)
 //  10. runBackup checksum trùng    → botClearBackup kèm unchanged=true (web báo "không đổi")
 //  11. runBackup thành công        → botClearBackup kèm unchanged=false (web báo "đã tạo xong")
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 // Mock discord.js (giống test-restore-pipeline).
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }

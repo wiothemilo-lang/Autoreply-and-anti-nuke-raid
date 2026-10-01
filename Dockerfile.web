@@ -7,8 +7,8 @@
 #   2. nginx     → chỉ copy dist/ → serve cực nhẹ (~25MB RAM)
 #
 # Lưu ý build-args (điền trong Dokploy → tab Build → Build Arguments):
-#   VITE_CONVEX_URL        URL deployment Convex thật (bắt buộc — build fail
-#                          closed nếu thiếu, không tự trỏ production)
+#   VITE_CONVEX_URL        URL deployment Convex thật (nên đặt — thiếu/sai thì
+#                          scripts/build.mjs dùng URL công khai mặc định ghi trong file)
 #   VITE_DISCORD_CLIENT_ID application id bot (để nút đăng nhập Discord hoạt động)
 #   DISCORD_CLIENT_ID      shim scripts/build.mjs tự chuyển thành VITE_DISCORD_CLIENT_ID
 

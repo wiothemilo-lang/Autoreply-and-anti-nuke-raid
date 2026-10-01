@@ -5,17 +5,17 @@
 //   handleRaidJoin — gate chống ban nhầm: hồ sơ bình thường → không phạt không khóa;
 //                    cụm acc mới đáng ngờ → chỉ phạt acc ĐÁNG NGỜ, người thật bỏ qua
 // Không mạng, không DB thật. Chạy: node scripts/test-member-layers.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }
@@ -793,7 +793,7 @@ module.exports = {
     check("hit-and-run: module tắt → không phạt", calls.memberBans.length === 0);
   }
 
-  fs.unlinkSync(path.join(__dirname, "..", "bot", "test-djs-mock.cjs"));
+  fs.unlinkSync(DJS_MOCK);
   console.log(`\nKết quả member layers: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

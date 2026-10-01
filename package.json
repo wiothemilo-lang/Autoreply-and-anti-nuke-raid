@@ -16,7 +16,7 @@
     "test:ts": "node scripts/run-all-tests.cjs --ts",
     "test:coverage": "c8 --config .c8rc.json node scripts/run-all-tests.cjs",
     "test:bot": "for s in scripts/test-*.cjs; do node \"$s\" || exit 1; done",
-    "test:mutation": "node scripts/mutation-test.cjs",
+    "test:mutation": "node scripts/mutation-test.cjs --full",
     "coverage:floor": "node scripts/check-coverage-floor.cjs",
     "smoke:vps": "node scripts/smoke-vps.cjs"
   },

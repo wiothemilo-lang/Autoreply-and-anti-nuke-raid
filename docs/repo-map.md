@@ -11,7 +11,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
                                                       ⇄ protogon.freebuff.app (Freebuff hosting)
 ```
 
-- Cấu hìnhbot ⇄ dashboard đồng bộ qua Convex, trễ ~1 phút.
+- Cấu hình bot ⇄ dashboard đồng bộ qua Convex, trễ ~1 phút.
 - Deploy Convex: CI tự chạy sau push main (lint+test xanh); VPS agent cũng
   deploy được qua guardrail 4 lớp (xem `docs/opencode-vps-guide.md`).
 
@@ -25,7 +25,8 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `pages/GuildPage.tsx`       | Trang cấu hình 1 server (tabs → các panel dưới)        |
 | `pages/Monitor.tsx`         | Giám sát thời gian thực (chart, sự cố)                 |
 | `pages/StatsPage.tsx`       | Thống kê tổng                                          |
-| `pages/Admin.tsx`           | Trang admin                                            |     | `pages/GuildHistory.tsx` | Lịch sử sự kiện server |
+| `pages/Admin.tsx`           | Trang admin                                            |
+| `pages/GuildHistory.tsx`    | Lịch sử sự kiện server                                 |
 | `pages/GuildIncidents.tsx`  | Sự cố gom cụm (nhóm 15 phút) + đánh dấu đã xử lý       |
 | `pages/DiscordCallback.tsx` | Bắt callback OAuth                                     |
 | `pages/LegalPage.tsx`       | Văn bản pháp lý (/terms, /privacy, /data-deletion)     |
@@ -43,13 +44,15 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `components/HaimiyaChat.tsx` | Chat nhân vật Haimiya (giữ màu brand illustration)                                                               |
 | `components/LangSwitch.tsx`  | Công tắc ngôn ngữ VI/EN/DE — nhúng vào chrome mọi trang (nav, taskbar, header dashboard, trang auth)             |
 | `components/SkipLink.tsx`    | Lối tắt "Bỏ qua tới nội dung" (WCAG 2.4.1) — mọi trang, chỉ hiện khi focus bàn phím                              |
-| `lib/i18n.tsx`               | Lõi đa ngôn ngữ gettext: LangProvider/useT, `translate()` toàn cục, `dateLocale()`                               |
+| `lib/i18n.tsx`               | Lõi đa ngôn ngữ gettext: LangProvider/useT, `translate()`, `ensureDictionary` (nạp lười EN/DE)                   |
+| `lib/i18n.dict.*.ts`         | Gộp 3 file từ điển mỗi ngôn ngữ thành MỘT chunk nạp lười                                                         |
 | `lib/i18n.en.ts`             | Từ điển EN (key = nguyên chuỗi tiếng Việt); thiếu key thì rơi về VI                                              |
 | `lib/legalContent.ts`        | Nội dung 3 văn bản pháp lý × VI/EN/DE (cổng 3f check-i18n kiểm cấu trúc)                                         |
 | `lib/useBotMonitor.ts`       | Hook trạng thái bot realtime                                                                                     |
 | `lib/routes.json`            | **BẢNG TUYẾN ĐƯỜNG** — nguồn duy nhất: path, public/private, index, sitemap, SPA fallback, alias redirect        |
 | `lib/routes.ts`              | Lớp kiểu + hàm đọc bảng (`routeForPath`, `canonicalPathFor`, `SITEMAP_ROUTES`…) — seo.ts + test đều đọc từ đây   |
 | `lib/bootOverlay.ts`         | `finishBootOverlay()` — đường ra THỨ HAI cho preloader khi /boot.js hỏng (fail-open, không phụ thuộc file ngoài) |
+| `lib/staleChunk.ts`          | Tab cũ sau deploy: `vite:preloadError` → tải lại đúng 1 lần/10s (sessionStorage chống lặp)                       |
 | `lib/constants.ts`           | SERVER_THEMES (đã mono xám), hằng số                                                                             |
 
 ## bot/ — Discord bot (CommonJS, chạy pm2 `protogon`)
@@ -111,15 +114,16 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 
 ## Vòng lặp làm việc
 
-- Kiểm chứng: `bun run test` (81 CJS suites — gồm `test-browser-contracts` cháº¡y Chromium headless THáº¬T qua DevTools Protocol) · `bun run test:ts` (18 TS suites) · `bun tsc -b --noEmit` ·
+- Kiểm chứng: `bun run test` (82 CJS suites, chạy song song — gồm `test-browser-contracts` chạy Chromium headless THẬT qua DevTools Protocol) · `bun run test:ts` (21 TS suites) · `bun tsc -b --noEmit` ·
   `bun run lint` · `bun run format:check` — chi tiết gộp 1 lệnh xem skill
   `verification-loop`.
 - Route/SEO/hosting: `src/lib/routes.json` là NGUỒN DUY NHẤT — thêm trang công khai PHẢI khai báo ở đó; `scripts/test-web-contracts.cjs` + `scripts/test-route-manifest.ts` suy kỳ vọng cho vercel.json / nginx / sitemap / robots.txt TỪ bảng. Alias (`/status` → `/monitor`) chỉ redirect 301, không tự khai canonical.
 - Kiểm tra cấu trúc: `scripts/check-repo-map.cjs` (bản đồ khớp thật) +
   `scripts/check-convex-contract.cjs` (tên function bot gọi tồn tại phía
   Convex) +
-  `scripts/check-i18n.cjs` (mọi chuỗi người dùng có bản EN) — CI chạy cả 3
-  trong job lint.
+  `scripts/check-i18n.cjs` (mọi chuỗi người dùng có bản EN) +
+  `scripts/check-settings-signal.cjs` (thay đổi từ dashboard không được "đứng im") —
+  CI chạy cả 4 trong job lint.
 - Đa ngôn ngữ: UI viết chuỗi tiếng Việt thẳng trong JSX rồi bọc
   `translate("…")` (key = chuỗi VI). Thêm chuỗi mới → chạy
   `node scripts/check-i18n.cjs` để biết key nào còn thiếu bản EN; hằng số

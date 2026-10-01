@@ -95,7 +95,7 @@ Rồi bấm **Start** — bot sẽ kết nối Convex Cloud và đồng bộ v�
 
 ### Tự động deploy qua GitHub Actions (không cần gõ lệnh) 🔄
 
-Repository đã có sẵn workflow **`.github/workflows/deploy-convex.yml`**: mỗi lần code trong `convex/` được push lên nhánh `main`, GitHub tự chạy `npx convex deploy` — bạn không cần mở terminal.
+Repository đã có sẵn job **`deploy`** trong **`.github/workflows/ci.yml`** (chạy sau lint + test xanh): mỗi lần code trong `convex/` được push lên nhánh `main`, GitHub tự chạy `npx convex deploy` — bạn không cần mở terminal.
 
 Chỉ cần làm 1 lần (tổng ~3 phút):
 

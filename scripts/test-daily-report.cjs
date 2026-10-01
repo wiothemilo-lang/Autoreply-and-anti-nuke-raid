@@ -6,17 +6,17 @@
 //   - lỗi từng guild không làm sập vòng lặp
 // Mock discord.js + ./antinuke + ../heat + ../util (không gửi Discord thật).
 // Chạy: node scripts/test-daily-report.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.data = { ...data }; this.d = this.data; }
   setColor(c) { this.data.color = c; return this; }
@@ -257,7 +257,7 @@ Module._load = function (request, parent) {
     check("sendLog lỗi → bắt lỗi, không crash", true);
   }
 
-  fs.unlinkSync(path.join(__dirname, "..", "bot", "test-djs-mock.cjs"));
+  fs.unlinkSync(DJS_MOCK);
   console.log(`\nKết quả daily report: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

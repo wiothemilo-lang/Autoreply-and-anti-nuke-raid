@@ -9,7 +9,7 @@
 //   8. selfDiagnose: lỗi runtime → fingerprint → cooldown 1h → mutation thống kê được gọi
 //   9. selfDiagnose: chuỗi lỗi (không phải Error) → bỏ qua, không treo
 // Không mạng thật (fetch bị chặn), không DB thật. Chạy: node scripts/test-chaos.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 // ── Chặn MỌI mạng thật: fetch ném lỗi như server down ──
 const realFetch = globalThis.fetch;
@@ -21,11 +21,11 @@ const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }
@@ -390,7 +390,7 @@ function check(label, cond) {
   }
 
   globalThis.fetch = realFetch;
-  fs.unlinkSync(path.join(__dirname, "..", "bot", "test-djs-mock.cjs"));
+  fs.unlinkSync(DJS_MOCK);
 
   console.log(`\nKết quả chaos: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);

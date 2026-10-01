@@ -67,6 +67,7 @@ export const getPendingJobs = query({
       importFileUrl?: string;
       // Số chunk của bản backup (chỉ có khi payload bị tách) — dùng để ghép lại.
       backupChunkCount?: number;
+      backupCreatedAt?: number;
     }[] = [];
     for (const g of guilds) {
       if (g.backupRequested) {
@@ -100,6 +101,33 @@ export const getPendingJobs = query({
               backupId: b._id,
               backupJson,
               guildName: b.guildName,
+            });
+          }
+        }
+      }
+      // Dry-run khôi phục ("xem kế hoạch trước khi bấm"): dashboard đặt
+      // `restorePlanRequested` + `restorePlanBackupId`. Đường quét cũ
+      // (`backup:botGetPending`) có sinh job này nhưng vòng quét cũ không còn được
+      // lên lịch — batch tick thiếu nhánh → nút xem kế hoạch quay mãi không có
+      // kết quả. Cùng quy tắc ghép chunk với restore; thiếu/hỏng chunk thì KHÔNG
+      // sinh job để người dùng thấy cờ treo thay vì nhận kế hoạch sai.
+      if (g.restorePlanRequested && g.restorePlanBackupId) {
+        const b = await ctx.db.get(g.restorePlanBackupId);
+        if (b) {
+          const backupJson = await reassembleBackupJsonForRead(
+            ctx,
+            b._id,
+            b.backupJson,
+            b.backupChunkCount,
+          );
+          if (backupJson !== null) {
+            backups.push({
+              kind: "plan",
+              guildId: g.discordId,
+              backupId: b._id,
+              backupJson,
+              guildName: b.guildName,
+              backupCreatedAt: b.createdAt,
             });
           }
         }

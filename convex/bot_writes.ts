@@ -37,6 +37,36 @@ function clampHeat(raw: number): number {
   return Math.min(100, Math.max(0, Math.round(raw)));
 }
 
+/**
+ * Giữ các bảng log theo trần số dòng mỗi server (800 sự kiện / 100 case / 500
+ * lượt join). Dọn theo XÁC SUẤT và theo LÔ: mỗi lượt ghi có 1/TRIM_ODDS khả năng
+ * đọc (cap + TRIM_BATCH) dòng mới nhất rồi xoá phần vượt trần (tối đa TRIM_BATCH
+ * dòng cũ nhất).
+ *
+ * Bản cũ cổng theo `Date.now() % 240_000 < 2000` (~0,8% lượt ghi) và mỗi lần chỉ
+ * xoá tối đa 1 dòng → ~99% dòng ghi vào sống mãi, bảng phình vô hạn (không có
+ * cron nào dọn thay). Nay xoá TRIM_BATCH dòng mỗi 1/TRIM_ODDS lượt ghi (2,5
+ * dòng/lượt ≥ 1 dòng ghi vào) nên bảng hội tụ về trần cộng tối đa ~TRIM_ODDS
+ * dòng, kể cả khi còn tồn đọng từ bản cũ (mỗi lần dọn 100 dòng).
+ */
+export const TRIM_ODDS = 40;
+export const TRIM_BATCH = 100;
+
+export function shouldTrim(): boolean {
+  return Math.random() * TRIM_ODDS < 1;
+}
+
+/** Xoá các dòng vượt `cap` trong danh sách đã sắp MỚI NHẤT TRƯỚC; trả về số dòng đã xoá. */
+export async function dropBeyondCap(
+  ctx: { db: { delete: (id: any) => Promise<unknown> } },
+  newestFirst: { _id: unknown }[],
+  cap: number,
+): Promise<number> {
+  const extra = newestFirst.slice(cap);
+  for (const row of extra) await ctx.db.delete(row._id);
+  return extra.length;
+}
+
 function claimIsActive(claimedAt: number | undefined, leaseUntil?: number): boolean {
   if (claimedAt === undefined) return false;
   return leaseUntil !== undefined
@@ -383,19 +413,15 @@ export const botRecordAntinukeEvent = mutation({
       punish: args.punish,
       createdAt: Date.now(),
     });
-    // Chống phình DB: giữ tối đa 800 sự kiện/server. KHÔNG collect toàn bộ mỗi
-    // lần ghi (tốn ~800 reads/event) — chỉ dọn định kỳ ~1/40 lần (~mỗi 4 phút
-    // khi có event liên tục).
-    if (Date.now() % 240_000 < 2000) {
-      const all = await ctx.db
+    // Chống phình DB: giữ tối đa 800 sự kiện/server. KHÔNG đọc toàn bộ mỗi lần ghi
+    // (tốn ~800 reads/event) — dọn theo xác suất + lô, xem `shouldTrim`.
+    if (shouldTrim()) {
+      const newest = await ctx.db
         .query("antinukeEvents")
         .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", args.guildId))
         .order("desc")
-        .take(801);
-      if (all.length > 800) {
-        const drop = all.slice(800).map((r) => r._id);
-        for (const id of drop) await ctx.db.delete(id);
-      }
+        .take(800 + TRIM_BATCH);
+      await dropBeyondCap(ctx, newest, 800);
     }
     return { ok: true };
   },
@@ -1347,16 +1373,14 @@ export const botRecordModAction = mutation({
       caseNumber,
       createdAt: now,
     });
-    // Chống phình DB: giữ tối đa 100 bản/server. Chỉ dọn định kỳ (~1/40 lần)
-    // thay vì collect toàn bộ mỗi lần ghi (tiết kiệm ~100 reads/action).
-    if (Date.now() % 240_000 < 2000) {
-      const extras = await ctx.db
+    // Chống phình DB: giữ tối đa 100 bản/server — dọn theo xác suất + lô (xem `shouldTrim`).
+    if (shouldTrim()) {
+      const newest = await ctx.db
         .query("modActions")
         .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", args.guildId))
         .order("desc")
-        .take(101);
-      const drop = extras.slice(100).map((r) => r._id);
-      for (const id of drop) await ctx.db.delete(id);
+        .take(100 + TRIM_BATCH);
+      await dropBeyondCap(ctx, newest, 100);
     }
     return { ok: true, caseNumber };
   },

@@ -12,8 +12,11 @@
  * mutant của hàm THUẦN (dùng lại code thật bằng cách đọc text source và replace
  * đúng 1 token), rồi chạy assertions của test-property trỏ vào bản mutant.
  *
- * Chạy: node scripts/mutation-test.cjs           (mặc định: nhanh, 12 mutant)
- *       node scripts/mutation-test.cjs --full    (13 mutant — bộ đầy đủ)
+ * Chạy: node scripts/mutation-test.cjs           (nhanh, 12 mutant)
+ *       node scripts/mutation-test.cjs --full    (20 mutant — bộ đầy đủ; `bun run test:mutation`
+ *                                                 và CI chạy bộ này: 8 mutant thêm — chốt chặn xoá
+ *                                                 backup, cổng quyền util, ngân sách hành động — từng
+ *                                                 không bao giờ chạy trong CI dù chỉ tốn ~0,1s)
  *
  * Chống "điểm xanh giả": anchor của mutant không còn khớp source (source đã
  * refactor) KHÔNG được đếm là "mutant bị giết" — script kiểm anchor trước khi
@@ -21,11 +24,12 @@
  */
 const fs = require("fs");
 const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 
 // shared.js require discord.js — cần mock như test-property để mutant nạp được.
 // KHÔNG có mock thì mutant "crash lúc import" bị đếm nhầm là bị giết (kill giả).
-const MOCK_PATH = path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+const MOCK_PATH = DJS_MOCK;
 /** Dọn file mock — gọi trước MỌI đường thoát để không để rác lại repo. */
 function cleanupMock() {
   try {

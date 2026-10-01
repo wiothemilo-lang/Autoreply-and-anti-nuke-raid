@@ -5,17 +5,17 @@
 //                        chỉ ban nghi phạm >= 4 điểm, tôn trọng exempt + cờ tắt,
 //                        recordRaidSample (fire-and-forget).
 // Mock discord.js + bot/src/ai.js (không gọi mạng thật). Chạy: node scripts/test-antinuke-ai.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `module.exports = {
   AuditLogEvent: new Proxy({}, { get: (t, k) => (t[k] ??= Symbol(k)) }),
   PermissionFlagsBits: { ManageGuild: 1n << 5n, Administrator: 1n << 3n },
@@ -341,7 +341,7 @@ Module._load = function (request, parent) {
     bans.length = 0;
     const now = Date.now();
     // AuditLogEvent mock là Symbol nên action phải khớp chính các symbol đó.
-    const { AuditLogEvent } = require("../bot/test-djs-mock.cjs");
+    const { AuditLogEvent } = require(DJS_MOCK);
     const auditEntries = [
       {
         executor: { id: "raider-1", username: "ke-pha-hoai" },
@@ -385,7 +385,7 @@ Module._load = function (request, parent) {
   {
     bans.length = 0;
     const now = Date.now();
-    const { AuditLogEvent } = require("../bot/test-djs-mock.cjs");
+    const { AuditLogEvent } = require(DJS_MOCK);
     const auditEntries = [
       {
         executor: { id: "mod-lanh", username: "mod-tao-invite" },
@@ -439,7 +439,7 @@ Module._load = function (request, parent) {
     check("recordRaidSample lỗi mạng → nuốt, không crash", true);
   }
 
-  fs.unlinkSync(path.join(__dirname, "..", "bot", "test-djs-mock.cjs"));
+  fs.unlinkSync(DJS_MOCK);
   console.log(`\nKết quả antinuke ai/raidIntel: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

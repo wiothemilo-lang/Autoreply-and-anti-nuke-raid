@@ -3,6 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
+import { HEAT_DEFAULTS } from "./modules";
 
 const EVENT_FIELDS = (e: {
   module: string;
@@ -120,6 +121,9 @@ export const heatLeaderboard = query({
       .withIndex("by_guildId_heat", (q) => q.eq("guildId", guildId))
       .order("desc")
       .take(Math.min(limit ?? 10, 50));
+    // Trả kèm decay THẬT của guild: client trừ decay từ `updatedAt` và không được
+    // đoán bằng mặc định (guild đặt decay 0 sẽ bị hiện nhiệt thấp hơn thực tế).
+    const decayPerMin = guild?.heatDecayPerMin ?? HEAT_DEFAULTS.decayPerMin;
     return rows
       .filter((r) => r.heat > 0)
       .map((r) => ({
@@ -128,6 +132,7 @@ export const heatLeaderboard = query({
         heat: r.heat,
         warnStrikes: r.warnStrikes ?? null,
         updatedAt: r.updatedAt,
+        decayPerMin,
       }));
   },
 });

@@ -374,7 +374,14 @@ class HeatTracker {
       this._scheduleFlush(guildId);
       return { escalated: true, punish: s.warnStrikePunish, count };
     }
-    this.strikes.set(key, { count, firstAt: now, username: username || hit?.username });
+    // `firstAt` là mốc strike ĐẦU của cửa sổ: chỉ đặt lại khi mở cửa sổ mới. Ghi
+    // `now` ở mọi strike thì cửa sổ trượt theo strike cuối — strike cách nhau 59
+    // phút tích luỹ mãi và tăng cấp dù cửa sổ cấu hình chỉ 60 phút.
+    this.strikes.set(key, {
+      count,
+      firstAt: count > 1 ? hit.firstAt : now,
+      username: username || hit?.username,
+    });
     this._scheduleFlush(guildId);
     return { escalated: false, punish: "warn", count };
   }
@@ -495,6 +502,7 @@ class HeatTracker {
     }
     const s = heatSettings(config);
     const prefix = `${guildId}:`;
+    const flushedAt = Date.now();
     const keys = new Set([
       ...[...this.states.keys()].filter((k) => k.startsWith(prefix)),
       ...[...this.strikes.keys()].filter((k) => k.startsWith(prefix)),
@@ -511,7 +519,11 @@ class HeatTracker {
         userId,
         username: entry?.username || this.strikes.get(key)?.username || undefined,
         heat: Math.max(0, heat),
-        updatedAt: entry?.updatedAt ?? Date.now(),
+        // `heat` đã trừ decay TỚI BÂY GIỜ nên mốc thời gian phải là bây giờ. Giữ
+        // entry.updatedAt thì mọi nơi đọc (loadHeatStates, HeatBar, StatsPage) lại
+        // trừ decay lần nữa cho đoạn [updatedAt, bây giờ] — người đang nóng 30
+        // hiện 0 và biến khỏi /heat top.
+        updatedAt: flushedAt,
         warnStrikes: strikes,
       });
       // Chống rò rỉ RAM: entry nhiệt = 0 và không còn trong cửa sổ tái phạm

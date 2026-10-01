@@ -125,7 +125,7 @@ Trả về danh sách vấn đề theo mức: [chặn merge] / [nên sửa] / [g
 
 ```bash
 git diff                                    # đọc bằng mắt, review từng file
-bun run test                                # 61 suites
+bun run test                                # toàn bộ suites
 bun tsc -b --noEmit                         # typecheck
 bun run lint                                # ESLint
 node scripts/check-i18n.cjs                 # bổ sung bản EN/DE nếu agy thêm key mới

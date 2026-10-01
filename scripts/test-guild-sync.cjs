@@ -9,18 +9,18 @@
 //   - markGone / ensureModules / isSyncHealthy.
 // LƯU Ý: module có state (firstRun/runCounter...) — require mới mỗi kịch bản
 // bằng cách xóa cache.
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 // Mock đủ ChannelType cho guildSync + EmbedBuilder cho các require dây chuyền.
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = { ...data }; }
   setColor() { return this; } setTitle() { return this; } setDescription() { return this; }
@@ -64,7 +64,7 @@ function makeRole(id, name, color = 0, position = 0) {
   return { id, name, color, position };
 }
 
-const { Collection } = require("../bot/test-djs-mock.cjs");
+const { Collection } = require(DJS_MOCK);
 
 function makeGuild(id, name, { withChannels = false } = {}) {
   const channels = new Collection();

@@ -16,7 +16,7 @@ Xử lý bug theo đúng quy trình AGENTS.md (nhánh 🐛 Bug thật), không l
 4. **Vá**: thay đổi nhỏ nhất đúng chỗ, giữ phong cách tiếng Việt của repo.
 5. **Test chặn tái diễn**: bug thuộc engine đã có test (antinuke, altDetection,
    heat, joinGate, backup, oauth client id…) → thêm test đúng chỗ cạnh test cũ,
-   chạy lại toàn bộ `bun run test` phải xanh toàn bộ (hiện 52 suites —
+   chạy lại toàn bộ `bun run test` phải xanh toàn bộ suites (
    xem AGENTS.md Pha 4).
 6. **Kiểm chứng đủ**: `bun tsc -b --noEmit` + `bun run lint`.
 7. **Báo cáo**: gốc rễ → bản vá → kết quả số → rồi mới commit (KHÔNG push).

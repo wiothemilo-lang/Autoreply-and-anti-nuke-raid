@@ -115,11 +115,12 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
 
   async function toggleEnabled() {
     setSaving(true);
+    // Tính giá trị MỚI một lần: `enabled` trong closure là giá trị CŨ, dùng nó để
+    // chọn thông báo sẽ hiện "Đã tắt" ngay khi người dùng vừa bật (và ngược lại).
+    const next = !enabled;
     try {
-      await updateConfig({ token, guildId, altDetectionEnabled: !enabled });
-      toast.success(
-        enabled ? translate("Đã bật Alt Detection") : translate("Đã tắt Alt Detection"),
-      );
+      await updateConfig({ token, guildId, altDetectionEnabled: next });
+      toast.success(next ? translate("Đã bật Alt Detection") : translate("Đã tắt Alt Detection"));
     } catch (e: unknown) {
       toast.error((e as Error).message);
     }

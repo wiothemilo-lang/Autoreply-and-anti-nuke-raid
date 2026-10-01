@@ -159,6 +159,9 @@ module.exports = function createAntiNukeState({ client, store }) {
   /** Dọn bộ nhớ định kỳ: xóa entry cũ của guild đã rời / vượt cửa sổ. */
   function sweepMemory() {
     const now = Date.now();
+    // Khai báo TRƯỚC mọi vòng lặp dùng nó: `const` sau vòng exemptBuckets khiến
+    // lần quét đầu tiên có entry exempt ném ReferenceError (TDZ) → sập bot.
+    const stale = now - 600_000;
     const live = new Set(client.guilds.cache.keys());
     for (const [key] of buckets) {
       const guildId = key.split(":")[0];
@@ -176,7 +179,6 @@ module.exports = function createAntiNukeState({ client, store }) {
     }
     // Chống rò rỉ RAM: ngoài việc xóa guild đã rời, còn loại luôn entry cũ
     // quá 10 phút của guild ĐANG hoạt động (trước đây cứ tích lại mãi).
-    const stale = now - 600_000;
     for (const [guildId, arr] of joiners) {
       if (!live.has(guildId)) {
         joiners.delete(guildId);

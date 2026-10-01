@@ -4,10 +4,10 @@ name: CI — Lint, Test & Deploy
 # Chặn merge khi fail — không cho code vỡ lọt vào main (trước đây deploy
 # Convex tự chạy mà không qua test nào).
 #
-# Job "lint" chạy TRƯỚC và song song với "test": no-undef chặn ngay loại bug
-# thiếu import / biến chưa khai báo — crash runtime mà test có thể không đụng tới.
-# Job "security" chạy song song: gitleaks chặn token/khóa lộ trong code, bun audit
-# chặn CVE critical (high/moderate chỉ cảnh báo — tránh block vì advisory không
+# Job "lint" và "security" chạy SONG SONG, job "test" chỉ chạy khi cả hai xanh
+# (needs): no-undef chặn ngay loại bug thiếu import / biến chưa khai báo — crash
+# runtime mà test có thể không đụng tới. "security": gitleaks chặn token/khóa lộ
+# trong code, bun audit chặn CVE critical (high/moderate chỉ cảnh báo — tránh block vì advisory không
 # ảnh hưởng runtime như dev-server-only).
 
 on:
@@ -17,9 +17,24 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Quyền tối thiểu cho mọi job; job nào cần hơn thì tự khai bên dưới.
+permissions:
+  contents: read
+
+# Đẩy commit mới lên PR thì huỷ lượt chạy cũ (mỗi lượt tốn vài phút runner).
+# Push lên main KHÔNG bị huỷ: deploy Convex không được bỏ dở giữa chừng.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # gitleaks-action có thể bình luận lên PR — giữ đúng quyền mặc định cũ của job này.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,24 +58,36 @@ jobs:
       - name: Bun audit — chặn CVE mức critical (high/moderate chỉ cảnh báo)
         run: |
           bun install --frozen-lockfile
-          echo "### 📋 Dependency audit" >> $GITHUB_STEP_SUMMARY
-          {
-            echo '```'
-            bun audit || true
-            echo '```'
-          } >> $GITHUB_STEP_SUMMARY
-          # Parse output text thay vì flag --level: cú pháp bun audit đổi giữa
-          # các version (1.3 nhận --level, 1.4 không) — dòng tổng kết dạng
-          # "N vulnerabilities (x critical, y high, ...)" ổn định trên mọi version.
-          bun audit > /tmp/audit.txt 2>&1 || true
-          if grep -qE "[1-9][0-9]* critical" /tmp/audit.txt; then
-            echo "::error::Có CVE mức critical trong dependencies — bắt buộc phải vá trước khi merge"
-            exit 1
-          fi
-          echo "✅ Không có CVE critical" >> $GITHUB_STEP_SUMMARY
+          (cd bot && bun install --frozen-lockfile)
+          echo "### 📋 Dependency audit" >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          # Audit CẢ hai lockfile: bot/bun.lock (discord.js, canvas — cây chạy production
+          # trên VPS) trước đây không bao giờ được quét.
+          for dir in . bot; do
+            out="/tmp/audit-$(echo "$dir" | tr './' '__').txt"
+            (cd "$dir" && bun audit) > "$out" 2>&1 || true
+            { echo "**\`$dir\`**"; echo '```'; cat "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            # FAIL-CLOSED: bun audit hỏng (registry/mạng) thì không in dòng tổng kết —
+            # trước đây trường hợp đó vẫn báo "✅ Không có CVE critical".
+            if ! grep -qE "No vulnerabilities found|[0-9]+ vulnerabilit" "$out"; then
+              echo "::error::bun audit không chạy được ở '$dir' (không có dòng tổng kết) — không thể khẳng định sạch"
+              status=1
+              continue
+            fi
+            # Parse output text thay vì flag --level: cú pháp bun audit đổi giữa
+            # các version (1.3 nhận --level, 1.4 không) — dòng tổng kết dạng
+            # "N vulnerabilities (x critical, y high, ...)" ổn định trên mọi version.
+            if grep -qE "[1-9][0-9]* critical" "$out"; then
+              echo "::error::Có CVE mức critical ở '$dir' — bắt buộc phải vá trước khi merge"
+              status=1
+            fi
+          done
+          [ "$status" -eq 0 ] && echo "✅ Không có CVE critical (root + bot)" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -97,19 +124,25 @@ jobs:
   test:
     needs: [lint, security]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - name: Cài dependencies (root + bot — 4 suites cần discord.js thật)
         run: |
           bun install --frozen-lockfile
-          (cd bot && bun install --no-save)
+          (cd bot && bun install --frozen-lockfile)
       # Test trình duyệt thật (scripts/test-browser-contracts.cjs) điều khiển
       # Chromium bằng DevTools Protocol — KHÔNG cài dependency nào vào repo,
       # nhưng cần một bản Chromium chạy được. Runner Ubuntu chỉ có snap-stub
       # chromium-browser (không dùng được trong service), nên tải bản
       # playwright về cache nếu chưa có. Thiếu Chromium = test FAIL kèm hướng
       # dẫn (không im lặng xanh).
+      - name: Cache Chromium của playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1.63.0-${{ runner.os }}
       - name: Bảo đảm có Chromium cho test trình duyệt
         run: |
           if ! ls -d "$HOME"/.cache/ms-playwright/chromium-* >/dev/null 2>&1; then
@@ -159,6 +192,11 @@ jobs:
     needs: [lint, security, test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Hai lượt deploy không được chồng nhau, và cũng không huỷ lượt đang chạy.
+    concurrency:
+      group: convex-deploy
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

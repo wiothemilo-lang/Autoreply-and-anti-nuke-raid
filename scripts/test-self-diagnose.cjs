@@ -3,16 +3,17 @@
 // Mock discord.js bằng đường dẫn trỏ sang module giả (giống test-research-commands).
 const Module = require("module");
 const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
   if (request === "discord.js") {
-    return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+    return DJS_MOCK;
   }
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }

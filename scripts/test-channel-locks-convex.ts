@@ -36,8 +36,14 @@ const check = (label: string, ok: boolean, detail?: unknown) => {
 
 /**
  * Ctx giả: bảng `channelLocks` trên mảng, `withIndex` mô phỏng đúng range
- * của Convex (chỉ lọc field đã `eq`).
+ * của Convex: `eq` + cận `gt`/`lte` theo THỨ TỰ KIỂU của Convex trong index
+ * (undefined < null < số). Bản cũ chỉ khớp `typeof === "number"` nên che mất bug
+ * thật: `lte("until", now)` một mình khớp cả khoá vô hạn (thiếu `until`).
  */
+const typeRank = (x: unknown) => (x === undefined ? 0 : x === null ? 1 : 2);
+const convexCmp = (a: unknown, b: unknown) =>
+  typeRank(a) - typeRank(b) || (typeRank(a) === 2 ? (a as number) - (b as number) : 0);
+
 function makeCtx(guildOverrides: Row = {}) {
   const locks: Row[] = [];
   const users: Row[] = [{ _id: "u1", discordId: "owner-1", manageableGuildIds: ["server-1"] }];
@@ -70,17 +76,19 @@ function makeCtx(guildOverrides: Row = {}) {
       query: (table: string) => ({
         withIndex: (_name: string, bound: (q: any) => any) => {
           const capture: Record<string, unknown> = {};
+          const ranges: Array<["lte" | "gt", string, unknown]> = [];
           const q: any = {
             eq: (f: string, v: unknown) => ((capture[f] = v), q),
-            lte: (f: string, v: unknown) => ((capture[f] = ["__lte__", v]), q),
+            lte: (f: string, v: unknown) => (ranges.push(["lte", f, v]), q),
+            gt: (f: string, v: unknown) => (ranges.push(["gt", f, v]), q),
           };
           bound(q);
-          const rows = (tables[table] ?? []).filter((r) =>
-            Object.entries(capture).every(([f, v]) =>
-              Array.isArray(v) && v[0] === "__lte__"
-                ? typeof r[f] === "number" && r[f] <= (v[1] as number)
-                : r[f] === v,
-            ),
+          const rows = (tables[table] ?? []).filter(
+            (r) =>
+              Object.entries(capture).every(([f, v]) => r[f] === v) &&
+              ranges.every(([op, f, v]) =>
+                op === "lte" ? convexCmp(r[f], v) <= 0 : convexCmp(r[f], v) > 0,
+              ),
           );
           return {
             first: async () => rows[0] ?? null,

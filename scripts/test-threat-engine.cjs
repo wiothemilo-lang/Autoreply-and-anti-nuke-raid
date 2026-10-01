@@ -1,17 +1,18 @@
 // Test threatEngine.js + flaggedMessages.js + research mở rộng (URLhaus/digest/AI review).
 // Chạy: node scripts/test-threat-engine.cjs — không mạng thật, không Convex thật.
 const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 // Mock discord.js (giống các test khác).
 const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }

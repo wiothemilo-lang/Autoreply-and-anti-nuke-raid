@@ -29,9 +29,9 @@ const root = path.join(__dirname, "..");
 // Mock ghi vào tmpdir thay vì thư mục repo — tránh làm bẩn `git status` trên
 // máy khác (file cũ từng bị commit kèm đường dẫn tuyệt đối của máy build, chạy test
 // trên VPS là git báo "modified" ảo). Xem commit vá kèm test này.
-const TMP_MOCK = path.join(os.tmpdir(), "protogon-djs-mock-boost.cjs");
+const TMP_MOCK = path.join(os.tmpdir(), "protogon-djs-mock-boost-" + process.pid + ".cjs");
 const mockSrc = `
-const { Collection } = require(${JSON.stringify(path.join(root, "bot/test-djs-mock.cjs"))});
+class Collection extends Map {}
 module.exports = {
   Colors: new Proxy({}, { get: () => 0x000000 }),
   AuditLogEvent: new Proxy({}, { get: () => 1 }),
@@ -43,6 +43,13 @@ module.exports = {
 };
 `;
 fs.writeFileSync(TMP_MOCK, mockSrc);
+process.on("exit", () => {
+  try {
+    fs.unlinkSync(TMP_MOCK);
+  } catch {
+    // đã xoá
+  }
+});
 const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === "discord.js") return require(TMP_MOCK);

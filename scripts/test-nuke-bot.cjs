@@ -1,17 +1,17 @@
 // Test chống nuke-bot: phân biệt BOT NUKE KHÔNG VERIFY (phạt ngay) với
 // bot xác minh / bot ở lại lâu / bot logging hợp pháp (không bị phạt oan).
 // Chạy: node scripts/test-nuke-bot.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }

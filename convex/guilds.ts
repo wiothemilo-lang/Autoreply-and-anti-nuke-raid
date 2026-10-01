@@ -27,16 +27,24 @@ function cleanGreetingField(field: string, val: string): string | undefined {
 }
 
 /** Decay a stored heat value by the guild's per-minute decay rate. */
-function decayHeat(heat: number, updatedAt: number, decayPerMin: number) {
-  const elapsedMin = (Date.now() - updatedAt) / 60000;
+function decayHeat(heat: number, updatedAt: number, decayPerMin: number, now = Date.now()) {
+  const elapsedMin = (now - updatedAt) / 60000;
   return Math.max(0, Math.round(heat - elapsedMin * decayPerMin));
 }
 
+/**
+ * Top nhiệt của guild, đã trừ decay tới bây giờ. Mỗi dòng trả về là cặp nhất
+ * quán (heat, updatedAt): `heat` đúng TẠI `updatedAt` = thời điểm query chạy.
+ * Dashboard (HeatBar) trừ decay tiếp theo mốc này để số nhiệt giảm sống khi
+ * đang mở trang — nếu trả lại `updatedAt` gốc của hàng thì cùng một đoạn thời
+ * gian bị trừ decay HAI lần (server rồi client).
+ */
 async function loadHeatStates(
   ctx: { db: import("./_generated/server").DatabaseReader },
   guildId: string,
   decayPerMin: number,
 ) {
+  const now = Date.now();
   const raw = await ctx.db
     .query("heatStates")
     .withIndex("by_guildId_heat", (q) => q.eq("guildId", guildId))
@@ -46,8 +54,8 @@ async function loadHeatStates(
     .map((h) => ({
       userId: h.userId,
       username: h.username,
-      heat: decayHeat(h.heat, h.updatedAt, decayPerMin),
-      updatedAt: h.updatedAt,
+      heat: decayHeat(h.heat, h.updatedAt, decayPerMin, now),
+      updatedAt: now,
       warnStrikes: h.warnStrikes ?? 0,
     }))
     .filter((h) => h.heat > 0 || h.warnStrikes > 0);

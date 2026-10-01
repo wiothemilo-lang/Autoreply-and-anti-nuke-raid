@@ -9,17 +9,17 @@
 //   3. botClearBackup xóa cờ sau khi xong.
 // Kiểm tra thêm các nhánh: tùy chỉnh khôi phục (tắt role/tin nhắn), guild mất, JSON hỏng.
 
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }

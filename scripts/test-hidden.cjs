@@ -8,17 +8,17 @@
 //   - processHiddenJobsData: panel/giveaway chưa post → post; giveaway hết hạn → end
 //     (chọn winner, edit message, DM khi bật, cấp role thưởng); bot rời guild bỏ qua.
 //   - processVerifyPanelItems: thiếu role → báo lỗi dashboard; thành công → clear cờ.
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = { ...data }; }
   setColor(c) { this.d.color = c; return this; }

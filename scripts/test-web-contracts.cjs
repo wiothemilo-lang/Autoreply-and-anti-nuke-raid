@@ -1489,5 +1489,29 @@ check(
     /path\.startsWith\(`\$\{to\}\/`\)/.test(activeFn),
 );
 
+// Thông báo sau khi bật/tắt phải dựa trên giá trị MỚI. `enabled` trong closure là
+// giá trị CŨ: dùng nó chọn thông báo thì bật xong hiện "Đã tắt" (bug thật ở
+// AltDetectionPanel.toggleEnabled).
+const altPanelSrc = files.get("components/dashboard/AltDetectionPanel.tsx") ?? "";
+const toggleFn = altPanelSrc.slice(
+  altPanelSrc.indexOf("async function toggleEnabled"),
+  altPanelSrc.indexOf("async function setPunish"),
+);
+check(
+  "AltDetectionPanel.toggleEnabled: thông báo và giá trị ghi cùng dùng `next` (không dùng closure cũ)",
+  /const next = !enabled;/.test(toggleFn) &&
+    /altDetectionEnabled: next/.test(toggleFn) &&
+    /next \? translate\("Đã bật Alt Detection"\)/.test(toggleFn) &&
+    !/\benabled \? translate\(/.test(toggleFn),
+);
+
+// Chunk bị xoá sau deploy: main.tsx phải gắn bộ tự tải lại (lib/staleChunk.ts).
+const mainSrc = files.get("main.tsx") ?? "";
+check(
+  "main.tsx gắn installStaleChunkRecovery (tab cũ sau deploy tự tải lại thay vì màn lỗi)",
+  /import \{ installStaleChunkRecovery \} from "\.\/lib\/staleChunk"/.test(mainSrc) &&
+    /installStaleChunkRecovery\(\);/.test(mainSrc),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

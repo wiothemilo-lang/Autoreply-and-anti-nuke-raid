@@ -8,17 +8,17 @@
 // mọi nút/modal ticket thêm ở đợt nâng cấp gần nhất chưa từng được test.
 //
 // Chạy: node scripts/test-ticket-interactions.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = { ...data }; }
   setColor(c) { this.d.color = c; return this; }
@@ -232,7 +232,7 @@ Module._load = function (request, parent) {
         async executePunishment() {
           return { executed: false };
         },
-        buildRiskEmbed: () => new (require("../bot/test-djs-mock.cjs").EmbedBuilder)(),
+        buildRiskEmbed: () => new (require(DJS_MOCK).EmbedBuilder)(),
       };
     if (request === "./incidentReport") return { reportInteractive: async () => {} };
     if (request === "./researchCommands") return { handleResearch: async () => {} };

@@ -152,6 +152,18 @@ async function runBackupJobs(client, store, items) {
         await backupMod.runRestore(client, store, item.guildId, item.backupJson, item.guildName, {
           claimAt,
         });
+      } else if (item.kind === "plan") {
+        // Dry-run: chỉ tính kế hoạch khôi phục, KHÔNG đụng server (xem runRestorePlan).
+        await backupMod.runRestorePlan(
+          client,
+          store,
+          item.guildId,
+          item.backupJson,
+          item.guildName,
+          {
+            claimAt,
+          },
+        );
       } else if (item.kind === "import") {
         const content = await readImportContent(item);
         await backupMod.runImportRestore(client, store, item.guildId, content, item.fileName, {
@@ -173,6 +185,16 @@ async function runBackupJobs(client, store, items) {
       } else if (item.kind === "restore") {
         await store.client
           .mutation("bot_writes:botReportRestoreError", {
+            guildId: item.guildId,
+            error: String(e?.message || "Lỗi không xác định").slice(0, 300),
+            claimAt,
+          })
+          .catch(() => {});
+      } else if (item.kind === "plan") {
+        // Lỗi dry-run có mutation riêng: botClearBackup/ReportBackupError sẽ đặt
+        // mốc backup/restore xong giả và xoá nhầm cờ khôi phục thật.
+        await store.client
+          .mutation("bot_writes:botReportRestorePlan", {
             guildId: item.guildId,
             error: String(e?.message || "Lỗi không xác định").slice(0, 300),
             claimAt,

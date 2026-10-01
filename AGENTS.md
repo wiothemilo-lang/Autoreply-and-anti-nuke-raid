@@ -72,8 +72,8 @@ thôi. Khi nghi file có thể sửa dở: xem `git diff` trước khi sửa ti�
 
 Đơn vị công việc chỉ coi là XONG khi tất cả điều này thoả:
 
-- [ ] `bun run test` — toàn bộ suites xanh (hiện tại **81 suites** — số liệu 29/09/2026; đếm theo lệnh này, KHÔNG cộng suite .ts của `bun run test:ts`. Nếu runner báo ít hơn nhiều → có suite bị bỏ sót, điều tra trước khi kết luận xanh). Số liệu này phải khớp với `CONTRACT_SUITES` trong `.opencode/plugins/guardrails.js` — đổi suite mới phải sửa CẢ HAI chỗ trong cùng commit
-- [ ] `bun run test:ts` — 20 suite tầng Convex/Haimiya/bot/web viết bằng TypeScript (chạy bằng bun; tách khỏi `bun run test` để không đụng phép đo coverage c8). Đụng `convex/`, `bot/src/ai.js`, logic panel hoặc thẻ ảnh `bot/src/handlers/welcomeCard.js` thì bắt buộc chạy
+- [ ] `bun run test` — toàn bộ suites xanh (hiện tại **82 suites** — số liệu 29/09/2026; đếm theo lệnh này, KHÔNG cộng suite .ts của `bun run test:ts`. Nếu runner báo ít hơn nhiều → có suite bị bỏ sót, điều tra trước khi kết luận xanh). Số liệu này phải khớp với `CONTRACT_SUITES` trong `.opencode/plugins/guardrails.js` — đổi suite mới phải sửa CẢ HAI chỗ trong cùng commit
+- [ ] `bun run test:ts` — 21 suite tầng Convex/Haimiya/bot/web viết bằng TypeScript (chạy bằng bun; tách khỏi `bun run test` để không đụng phép đo coverage c8). Đụng `convex/`, `bot/src/ai.js`, logic panel hoặc thẻ ảnh `bot/src/handlers/welcomeCard.js` thì bắt buộc chạy
 - [ ] `bun tsc -b --noEmit` — typecheck sạch
 - [ ] `bun run lint` — sạch
 - [ ] `node scripts/check-repo-map.cjs` — bản đồ khớp cấu trúc thật (chỉ khi
@@ -178,7 +178,7 @@ Các lệnh kiểm chứng đã được allow sẵn trong `opencode.json` — c
 ## 5. Lệnh hữu ích
 
 ```
-bun run test              # toàn bộ test suites (~8s) — chạy sau MỌI thay đổi logic
+bun run test              # toàn bộ test suites (~1 phút, chạy song song; thêm --serial để chạy tuần tự) — chạy sau MỌI thay đổi logic
 bun tsc -b --noEmit       # typecheck
 bun run lint              # ESLint
 bun run test:coverage     # test + đo coverage (c8, có ngưỡng chặn)

@@ -1,16 +1,17 @@
 // Test pipeline backup sau các bản fix (auto includeMessages, nén Gist, import 'z:', skip notice).
 // Chạy: node scripts/test-backup-pipeline.cjs — không mạng thật, không Convex thật, không Discord thật.
 const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }
@@ -255,7 +256,7 @@ const check = (label, ok) => {
   // Nhánh CHỤP chưa từng chạy với dữ liệu thật: captureChannelMessages và
   // phần serialize emoji/sticker/overwrite đều là dòng chưa phủ. Chụp hỏng thì
   // bản backup vào Convex/Gist cũng hỏng theo — mà test cũ chỉ kiểm nén/import.
-  const { PermissionsBitField, ChannelType: CT } = require("../bot/test-djs-mock.cjs");
+  const { PermissionsBitField, ChannelType: CT } = require(DJS_MOCK);
   const SRC = "111222333444555666";
   const MY_BITS = (1n << 10n) | (1n << 11n); // ViewChannel | SendMessages
   const PNG_URI =

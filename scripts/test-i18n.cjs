@@ -55,15 +55,40 @@ check(
 );
 check(
   "translate() rơi về chuỗi VI khi thiếu bản dịch (không vỡ UI)",
-  /DICTS\[currentLang\]\[s\] \?\? s/.test(i18n) && /DICTS\[lang\]\[s\] \?\? s/.test(i18n),
+  /lookupTranslation\(currentLang, s\) \?\? s/.test(i18n) &&
+    /lookupTranslation\(lang, s\) \?\? s/.test(i18n),
+);
+// Từ điển nạp LƯỜI: đo 30/09/2026 hai từ điển chiếm ~404 KB / 509 KB chunk entry.
+// Import tĩnh quay lại là kéo cả EN lẫn DE về cho người dùng tiếng Việt.
+const dictEn = read("src/lib/i18n.dict.en.ts");
+const dictDe = read("src/lib/i18n.dict.de.ts");
+const main0 = read("src/main.tsx");
+check(
+  "i18n.tsx KHÔNG import tĩnh từ điển EN/DE (chỉ import() động theo ngôn ngữ)",
+  !/^import .* from "\.\/i18n\.(en|de)(\.panels|\.labels)?";/m.test(i18n) &&
+    /import\("\.\/i18n\.dict\.en"\)/.test(i18n) &&
+    /import\("\.\/i18n\.dict\.de"\)/.test(i18n),
 );
 check(
   "Từ điển EN gộp 3 file (i18n.en.ts + i18n.en.panels.ts + i18n.en.labels.ts) — không mất bản dịch",
-  /import \{ EN_PANELS \} from "\.\/i18n\.en\.panels"/.test(i18n) &&
-    /import \{ EN_LABELS \} from "\.\/i18n\.en\.labels"/.test(i18n) &&
-    /const DICTS: Record<Exclude<Lang, "vi">, Record<string, string>> = \{/.test(i18n) &&
+  /import \{ EN \} from "\.\/i18n\.en"/.test(dictEn) &&
+    /import \{ EN_PANELS \} from "\.\/i18n\.en\.panels"/.test(dictEn) &&
+    /import \{ EN_LABELS \} from "\.\/i18n\.en\.labels"/.test(dictEn) &&
+    /\{ \.\.\.EN, \.\.\.EN_PANELS, \.\.\.EN_LABELS \}/.test(dictEn) &&
     fs.existsSync(path.join(ROOT, "src/lib/i18n.en.panels.ts")) &&
     fs.existsSync(path.join(ROOT, "src/lib/i18n.en.labels.ts")),
+);
+check(
+  "Từ điển DE gộp 3 file (i18n.de.ts + i18n.de.panels.ts + i18n.de.labels.ts) — không mất bản dịch",
+  /import \{ DE \} from "\.\/i18n\.de"/.test(dictDe) &&
+    /import \{ DE_PANELS \} from "\.\/i18n\.de\.panels"/.test(dictDe) &&
+    /import \{ DE_LABELS \} from "\.\/i18n\.de\.labels"/.test(dictDe) &&
+    /\{ \.\.\.DE, \.\.\.DE_PANELS, \.\.\.DE_LABELS \}/.test(dictDe),
+);
+check(
+  "main.tsx chờ từ điển ngôn ngữ ban đầu trước khi vẽ lần đầu (không nháy tiếng Việt)",
+  /await prepareInitialLanguage\(\)/.test(main0) &&
+    main0.indexOf("await prepareInitialLanguage()") < main0.indexOf(".render("),
 );
 check("Lưu lựa chọn ngôn ngữ vào localStorage (protogon-lang)", /protogon-lang/.test(i18n));
 check("Cập nhật <html lang> khi đổi ngôn ngữ", /document\.documentElement\.lang = lang/.test(i18n));

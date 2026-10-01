@@ -212,7 +212,13 @@ module.exports = function createAntiNuke(client, store, heat) {
       void tickHeatResets().catch((e) => console.error("[heat:resetTick]", e.message));
       // S4: gỡ role cách ly hết hạn (vandalBudget).
       void tickVandalReleases().catch((e) => console.error("[vandalBudget:tick]", e.message));
-      sweepMemory();
+      // Dọn RAM không bao giờ được làm sập bot: lỗi ném đồng bộ trong setInterval
+      // đi thẳng tới uncaughtException → exit(1).
+      try {
+        sweepMemory();
+      } catch (e) {
+        console.error("[antinuke:sweep]", e.message);
+      }
     }, 20_000);
   }
 

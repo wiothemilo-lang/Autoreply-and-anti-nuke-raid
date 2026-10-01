@@ -393,6 +393,128 @@ const status = { _id: "st", kind: "status", botKeySeed: computeBotKey(BOT_KEY), 
     );
   }
 
+  console.log("\n── Job plan (dry-run khôi phục): batch tick phải sinh job cho bot ──");
+  {
+    // Nút "xem kế hoạch khôi phục" đặt restorePlanRequested. Đường quét cũ sinh job
+    // `plan` nhưng batch tick thì không → yêu cầu không bao giờ được trả lời.
+    const mkPlanCtx = (guildExtra: any, backupRow: any, chunks: any[] = []) =>
+      makeCtx({
+        botStatus: [status],
+        guilds: [
+          {
+            _id: "g1",
+            discordId: "g-plan",
+            botInGuild: true,
+            name: "Cần xem kế hoạch",
+            ...guildExtra,
+          },
+        ],
+        guildBackups: [backupRow],
+        backupChunks: chunks,
+        reactionRolePanels: [],
+        giveaways: [],
+        guildWebhooks: [],
+      });
+    const row = (extra: any = {}) => ({
+      _id: "b1",
+      guildId: "g-plan",
+      guildName: "Bản sao",
+      backupJson: "z:PLAN",
+      createdAt: 1234,
+      ...extra,
+    });
+
+    const asked = await handler(
+      mkPlanCtx({ restorePlanRequested: true, restorePlanBackupId: "b1" }, row()),
+      { botKey: BOT_KEY },
+    );
+    const planJob = asked.backups.find((b: any) => b.kind === "plan");
+    check(
+      "restorePlanRequested → sinh job kind plan kèm nội dung backup",
+      !!planJob && planJob.guildId === "g-plan" && planJob.backupJson === "z:PLAN",
+    );
+    check(
+      "job plan mang đúng backupId + tên + mốc tạo",
+      planJob?.backupId === "b1" &&
+        planJob?.guildName === "Bản sao" &&
+        planJob?.backupCreatedAt === 1234,
+    );
+    check(
+      "plan KHÔNG bị nhầm thành restore thật",
+      !asked.backups.some((b: any) => b.kind === "restore"),
+    );
+
+    const notAsked = await handler(mkPlanCtx({}, row()), { botKey: BOT_KEY });
+    check(
+      "không có cờ plan → không sinh job plan",
+      !notAsked.backups.some((b: any) => b.kind === "plan"),
+    );
+    const noBackupId = await handler(mkPlanCtx({ restorePlanRequested: true }, row()), {
+      botKey: BOT_KEY,
+    });
+    check(
+      "cờ plan nhưng thiếu restorePlanBackupId → không sinh job",
+      !noBackupId.backups.some((b: any) => b.kind === "plan"),
+    );
+    const gone = await handler(
+      mkPlanCtx({ restorePlanRequested: true, restorePlanBackupId: "b-khong-con" }, row()),
+      { botKey: BOT_KEY },
+    );
+    check(
+      "backup đã bị xoá → không sinh job (không ném)",
+      !gone.backups.some((b: any) => b.kind === "plan"),
+    );
+
+    // Backup tách chunk phải được GHÉP LẠI như restore (nếu không bot tính kế hoạch từ chuỗi rác).
+    const payload = "z:" + "P".repeat(1_200_000);
+    const chunked = await handler(
+      mkPlanCtx(
+        { restorePlanRequested: true, restorePlanBackupId: "b1" },
+        row({ backupJson: "chunked:2", backupChunkCount: 2 }),
+        [
+          { _id: "c0", backupId: "b1", index: 0, data: payload.slice(0, 600_000) },
+          { _id: "c1", backupId: "b1", index: 1, data: payload.slice(600_000) },
+        ],
+      ),
+      { botKey: BOT_KEY },
+    );
+    check(
+      "plan của bản tách chunk → ghép lại đủ, không gửi ký hiệu chunked:N",
+      chunked.backups.find((b: any) => b.kind === "plan")?.backupJson === payload,
+    );
+    const brokenChunks = await handler(
+      mkPlanCtx(
+        { restorePlanRequested: true, restorePlanBackupId: "b1" },
+        row({ backupJson: "chunked:3", backupChunkCount: 3 }),
+        [{ _id: "c0", backupId: "b1", index: 0, data: payload.slice(0, 600_000) }],
+      ),
+      { botKey: BOT_KEY },
+    );
+    check(
+      "thiếu chunk → KHÔNG sinh job plan (kế hoạch từ dữ liệu cụt còn tệ hơn không có)",
+      !brokenChunks.backups.some((b: any) => b.kind === "plan"),
+    );
+
+    // Yêu cầu restore thật VÀ plan cùng lúc → cả hai job, không cái nào nuốt cái nào.
+    const both = await handler(
+      mkPlanCtx(
+        {
+          restoreRequested: true,
+          restoreBackupId: "b1",
+          restorePlanRequested: true,
+          restorePlanBackupId: "b1",
+        },
+        row(),
+      ),
+      { botKey: BOT_KEY },
+    );
+    check(
+      "restore thật + plan cùng lúc → đủ 2 job phân biệt",
+      both.backups.filter((b: any) => b.kind === "restore").length === 1 &&
+        both.backups.filter((b: any) => b.kind === "plan").length === 1,
+    );
+  }
+
   console.log(`\n${pass}/${pass + fail} ✅`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

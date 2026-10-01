@@ -13,6 +13,15 @@ import {
 } from "../src/lib/useUnsavedChanges";
 import { filterCommands, foldDiacritics, scoreCommand } from "../src/components/CommandPalette";
 import { syncState, SETTINGS_APPLY_WINDOW_MS, STALE_HEARTBEAT_MS } from "../src/lib/syncState";
+import { ensureDictionary, lookupTranslation, translate } from "../src/lib/i18n";
+import { safeRedirectPath } from "../src/lib/discord";
+import { CHUNK_RELOAD_COOLDOWN_MS, installStaleChunkRecovery } from "../src/lib/staleChunk";
+import { EN } from "../src/lib/i18n.en";
+import { EN_PANELS } from "../src/lib/i18n.en.panels";
+import { EN_LABELS } from "../src/lib/i18n.en.labels";
+import { DE } from "../src/lib/i18n.de";
+import { DE_PANELS } from "../src/lib/i18n.de.panels";
+import { DE_LABELS } from "../src/lib/i18n.de.labels";
 
 let pass = 0;
 let fail = 0;
@@ -201,6 +210,143 @@ check(
     now: T + SETTINGS_APPLY_WINDOW_MS + 1,
   }) === "sent",
 );
+
+// ─────────────────────────────────────────────────────────────
+console.log("\n── #5 từ điển i18n nạp lười (EN/DE tách chunk, VI không cần gì) ──");
+// Đo 30/09/2026: hai từ điển chiếm ~404 KB / 509 KB chunk entry. Nạp lười chỉ
+// an toàn nếu tra cứu vẫn ĐÚNG từng key sau khi nạp và không bao giờ ném.
+{
+  const enKey = Object.keys(EN)[0];
+  const panelKey = Object.keys(EN_PANELS)[0];
+  const labelKey = Object.keys(EN_LABELS)[0];
+  check(
+    "chưa nạp → chưa có bản dịch EN (null, để caller rơi về chuỗi VI)",
+    lookupTranslation("en", enKey) === null,
+  );
+  check(
+    "tiếng Việt là key nên không bao giờ cần từ điển",
+    lookupTranslation("vi", enKey) === null && (await ensureDictionary("vi")) === true,
+  );
+  const first = ensureDictionary("en");
+  check("hai lần gọi đồng thời dùng chung MỘT lượt nạp", first === ensureDictionary("en"));
+  check("nạp xong trả true", (await first) === true);
+
+  const mergedEn: Record<string, string> = { ...EN, ...EN_PANELS, ...EN_LABELS };
+  check(
+    "EN: mọi key của cả 3 file đều tra ra đúng bản dịch (file sau đè file trước)",
+    Object.entries(mergedEn).every(([k, v]) => lookupTranslation("en", k) === v),
+  );
+  check(
+    "EN: có mặt key từ đợt 1, panel và nhãn dữ liệu",
+    [enKey, panelKey, labelKey].every((k) => lookupTranslation("en", k) !== null),
+  );
+  check("nạp EN không kéo theo DE", lookupTranslation("de", enKey) === null);
+
+  check("DE nạp xong trả true", (await ensureDictionary("de")) === true);
+  const mergedDe: Record<string, string> = { ...DE, ...DE_PANELS, ...DE_LABELS };
+  check(
+    "DE: mọi key của cả 3 file đều tra ra đúng bản dịch",
+    Object.entries(mergedDe).every(([k, v]) => lookupTranslation("de", k) === v),
+  );
+  check("key lạ → null (không ném)", lookupTranslation("en", "khóa-không-tồn-tại-xyz") === null);
+  check(
+    "translate() ở tiếng Việt trả nguyên chuỗi và thay biến",
+    translate("Đã lưu {n} rule", { n: 3 }) === "Đã lưu 3 rule",
+  );
+  check("nạp lại khi đã nạp → true ngay", (await ensureDictionary("en")) === true);
+}
+
+console.log("\n── #6 safeRedirectPath (hàm THẬT, không tái tạo) ──");
+// Hồi quy: hàm tự nhận "không chứa ký tự điều khiển" nhưng "/\t/evil.com" lọt qua,
+// mà bộ phân tích URL của trình duyệt bỏ tab → thành "//evil.com" (protocol-relative).
+{
+  const FALLBACK = "/dashboard";
+  check("đường dẫn nội bộ giữ nguyên", safeRedirectPath("/dashboard/g/123") === "/dashboard/g/123");
+  check(
+    "query string nội bộ giữ nguyên",
+    safeRedirectPath("/dashboard?tab=heat") === "/dashboard?tab=heat",
+  );
+  check("gốc '/' hợp lệ", safeRedirectPath("/") === "/");
+  check("khoảng trắng hai đầu được cắt", safeRedirectPath("  /ok ") === "/ok");
+  const evil = [
+    "//evil.com",
+    "/\\evil.com",
+    "/a\\b",
+    "/\t/evil.com",
+    "/\n/evil.com",
+    "/\r/evil.com",
+    "/\u0000/evil.com",
+    "/\u007f",
+    "https://evil.com",
+    "http://evil.com",
+    "javascript:alert(1)",
+    "evil.com",
+    "",
+  ];
+  for (const raw of evil) {
+    check(`từ chối ${JSON.stringify(raw)}`, safeRedirectPath(raw) === FALLBACK);
+  }
+  check(
+    "null/undefined/không phải chuỗi → fallback",
+    safeRedirectPath(null) === FALLBACK &&
+      safeRedirectPath(undefined) === FALLBACK &&
+      safeRedirectPath(42 as unknown as string) === FALLBACK,
+  );
+  check("fallback tuỳ chỉnh được dùng", safeRedirectPath("//evil.com", "/home") === "/home");
+}
+
+console.log("\n── #7 tự tải lại khi chunk bị xoá sau deploy (vite:preloadError) ──");
+{
+  const mk = (opts: { now?: () => number; storage?: any } = {}) => {
+    const target = new EventTarget();
+    const mem = new Map<string, string>();
+    const storage = opts.storage ?? {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, v),
+    };
+    let reloads = 0;
+    let t = 1_700_000_000_000;
+    const dispose = installStaleChunkRecovery({
+      target,
+      storage,
+      now: opts.now ?? (() => t),
+      reload: () => void reloads++,
+    });
+    const fire = () => {
+      const ev = new Event("vite:preloadError", { cancelable: true });
+      target.dispatchEvent(ev);
+      return ev;
+    };
+    return { fire, dispose, reloads: () => reloads, advance: (ms: number) => void (t += ms) };
+  };
+
+  const a = mk();
+  const ev1 = a.fire();
+  check("lỗi chunk đầu tiên → tải lại đúng 1 lần", a.reloads() === 1);
+  check("lỗi gốc bị chặn (không nháy màn lỗi lúc đang tải lại)", ev1.defaultPrevented);
+  a.advance(CHUNK_RELOAD_COOLDOWN_MS - 1);
+  const ev2 = a.fire();
+  check("vừa tải lại mà vẫn lỗi (trong cooldown) → KHÔNG tải lại nữa", a.reloads() === 1);
+  check("...và để lỗi nổi lên cho error boundary (không chặn)", !ev2.defaultPrevented);
+  a.advance(1);
+  a.fire();
+  check("hết cooldown → được tải lại lần nữa", a.reloads() === 2);
+  a.dispose();
+  a.fire();
+  check("đã gỡ listener → không phản ứng", a.reloads() === 2);
+
+  const b = mk({
+    storage: {
+      getItem: () => {
+        throw new Error("sessionStorage bị chặn");
+      },
+      setItem: () => {},
+    },
+  });
+  const evB = b.fire();
+  check("sessionStorage bị chặn → không có chống lặp nên KHÔNG tải lại", b.reloads() === 0);
+  check("...và không nuốt lỗi gốc", !evB.defaultPrevented);
+}
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

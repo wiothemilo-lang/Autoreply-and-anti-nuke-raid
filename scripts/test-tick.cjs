@@ -10,16 +10,16 @@
 // Mock discord.js + handlers/{hidden,backup,selfDiagnose} + webhookHub (không mạng thật,
 // không Convex thật).
 // Chạy: node scripts/test-tick.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
-fs.writeFileSync(path.join(__dirname, "..", "bot", "test-djs-mock.cjs"), "module.exports = {};\n");
+fs.writeFileSync(DJS_MOCK, "module.exports = {};\n");
 
 // ── Mocks cho các module mà tick.js require ──
 const calls = {
@@ -27,6 +27,7 @@ const calls = {
   verify: [],
   backup: [],
   restore: [],
+  plan: [],
   import: [],
   selfDiagnose: [],
   mutations: [],
@@ -42,6 +43,7 @@ let claimAt = null;
 let claimShouldThrow = false;
 let backupShouldThrow = false;
 let restoreShouldThrow = false;
+let planShouldThrow = false;
 let importShouldThrow = false;
 let importFileUrlResponse = null;
 
@@ -61,6 +63,10 @@ const backupMock = {
   async runRestore(client, store, guildId, backupJson, guildName, options) {
     calls.restore.push({ guildId, backupJson, guildName, options });
     if (restoreShouldThrow) throw new Error("restore lỗi");
+  },
+  async runRestorePlan(client, store, guildId, backupJson, guildName, options) {
+    calls.plan.push({ guildId, backupJson, guildName, options });
+    if (planShouldThrow) throw new Error("plan lỗi");
   },
   async runImportRestore(client, store, guildId, content, fileName, options) {
     calls.import.push({ guildId, content, fileName, options });
@@ -356,6 +362,50 @@ globalThis.fetch = async () => {
   }
 
   // ── 8. runBackupJobs: claim lỗi mạng → bỏ qua an toàn ──
+  // ── 7b. runBackupJobs: dry-run khôi phục (kind plan) ──
+  // Batch tick từng không sinh job plan và runBackupJobs không có nhánh plan → nút
+  // "xem kế hoạch khôi phục" trên dashboard quay mãi. Nay job được dispatch vào
+  // runRestorePlan (KHÔNG phải runRestore — dry-run không được đụng server).
+  {
+    clear();
+    claimAt = 4242;
+    await runBackupJobs(client, store, [
+      { guildId: "g5", kind: "plan", backupJson: "z:plan", guildName: "G5" },
+    ]);
+    check(
+      "kind plan → runRestorePlan kèm nội dung + tên backup",
+      calls.plan.length === 1 &&
+        calls.plan[0].backupJson === "z:plan" &&
+        calls.plan[0].guildName === "G5",
+    );
+    check("claimAt được truyền vào dry-run", calls.plan[0].options.claimAt === 4242);
+    check("dry-run KHÔNG gọi runRestore (không đụng server)", calls.restore.length === 0);
+    check(
+      "claim giành quyền với đúng kind plan",
+      calls.mutations.some((m) => m.name === "bot_writes:botClaimBackup" && m.args.kind === "plan"),
+    );
+
+    clear();
+    planShouldThrow = true;
+    await runBackupJobs(client, store, [{ guildId: "g5", kind: "plan", backupJson: "z:plan" }]);
+    const report = calls.mutations.find((m) => m.name === "bot_writes:botReportRestorePlan");
+    check(
+      "dry-run lỗi → botReportRestorePlan kèm lý do + claimAt (để dashboard hết quay)",
+      !!report && report.args.error === "plan lỗi" && report.args.claimAt === 4242,
+    );
+    check(
+      "dry-run lỗi KHÔNG đi qua mutation lỗi backup/restore (sẽ đặt mốc xong giả)",
+      !calls.mutations.some(
+        (m) =>
+          m.name === "bot_writes:botReportBackupError" ||
+          m.name === "bot_writes:botReportRestoreError",
+      ),
+    );
+    planShouldThrow = false;
+    claimAt = null;
+  }
+
+  // ── 8. runBackupJobs: claim lỗi mạng → bỏ qua an toàn ──
   {
     clear();
     claimShouldThrow = true;
@@ -437,7 +487,7 @@ globalThis.fetch = async () => {
     }
   }
 
-  fs.unlinkSync(path.join(__dirname, "..", "bot", "test-djs-mock.cjs"));
+  fs.unlinkSync(DJS_MOCK);
   console.log(`\nKết quả tick: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

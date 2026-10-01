@@ -11,12 +11,12 @@
 //     lỗi AI throw → trả lời lỗi, không chết.
 //   - emergencyRaidAlert: cooldown 5 phút + toggle emergencyAlertEnabled=false
 //     + gửi kênh log thành công (không fallback) / kênh chết → fallback sendLog.
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 // Mock discord.js (cần Colors/ChannelType cho incidentReport + util).
-const mockFile = path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+const mockFile = DJS_MOCK;
 fs.writeFileSync(
   mockFile,
   `class EmbedBuilder {
@@ -76,7 +76,7 @@ Module._load = function (request, parent, isMain) {
 };
 
 const { reportInteractive, emergencyRaidAlert } = require("../bot/src/handlers/incidentReport.js");
-const { Collection } = require("../bot/test-djs-mock.cjs");
+const { Collection } = require(DJS_MOCK);
 
 let pass = 0;
 let fail = 0;

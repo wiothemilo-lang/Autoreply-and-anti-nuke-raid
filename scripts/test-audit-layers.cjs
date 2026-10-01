@@ -5,17 +5,17 @@
 // bot logging hợp pháp không bị xử lý oan, thiếu member → chỉ ghi nhận,
 // dedupe 1 hành vi = 1 phạt, tick mở khóa + xóa nhiệt từ dashboard.
 // Không mạng, không DB thật. Chạy: node scripts/test-audit-layers.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }
@@ -1227,7 +1227,7 @@ module.exports = {
     check("tickUnlocks: guild chưa có config → bỏ qua, không vỡ", ok);
   }
 
-  fs.unlinkSync(path.join(__dirname, "..", "bot", "test-djs-mock.cjs"));
+  fs.unlinkSync(DJS_MOCK);
   console.log(`\nKết quả audit layers: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

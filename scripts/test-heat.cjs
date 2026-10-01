@@ -552,6 +552,33 @@ function mkTracker(opts = {}) {
     check("strike thiếu username → giữ tên lần trước", tracker.strikeUsername("g1", "u3") === "C");
   }
 
+  console.log("\n── strike: cửa sổ neo tại strike ĐẦU, không trượt theo strike cuối ──");
+  {
+    // `firstAt` là mốc strike ĐẦU của cửa sổ. Bug cũ: ghi `now` ở mọi strike →
+    // cửa sổ trượt theo strike cuối, strike cách nhau gần một cửa sổ tích luỹ mãi.
+    const { tracker } = mkTracker();
+    const s = heatSettings({ warnStrikeLimit: 3, warnStrikeWindowMin: 60 });
+    tracker.strike("g1", "w1", s, "W");
+    tracker.strikes.get("g1:w1").firstAt = Date.now() - 50 * MIN; // strike đầu cách đây 50 phút
+    const st2 = tracker.strike("g1", "w1", s, "W");
+    check(
+      "strike thứ 2 trong cửa sổ: đếm 2, KHÔNG dời mốc đầu cửa sổ",
+      st2.count === 2 && Date.now() - tracker.strikes.get("g1:w1").firstAt >= 50 * MIN - 1_000,
+      JSON.stringify(st2),
+    );
+    tracker.strikes.get("g1:w1").firstAt = Date.now() - 61 * MIN; // cửa sổ gốc đã hết hạn
+    const st3 = tracker.strike("g1", "w1", s, "W");
+    check(
+      "strike thứ 3 sau khi cửa sổ gốc hết hạn: mở cửa sổ MỚI, không tăng cấp",
+      st3.escalated === false && st3.count === 1,
+      JSON.stringify(st3),
+    );
+    check(
+      "cửa sổ mới neo tại strike vừa rồi",
+      Date.now() - tracker.strikes.get("g1:w1").firstAt < 5_000,
+    );
+  }
+
   console.log("\n── resetGuild: xoá luôn warn tích luỹ ──");
   {
     const { tracker, calls } = mkTracker();
@@ -640,6 +667,83 @@ function mkTracker(opts = {}) {
     );
     const plain = heatSummary({ added: 10, heat: 10, repeated: false, warned: false });
     check("không tái phạm/DM → không thêm chú thích", plain === " · +10 nhiệt → 10/100", plain);
+  }
+
+  console.log("\n── flushGuild: cặp (heat, updatedAt) nhất quán với công thức decay phía đọc ──");
+  {
+    // Công thức ĐÚNG NHƯ phía đọc (convex/guilds.ts decayHeat + HeatBar.effectiveHeat):
+    // nhiệt hiển thị = heat ghi - (bây giờ - updatedAt) × decay. Bug cũ: bot ghi
+    // `heat` đã trừ decay tới bây giờ nhưng giữ `updatedAt` cũ → phía đọc trừ lần 2.
+    const readerHeat = (row, decay) =>
+      Math.max(0, Math.round(row.heat - ((Date.now() - row.updatedAt) / MIN) * decay));
+    const { tracker, calls } = mkTracker({ getConfig: async () => ({ heatDecayPerMin: 3 }) });
+    const s = heatSettings({ heatDecayPerMin: 3 });
+    await tracker.add("g1", "u1", "Alice", 60, s);
+    await tracker.add("g1", "u2", "Bob", 50, s);
+    tracker.states.get("g1:u1").updatedAt = Date.now() - 10 * MIN; // Alice nóng từ 10 phút trước
+    calls.mutations.length = 0;
+    await tracker.flushGuild("g1");
+    const rows = calls.mutations.find((m) => m.name === "bot_writes:botRecordHeatBatch").args
+      .entries;
+    const alice = rows.find((r) => r.userId === "u1");
+    const bob = rows.find((r) => r.userId === "u2");
+    check(
+      "người nóng từ 10 phút trước: phía đọc thấy ĐÚNG nhiệt thật (30), không phải 0",
+      readerHeat(alice, 3) === tracker.getHeat("g1", "u1", s) && readerHeat(alice, 3) === 30,
+      `đọc=${readerHeat(alice, 3)} thật=${tracker.getHeat("g1", "u1", s)}`,
+    );
+    check(
+      "người mới nóng: nhất quán tương tự",
+      readerHeat(bob, 3) === tracker.getHeat("g1", "u2", s),
+      `đọc=${readerHeat(bob, 3)}`,
+    );
+    check(
+      "updatedAt là mốc flush (heat đã trừ decay tới mốc đó), không phải mốc vi phạm cũ",
+      Math.abs(Date.now() - alice.updatedAt) < 5_000 &&
+        Math.abs(Date.now() - bob.updatedAt) < 5_000,
+      JSON.stringify([alice.updatedAt, bob.updatedAt]),
+    );
+    check(
+      "flush không đụng trạng thái RAM (vẫn là giá trị gốc + mốc vi phạm thật)",
+      tracker.states.get("g1:u1").heat === 60 &&
+        Date.now() - tracker.states.get("g1:u1").updatedAt >= 10 * MIN - 1_000,
+    );
+    // Flush lần 2 sau 4 phút: cặp mới vẫn nhất quán (không cộng dồn sai số decay).
+    tracker.states.get("g1:u1").updatedAt = Date.now() - 14 * MIN;
+    calls.mutations.length = 0;
+    await tracker.flushGuild("g1");
+    const alice2 = calls.mutations[0].args.entries.find((r) => r.userId === "u1");
+    check(
+      "flush lần 2: vẫn nhất quán (60 - 14×3 = 18)",
+      readerHeat(alice2, 3) === 18 && alice2.heat === 18,
+      JSON.stringify(alice2),
+    );
+  }
+
+  console.log("\n── sweepCold: nhiều guild / entry dựng tay trong CÙNG một lượt quét ──");
+  {
+    // Bổ sung cho mục "tôn trọng tốc độ giảm thật" phía trên: mỗi entry mang decay
+    // RIÊNG của guild mình, nên một lượt quét xử lý đúng nhiều guild khác decay.
+    const { tracker } = mkTracker();
+    const decays = { gSlow: 0, gFast: 10 };
+    for (const g of Object.keys(decays)) {
+      await tracker.add(g, "u", "U", 30, heatSettings({ heatDecayPerMin: decays[g] }));
+      tracker.states.get(`${g}:u`).updatedAt = Date.now() - 5 * MIN;
+    }
+    check(
+      "guild decay 10 nguội sau 5 phút bị dọn; guild decay 0 thì giữ",
+      tracker.sweepCold() === 1 && !tracker.states.has("gFast:u") && tracker.states.has("gSlow:u"),
+    );
+  }
+  {
+    // Entry dựng tay (không có decay) giữ hành vi cũ 1 điểm/phút.
+    const { tracker } = mkTracker();
+    tracker.states.set("g1:old", { heat: 5, updatedAt: Date.now() - 10 * MIN, username: "x" });
+    tracker.states.set("g1:hot", { heat: 50, updatedAt: Date.now() - 10 * MIN, username: "y" });
+    check(
+      "entry không biết decay: dùng mốc giả định thấp (1/phút) như trước",
+      tracker.sweepCold() === 1 && !tracker.states.has("g1:old") && tracker.states.has("g1:hot"),
+    );
   }
 
   console.log(`\nKết quả heat: ${pass} PASS, ${fail} FAIL`);

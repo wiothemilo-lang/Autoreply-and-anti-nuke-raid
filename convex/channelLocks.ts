@@ -21,8 +21,10 @@ import { getUserByToken, guildAccessibleBy } from "./auth";
 const DUE_TAKE = 200;
 
 /**
- * Bot đọc các khoá ĐÃ HẾT HẠN để tự mở (khoá vô hạn không có `until` nên
- * không nằm trong index `by_due` → không bao giờ lọt vào, đúng nghĩa "vô hạn").
+ * Bot đọc các khoá ĐÃ HẾT HẠN để tự mở. Khoá vô hạn không có `until`, nhưng
+ * Convex xếp `undefined`/`null` TRƯỚC mọi số trong index nên `lte("until", now)`
+ * một mình vẫn khớp chúng — khoá vô hạn sẽ bị tự mở trong vòng 3 phút. Cận dưới
+ * `gt("until", 0)` cắt đúng phần đó (xác nhận ở cộng đồng Convex, 10/2025).
  */
 export const botDueChannelLocks = query({
   args: { botKey: v.optional(v.string()) },
@@ -31,7 +33,7 @@ export const botDueChannelLocks = query({
     const now = Date.now();
     return await ctx.db
       .query("channelLocks")
-      .withIndex("by_due", (q) => q.lte("until", now))
+      .withIndex("by_due", (q) => q.gt("until", 0).lte("until", now))
       .take(DUE_TAKE);
   },
 });

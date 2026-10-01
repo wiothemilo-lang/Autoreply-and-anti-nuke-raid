@@ -153,7 +153,8 @@ export function pickValidClientId(...candidates: (string | undefined | null)[]):
  *
  * Chỉ chấp nhận đường dẫn TUYỆT ĐỐI trong cùng origin: bắt đầu bằng đúng một
  * dấu `/`, không phải `//` hay `/\` (trình duyệt quy đổi `\` thành `/`), không
- * chứa ký tự điều khiển/backslash. Mọi giá trị khác → fallback `/dashboard`.
+ * chứa ký tự điều khiển/backslash, và phải phân giải về ĐÚNG origin hiện tại.
+ * Mọi giá trị khác → fallback `/dashboard`.
  */
 export function safeRedirectPath(raw: string | null | undefined, fallback = "/dashboard"): string {
   if (typeof raw !== "string") return fallback;
@@ -161,6 +162,17 @@ export function safeRedirectPath(raw: string | null | undefined, fallback = "/da
   if (!path.startsWith("/")) return fallback;
   if (path.startsWith("//") || path.startsWith("/\\")) return fallback;
   if (path.includes("\\")) return fallback;
+  // Bộ phân tích URL của trình duyệt BỎ tab/CR/LF nên "/\t/evil.com" thành
+  // "//evil.com" (protocol-relative) dù bề ngoài chỉ có một dấu `/` đầu.
+  if (/[\u0000-\u001f\u007f]/.test(path)) return fallback;
+  // Chốt cuối: bất kể còn lối lách nào, kết quả phải nằm trong cùng origin.
+  try {
+    if (new URL(path, "https://same-origin.invalid").origin !== "https://same-origin.invalid") {
+      return fallback;
+    }
+  } catch {
+    return fallback;
+  }
   return path;
 }
 

@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
+import { TRIM_BATCH, dropBeyondCap, shouldTrim } from "./bot_writes";
 
 /** Alt detection configuration per guild. */
 export const getAltConfig = query({
@@ -135,19 +136,15 @@ export const recordJoin = mutation({
       ipCountry: args.ipCountry,
       ipOrg: args.ipOrg,
     });
-    // Keep max 500 joins per guild. KHÔNG collect toàn bộ mỗi lần join (tốn
-    // ~500 reads/join — rất nặng khi raid) — chỉ dọn định kỳ ~1/40 lần
-    // (~mỗi 4 phút khi có join liên tục).
-    if (Date.now() % 240_000 < 2000) {
-      const all = await ctx.db
+    // Giữ tối đa 500 lượt join/server. KHÔNG đọc toàn bộ mỗi lần join (tốn ~500
+    // reads/join — rất nặng khi raid) — dọn theo xác suất + lô, xem `shouldTrim`.
+    if (shouldTrim()) {
+      const newest = await ctx.db
         .query("memberJoins")
         .withIndex("by_guildId_joinedAt", (q) => q.eq("guildId", args.guildId))
         .order("desc")
-        .take(501);
-      if (all.length > 500) {
-        const drop = all.slice(500).map((r) => r._id);
-        for (const id of drop) await ctx.db.delete(id);
-      }
+        .take(500 + TRIM_BATCH);
+      await dropBeyondCap(ctx, newest, 500);
     }
     return { ok: true, riskScore: args.riskScore };
   },

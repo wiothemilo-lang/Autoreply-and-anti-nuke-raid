@@ -7,18 +7,19 @@
 // Không mạng, không Discord thật. Chạy: node scripts/test-owner-alert.cjs
 
 const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 const origResolve = Module._resolveFilename;
 let utilMockPath = null;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   if (utilMockPath && request.endsWith("/util")) return utilMockPath;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `module.exports = { Colors: { Red: 0xed4245, Orange: 0xe67e22 }, EmbedBuilder: class { setColor() { return this; } setTitle() { return this; } setDescription() { return this; } setTimestamp() { return this; } addFields() { return this; } setFooter() { return this; } } };`,
 );
 

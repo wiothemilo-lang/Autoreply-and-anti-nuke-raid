@@ -4,6 +4,110 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 30/09/2026 (3) — Rà soát 4 hướng song song + sửa có test ĐỎ trên code cũ → XANH
+
+- 🧭 **Cách làm**: 4 reviewer chỉ-đọc (bot runtime / Convex / dashboard / tooling) chạy song
+  song, mỗi phát hiện kèm `file:line`. Mình tự tái hiện bằng module thật (mô phỏng) TRƯỚC khi
+  sửa, rồi chứng minh test mới ĐỎ trên code cũ bằng cách trả file về `HEAD` (hoặc đảo helper về
+  hành vi cũ). Phát hiện trùng việc upstream vừa merge (#22 sweeper) → dùng bản upstream.
+- 🔴 **Đã sửa** (mỗi mục một commit, có decision-log khi là quyết định):
+  1. `antinuke/state.js` `sweepMemory`: `const stale` khai báo SAU vòng `exemptBuckets` → TDZ
+     `ReferenceError` ngay lần quét đầu có entry exempt → `uncaughtException` → `exit(1)` mỗi khi
+     owner/admin/whitelist thao tác (từ f250aae 28/09). + try/catch quanh sweep.
+  2. Nhiệt độ bị trừ decay 3 lần: `flushGuild` ghi heat đã decay + `updatedAt` CŨ →
+     `loadHeatStates` trừ lần 2 → `HeatBar` trừ lần 3 (người nóng 30 hiện 0, biến khỏi
+     `/heat top`). Nay cặp (heat, updatedAt) luôn nhất quán; `heatLeaderboard` trả decay thật.
+  3. `strike()` ghi `firstAt: now` mọi lần → cửa sổ warn tích luỹ trượt mãi.
+  4. Retention `antinukeEvents`/`modActions`/`memberJoins` cổng theo đồng hồ (~0,8% lượt ghi) và
+     chỉ xoá 1 dòng → bảng phình vô hạn (không có cron). Nay 1/40 lượt + lô 100 dòng.
+  5. `channelLocks:botDueChannelLocks` `lte("until", now)` khớp cả khoá VÔ HẠN (Convex xếp
+     undefined/null trước số) → khoá vô hạn tự mở trong ≤3 phút; fake test từng che bug.
+  6. Dry-run khôi phục: batch tick không sinh job `plan`, `runBackupJobs` không có nhánh → nút
+     "xem kế hoạch" quay mãi. Nay có đủ hai phía + báo lỗi qua `botReportRestorePlan`.
+  7. Dashboard: toast bật/tắt Alt Detection ngược; `safeRedirectPath` lọt `"/\t/evil.com"`;
+     thêm tự tải lại ĐÚNG 1 lần khi chunk cũ bị xoá sau deploy (`vite:preloadError`).
+- 🟢 **Hiệu năng (đo bằng sourcemap + build thật)**: 6 file từ điển i18n chiếm ~404 KB / 509 KB
+  chunk entry → nạp lười theo ngôn ngữ: entry **509,7 → 104,9 KB raw (168,2 → 33,0 KB gzip)**,
+  EN 66 KB / DE 71 KB gzip chỉ tải khi dùng (người dùng VI không tải cả hai). 5 test Chromium thật.
+- 🧪 **Hạ tầng test**: 45 suite từng dùng chung `bot/test-djs-mock.cjs` (34 nội dung khác nhau) →
+  chạy song song là giẫm nhau (đo 7 suite đỏ giả) và `lockdown`/`boost-modules` chỉ xanh nhờ file
+  suite trước để lại. Nay mock riêng theo PID (`scripts/support/djs-mock-path.cjs`), runner song
+  song (pool ≤4, làn độc quyền cho `kiira-proxy`/Chromium, retry lẻ, giết cả nhóm tiến trình khi
+  quá hạn) + test hermetic 24 check; runner tự kiểm số suite khớp AGENTS.md + CONTRACT_SUITES.
+  Sai lầm phiên này: codemod làm 31 suite thừa `const path` → lint đỏ; bắt được nhờ chạy `eslint .`
+  toàn repo (không chỉ vài file) — **luôn lint toàn repo sau codemod**.
+- 🛠️ **CI**: quyền tối thiểu, huỷ lượt cũ của PR, `timeout-minutes`, cache Chromium, bot cài
+  `--frozen-lockfile`, audit fail-closed cho cả root + bot, `test:mutation` chạy đủ 20 mutant.
+- 📁 File đụng: `bot/src/{heat,tick,handlers/antinuke/{state,index}}.js`,
+  `convex/{guilds,reports,bot_writes,bot_tick,altDetection,channelLocks}.ts`,
+  `src/lib/{i18n.tsx,i18n.dict.*.ts,staleChunk.ts,discord.ts}`, `src/main.tsx`,
+  `scripts/run-all-tests.cjs` + 45 suite, `.github/workflows/ci.yml`, docs/README/AGENTS (số
+  suite 82 CJS + 21 TS).
+- 🧪 **Kiểm chứng (head cuối)**: `bun run test:coverage` **82/82** (147s trên máy 2 lõi, gồm 15
+  test Chromium) · coverage 94,97% stmts / 79,66% nhánh / 98,19% hàm, sàn theo file đạt · 21/21
+  TS · mutation 20/20 · tsc · eslint toàn repo · prettier toàn repo · repo-map · convex-contract ·
+  i18n --self-test · settings-signal --self-test.
+- 🔁 **Kiểm lại sau check đỏ của PR #2** (check duy nhất đỏ là Kilo Code Review — app review AI bên
+  thứ ba báo "Assistant request timed out", không có finding nào; fork không có run Actions nào):
+  · Tái hiện CI cục bộ bằng binary release (kiểm checksum, để ở /tmp, không vào repo):
+  `gitleaks git --log-opts="upstream/main..HEAD"` (bản 8.24.3 như CI ghim) + so tập phát hiện của
+  cây cuối với cây `upstream/main` (7 phát hiện cũ, không cái nào do PR) · `actionlint` + `shellcheck` cho mọi
+  bước `run:` của ci.yml. Precedent b84af3c: ID giả 18 chữ số làm đỏ job security → test mới dùng ID chữ.
+  · `test-browser-contracts.cjs` test **B** (chờ CỐ ĐỊNH 1,6s cho preloader rời DOM) đỏ ở sandbox chậm
+  cả trên `upstream/main` chưa sửa: gỡ overlay sau `load` đo 1,1–2,1s (hai đỉnh ~1,1s / ~1,8s, TB
+  1665ms nhánh này vs 1639ms upstream, n=18) → KHÔNG do PR, nên đổi sang poll (`waitForPage`) như H/I.
+  · Sai lầm: `pkill -f <mẫu>` khớp luôn dòng lệnh của CHÍNH shell đang chạy nó → giết shell (exit 143) và
+  bỏ dở thí nghiệm; dùng PID đã lưu hoặc lọc theo `comm`. Và: `t.after(() => page.close())` treo khi
+  renderer kẹt thì một test đỏ kéo cả file đỏ — bọc bằng race 5s (`closeQuietly`).
+- ⚠️ **Backlog ĐÃ KIỂM CHỨNG NHƯNG CHƯA SỬA** (quyết định chính sách hoặc rủi ro đường raid — cần
+  người quyết; chi tiết `file:line` từ đợt rà soát):
+  · **Bot/raid**: `antinuke/shared.js:65-72` `isKnownLoggingBot` chỉ khớp TÊN (bot/webhook đặt tên
+  "Dyno" lách mọi module; `externalApp.js:450` còn dùng `includes`) — đề xuất yêu cầu
+  `VerifiedBot`/ID cố định, cần đổi mock ở ≥5 suite · `antinuke/members.js:449-456` ngân sách
+  20 phạt/phút: `punishMember` trả "bỏ qua" nhưng massJoin vẫn `markHandled` và `joiners` đã
+  reset → phần còn lại của làn sóng không bao giờ bị xử lý lại · `lockdown.js`: guard và
+  `locked.add` cách nhau cả vòng kênh (trigger đồng thời sửa quyền lặp), `isTextBased()` true
+  cho voice (nhánh Connect chết), unlock đặt `null` làm mất override gốc (`channelLock.js` đã có
+  `prev`), `joinGate.js:237-271` lặp logic · `convex.js:282-310` getConfig không gộp request +
+  fetch trước `invalidate()` có thể cache lại dữ liệu cũ 30 phút, `withRetry` thử lại cả lỗi
+  không có status → mutation không idempotent ghi đôi · `altDetection.js:443`
+  `guild.bans.fetch()` mỗi lượt join · `webhookHub.js:179-184` WebhookClient không `destroy()`
+  (rò ~30 MB/20k lượt) · `nukeRollback.js:86` đặt cooldown trước khi khôi phục ·
+  `threatEngine.js` OpenPhish không tới filters, `filters.js:280` khớp host chính xác (lách bằng
+  `:443`/`user@`) · `raidIntel.js:93-131` ban mọi người vừa ban/kick trong 30 phút ·
+  `welcomeCard.js` 25 ms/thẻ trên main thread, `index.js:93-124` thứ tự khởi động.
+  · **Convex**: `bot_writes.ts:1579-1803` (+ `tickets.ts:403`, `bot_tick.ts:171`) tìm ticket bằng
+  `collect()` cả guild rồi `.find` — thay bằng `db.get` (`botTouchTickets` chạy mỗi tin nhắn
+  trong kênh ticket) · `sessions.ts:36` `me` collect mọi guild, `getGuild` →
+  `hiddenPasswordIsSet` quét mọi guild · `guilds.ts:804,1022-1026,1142-1153` `updateSettings`
+  thiếu trần độ dài nhiều field (doc phình ≤1 MiB, tick đọc hai lần) · `webhooks.ts:217-316`
+  `sendEmbed` không giới hạn theo user/không timeout (relay spam), `sessionAuth.ts:180` bucket
+  "public" toàn cục khoá đăng nhập · `guilds.ts:1313-1335` `ctx.storage.delete` rồi `throw` bị
+  rollback (file mồ côi), `saveGreetingImage` nhận storageId bất kỳ · `auth.ts:38-44`
+  `manageableGuildIds` snapshot 30 ngày · `botStatus` (4–10 KB) đọc mỗi call bot và ghi mỗi
+  180s làm mọi `getGuild` mở chạy lại, cửa sổ "online" 180s = chu kỳ heartbeat → nhấp nháy
+  offline · hàm/index không dùng: `audit:*`, `guilds:listMine`, `threatIntel:sampleStats`, 8
+  index.
+  · **Dashboard**: lỗi Convex production bị che thành "Server Error" (139 `throw new Error`, 0
+  `ConvexError`, ~67 chỗ in `e.message`) → cần `ConvexError` + helper `errorMessage` ·
+  `ui/switch.tsx` ModernToggle không hoàn tác khi mutation reject (43 Switch) · `SettingsPanel`
+  seed state một lần, không đồng bộ lại sau import-config → "Lưu" ghi đè · `Date.now()` lúc
+  render (badge online, `syncState`, đếm ngược lockdown) cần `useNow()` · `ui/dialog.tsx` không
+  cuộn ≤768px, Enter bỏ qua IME (Telex), nhiều nút chỉ-icon thiếu `aria-label`, guard "chưa
+  lưu" chưa phủ Welcome/Ticket, theme không áp ở `/auth` · first-load: `RequireAuth` chờ
+  `sessions.me` mới tải chunk, Google Fonts chặn render, HaimiyaChat 32 KB import tĩnh,
+  framer-motion có thể `LazyMotion` (~35 KB).
+  · **Tooling**: timing test nhạy tải (`test-chaos.cjs:346-378`, `test-convex-client.cjs:91`,
+  `test-local-snapshot.cjs:214`, `test-browser-contracts.cjs` test B chờ cố định 1,6s) — runner đã
+  retry lẻ nhưng nên làm tất định;
+  `check-sync-trust` / `check-research-chain` là script kiểm tra thật nhưng không nằm trong glob
+  `test-*`; không có `.env.example`; ESLint không phủ `scripts/*.mjs` (gồm
+  `kiira-retry-proxy.mjs` chạy production); `coverage` loại `commands/**`, `ai.js`, `index.js`
+  (4.553 / 27.806 dòng).
+- ▶️ **Tiếp theo**: chọn từ backlog trên theo mức rủi ro — đề xuất thứ tự: (1) tìm ticket bằng
+  `db.get`, (2) `ConvexError` + `errorMessage`, (3) ngân sách hành động vs massJoin, (4) khoá
+  `isKnownLoggingBot` bằng VerifiedBot. Mỗi việc cần test đỏ→xanh như các mục trên.
+
 ## 30/09/2026 — Sweeper nhiệt dùng decay thật của guild (bug dọn mất nhiệt còn sống)
 
 - 🐛 **BUG THẬT (đã sửa)**: `HeatTracker.sweepCold()` (memGuard gọi mỗi 10 phút) giả
@@ -126,6 +230,9 @@
 - ✅ Kiểm chứng: **80/80 CJS + 18/18 TS** suites · tsc · lint · format · repo-map · convex-contract · i18n · settings-signal · coverage floor · mutation 12/12 · `nginx -t` trong container nginx:1.27 thật · browser suite 7/7. Cập nhật AGENTS.md + guardrails (79→80, 17→18) và repo-map.
 
 ## Đang dở
+
+- 📌 **Backlog rà soát 30/09 (đã kiểm chứng, CHƯA sửa)**: xem mục "Backlog" trong entry đầu
+  file ("30/09/2026 (3)") — gồm cả việc trên đường raid cần người quyết định chính sách.
 
 - 🔴 **Bot production OFFLINE từ 26/09 13:23 UTC (11h lúc phát hiện 27/09)** —
   `status:botStatus` trả `online: false`, `guildCount: 9`, heartbeat cũ. Nghi do

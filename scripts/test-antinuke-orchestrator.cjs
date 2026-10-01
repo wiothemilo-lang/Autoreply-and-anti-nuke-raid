@@ -10,17 +10,17 @@
 // bot.
 //
 // Chạy: node scripts/test-antinuke-orchestrator.cjs
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `module.exports = {
   // Tên hằng nguyên văn để assert được (Proxy Symbol sẽ đổi mỗi lần đọc).
   AuditLogEvent: {

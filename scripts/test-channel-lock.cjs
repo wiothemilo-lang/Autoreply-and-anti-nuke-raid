@@ -12,10 +12,11 @@
 // Nên ở đây test theo BẤT BIẾN (lock → unlock trả về đúng trạng thái ban
 // đầu), không test theo từng lệnh gọi.
 const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
-const MOCK = path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+const MOCK = DJS_MOCK;
 const UTIL_STUB = path.join(__dirname, "_channel-lock-util.cjs");
 
 const origResolve = Module._resolveFilename;

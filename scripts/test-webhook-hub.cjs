@@ -7,7 +7,7 @@
 //   - reconcileDefaultWebhook: create (kênh chết → backoff 10 phút), delete
 //   - ensureDefaultWebhook: cache hit / Convex có sẵn / tạo mới / kênh hỏng → null
 //   - fillTemplate + buildPayload: placeholder + màu ghi đè
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
@@ -16,11 +16,11 @@ const whClients = [];
 globalThis.__whClients = whClients; // mock string truy cập qua globalThis
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = { ...data }; }
   setColor(c) { this.d.color = c; return this; }

@@ -19,6 +19,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "proto-nuke-rollback-"));
 process.env.PROTOGON_SNAPSHOT_DIR = path.join(tmp, "snapshots");
@@ -27,11 +28,11 @@ process.env.PROTOGON_LOG_DIR = path.join(tmp, "logs");
 const Module = require("module");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }

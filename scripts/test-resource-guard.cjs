@@ -4,17 +4,17 @@
  * bộ nhớ bị lỡ trước đây (heat nguội, guild đã rời, cache cũ) mà KHÔNG xóa
  * nhầm dữ liệu còn nóng.
  */
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 
 // Mock discord.js cho các module bot import (heat → timeoutWatch → discord.js).
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   return origResolve.call(this, request, ...args);
 };
 require("fs").writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder { setColor(){return this} setTitle(){return this} setDescription(){return this} addFields(){return this} setTimestamp(){return this} setFooter(){return this} }
 class Collection extends Map {}
 module.exports = { EmbedBuilder, Collection, Colors: new Proxy({}, { get: () => 0x000000 }), PermissionFlagsBits: new Proxy({}, { get: () => 0n }), AuditLogEvent: new Proxy({}, { get: () => 0 }), Partials: {}, GatewayIntentBits: new Proxy({}, { get: () => 0 }) };`,

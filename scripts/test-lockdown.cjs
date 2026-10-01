@@ -10,16 +10,28 @@
 // trình bot. Mỗi case ở đây dùng guildId RIÊNG để không lẫn trạng thái —
 // nếu không, một case để kẹt `locked` sẽ làm các case sau "tưởng đã khoá".
 const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
 
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
-  if (request === "discord.js") return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+  if (request === "discord.js") return DJS_MOCK;
   if (request === "./util" || request.endsWith(path.join("src", "util")))
     return path.join(__dirname, "_lockdown-util.cjs");
   return origResolve.call(this, request, ...args);
 };
+// Mock riêng: suite này từng KHÔNG tự ghi file mock mà dựa vào file do suite đứng
+// trước để lại — chạy lẻ trên cây sạch (hoặc song song) là hỏng. lockdown.js chỉ
+// cần PermissionFlagsBits.ManageChannels và Colors.{Yellow,Red,Green}.
+fs.writeFileSync(
+  DJS_MOCK,
+  `module.exports = {
+  PermissionFlagsBits: new Proxy({}, { get: (t, k) => (t[k] ??= BigInt(Object.keys(t).length + 1)) }),
+  Colors: new Proxy({}, { get: (t, k) => (t[k] ??= Object.keys(t).length + 1) }),
+};
+`,
+);
 fs.writeFileSync(
   path.join(__dirname, "_lockdown-util.cjs"),
   `const calls = [];

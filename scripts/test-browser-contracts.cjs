@@ -1064,6 +1064,184 @@ browserTest("G. Chuyển route không nháy màn chờ toàn màn hình (React g
   t.assert.ok(after.hasDonate, "trang /donate phải render ra nội dung thật");
 });
 
+// ─── H. Từ điển i18n nạp LƯỜI ────────────────────────────────────────────────
+// Đo 30/09/2026: hai từ điển EN+DE chiếm ~404 KB / 509 KB chunk entry, nên người
+// dùng tiếng Việt (không cần bản dịch nào) từng tải cả hai. Chỉ trình duyệt thật
+// mới chứng minh được chunk nào THỰC SỰ được tải, và nạp lỗi không được làm kẹt trang.
+const DICT_CHUNK_RE = /i18n\.dict\.(en|de)-[\w-]+\.js/;
+
+/**
+ * Chờ biểu thức JS trong trang trả về giá trị đúng (tối đa timeoutMs) — thay cho sleep
+ * cố định. Hết hạn thì trả false và để assert phía sau báo trạng thái thật: máy chậm
+ * chỉ làm test lâu hơn, không làm test đỏ giả.
+ */
+async function waitForPage(page, expression, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      if (await page.evaluate(expression)) return true;
+    } catch {
+      // trang đang điều hướng / chưa sẵn sàng — thử lại
+    }
+    if (Date.now() >= deadline) return false;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+/**
+ * Đóng trang nhưng KHÔNG chờ quá 5s: renderer đang kẹt có thể khiến `Page.close` không bao
+ * giờ trả lời, mà `t.after` treo thì cả suite treo theo (một test đỏ thành cả file đỏ,
+ * mất hết kết quả) — xem cùng cách xử lý ở test F (màn chờ RouteLoader).
+ */
+const closeQuietly = (page) =>
+  Promise.race([page.close(), new Promise((resolve) => setTimeout(resolve, 5000))]);
+const APP_RENDERED = `document.querySelectorAll("#root > *").length > 0 && !!document.querySelector("h1")`;
+const OVERLAY_GONE = `(${OVERLAY_STATE}) === "removed"`;
+
+/** Mở "/" với ngôn ngữ đã lưu `lang` (đặt trước mọi script của app). */
+async function openWithSavedLang(ctx, lang, { blockDict = false } = {}) {
+  const page = await ctx.openPage();
+  await page.send("Network.setBlockedURLs", { urls: blockDict ? ["*i18n.dict.*"] : [] });
+  await page.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `try { localStorage.setItem("protogon-lang", ${JSON.stringify(lang)}); } catch (e) {}`,
+  });
+  await page.goto(ctx.base + "/");
+  await waitForPage(page, APP_RENDERED);
+  return page;
+}
+
+/** Các ngôn ngữ có chunk từ điển đã được tải về (theo phản hồi mạng thật). */
+const dictsLoaded = (page) =>
+  page.responses
+    .map((r) => DICT_CHUNK_RE.exec(r.url)?.[1])
+    .filter(Boolean)
+    .sort();
+
+const langState = (page) =>
+  page.evaluate(`(() => {
+    const text = document.body.innerText;
+    return {
+      lang: document.documentElement.lang,
+      vi: text.includes("Đăng nhập"),
+      en: text.includes("Sign in"),
+      de: text.includes("Anmelden"),
+      rootChildren: document.querySelectorAll("#root > *").length,
+      overlay: ${OVERLAY_STATE},
+    };
+  })()`);
+
+browserTest("H1. Tiếng Việt: KHÔNG tải chunk từ điển nào (VI là chính key)", async (t) => {
+  const ctx = await setup();
+  const page = await openWithSavedLang(ctx, "vi");
+  t.after(() => closeQuietly(page));
+  await waitForPage(page, OVERLAY_GONE);
+  const state = await langState(page);
+  t.diagnostic(`vi: ${JSON.stringify({ ...state, dicts: dictsLoaded(page) })}`);
+  t.assert.deepStrictEqual(dictsLoaded(page), [], "người dùng VI không được tải từ điển EN/DE");
+  t.assert.strictEqual(state.lang, "vi");
+  t.assert.ok(state.vi && !state.en && !state.de, "trang phải hiện tiếng Việt");
+  t.assert.strictEqual(state.overlay, "removed");
+});
+
+browserTest("H2. Tiếng Anh: chỉ tải từ điển EN và giao diện hiện bằng tiếng Anh", async (t) => {
+  const ctx = await setup();
+  const page = await openWithSavedLang(ctx, "en");
+  t.after(() => closeQuietly(page));
+  await waitForPage(page, `document.body.innerText.includes("Sign in")`);
+  const state = await langState(page);
+  t.diagnostic(`en: ${JSON.stringify({ ...state, dicts: dictsLoaded(page) })}`);
+  t.assert.deepStrictEqual(dictsLoaded(page), ["en"], "chỉ chunk EN được tải");
+  t.assert.strictEqual(state.lang, "en");
+  t.assert.ok(state.en && !state.vi, "chuỗi phải được dịch sang EN (không còn tiếng Việt)");
+});
+
+browserTest("H3. Tiếng Đức: chỉ tải từ điển DE", async (t) => {
+  const ctx = await setup();
+  const page = await openWithSavedLang(ctx, "de");
+  t.after(() => closeQuietly(page));
+  await waitForPage(page, `document.body.innerText.includes("Anmelden")`);
+  const state = await langState(page);
+  t.diagnostic(`de: ${JSON.stringify({ ...state, dicts: dictsLoaded(page) })}`);
+  t.assert.deepStrictEqual(dictsLoaded(page), ["de"], "chỉ chunk DE được tải");
+  t.assert.ok(state.de && !state.vi, "chuỗi phải được dịch sang DE");
+});
+
+browserTest("H4. Chunk từ điển bị chặn → FAIL-OPEN: app vẫn hiện, rơi về tiếng Việt", async (t) => {
+  const ctx = await setup();
+  const page = await openWithSavedLang(ctx, "en", { blockDict: true });
+  t.after(() => closeQuietly(page));
+  await waitForPage(page, OVERLAY_GONE);
+  const state = await langState(page);
+  t.diagnostic(`en (từ điển bị chặn): ${JSON.stringify({ ...state, dicts: dictsLoaded(page) })}`);
+  t.assert.deepStrictEqual(dictsLoaded(page), [], "chunk bị chặn thật");
+  t.assert.ok(state.rootChildren > 0, "React vẫn phải render (không phải trang trắng)");
+  t.assert.strictEqual(state.overlay, "removed", "preloader không được kẹt vì từ điển hỏng");
+  t.assert.ok(state.vi, "thiếu từ điển → rơi về chuỗi VI như khi thiếu bản dịch");
+});
+
+browserTest("H5. Bấm công tắc ngôn ngữ: nạp đúng chunk rồi mới đổi, lưu lựa chọn", async (t) => {
+  const ctx = await setup();
+  const page = await openWithSavedLang(ctx, "vi");
+  t.after(() => closeQuietly(page));
+  t.assert.deepStrictEqual(dictsLoaded(page), [], "đang ở VI chưa tải gì");
+  // Lớp phủ #boot còn che thì cú click toạ độ rơi vào nó (xem test A).
+  await waitForPage(page, OVERLAY_GONE);
+  await page.clickText("DE");
+  // Công tắc CHỈ đổi sau khi chunk DE về (để không nháy tiếng Việt) nên đổi ngôn ngữ là
+  // bất đồng bộ — chờ trạng thái cuối thay vì đoán thời gian tải.
+  await waitForPage(page, `document.documentElement.lang === "de"`);
+  const state = await langState(page);
+  const saved = await page.evaluate(`localStorage.getItem("protogon-lang")`);
+  t.diagnostic(`sau khi bấm DE: ${JSON.stringify({ ...state, saved, dicts: dictsLoaded(page) })}`);
+  t.assert.deepStrictEqual(dictsLoaded(page), ["de"], "bấm DE chỉ tải chunk DE");
+  t.assert.strictEqual(state.lang, "de");
+  t.assert.ok(state.de && !state.vi, "giao diện đã dịch sang DE");
+  t.assert.strictEqual(saved, "de", "lựa chọn được lưu");
+});
+
+// ─── I. Chunk route bị xoá sau deploy → tự tải lại ĐÚNG MỘT lần ─────────────
+// Mọi lần deploy xoá file có hash cũ: tab đang mở từ bản trước mà bấm sang route
+// chưa tải sẽ lỗi "Failed to fetch dynamically imported module". Vite bắn
+// `vite:preloadError`; lib/staleChunk.ts tải lại trang, chống vòng lặp bằng mốc
+// thời gian trong sessionStorage. Cả hai vế đều phải đúng: THIẾU tự tải lại thì
+// người dùng kẹt màn lỗi; THIẾU chống lặp thì trang nhấp nháy mãi khi chunk hỏng.
+browserTest("I1. Chunk bị xoá → tự tải lại ĐÚNG MỘT lần, không lặp vô hạn", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+  await page.send("Network.setBlockedURLs", { urls: [] });
+  // Đếm số lần tài liệu được nạp VÀ số lần mỗi tài liệu nhận lỗi chunk (sessionStorage sống
+  // qua reload trong cùng tab). Listener này đăng ký TRƯỚC script của app và không gọi
+  // preventDefault nên không ảnh hưởng handler thật của app.
+  await page.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `try {
+      var bump = function (k) { sessionStorage.setItem(k, String(Number(sessionStorage.getItem(k) || 0) + 1)); };
+      bump("__docLoads");
+      window.addEventListener("vite:preloadError", function () { try { bump("__preloadErrors"); } catch (e) {} });
+    } catch (e) {}`,
+  });
+  await page.goto(ctx.base + "/");
+  await waitForPage(page, APP_RENDERED);
+
+  // Giả lập deploy: chunk route CHƯA tải biến mất, rồi điều hướng SPA tới route đó.
+  await page.send("Network.setBlockedURLs", { urls: ["*FeaturesPage-*.js*"] });
+  await page.evaluate(
+    `history.pushState({}, "", "/features"); window.dispatchEvent(new PopStateEvent("popstate"));`,
+  );
+  // Chờ đúng chuỗi sự kiện: lỗi (tài liệu 1) → tải lại → lỗi lần 2 (tài liệu 2, nằm trong
+  // cooldown nên KHÔNG tải lại nữa). Sau đó để yên thêm một lúc: nếu chống lặp hỏng thì lần
+  // tải lại thứ ba xảy ra ngay sau lỗi lần 2.
+  await waitForPage(page, `Number(sessionStorage.getItem("__preloadErrors") || 0) >= 2`, 25000);
+  await new Promise((r) => setTimeout(r, 3000));
+
+  const loads = await page.evaluate(`sessionStorage.getItem("__docLoads")`);
+  const errors = await page.evaluate(`sessionStorage.getItem("__preloadErrors")`);
+  const stamp = await page.evaluate(`sessionStorage.getItem("protogon-chunk-reload-at")`);
+  t.diagnostic(`nạp tài liệu = ${loads}, lỗi chunk = ${errors}, mốc tải lại = ${stamp}`);
+  t.assert.ok(Number(errors) >= 2, "cả hai tài liệu đều gặp lỗi chunk (lần 2 nằm trong cooldown)");
+  t.assert.strictEqual(loads, "2", "đúng 1 lần tải lại (nạp đầu + 1 reload), không lặp vô hạn");
+  t.assert.ok(stamp, "mốc chống lặp đã được ghi");
+});
+
 // Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server
 test.after(() => {
   teardown();

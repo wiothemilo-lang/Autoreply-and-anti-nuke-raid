@@ -19,6 +19,8 @@
 // convex/bot_record_heat.ts riêng) — test import từ đúng nơi thật.
 import { botRecordHeatBatch } from "../convex/bot_writes";
 import { computeBotKey } from "../convex/botAuth";
+import { getBotConfig } from "../convex/guilds";
+import { heatLeaderboard } from "../convex/reports";
 
 let pass = 0;
 let fail = 0;
@@ -35,8 +37,8 @@ const GUILD = "111111111111111111";
 const handler = (botRecordHeatBatch as any)._handler;
 
 /** ctx giả trong bộ nhớ: query/patch/insert/delete có đủ để upsert chạy. */
-function makeCtx(heatRows: Row[] = []) {
-  const tables: Record<string, Row[]> = { heatStates: heatRows, botStatus: [] };
+function makeCtx(heatRows: Row[] = [], extra: Record<string, Row[]> = {}) {
+  const tables: Record<string, Row[]> = { heatStates: heatRows, botStatus: [], ...extra };
   tables.botStatus.push({
     _id: "st",
     kind: "status",
@@ -349,6 +351,74 @@ console.log("\n── Tách guild: nhiệt không lẫn sang server khác ──
   check("cùng userId ở guild khác vẫn giữ nguyên nhiệt", other?.heat === 70);
   check("guild của ta tạo hàng riêng", mine?.heat === 10);
   check("tổng 2 hàng, không ghi đè chéo", tables.heatStates.length === 2);
+}
+
+console.log("\n── Hợp đồng ĐỌC: heat + updatedAt luôn là một cặp nhất quán ──");
+// Bug thật: bot ghi heat đã trừ decay + updatedAt cũ; loadHeatStates lại trừ decay
+// lần nữa rồi trả updatedAt gốc, HeatBar (client) trừ lần thứ ba. Người đang nóng
+// 30 hiện 0 và biến khỏi /heat top. Công thức client bên dưới phản chiếu
+// HeatBar.effectiveHeat.
+{
+  const clientHeat = (h: { heat: number; updatedAt: number }, decay: number) =>
+    Math.max(0, Math.round(h.heat - ((Date.now() - h.updatedAt) / 60000) * decay));
+  const guildDoc = (o: Row = {}) => ({
+    _id: "g-doc",
+    discordId: GUILD,
+    managers: [],
+    heatDecayPerMin: 3,
+    ...o,
+  });
+  const row = (o: Row = {}) => ({
+    _id: "h1",
+    guildId: GUILD,
+    userId: "u1",
+    username: "Alice",
+    heat: 60,
+    updatedAt: Date.now() - 10 * 60_000,
+    warnStrikes: 0,
+    ...o,
+  });
+  const botCfg = (getBotConfig as any)._handler;
+
+  const a = makeCtx([row()], { guilds: [guildDoc()] });
+  const cfg = await botCfg(a.ctx, { guildId: GUILD, botKey: BOT_KEY });
+  const top = cfg.heatStates[0];
+  check("hàng 60 nhiệt từ 10 phút trước, decay 3 → server trả 30", top?.heat === 30);
+  check(
+    "updatedAt trả về là mốc query (heat đúng TẠI mốc này), không phải mốc gốc của hàng",
+    Math.abs(Date.now() - top.updatedAt) < 5_000,
+  );
+  check(
+    "client trừ decay tiếp từ mốc trả về → vẫn 30, KHÔNG bị trừ lần nữa",
+    clientHeat(top, 3) === 30,
+  );
+  check("safetyPercent tính từ nhiệt đã decay (100 - 30)", cfg.safetyPercent === 70);
+
+  const cold = makeCtx([row({ heat: 20, updatedAt: Date.now() - 60 * 60_000 })], {
+    guilds: [guildDoc()],
+  });
+  const coldCfg = await botCfg(cold.ctx, { guildId: GUILD, botKey: BOT_KEY });
+  check("hàng đã nguội hẳn bị lọc khỏi danh sách", coldCfg.heatStates.length === 0);
+
+  const slow = makeCtx([row()], { guilds: [guildDoc({ heatDecayPerMin: 0 })] });
+  const slowCfg = await botCfg(slow.ctx, { guildId: GUILD, botKey: BOT_KEY });
+  check("guild decay 0: nhiệt không tự giảm (vẫn 60)", slowCfg.heatStates[0]?.heat === 60);
+
+  const lb = (heatLeaderboard as any)._handler;
+  const dash = (decay: number | undefined) =>
+    makeCtx([row({ heat: 40 })], {
+      guilds: [
+        guildDoc(decay === undefined ? { heatDecayPerMin: undefined } : { heatDecayPerMin: decay }),
+      ],
+      sessions: [{ token: "tok", createdAt: Date.now(), authVersion: 1, userId: "u1" }],
+      users: [{ _id: "u1", discordId: "d1", manageableGuildIds: [GUILD] }],
+    });
+  const rows0 = await lb(dash(0).ctx, { token: "tok", guildId: GUILD });
+  check("bảng xếp hạng trả kèm decay thật của guild (0)", rows0?.[0]?.decayPerMin === 0);
+  const rowsDef = await lb(dash(undefined).ctx, { token: "tok", guildId: GUILD });
+  check("guild chưa cấu hình decay → trả mặc định 3", rowsDef?.[0]?.decayPerMin === 3);
+  const denied = await lb(dash(3).ctx, { token: "sai", guildId: GUILD });
+  check("token sai → null, không lộ dữ liệu", denied === null);
 }
 
 console.log(`\n${pass}/${pass + fail} ✅`);

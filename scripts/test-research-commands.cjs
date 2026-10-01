@@ -3,20 +3,20 @@
 //
 // Mock discord.js bằng đường dẫn trỏ sang module giả (Colors chỉ là object).
 const Module = require("module");
-const path = require("path");
+const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
   if (request === "discord.js") {
     // Trả về util.js cũng đủ — nó re-export Colors từ discord.js... không được.
     // Thay vào đó tạo module giả trong tmp.
-    return path.join(__dirname, "..", "bot", "test-djs-mock.cjs");
+    return DJS_MOCK;
   }
   return origResolve.call(this, request, ...args);
 };
 // Tạo mock discord.js (Colors + EmbedBuilder builder chain).
 const fs = require("fs");
 fs.writeFileSync(
-  path.join(__dirname, "..", "bot", "test-djs-mock.cjs"),
+  DJS_MOCK,
   `class EmbedBuilder {
   constructor(data = {}) { this.d = data; }
   setColor(c) { this.d.color = c; return this; }
