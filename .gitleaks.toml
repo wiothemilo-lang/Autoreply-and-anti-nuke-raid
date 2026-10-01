@@ -1,0 +1,52 @@
+# .gitleaks.toml — allowlist cho Protogon
+#
+# VÌ SAO CẦN: `gitleaks-action` quét TOÀN BỘ lịch sử commit. Lúc push/PR nó chỉ
+# báo phát hiện MỚI nên im; nhưng khi chạy thủ công (workflow_dispatch) — cũng
+# là cách duy nhất rerun được khi CI đỏ — 9 phát hiện cũ lộ ra và làm ĐỎ job
+# `security`, chặn không deploy được. Cả 9 đã được mở file gốc trong git để
+# kiểm tra: KHÔNG có credential thật nào.
+#
+# ⚠️ `useDefault = true` là BẮT BUỘC, không được bỏ. Đã thử bỏ: gitleaks hiểu
+# config này là bộ rule HOÀN CHỈNH mới → chạy được 0 rule → "no leaks found"
+# dù có secret thật trong repo. Đã kiểm chứng bằng cách cài một
+# `discord_client_id` khác trong file test: có `useDefault` thì bắt, không có
+# thì im. Đừng bao giờ rút dòng này.
+
+title = "Protogon — allowlist gitleaks (chỉ dương tính đã xác minh)"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+3 mẫu dương tính đã xác minh bằng cách mở đúng file gốc trong git:
+
+1. `123456789012345678` — snowflake Discord MẪU (6 chỗ: test-backup-convex ×2,
+   test-register-slash ×3, test-haimiya-action, test-haimiya-vision). Chuỗi
+   1→8 lặp liên tiếp, không thể là ID thật. Giá trị fixture phổ biến nhất
+   trong mọi dự án. Allowlist THEO GIÁ TRỊ, không theo đường dẫn → một
+   client ID thật lỡ dán vào `scripts/` vẫn bị bắt.
+
+2. `Zx7pQ2vL9nM4kR8wT1yH3uB6cD5aF0eG` — khoá gõ tay trong
+   `scripts/test-backup-import.cjs` (commit 19d1023), dùng làm token giả để
+   kiểm tra logic khôi phục. Cũng allowlist theo giá trị.
+
+3. `src/shaders/neuform-isolated/sources/flow-field.html` — allowlist THEO
+   ĐƯỜNG DẪN vì gitleaks không nắm được giá trị: rule generic-api-key bắt
+   token RUM 32 ký tự hex nằm trong thuộc tính `data-cf-beacon`, và cửa sổ
+   ngữ cảnh mà gitleaks khớp chỉ là `token":"…"` — không chứa "beacon" nên
+   không regex theo ngữ cảnh nào khớp được. Đây là token analytics CÔNG
+   KHAI của Cloudflare (URL `static.cloudflareinsights.com/beacon.min.js`),
+   ai tải trang này cũng thấy. Đây là ngoại lệ DUY NHẤT theo đường dẫn:
+   secret thật lỡ dán vào chính file này sẽ không bị bắt — file là HTML demo
+   tĩnh của lớp shader, không thuộc mã chạy production.
+
+Mọi phát hiện ngoài 3 mục trên vẫn bị chặn, kể cả trong `scripts/`.
+"""
+regexes = [
+  '''123456789012345678''',
+  '''Zx7pQ2vL9nM4kR8wT1yH3uB6cD5aF0eG''',
+]
+paths = [
+  '''src/shaders/neuform-isolated/sources/flow-field\.html''',
+]
