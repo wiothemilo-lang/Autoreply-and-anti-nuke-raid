@@ -225,6 +225,41 @@ function freshStore() {
     check("pruneCache giữ guild live", store.cache.has("g-1") && !store.cache.has("g-2"));
   }
 
+  // ── 8b. RACE: invalidate trong lúc fetch đang bay ─────────────────────────
+  // Bot tự ghi cấu hình (proxy gọi invalidate) ĐÚNG lúc một getConfig khác
+  // đang chờ mạng: nếu kết quả fetch cũ vẫn được ghi cache thì cấu hình trước
+  // khi ghi bị giữ tới 30 phút (bug thật đã gặp ở luồng khoá/ticket).
+  {
+    const store = freshStore();
+    const origQuery = store._rawClient.query.bind(store._rawClient);
+    let release = null;
+    store._rawClient.query = () =>
+      new Promise((resolve) => {
+        // Kết quả "CŨ" — trả về SAU khi invalidate đã chạy.
+        release = () => resolve({ guildId: "g-race", config: "CU", lockdownUntil: undefined });
+      });
+    const p = store.getConfig("g-race");
+    for (let i = 0; i < 40 && !release; i++) await new Promise((r) => setTimeout(r, 5));
+    check("race: fetch đã bắt đầu", typeof release === "function");
+    store.invalidate("g-race");
+    release();
+    await p;
+    check(
+      "race: invalidate khi fetch đang bay → kết quả cũ KHÔNG ghi vào cache",
+      !store.cache.has("g-race"),
+    );
+    // Đọc lại phải đi Convex lần nữa và nhận bản MỚI, không phải "CU".
+    store._rawClient.query = origQuery;
+    calls.length = 0;
+    const after = await store.getConfig("g-race");
+    check(
+      "race: lượt đọc sau gọi lại Convex (không phục vụ cache cũ)",
+      calls.filter((c) => c.name === "guilds:getBotConfig" && c.args?.guildId === "g-race")
+        .length === 1,
+    );
+    check("race: lượt đọc sau nhận cấu hình mới", after?.config === true, JSON.stringify(after));
+  }
+
   // ── 9. ruleCooldowns: isCooledDown/recordReply + cap 500 ──────────────────
   {
     const store = freshStore();

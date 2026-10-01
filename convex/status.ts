@@ -5,6 +5,15 @@ import { isBotOwnerUser } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
 
 /**
+ * Cửa sổ coi bot còn "online". Bot đẩy heartbeat trong vòng sync guild mỗi
+ * 180s (bot/src/index.js), và vòng đó hẹn nhịp KẾ TIẾP sau khi lượt trước chạy
+ * xong — nên ngay trước mỗi nhịp, tuổi heartbeat đã > 180s một chút. Lấy đúng
+ * 180s làm ngưỡng thì huy hiệu online nhấp nháy offline vài giây mỗi 3 phút.
+ * Rộng 2 nhịp = bỏ qua được 1 nhịp lỡ mà vẫn phát hiện bot chết trong ~6 phút.
+ */
+const BOT_ONLINE_WINDOW_MS = 360_000;
+
+/**
  * Trạng thái tổng thể của bot (công khai, không nhạy cảm): online hay không,
  * số server/thành viên, heartbeat gần nhất, và thông tin chủ bot mà bot tự
  * đồng bộ từ Discord mỗi phút (cập nhật 24/7).
@@ -150,8 +159,8 @@ export const getAiHealth = query({
     if (!isBotOwnerUser(user, status)) return null;
     const ai = status?.aiHealth;
     if (!ai) return null;
-    // Bot ngừng sync quá 3 phút → số liệu cũ coi như mất kết nối (không hiển thị).
-    if (Date.now() - status.lastHeartbeat > 180_000) return { stale: true, ...ai };
+    // Bot ngừng sync quá 2 nhịp (lỡ 1 nhịp + dư) → số liệu cũ coi như mất kết nối.
+    if (Date.now() - status.lastHeartbeat > BOT_ONLINE_WINDOW_MS) return { stale: true, ...ai };
     return { stale: false, ...ai };
   },
 });
@@ -234,7 +243,7 @@ export const botStatus = query({
       };
     }
     return {
-      online: status.online && Date.now() - status.lastHeartbeat < 180_000,
+      online: status.online && Date.now() - status.lastHeartbeat < BOT_ONLINE_WINDOW_MS,
       guildCount: status.guildCount,
       memberCount: status.memberCount,
       lastHeartbeat: status.lastHeartbeat,

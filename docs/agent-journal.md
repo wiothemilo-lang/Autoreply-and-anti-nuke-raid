@@ -4,6 +4,59 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 01/10/2026 (1) — Quét toàn bộ module, sửa 7 bug thật (test ĐỎ trên code cũ)
+
+- 🧭 **Cách làm**: đọc `docs/repo-map.md` + backlog đã kiểm chứng ở entry 30/09 (3), grep từng
+  nghi vấn có `file:line`, tái hiện bằng module thật (mô phỏng) trước khi sửa, rồi chứng minh
+  test mới ĐỎ trên code cũ. Không thêm suite mới — chỉ mở rộng 5 suite có sẵn nên số suite
+  giữ nguyên 82 CJS / 21 TS (không phải sửa `AGENTS.md`/`guardrails.js`).
+- 🔴 **Bug nghiêm trọng nhất — `bot/src/lockdown.js` nhánh `Connect` chết**: discord.js v14
+  `BaseGuildVoiceChannel` có `this.messages` nên `isTextBased()` trả **true** cho voice
+  channel; code kiểm `isTextBased()` TRƯỚC nên voice rơi vào nhánh text, chặn `SendMessages`
+  thay vì `Connect` → **raid vẫn vào voice bình thường**. Test mock cũ khai báo
+  `isTextBased: () => false` cho voice nên **che mất bug**. Fix: kiểm voice TRƯỚC text.
+  Kèm: `lockPrev` (snapshot overwrite @everyone trước khi khoá) để unlock **trả lại giá
+  trị cũ** thay vì `null` (xoá trắng mất deny chủ đích); `lockPending` Set giữ chỗ **trước
+  mọi await** + `finally` giải phóng (chặn 2 trigger đồng thời).
+- 🔴 **`bot/src/webhookHub.js` rò REST client**: mỗi lượt log tạo `WebhookClient` không
+  `destroy()` (~30MB / 20k lượt). Fix `try/finally { wh.destroy() }` ở `send()` và nhánh
+  `delete` của `reconcileDefaultWebhook`.
+- 🔴 **`bot/src/convex.js` race cache**: `getConfig` fetch bay thì `invalidate()` xảy ra →
+  kết quả CŨ vẫn ghi đè cache (giữ config cũ tới 30 phút, đúng triệu chứng "đổi cấu
+  hình trên dashboard mà bot không nhận"). Fix: `_cacheGen` tăng mỗi `invalidate()`,
+  `getConfig` chụp `gen` trước fetch, chỉ `cache.set` nếu `gen` không đổi; `pruneCache`
+  xoá luôn `_cacheGen`.
+- 🔴 **`convex/status.ts` nhấp nháy offline**: ngưỡng `online`/`stale` đúng bằng 180s trong
+  khi vòng sync guild hẹn nhịp kế tiếp SAU lượt trước → tuổi heartbeat vượt ngưỡng ngay
+  trước mỗi nhịp. Fix: hằng `BOT_ONLINE_WINDOW_MS = 360_000` (2 nhịp) dùng chung cho
+  `botStatus.online` + `getAiHealth.stale`.
+- 🟠 **`convex/webhooks.ts` `sendEmbed`**: `fetch` không timeout → action treó vô hạn. Thêm
+  `signal: AbortSignal.timeout(10_000)`.
+- 🟠 **`convex/guilds.ts` `updateSettings`**: `verifyWelcomeTitle`/`Description` không có
+  trần, `verifyWelcomeColor` ghi bừa. Fix: title `slice(0,256)`, description `slice(0,1000)`
+  (trùng luật `guildConfig.ts` `STRING_FIELDS`), color `/^#[0-9a-fA-F]{3,8}$/` → lowercase
+  else `undefined`. Bẫy TS: `args.verifyWelcomeColor` là `string | null | undefined` → phải
+  `?? ""` (bắt qua `bun convex dev --once` báo `TS18047`).
+- 🟠 **`src/components/ui/switch.tsx`**: khi `onCheckedChange` (async mutation dashboard)
+  reject, effect `[checked]` không chạy vì prop không đổi → núm ModernToggle kẹt sai vị trí
+  **vĩnh viễn**. Fix: `checkedRef` + `syncFromProp()` (set `emitted.current` + bump `revision`
+  → remount về giá trị thật), `handleChange` bọc try/catch + `Promise.resolve(result).catch(syncFromProp)`.
+- 🧪 **Kiểm chứng**: từng suite sau fix `test-lockdown` 41/0 · `test-webhook-hub` 37/0 ·
+  `test-convex-client` 38/0 · `test-usage-optimization` 17/0 · `test-tickets-convex` 173/0.
+  **RED-PROOF** (đảo hành vi cũ rồi hoàn nguyên): lockdown 4 FAIL, webhook-hub 2 FAIL,
+  convex-client 3 FAIL. `bun convex dev --once` OK · `bun tsc -b --noEmit` exit 0 · `bun run lint`
+  exit 0 · `bun run format:check` XANH (sau `bun run format` vì 2 file test lệch) ·
+  `SKIP_BROWSER_TESTS=1 bun run test` **82/82** (118,4s) · `bun run test:ts` **21/21** ·
+  `test:coverage` 95,09% stmts / 79,89% nhánh / 98,19% hàm, sàn theo file đạt ·
+  `test:mutation` **20/20** · repo-map · convex-contract · i18n --self-test ·
+  settings-signal --self-test.
+- 📁 File đụng (12): `bot/src/{convex,lockdown,webhookHub}.js`, `convex/{guilds,status,webhooks}.ts`,
+  `src/components/ui/switch.tsx`, 5 suite (`test-{convex-client,lockdown,tickets-convex,usage-optimization,webhook-hub}`).
+- ⚠️ **Ghi chú môi trường**: sandbox không có Chromium nên `test-browser-contracts.cjs` đỎ vì
+  lỗi môi trường ("Không tìm thấy trình duyệt Chromium"), KHÔNG phải lỗi code → dùng
+  `SKIP_BROWSER_TESTS=1` (CI cài sẵn Chromium). Chưa deploy bot lên VPS; `bot/src/*` chỉ chạy
+  production sau `/deploy`.
+
 ## 30/09/2026 (3) — Rà soát 4 hướng song song + sửa có test ĐỎ trên code cũ → XANH
 
 - 🧭 **Cách làm**: 4 reviewer chỉ-đọc (bot runtime / Convex / dashboard / tooling) chạy song
@@ -231,8 +284,9 @@
 
 ## Đang dở
 
-- 📌 **Backlog rà soát 30/09 (đã kiểm chứng, CHƯA sửa)**: xem mục "Backlog" trong entry đầu
-  file ("30/09/2026 (3)") — gồm cả việc trên đường raid cần người quyết định chính sách.
+- ✅ **Backlog rà soát 30/09: đã sửa xong phần bug kỹ thuật** (entry "01/10/2026 (1)").
+  Còn lại các mục cần **người quyết định chính sách** trên đường raid — xem mục "Backlog"
+  trong entry "30/09/2026 (3)".
 
 - 🔴 **Bot production OFFLINE từ 26/09 13:23 UTC (11h lúc phát hiện 27/09)** —
   `status:botStatus` trả `online: false`, `guildCount: 9`, heartbeat cũ. Nghi do

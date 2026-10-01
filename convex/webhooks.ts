@@ -297,6 +297,9 @@ export const sendEmbed = action({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      // Discord treo/không phản hồi: không có timeout thì action giữ kết nối
+      // tới trần của Convex và web quay vô hạn. 10s đủ rộng cho payload ≤6k ký tự.
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!res.ok) {

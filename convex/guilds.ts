@@ -1153,12 +1153,24 @@ export const updateSettings = mutation({
     if (args.verifiedRoleId !== undefined) patch.verifiedRoleId = args.verifiedRoleId || undefined;
     if (args.verifyWelcomeEnabled !== undefined)
       patch.verifyWelcomeEnabled = args.verifyWelcomeEnabled;
+    // Trần độ dài + định dạng TRÙNG luật import cấu hình (guildConfig.ts):
+    // title 256 / description 1000, màu phải #hex 3–8 ký tự. Thiếu trần thì
+    // client gửi chuỗi lớn làm doc phình (trần 1 MiB/document) và tick đọc lặp;
+    // màu rác làm `parseInt` ra 0 — embed mất màu.
     if (args.verifyWelcomeTitle !== undefined)
-      patch.verifyWelcomeTitle = args.verifyWelcomeTitle || undefined;
+      patch.verifyWelcomeTitle = args.verifyWelcomeTitle
+        ? args.verifyWelcomeTitle.slice(0, 256)
+        : undefined;
     if (args.verifyWelcomeDescription !== undefined)
-      patch.verifyWelcomeDescription = args.verifyWelcomeDescription || undefined;
-    if (args.verifyWelcomeColor !== undefined)
-      patch.verifyWelcomeColor = args.verifyWelcomeColor || undefined;
+      patch.verifyWelcomeDescription = args.verifyWelcomeDescription
+        ? args.verifyWelcomeDescription.slice(0, 1000)
+        : undefined;
+    if (args.verifyWelcomeColor !== undefined) {
+      const color = args.verifyWelcomeColor ?? "";
+      patch.verifyWelcomeColor = /^#[0-9a-fA-F]{3,8}$/.test(color)
+        ? color.toLowerCase()
+        : undefined;
+    }
     if (args.verifySendPanel !== undefined) patch.verifySendPanel = args.verifySendPanel;
     // Yêu cầu gửi panel mới → xóa lỗi cũ (đây là lần thử lại của người dùng).
     if (args.verifySendPanel === true) {

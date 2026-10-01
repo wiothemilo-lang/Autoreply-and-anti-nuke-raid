@@ -68,6 +68,11 @@ const Switch = React.forwardRef<HTMLSpanElement, SwitchProps>(
     const emitted = React.useRef(checked);
     const [revision, setRevision] = React.useState(0);
 
+    /* `checked` mới nhất — callback bất đồng bộ (revert khi mutation lỗi) cần
+       đọc nó mà không phải đưa `checked` vào deps của handleChange. */
+    const checkedRef = React.useRef(checked);
+    checkedRef.current = checked;
+
     React.useEffect(() => {
       if (emitted.current === checked) return;
       emitted.current = checked;
@@ -84,15 +89,36 @@ const Switch = React.forwardRef<HTMLSpanElement, SwitchProps>(
       button.disabled = Boolean(disabled);
     }, [id, disabled, revision]);
 
+    /* Trả công tắc về ĐÚNG giá trị thật từ prop. Bắt buộc sau khi lưu thất
+       bại: effect [checked] KHÔNG chạy khi prop không đổi, nên không remount
+       là núm ModernToggle kẹt sai vị trí vĩnh viễn. */
+    const syncFromProp = React.useCallback(() => {
+      emitted.current = checkedRef.current;
+      setRevision((value) => value + 1);
+    }, []);
+
     const handleChange = React.useCallback(
       (next: boolean) => {
         if (disabled) return;
         /* Đánh dấu TRƯỚC khi gọi lên trên: `ModernToggle` đã tự áp dụng giá
            trị rồi, nên lần effect sau phải thấy khớp và im lặng. */
         emitted.current = next;
-        onCheckedChange(next);
+        let result: unknown;
+        try {
+          result = onCheckedChange(next);
+        } catch {
+          // Handler ném đồng bộ → giá trị mới chưa lưu được.
+          syncFromProp();
+          return;
+        }
+        // Handler bất đồng bộ (mutation của dashboard): reject = lưu thất bại.
+        // Dashboard vẫn đang hiển thị giá trị cũ (subscription Convex chưa
+        // đổi) → remount về giá trị thật thay vì để công tắc nói dối.
+        if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+          Promise.resolve(result).catch(syncFromProp);
+        }
       },
-      [disabled, onCheckedChange],
+      [disabled, onCheckedChange, syncFromProp],
     );
 
     return (

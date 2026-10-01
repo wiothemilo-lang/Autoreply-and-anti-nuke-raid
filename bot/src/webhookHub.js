@@ -158,10 +158,13 @@ async function reconcileDefaultWebhook(guild, req) {
       console.log(`[webhook:default] ${guildId}: đã tự tạo "Protogon Log" tại #${channel.name}`);
     } else if (req.kind === "delete") {
       if (req.webhookId && req.token) {
+        const wh = new WebhookClient({ id: req.webhookId, token: req.token });
         try {
-          await new WebhookClient({ id: req.webhookId, token: req.token }).delete();
+          await wh.delete();
         } catch (e) {
           console.warn(`[webhook:default:delete] ${guildId}:`, e.message);
+        } finally {
+          wh.destroy();
         }
       }
       await store.client.mutation("webhooks:botDefaultWebhookDeleted", { guildId });
@@ -178,9 +181,16 @@ async function reconcileDefaultWebhook(guild, req) {
 /** Gửi embed qua 1 webhook. Trả về true nếu Discord nhận. */
 async function send(whInfo, embed, meta = {}) {
   const wh = new WebhookClient({ id: whInfo.webhookId, token: whInfo.token });
-  const payload = buildPayload(whInfo, embed, meta);
-  await wh.send(payload);
-  return true;
+  try {
+    const payload = buildPayload(whInfo, embed, meta);
+    await wh.send(payload);
+    return true;
+  } finally {
+    // Mỗi lượt log tạo một WebhookClient (một REST client riêng kèm timer
+    // sweeper của @discordjs/rest). Không destroy thì chúng dồn theo số log →
+    // rò bộ nhớ thật (đo ~30 MB sau ~20k lượt). Finally để lượt gửi LỖI cũng được dọn.
+    wh.destroy();
+  }
 }
 
 /**
