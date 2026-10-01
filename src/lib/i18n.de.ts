@@ -998,7 +998,7 @@ export const DE: Record<string, string> = {
   "— Không cấp role —": "— Keine Rolle vergeben —",
   "— Không dùng —": "— Keine —",
   "— Mọi thành viên —": "— Alle Mitglieder —",
-  "— mọi server dùng chung, các owner server khác không phải cấu hình gì. Bot giữ tối đa 3 bản backup mới nhất cho mỗi server.":
+  "— mọi server dùng chung, các owner server khác không phải cấu hình gì. Số bản backup giữ lại theo quy tắc Giữ bản bên dưới (mặc định 3 bản mới nhất).":
     "— von allen Servern geteilt; andere Owner konfigurieren nichts. Der Bot behält die 3 neuesten Backups pro Server.",
   "— đóng trình duyệt sẽ phải đăng nhập lại":
     "— beim Schließen des Browsers ist neue Anmeldung nötig",

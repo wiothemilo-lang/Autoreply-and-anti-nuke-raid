@@ -25,6 +25,12 @@ import { reassembleBackupJsonForRead } from "./backupChunks";
  */
 const MAX_IMPORT_FILE_BYTES = 8_000_000;
 const BACKUP_CLAIM_TTL_MS = 600_000;
+/**
+ * Trần số bản backup ĐỌC RA cho mỗi server (danh sách chat/dashboard/audit).
+ * PHẢI bằng trần của quy tắc giữ bản (`backupKeepCount`: 2-50 ở botStoreBackup
+ * / setRetention) — xem chú thích ở listGuild.
+ */
+export const MAX_BACKUPS_PER_GUILD = 50;
 
 function isClaimActive(claimedAt: number | undefined, leaseUntil?: number): boolean {
   if (claimedAt === undefined) return false;
@@ -59,7 +65,7 @@ export const listMine = query({
         .query("guildBackups")
         .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", g.discordId))
         .order("desc")
-        .take(3);
+        .take(MAX_BACKUPS_PER_GUILD);
       for (const b of backups) {
         out.push({
           _id: b._id,
@@ -77,7 +83,7 @@ export const listMine = query({
         });
       }
     }
-    return out.sort((a, b) => b.createdAt - a.createdAt).slice(0, 20);
+    return out.sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_BACKUPS_PER_GUILD);
   },
 });
 
@@ -94,7 +100,7 @@ export const listGuild = query({
       .query("guildBackups")
       .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", guildId))
       .order("desc")
-      .take(3);
+      .take(MAX_BACKUPS_PER_GUILD);
     return backups.map((b) => ({
       _id: b._id,
       guildId: b.guildId,
@@ -131,7 +137,7 @@ export const botAuditBackups = query({
       .query("guildBackups")
       .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", guildId))
       .order("desc")
-      .take(3);
+      .take(MAX_BACKUPS_PER_GUILD);
     const out = [];
     for (const b of backups) {
       out.push({

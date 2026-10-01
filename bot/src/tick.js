@@ -26,6 +26,12 @@
 const TICK_INTERVAL_MS = 180_000;
 /** Sau khi batch lỗi, tránh gọi lại batch trong khoảng này (dùng fallback). */
 const BATCH_RETRY_AFTER_MS = 10 * 60_000;
+/**
+ * Nhịp gia hạn lease khi job backup/restore còn chạy. PHẢI nhỏ hơn
+ * `BACKUP_CLAIM_TTL_MS` của Convex (10 phút) — chọn 4 phút để một lần mạng lỗi
+ * vẫn còn dư một nhịp trước khi lease hết hạn.
+ */
+const CLAIM_RENEW_EVERY_MS = 4 * 60_000;
 
 const hiddenMod = require("./handlers/hidden");
 const backupMod = require("./handlers/backup");
@@ -66,6 +72,30 @@ function applySettingsChanges(store, changes) {
     cleared++;
   }
   return cleared;
+}
+
+/**
+ * Gia hạn lease định kỳ trong lúc job còn chạy.
+ *
+ * Vì sao cần: lease của Convex chỉ sống 10 phút (`BACKUP_CLAIM_TTL_MS`).
+ * `restoreCore` tự gia hạn theo từng bước, nhưng nhánh BACKUP chỉ có một bước
+ * dài (chụp snapshot role/kênh/tin) nên không có chỗ nào móc vào: job quá 10
+ * phút bị Convex từ chối kết quả cuối bằng `stale_claim`, và lần báo lỗi cũng
+ * dùng đúng claimAt cũ nên cũng bị từ chối ⇒ dashboard KHÔNG thấy lỗi gì, cờ
+ * yêu cầu còn nguyên ⇒ bot chụp lại từ đầu mỗi 3 phút, vô hạn (bug thật).
+ *
+ * Trả về hàm dừng — job xong thì tắt (job chết theo process, timer chết theo).
+ */
+function startClaimRenewal(store, guildId, kind, claimAt, everyMs = CLAIM_RENEW_EVERY_MS) {
+  // claimAt undefined = bot bản cũ không gửi fencing token → không có gì để gia hạn.
+  if (typeof claimAt !== "number") return () => {};
+  const timer = setInterval(() => {
+    store.client
+      .mutation("bot_writes:botRenewBackupClaim", { guildId, kind, claimAt })
+      .catch(() => {});
+  }, everyMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
 }
 
 /**
@@ -138,6 +168,7 @@ async function runBackupJobs(client, store, items) {
     if (!lease) continue;
     const claimAt = lease.claimAt;
     backupInFlight.add(key);
+    const stopRenewal = startClaimRenewal(store, item.guildId, item.kind, claimAt);
     try {
       if (item.kind === "backup") {
         await backupMod.runBackup(client, store, item.guildId, {
@@ -210,6 +241,7 @@ async function runBackupJobs(client, store, items) {
           .catch(() => {});
       }
     } finally {
+      stopRenewal();
       backupInFlight.delete(key);
     }
   }
@@ -332,4 +364,10 @@ function setupTick(client, store) {
   }
 }
 
-module.exports = { setupTick, runBackupJobs, runTickOnce, applySettingsChanges };
+module.exports = {
+  setupTick,
+  runBackupJobs,
+  runTickOnce,
+  applySettingsChanges,
+  startClaimRenewal,
+};
