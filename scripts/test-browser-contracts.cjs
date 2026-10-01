@@ -37,6 +37,13 @@ const { test } = require("node:test");
 const browserTest = process.env.SKIP_BROWSER_TESTS === "1" ? test.skip : test;
 
 const ROOT = path.resolve(__dirname, "..");
+/**
+ * Trần cho MỘT lệnh CDP. Bản trước không có trần: lệnh chờ browser trả lời
+ * mãi, renderer treo là cả suite treo — trần 120s của runner chỉ che lỗi
+ * chứ không báo. 30s dư cho lần tải trang chậm nhất đã đo (cả suite ~100s,
+ * không phải một lệnh), nên lệnh treo bị báo đúng tên.
+ */
+const CDP_COMMAND_TIMEOUT_MS = Number(process.env.CDP_COMMAND_TIMEOUT_MS) || 30000;
 const DIST = process.env.BROWSER_TEST_DIST || path.join(ROOT, "dist");
 const MANIFEST = require("../src/lib/routes.json");
 const ROUTES = MANIFEST.routes;
@@ -216,10 +223,36 @@ class Cdp {
     }
   }
 
-  send(method, params = {}) {
+  /**
+   * Gửi lệnh CDP và CHỜ CÓ CHỐT THỜI GIAN.
+   *
+   * Bản trước chỉ `new Promise` + lưu vào `pending` rồi chờ browser trả lời.
+   * Khi renderer treo (tab crash, `awaitPromise` bám một promise không bao
+   * giờ settle, request bị chặn vô hạn) thì browser KHÔNG BAO GIỜ trả lời →
+   * promise treo vĩnh viễn → cả suite đứng, không test nào báo kết quả. Trần
+   * 120s của runner che giấu đúng lỗi này: suite bị giết ở 120s/300s mà
+   * không hề biết mình treo ở đâu.
+   *
+   * Nay mỗi lệnh có trần riêng. Trần ngắn (30s) vẫn dư cho lần tải trang
+   * chậm nhất đã đo (~100s cho CẢ suite, không phải một lệnh), nên lệnh treo
+   * bị báo đúng tên thay vì kéo cả suite.
+   */
+  send(method, params = {}, timeoutMs = CDP_COMMAND_TIMEOUT_MS) {
     const id = ++this.seq;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const entry = { resolve, reject, timer: null };
+      entry.timer = setTimeout(() => {
+        // Dọn entry để `pending` không phình vô hạn khi renderer treo.
+        this.pending.delete(id);
+        reject(new Error(`CDP "${method}" không trả lời trong ${timeoutMs}ms (renderer treo?)`));
+      }, timeoutMs);
+      // Không giữ event loop sống vì timer của lệnh đã xong.
+      entry.timer.unref?.();
+      const done = (fn) => (v) => {
+        clearTimeout(entry.timer);
+        fn(v);
+      };
+      this.pending.set(id, { resolve: done(resolve), reject: done(reject) });
       this.ws.send(JSON.stringify({ id, method, params }));
     });
   }
@@ -363,7 +396,10 @@ class Cdp {
 
   async close() {
     try {
-      await this.send("Page.close");
+      // Trần ngắn hơn (5s): đóng tab là việc dọn dẹp, không có lý do chờ
+      // 30s. Không có trần thì `t.after(() => page.close())` treo hook after,
+      // node:test chờ hook → cả suite đứng mà không báo lỗi.
+      await this.send("Page.close", {}, 5000);
     } catch {
       // trang đã đóng — bỏ qua
     }
@@ -916,7 +952,6 @@ browserTest(
       snaps && !snaps.__timeout && !snaps.__none && snaps.role,
       "màn chờ phải quan sát được",
     );
-    t.assert.strictEqual(snaps.role, "status", 'màn chờ phải có role="status"');
     t.assert.strictEqual(snaps.role, "status", 'màn chờ phải có role="status"');
     t.assert.strictEqual(snaps.ariaLive, "polite", 'màn chờ phải aria-live="polite"');
     t.assert.strictEqual(

@@ -1608,5 +1608,132 @@ for (const rel of ["lib/i18n.en.labels.ts", "lib/i18n.de.labels.ts"]) {
   );
 }
 
+// ─── Q. Cổng gitleaks + trần timeout CI: chặn việc "vô hiệu hoá" âm thầm ───
+//
+// (1) `useDefault = true` là BẮT BUỘC trong .gitleaks.toml. Đã thử bỏ: gitleaks
+// hiểu config là bộ rule HOÀN CHỈNH mới → chạy 0 rule → "no leaks found" dù có
+// secret thật trong repo. Chính vì vậy mọi lần gitleaks báo "sạch" phải kèm
+// check này, không tin mắt thường.
+const gitleaksPath = path.join(ROOT, ".gitleaks.toml");
+const gitleaksSrc = fs.existsSync(gitleaksPath) ? fs.readFileSync(gitleaksPath, "utf8") : "";
+check(
+  ".gitleaks.toml tồn tại và giữ useDefault = true (bỏ là mất SẠT mọi rule)",
+  /\[extend\]/.test(gitleaksSrc) && /useDefault\s*=\s*true/.test(gitleaksSrc),
+);
+// Allowlist theo đường dẫn phải HẸP: chỉ được phép trỏ tới tệp cụ thể đã
+// xác minh, không được phủ `scripts/` hay `src/` — nếu không thì lỡ dán
+// token thật vào file test thì gitleaks im lặng, đúng lỗi ta muốn chặn.
+const pathRules = [...gitleaksSrc.matchAll(/^\s*'''([^']+)''',?\s*$/gm)]
+  .map((m) => m[1])
+  .filter(
+    (p) => !p.includes("123456789012345678") && !p.includes("Zx7pQ2vL9nM4kR8wT1yH3uB6cD5aF0eG"),
+  );
+check(
+  ".gitleaks.toml KHÔNG allowlist rộng theo đường dẫn (không phủ scripts/ hay src/)",
+  pathRules.every((p) => /[.^$*+?()[\]{}|\\]/.test(p) || p.includes("flow-field")),
+);
+
+// (2) Trần timeout/suite mặc định là 120s nhưng test-browser-contracts điều
+// khiển Chromium thật nên phụ thuộc tốc độ runner: đo được 87–100,5s (xanh)
+// và 2 lần vượt 120s (đỏ). Job `test` phải nâng trần, nếu không thì CI đỏ theo
+// vận may và mỗi lần đỏ lại chặn luôn job deploy.
+const ciSrc = fs.readFileSync(path.join(ROOT, ".github", "workflows", "ci.yml"), "utf8");
+const timeoutMatches = [...ciSrc.matchAll(/TEST_SUITE_TIMEOUT_MS:\s*"?(\d+)"?/g)].map((m) =>
+  Number(m[1]),
+);
+check(
+  "ci.yml đặt TEST_SUITE_TIMEOUT_MS cho job test (Chromium thật cần biên an toàn)",
+  timeoutMatches.length > 0 && timeoutMatches.every((ms) => ms >= 240_000),
+);
+
+// Ghi chú thay đổi: test-browser-contracts vẫn phải FAIL (không im lặng xanh)
+// khi thiếu Chromium — nâng trần không được biến lỗi môi trường thành xanh.
+const browserSrc = fs.readFileSync(
+  path.join(ROOT, "scripts", "test-browser-contracts.cjs"),
+  "utf8",
+);
+check(
+  "test-browser-contracts vẫn báo lỗi khi thiếu Chromium (nâng trần không được che lỗi)",
+  /Chromium/.test(browserSrc) && /process\.exit|throw/.test(browserSrc),
+);
+
+// (3) test-browser-contracts KHÔNG ĐƯỢC treo. Trần 120s của runner từng che
+// một lỗi thật: `Cdp.send()` lưu promise vào `pending` rồi chờ browser trả
+// lời mãi — renderer treo là CẢ SUITE đứng, không test nào báo kết quả. Đã
+// xảy ra 2 lần (đỏ ở 120s, rồi đỏ ở 300s khi nâng trần) và cả hai lần đều
+// dừng im ở test E, không báo test nào hỏng. Nay mỗi lệnh CDP có trần riêng
+// nên treo sẽ báo ĐÚNG TÊN lệnh thay vì im lặng.
+const browserSuiteSrc = fs.readFileSync(
+  path.join(ROOT, "scripts", "test-browser-contracts.cjs"),
+  "utf8",
+);
+const cdpSendFn = browserSuiteSrc.slice(
+  browserSuiteSrc.indexOf("  send(method, params = {}"),
+  browserSuiteSrc.indexOf("  once(method)"),
+);
+check(
+  "Cdp.send() có trần thời gian (không chờ browser vô hạn)",
+  /setTimeout\(/.test(cdpSendFn) && /reject\(/.test(cdpSendFn),
+);
+check(
+  "Cdp.send() dọn entry pending khi hết trần (không phình vô hạn)",
+  /this\.pending\.delete\(id\)/.test(cdpSendFn),
+);
+const pageCloseStart = browserSuiteSrc.indexOf(
+  "  async close() {",
+  browserSuiteSrc.indexOf("class Page"),
+);
+const pageCloseFn = browserSuiteSrc.slice(
+  pageCloseStart,
+  browserSuiteSrc.indexOf("\n}", pageCloseStart),
+);
+check(
+  "Page.close() có trần ngắn (t.after không treo cả suite)",
+  // `Page.close", {}, 5000` — số phải đứng SAU object rỗng, nên không neo
+  // `\s*\d+` ngay sau dấu phẩy (bản đầu neo sai chỗ nên báo FAIL giả).
+  /Page\.close"[\s\S]*?\b\d{3,}\b/.test(pageCloseFn) || /setTimeout/.test(pageCloseFn),
+);
+// Assert lặp NGUYÊN DÒNG là code chết: chạy hai lần cũng cho cùng kết quả,
+// chỉ làm chậm và gây hiểu nhầm là còn ca kiểm thứ hai. Chỉ xét assert viết
+// trọn một dòng (kết thúc bằng `);`) — assert xuống dòng có mỗi dòng mở đầu
+// giống nhau nên đếm theo dòng sẽ báo động giả.
+const assertCounts = new Map();
+for (const raw of browserSuiteSrc.split("\n")) {
+  const line = raw.trim();
+  if (!line.startsWith("t.assert.") || !line.endsWith(");")) continue;
+  assertCounts.set(line, (assertCounts.get(line) ?? 0) + 1);
+}
+const dupAsserts = [...assertCounts.entries()]
+  .filter(([, n]) => n > 1)
+  .map(([line, n]) => `${n}x ${line}`);
+check(
+  "test-browser-contracts không có assert lặp lặp nguyên dòng",
+  dupAsserts.length === 0,
+  dupAsserts.slice(0, 2).join(" | "),
+);
+// Tài liệu KHÔNG được chứa giá trị hình dạng credential. Job `security` đã
+// bắt đúng trường hợp này (17s, rule `discord-client-id` bám vào
+// docs/agent-journal.md vì tôi dán giá trị giả khi viết RED-PROOF), nhưng chờ
+// CI thì chậm — check này bắt ngay ở `bun run test`. Cố tình KHÔNG allowlist:
+// vá bằng allowlist sẽ làm mờ đúng cái cổng gác đang cố giữ.
+const CREDENTIAL_SHAPED =
+  /(?:discord[-_ ]?client[-_ ]?id|client[-_ ]?secret|api[-_ ]?key|access[-_ ]?token)["'\s:=]{1,6}[0-9A-Za-z_-]{18,}/i;
+const docLeaks = fs
+  .readdirSync(path.join(ROOT, "docs"))
+  .filter((f) => f.endsWith(".md"))
+  .flatMap((f) =>
+    fs
+      .readFileSync(path.join(ROOT, "docs", f), "utf8")
+      .split("\n")
+      .map((text, i) => ({ text, at: i + 1 }))
+      .filter(({ text }) => CREDENTIAL_SHAPED.test(text))
+      .map(({ at }) => `${f}:${at}`),
+  );
+check(
+  "docs/*.md không dán giá trị hình dạng credential (job security sẽ đỏ)",
+  docLeaks.length === 0,
+  docLeaks.slice(0, 3).join(" | "),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);
