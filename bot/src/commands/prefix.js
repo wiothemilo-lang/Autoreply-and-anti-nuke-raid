@@ -935,6 +935,14 @@ async function handleReactionRole(client, message, args, config, store) {
   return message.reply(REACTION_ROLE_HELP);
 }
 
+/**
+ * Số dòng backup tối đa in trong 1 embed chat. Danh sách có thể tới 50 bản
+ * (quy tắc "Giữ bản" 2-50), nhưng embed chỉ chịu 4096 ký tự — in hết một lượt
+ * là Discord từ chối CẢ embed, người dùng không thấy gì (kể cả các bản mới).
+ * In 20 bản mới nhất, phần còn lại chỉ sang dashboard (nơi khôi phục được mọi bản).
+ */
+const BACKUP_LIST_MAX_LINES = 20;
+
 async function handleBackup(client, message, args, config, store) {
   const sub = (args[0] || "").toLowerCase();
   const guildId = message.guild.id;
@@ -951,10 +959,16 @@ async function handleBackup(client, message, args, config, store) {
       (b, i) =>
         `${i + 1}. **${b.guildName}** — ${new Date(b.createdAt).toLocaleString("vi-VN")} — ${b.roleCount} role · ${b.channelCount} kênh${(b.emojiCount ?? 0) > 0 ? ` · ${b.emojiCount} emoji` : ""}${(b.stickerCount ?? 0) > 0 ? ` · ${b.stickerCount} sticker` : ""}${b.pushedToGithub ? " · ☁️ GitHub" : ""}`,
     );
+    const shown = lines.slice(0, BACKUP_LIST_MAX_LINES);
+    if (lines.length > shown.length) {
+      shown.push(
+        `… và ${lines.length - shown.length} bản nữa — xem và khôi phục các bản cũ hơn trên dashboard.`,
+      );
+    }
     const embed = new EmbedBuilder()
       .setColor(Colors.Blurple)
       .setTitle(`💾 Backup của server (${list.length})`)
-      .setDescription(lines.join("\n"))
+      .setDescription(shown.join("\n"))
       .setFooter({ text: "Khôi phục: !backup restore <số thứ tự>" });
     return message.reply({ embeds: [embed] });
   }

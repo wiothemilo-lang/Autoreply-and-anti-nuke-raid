@@ -542,6 +542,41 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     );
   }
 
+  console.log("\n── backup:listGuild: trả ĐỦ bản đang giữ (trần retention 50) ──");
+  {
+    // REGRESSION: quy tắc giữ bản cho giữ tới 50 (backupKeepCount 2-50 ở
+    // botStoreBackup/setRetention), nhưng listGuild/listMine/botAuditBackups cũ
+    // chỉ `take(3)` → bản thứ 4 trở đi vẫn nằm trong DB mà KHÔNG hiện ở đâu, và
+    // vì id chỉ có từ danh sách nên cũng KHÔNG khôi phục được: chủ server tưởng
+    // giữ 10 bản mà thực tế chỉ dùng được 3.
+    const { ctx, backupRows } = makeCtx({ seed: BOT_KEY });
+    for (let i = 0; i < 6; i++) {
+      backupRows.push({
+        _id: `k${i}`,
+        guildId: "g1",
+        guildName: "G1",
+        createdAt: 100 + i,
+        roleCount: 1,
+        channelCount: 1,
+        pushedToGithub: false,
+        backupJson: "z:x",
+      });
+    }
+    const out = await listGuildHandler(ctx as any, { guildId: "g1", botKey: BOT_KEY });
+    check(
+      "listGuild trả đủ 6 bản đang giữ (không cắt còn 3)",
+      out.length === 6,
+      String(out.length),
+    );
+    check("listGuild vẫn sắp mới nhất trước", out[0]._id === "k5" && out[5]._id === "k0");
+    const audited = await auditHandler(ctx as any, { guildId: "g1", botKey: BOT_KEY });
+    check(
+      "botAuditBackups cũng thấy đủ 6 bản (audit không được bỏ sót bản phải soi)",
+      audited.length === 6,
+      String(audited.length),
+    );
+  }
+
   console.log("\n── backup:botAuditBackups: trả backupJson + checksum cho audit ──");
   {
     // REGRESSION: listGuild CỐ TÌNH bỏ backupJson (nhẹ cho lệnh chat) → audit

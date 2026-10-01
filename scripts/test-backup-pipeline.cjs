@@ -1809,6 +1809,64 @@ const check = (label, ok) => {
     );
   }
   {
+    // Bản backup IMPORT (.msc/.json) do normalizeBackupFile dựng nên KHÔNG có
+    // createdAt, và planRestoreCore trả `null` cho field thiếu. Hợp đồng Convex
+    // (`restorePlan.createdAt`/`guildName`) là v.optional — chỉ nhận field VẮNG
+    // MẶT, gửi null là ArgumentValidationError ⇒ dashboard hiện lỗi kỹ thuật thay
+    // vì kế hoạch (bug thật: bấm "Xem kế hoạch" trên bản backup nhập từ file là
+    // luôn hỏng, mọi field khác vẫn có nhưng cả mutation bị từ chối).
+    const muts = [];
+    const st = {
+      client: {
+        mutation: async (name, args) => {
+          muts.push({ name, args });
+          return { ok: true };
+        },
+      },
+      getConfig: async () => null,
+    };
+    const client = { guilds: { cache: new Map([[TGT, makeTarget()]]) } };
+    // (a) thiếu createdAt nhưng có guildName (đúng dạng file import thật).
+    await backup.runRestorePlan(
+      client,
+      st,
+      TGT,
+      JSON.stringify({
+        version: 4,
+        guildName: "server từ file backup",
+        roles: [{ id: "r1", name: "R" }],
+        channels: [],
+      }),
+    );
+    const argA = muts[0]?.args?.plan ?? {};
+    const wireA = JSON.parse(JSON.stringify(argA)); // như client Convex gửi đi
+    check(
+      "plan: bản import thiếu createdAt → bỏ hẳn field, KHÔNG gửi null",
+      wireA.createdAt === undefined && !Object.values(wireA).some((v) => v === null),
+      JSON.stringify(wireA),
+    );
+    check(
+      "plan: field thật vẫn giữ (roleCount/guildName)",
+      wireA.roleCount === 1 && !!wireA.guildName,
+    );
+    // (b) thiếu CẢ guildName lẫn createdAt → không field nào được thành null.
+    muts.length = 0;
+    await backup.runRestorePlan(
+      client,
+      st,
+      TGT,
+      JSON.stringify({ version: 4, roles: [{ id: "r1", name: "R" }], channels: [] }),
+    );
+    const wireB = JSON.parse(JSON.stringify(muts[0]?.args?.plan ?? {}));
+    check(
+      "plan: thiếu cả guildName + createdAt → vẫn không có null nào",
+      !Object.values(wireB).some((v) => v === null) &&
+        wireB.guildName === undefined &&
+        wireB.createdAt === undefined,
+      JSON.stringify(wireB),
+    );
+  }
+  {
     // Claim bị bot khác cướp / hết hạn → phải ném lỗi, im lặng coi như xong thì
     // dashboard mãi chờ kế hoạch không bao giờ tới.
     const tg = makeTarget();

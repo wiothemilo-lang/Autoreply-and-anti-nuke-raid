@@ -1073,7 +1073,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
             {translate(") của")} <b className="text-foreground">{translate("chủ sở hữu bot")}</b>{" "}
             {translate("đặt trong tab")} <b>Keys / API keys</b>{" "}
             {translate(
-              "— mọi server dùng chung, các owner server khác không phải cấu hình gì. Bot giữ tối đa 3 bản backup mới nhất cho mỗi server.",
+              "— mọi server dùng chung, các owner server khác không phải cấu hình gì. Số bản backup giữ lại theo quy tắc Giữ bản bên dưới (mặc định 3 bản mới nhất).",
             )}{" "}
           </p>
           <p className="mt-2">

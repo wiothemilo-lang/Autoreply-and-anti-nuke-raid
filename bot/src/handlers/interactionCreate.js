@@ -2124,10 +2124,19 @@ module.exports = async function onInteractionCreate(client, interaction, store, 
           (b, i) =>
             `${i + 1}. **${b.guildName}** — ${new Date(b.createdAt).toLocaleString("vi-VN")} — ${b.roleCount} role · ${b.channelCount} kênh${b.pushedToGithub ? " · ☁️ GitHub" : ""}`,
         );
+        // Danh sách có thể tới 50 bản (quy tắc "Giữ bản" 2-50) nhưng embed chỉ
+        // chịu 4096 ký tự — in hết một lượt là Discord từ chối cả embed. In 20
+        // bản mới nhất, phần còn lại chỉ sang dashboard.
+        const shown = lines.slice(0, 20);
+        if (lines.length > shown.length) {
+          shown.push(
+            `… và ${lines.length - shown.length} bản nữa — xem và khôi phục các bản cũ hơn trên dashboard.`,
+          );
+        }
         const embed = new EmbedBuilder()
           .setColor(Colors.Blurple)
           .setTitle(`💾 Backup của server (${list.length})`)
-          .setDescription(lines.join("\n"))
+          .setDescription(shown.join("\n"))
           .setFooter({ text: "Khôi phục: /backup restore <số thứ tự>" });
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }

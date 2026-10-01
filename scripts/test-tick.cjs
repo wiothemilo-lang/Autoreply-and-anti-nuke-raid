@@ -108,7 +108,7 @@ globalThis.fetch = async () => {
 };
 
 (async () => {
-  const { runTickOnce, runBackupJobs, setupTick } = require("../bot/src/tick");
+  const { runTickOnce, runBackupJobs, setupTick, startClaimRenewal } = require("../bot/src/tick");
 
   let pass = 0;
   let fail = 0;
@@ -485,6 +485,38 @@ globalThis.fetch = async () => {
       global.setTimeout = realSetTimeout;
       global.setInterval = realSetInterval;
     }
+  }
+
+  // ── 12. Gia hạn lease khi job chạy dài. restoreCore tự gia hạn theo từng bước,
+  // nhưng nhánh BACKUP (chụp snapshot role/kênh/tin) không có bước nào để móc vào
+  // → lease 10 phút hết hạn giữa chừng, Convex từ chối kết quả cuối (`stale_claim`)
+  // và chính lần báo lỗi cũng dùng claimAt cũ nên cũng bị từ chối ⇒ dashboard im
+  // lặng, cờ yêu cầu còn nguyên ⇒ bot chụp lại từ đầu mỗi lượt tick, vô hạn. ──
+  {
+    clear();
+    const stop = startClaimRenewal(store, "g9", "backup", 777, 5);
+    await new Promise((r) => setTimeout(r, 30));
+    const renewals = calls.mutations.filter((m) => m.name === "bot_writes:botRenewBackupClaim");
+    check(
+      "gia hạn lease: gọi botRenewBackupClaim định kỳ với đúng claimAt (fencing token)",
+      renewals.length >= 1 &&
+        renewals.every(
+          (m) => m.args.guildId === "g9" && m.args.kind === "backup" && m.args.claimAt === 777,
+        ),
+    );
+    stop();
+    const before = calls.mutations.length;
+    await new Promise((r) => setTimeout(r, 20));
+    check("gia hạn lease: job xong → DỪNG gia hạn", calls.mutations.length === before);
+
+    clear();
+    const stopNoop = startClaimRenewal(store, "g9", "backup", undefined, 5);
+    await new Promise((r) => setTimeout(r, 20));
+    check(
+      "gia hạn lease: bot bản cũ không gửi claimAt → không gia hạn (không gọi thừa)",
+      calls.mutations.length === 0,
+    );
+    stopNoop();
   }
 
   fs.unlinkSync(DJS_MOCK);

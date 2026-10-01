@@ -2249,9 +2249,21 @@ async function runRestorePlan(client, store, guildId, backupJson, backupName, op
     });
   }
   const plan = await planRestoreCore(client, store, guildId, backup, { backupName });
+  // Bản backup nhập từ file (.msc/.json) do `normalizeBackupFile` dựng nên KHÔNG
+  // có `createdAt`, và `planRestoreCore` trả `null` cho field thiếu. Hợp đồng
+  // Convex (`restorePlan.createdAt`/`guildName` = v.optional) chỉ nhận field
+  // VẮNG MẶT, không nhận null ⇒ gửi thẳng null làm botReportRestorePlan ném
+  // ArgumentValidationError: dashboard hiện lỗi kỹ thuật thay vì kế hoạch
+  // (bug thật: bấm "Xem kế hoạch" trên bản backup import là luôn hỏng).
   const reported = await store.client.mutation("bot_writes:botReportRestorePlan", {
     guildId,
-    plan,
+    plan: {
+      ...plan,
+      guildName: plan.guildName ?? undefined,
+      createdAt: plan.createdAt ?? undefined,
+      threadCount: plan.threadCount ?? undefined,
+      banCount: plan.banCount ?? undefined,
+    },
     claimAt: options.claimAt,
   });
   if (reported?.ok !== true) {

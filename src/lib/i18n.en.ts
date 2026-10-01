@@ -1007,8 +1007,8 @@ export const EN: Record<string, string> = {
   "— Không cấp role —": "— Grant no role —",
   "— Không dùng —": "— None —",
   "— Mọi thành viên —": "— Everyone —",
-  "— mọi server dùng chung, các owner server khác không phải cấu hình gì. Bot giữ tối đa 3 bản backup mới nhất cho mỗi server.":
-    "— shared by all servers; other owners configure nothing. The bot keeps the latest 3 backups per server.",
+  "— mọi server dùng chung, các owner server khác không phải cấu hình gì. Số bản backup giữ lại theo quy tắc Giữ bản bên dưới (mặc định 3 bản mới nhất).":
+    "— shared by all servers; other owners configure nothing. How many backups are kept follows the Keep backups rule below (3 most recent by default).",
   "— đóng trình duyệt sẽ phải đăng nhập lại": "— closing the browser means signing in again",
   "• Bot cần quyền": "• The bot needs the",
   "• Bot gửi": "• The bot posts",
