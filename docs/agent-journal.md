@@ -4,6 +4,61 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 01/10/2026 (4) — CI đỏ: 9 dương tính gitleaks + suite trình duyệt treo vô hạn
+
+- 🎯 **Cách làm**: user gửi 2 run đỏ. #286 (`security`, 40s) và #285 (`test`, 4m2s).
+  Tải log CI, tái hiện từng lỗi bằng `gitleaks 8.24.3` tải về `/tmp` (không tin bản
+  cài sẵn — CI chạy bản khác) + đọc source để tìm gốc rẅ thay vì nâng trần.
+- 🔴 **Lỗi 1 — gitleaks quét TOÀN BỘ lịch sử, lộ 9 dương tính CŨ.** Run #286 là
+  `workflow_dispatch` nên không có diff mới; 9 hit đều từ commit cũ. Đã mở từng
+  file gốc trong git kiểm tra: **không có credential thật** — 6× snowflake mẫu
+  `123456789012345678`, 1× khoá gõ tay trong test, 1× token RUM 32 hex của
+  Cloudflare (token beacon thật dài 40 ký tự). Fix đúng là **allowlist hẹp theo
+  GIÁ TRỊ + đường dẫn**, không phải tắt rule.
+  - 🔴 **Bẫy nguy hiểm — `useDefault = true` trong `.gitleaks.toml`**: bỏ dòng này
+    thì gitleaks hiểu config là bộ rule **hoàn chỉnh mới** → **chạy 0 rule** → báo
+    `"no leaks found"` dù repo có secret thật. Đã tái hiện bằng RED-PROOF: dán
+    `discord_client_id: "987654321098765432"` vào file test → không có
+    `useDefault` thì im lặng, có thì bắt. Nay có check riêng trong
+    `test-web-contracts.cjs` canh.
+  - 🔴 **Bẫy thứ hai — `gitleaks --config <path>` hành xử KHÁC auto-discover**:
+    test allowlist bằng cờ `--config` cho kết quả sai. Phải đặt `.gitleaks.toml`
+    cạnh file rồi chạy `gitleaks dir .` / `gitleaks git .` đúng như CI.
+- 🔴 **Lỗi 2 — gốc rẻ thật của `test-browser-contracts` treo KHÔNG phải chậm.**
+  Lịch sử: 87s → 91s → 98s → 100s (xanh) rồi 2 lần >120s (đỏ), nâng trần 300s
+  vẫn đỏ. `class Cdp.send()` tạo `new Promise`, lưu vào `this.pending` và **chờ
+  browser trả lời mãi** — không timeout, không dọn entry. Renderer treo (tab
+  crash, `awaitPromise` bám promise không settle, request bị chặn) là **cả suite
+  đứng im**, không test nào báo kết quả; log CI dừng im ở `ok 5 - E.` đúng triệu
+  chứng. Trần của runner chỉ **che** lỗi, không phải lỗi.
+  - Fix tận gốc: `Cdp.send(method, params, timeoutMs = CDP_COMMAND_TIMEOUT_MS)`
+    có `setTimeout` → reject kèm **tên lệnh** (`CDP "Page.navigate" không trả lời
+trong 30000ms`), dọn `this.pending.delete(id)` để map không phình, `timer
+.unref()` để không giữ event loop. `Page.close()` dùng trần 5s vì
+    `t.after(() => page.close())` treo hook after thì node:test chờ mãi.
+    Biến `CDP_COMMAND_TIMEOUT_MS` đọc từ env để CI chỉnh được không cần sửa code.
+  - Đồng thời **xoá 1 assert nhân đôi nguyên dòng** (`snaps.role === "status"`) —
+    chạy hai lần cho cùng kết quả, chỉ làm chậm và gây hiểu nhầm là còn ca thứ hai.
+- 🧪 **Test chặn tái diễn**: 4 check mới trong `test-web-contracts.cjs` (mục Q.3) —
+  `Cdp.send()` có trần + dọn `pending`, `Page.close()` có trần ngắn, và không có
+  assert lặp nguyên dòng. **253 PASS / 0 FAIL**. **RED-PROOF** cả 4: gỡ trần
+  `Page.close` → FAIL đúng chỗ; nhân đôi assert → FAIL đúng chỗ; gỡ trần
+  `Cdp.send` → 2 FAIL; rồi hoàn nguyên.
+  - Sai lầm trong lúc làm (đã sửa trong chính cái check): regex neo
+    `Page\.close",\s*\d+` **FAIL giả** vì sau dấu phẩy là `{}` chứ không phải số;
+    check assert-lặp đếm theo dòng nên **báo động giả** với 2 assert khác nhau
+    nằm cạnh nhau. Đã đổi sang đếm assert **trọn một dòng** rồi mới so trùng.
+- ✅ **Kiểm chứng**: `bun run test` **82/82** (118,3s) · `test:ts` **21/21** ·
+  `tsc -b --noEmit` exit 0 · `eslint` exit 0 · `prettier --check` OK · repo-map ·
+  convex-contract · check-i18n --self-test · settings-signal --self-test.
+  `gitleaks git --exit-code 1` toàn lịch sử (424 commit) → **no leaks, exit 0**.
+- ⚠️ **Còn giới hạn**: sandbox **không có Chromium** nên không chạy được
+  `test-browser-contracts` thật → bù bằng check tĩnh. Chỉ CI mới chứng minh được
+  trần CDP có tác dụng. Trần suite vẫn giữ 300s trong `ci.yml` như biên an toàn.
+- 📁 File đụng (3): `.gitleaks.toml` (mới) · `.github/workflows/ci.yml` ·
+  `scripts/test-browser-contracts.cjs` · `scripts/test-web-contracts.cjs` ·
+  `docs/agent-journal.md`.
+
 ## 01/10/2026 (3) — Rà bản dịch: 1 lớp lọt tiếng Việt ra UI + 14 key chết
 
 - 🧭 **Cách làm**: chạy `check-i18n.cjs` (gate chính thức) rồi so **sâu hơn gate** vì gate
