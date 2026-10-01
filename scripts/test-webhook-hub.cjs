@@ -32,9 +32,10 @@ fs.writeFileSync(
 }
 class Collection extends Map {}
 class WebhookClient {
-  constructor(opts) { this.id = opts.id; this.token = opts.token; this.sent = []; this.deleted = false; globalThis.__whClients.push(this); }
+  constructor(opts) { this.id = opts.id; this.token = opts.token; this.sent = []; this.deleted = false; this.destroyed = false; globalThis.__whClients.push(this); }
   async send(payload) { this.sent.push(payload); return payload; }
   async delete() { this.deleted = true; }
+  destroy() { this.destroyed = true; }
 }
 module.exports = {
   Colors: new Proxy({}, { get: () => 0x000000 }),
@@ -247,6 +248,10 @@ function fakeEmbed(color = 0xff0000) {
       client?.id === "wh-x" && client.deleted === true,
     );
     check(
+      "delete: destroy WebhookClient sau khi xoá (không rò REST client)",
+      client?.destroyed === true,
+    );
+    check(
       "delete: mutation botDefaultWebhookDeleted",
       store._mutations.some(
         (m) => m.name === "webhooks:botDefaultWebhookDeleted" && m.args.guildId === "g-del",
@@ -339,6 +344,10 @@ function fakeEmbed(color = 0xff0000) {
     const sent = whClients[whClients.length - 1];
     const payload = sent.sent[0];
     check("send: gửi đúng qua WebhookClient", sent.id === "w-send" && payload.embeds.length === 1);
+    check(
+      "send: destroy WebhookClient sau khi gửi (không rò REST client/timer)",
+      sent.destroyed === true,
+    );
     // buildPayload bọc EmbedBuilder thật (mock lưu ở .d); nhánh không-màu giữ
     // object thô (có .data) — đọc cả 2 dạng.
     const finalColor = payload.embeds[0].d?.color ?? payload.embeds[0].data?.color;

@@ -185,6 +185,16 @@ function makeClient() {
       "guilds.ts: patch guild CHỈ khi changed hoặc refreshHeartbeat",
       gsConvex.includes("if (changed || refreshHeartbeat === true)"),
     );
+
+    // status.ts: ngưỡng online phải RỘNG HƠN 1 nhịp sync 180s — dùng đúng
+    // 180s là huy hiệu online nhấp nháy offline vài giây mỗi chu kỳ (tuổi
+    // heartbeat vượt ngưỡng ngay trước khi nhịp kế tiếp ghi).
+    const statusSrc = fs.readFileSync(path.join(__dirname, "..", "convex", "status.ts"), "utf8");
+    check(
+      "status.ts: cửa sổ online 360s = 2 nhịp sync (chống nhấp nháy offline)",
+      statusSrc.includes("BOT_ONLINE_WINDOW_MS = 360_000") &&
+        !/lastHeartbeat[^\n]*[<>]\s*180_000/.test(statusSrc),
+    );
   }
 
   console.log(`\n${pass} pass, ${fail} fail`);

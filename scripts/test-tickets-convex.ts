@@ -1125,6 +1125,48 @@ const throws = async (fn: () => Promise<unknown>) => {
     );
   }
 
+  // ── Trần field "lời chào xác minh": TRÙNG luật import (guildConfig.ts) ──
+  // Đường ghi TRỰC TIẾP từ dashboard phải áp cùng trần với đường import; nếu
+  // không, client gửi chuỗi lớn là doc phình (trần 1 MiB/doc) và màu rác làm
+  // `parseInt` ra 0 → embed mất màu.
+  {
+    const p = await save(
+      { verifyWelcomeTitle: "cũ", verifyWelcomeDescription: "cũ" },
+      {
+        verifyWelcomeTitle: "T".repeat(400),
+        verifyWelcomeDescription: "D".repeat(3000),
+        verifyWelcomeColor: "#ABCDEF",
+      },
+    );
+    check(
+      "verifyWelcomeTitle cắt còn 256",
+      typeof p.verifyWelcomeTitle === "string" && p.verifyWelcomeTitle.length === 256,
+      String(p.verifyWelcomeTitle?.length),
+    );
+    check(
+      "verifyWelcomeDescription cắt còn 1000",
+      typeof p.verifyWelcomeDescription === "string" && p.verifyWelcomeDescription.length === 1000,
+      String(p.verifyWelcomeDescription?.length),
+    );
+    check(
+      "verifyWelcomeColor chuẩn hoá về #hex thường",
+      p.verifyWelcomeColor === "#abcdef",
+      String(p.verifyWelcomeColor),
+    );
+  }
+  {
+    const p = await save({}, { verifyWelcomeColor: "javascript:alert(1)" });
+    check(
+      "verifyWelcomeColor rác → xoá (undefined), không ghi chuỗi lạ",
+      p.verifyWelcomeColor === undefined,
+      JSON.stringify(p),
+    );
+  }
+  {
+    const p = await save({}, { verifyWelcomeTitle: "" });
+    check("verifyWelcomeTitle rỗng → xoá", p.verifyWelcomeTitle === undefined, JSON.stringify(p));
+  }
+
   // ═══ MỐC channelClosedAt — phân biệt "đã khoá kênh" với "chỉ đóng ở DB" ═══
   // Dashboard đóng ticket KHÔNG đụng kênh Discord. Job `closeChannel` trong
   // getPendingJobs thu quyền rồi ghi mốc này; bot đóng trong kênh thì ghi

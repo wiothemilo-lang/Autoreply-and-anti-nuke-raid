@@ -146,7 +146,9 @@ function mkStore() {
     const voice = {
       id: "v1",
       name: "Voice",
-      isTextBased: () => false,
+      // discord.js v14: voice channel CÓ `.messages` → isTextBased() trả true.
+      // Mock theo ĐÚNG hành vi thật để không che bug "nhánh Connect chết".
+      isTextBased: () => true,
       isVoiceBased: () => true,
       permissionOverwrites: {
         edit: async (t, p) => {
@@ -201,6 +203,11 @@ function mkStore() {
       voice.edited?.Connect === false,
       JSON.stringify(voice.edited),
     );
+    check(
+      "kênh voice KHÔNG bị chặn SendMessages (isTextBased()=true không được lấn nhánh Connect)",
+      voice.edited?.SendMessages === undefined,
+      JSON.stringify(voice.edited),
+    );
     check("THREAD KHÔNG bị khoá (nằm trong kênh cha)", thread.edited !== true);
     check("kênh hỏng KHÔNG làm hỏng cả lượt", ok === true);
     check("đánh dấu server đã khoá", lockdown.isLocked("G3") === true);
@@ -234,6 +241,34 @@ function mkStore() {
     check("đã khoá → trả false, KHÔNG ghi thêm", ok === false && store.mutations.length === 0);
     check("đã khoá → KHÔNG gửi log lần 2", utilStub.calls.length === 0);
   }
+  {
+    // 2 trigger đồng thời (raid + bấm nút) chỉ được sửa quyền/log MỘT lần: cổng
+    // chống chồng lượt phải đóng TRƯỚC mọi await, nếu không cả hai cùng lọt.
+    let edits = 0;
+    const text = {
+      id: "t4",
+      name: "general",
+      isTextBased: () => true,
+      permissionOverwrites: {
+        edit: async () => {
+          edits++;
+        },
+      },
+    };
+    const g = mkGuild("G5b", { channels: [text] });
+    const store = mkStore();
+    const [a, b] = await Promise.all([
+      lockdown.lockGuild({}, g, {}, store),
+      lockdown.lockGuild({}, g, {}, store),
+    ]);
+    check("2 lượt khoá đồng thời: đúng 1 lượt thắng", a !== b, `a=${a} b=${b}`);
+    check("2 lượt khoá đồng thời: sửa quyền đúng 1 lần", edits === 1, String(edits));
+    check(
+      "2 lượt khoá đồng thời: đúng 1 mutation",
+      store.mutations.length === 1,
+      String(store.mutations.length),
+    );
+  }
 
   // ═══ 4. unlockGuild ═══
   section("unlockGuild — mở lại đúng hạn");
@@ -255,8 +290,8 @@ function mkStore() {
     const ok = await lockdown.unlockGuild({}, g, {}, store);
     check("mở khoá thành công", ok === true);
     check(
-      "bỏ chặn SendMessages + Connect",
-      text.edited?.SendMessages === null && text.edited?.Connect === null,
+      "khôi phục SendMessages về trạng thái trước khoá (null) và không đụng quyền khác",
+      text.edited?.SendMessages === null && !!text.edited && !("Connect" in text.edited),
       JSON.stringify(text.edited),
     );
     check("KHÔNG còn đánh dấu khoá", lockdown.isLocked("G6") === false);
@@ -270,6 +305,61 @@ function mkStore() {
       "gửi log đã mở khoá",
       utilStub.calls.length === 1 && /mở khóa/i.test(utilStub.calls[0].embed.title),
       utilStub.calls[0]?.embed?.title,
+    );
+  }
+  {
+    // Kênh có overwrite @everyone TỪ TRƯỚC (chủ server cố ý chặn/cho quyền):
+    // mở khoá phải TRẢ LẠI giá trị cũ, không được xoá trắng. Trước đây text bị
+    // mất deny và voice bị mở toang vì luôn set null.
+    const text = {
+      id: "t3",
+      name: "announcement",
+      isTextBased: () => true,
+      isVoiceBased: () => false,
+      permissionOverwrites: {
+        // deny mọi quyền → prevOverwrite(SendMessages) phải thấy false.
+        cache: new Map([["EVERYONE", { allow: { has: () => false }, deny: { has: () => true } }]]),
+        edit: async (t, p) => {
+          text.edited = p;
+        },
+      },
+    };
+    const voice = {
+      id: "v3",
+      name: "Voice",
+      isTextBased: () => true,
+      isVoiceBased: () => true,
+      permissionOverwrites: {
+        // allow mọi quyền → prevOverwrite(Connect) phải thấy true.
+        cache: new Map([["EVERYONE", { allow: { has: () => true }, deny: { has: () => false } }]]),
+        edit: async (t, p) => {
+          voice.edited = p;
+        },
+      },
+    };
+    const g = mkGuild("G6b", { channels: [text, voice], everyone: { id: "EVERYONE" } });
+    await lockdown.lockGuild({}, g, {}, mkStore());
+    check(
+      "khoá: text ghi SendMessages=false",
+      text.edited?.SendMessages === false,
+      JSON.stringify(text.edited),
+    );
+    check(
+      "khoá: voice ghi Connect=false và KHÔNG đụng SendMessages",
+      voice.edited?.Connect === false && voice.edited?.SendMessages === undefined,
+      JSON.stringify(voice.edited),
+    );
+    const ok = await lockdown.unlockGuild({}, g, {}, mkStore());
+    check("mở khoá kênh có overwrite cũ thành công", ok === true);
+    check(
+      "mở khoá: TRẢ LẠI deny SendMessages cũ (không xoá trắng)",
+      text.edited?.SendMessages === false && !!text.edited && !("Connect" in text.edited),
+      JSON.stringify(text.edited),
+    );
+    check(
+      "mở khoá: TRẢ LẠI allow Connect cũ",
+      voice.edited?.Connect === true && !!voice.edited && !("SendMessages" in voice.edited),
+      JSON.stringify(voice.edited),
     );
   }
   {

@@ -122,6 +122,10 @@ class ConvexStore {
       this.client.setAdminAuth(process.env.CONVEX_DEPLOY_KEY);
     }
     this.cache = new Map(); // guildId -> { config, fetchedAt }
+    // Thế hệ cache theo guild: tăng mỗi lần invalidate(). Fetch đang bay mà bị
+    // invalidate giữa chừng (bot vừa tự ghi cấu hình) thì kết quả CŨ không được
+    // ghi đè cache — nếu không, cấu hình trước khi ghi bị giữ tới 30 phút.
+    this._cacheGen = new Map(); // guildId -> số thế hệ
     this.ruleCooldowns = new Map(); // `${guildId}:${ruleId}` -> timestamp
     this._startedAt = Date.now();
     this._lastHeartbeat = 0;
@@ -294,12 +298,16 @@ class ConvexStore {
       const ttl = hasPending ? CONFIG_TTL_PENDING_MS : CONFIG_TTL_MS;
       if (now - hit.fetchedAt < ttl) return hit.config;
     }
+    const gen = this._cacheGen.get(guildId) ?? 0;
     try {
       const config = await withRetry(
         () => this.client.query("guilds:getBotConfig", { guildId }),
         `getConfig:${guildId}`,
       );
-      this.cache.set(guildId, { config, fetchedAt: Date.now() });
+      // Chỉ ghi cache nếu không có lượt invalidate nào xen vào trong lúc fetch.
+      if ((this._cacheGen.get(guildId) ?? 0) === gen) {
+        this.cache.set(guildId, { config, fetchedAt: Date.now() });
+      }
       return config;
     } catch (err) {
       console.error(`[convex] getConfig(${guildId}) failed after retries:`, err?.message);
@@ -311,6 +319,7 @@ class ConvexStore {
 
   /** Invalidate the cache after the bot itself writes config. */
   invalidate(guildId) {
+    this._cacheGen.set(guildId, (this._cacheGen.get(guildId) ?? 0) + 1);
     this.cache.delete(guildId);
   }
 
@@ -324,6 +333,7 @@ class ConvexStore {
     for (const guildId of [...this.cache.keys()]) {
       if (!liveGuildIds.has(guildId)) {
         this.cache.delete(guildId);
+        this._cacheGen.delete(guildId);
         removed++;
       }
     }
