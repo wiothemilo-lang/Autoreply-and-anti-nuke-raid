@@ -107,6 +107,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `rateGuard.ts`                                                    | Giới hạn tần suất gọi API từ bot                                                         |
 | `public.ts`, `hidden.ts`                                          | API công khai landing + endpoint ẩn                                                      |
 | `http.ts`                                                         | httpRouter `/geo_lang`: dò quốc gia theo IP cho web tự chọn ngôn ngữ                     |
+| `geoGuard.ts`                                                     | Chặn đốt usage cho `/geo_lang`: chỉ IP công cộng + trần mỗi IP/toàn cục                  |
 | `selfDiagnose.ts`                                                 | Tự chẩn đoán bot báo về dashboard                                                        |
 | `sha256.ts`                                                       | Hash dùng chung (botKey, session)                                                        |
 | `audit.ts`, `reports.ts`, `status.ts`                             | Log/sự kiện/trạng thái; getAiHealth chỉ owner đọc                                        |

@@ -26,6 +26,7 @@ import {
   botSetTicketChannel,
   botClaimTicket,
   botMarkTicketChannelClosed,
+  botTouchTickets,
 } from "../convex/bot_writes";
 import { updateSettings } from "../convex/guilds";
 import {
@@ -53,6 +54,7 @@ const claimH = (botClaimTicket as any)._handler;
 const transcriptH = (ticketTranscript as any)._handler;
 const transcriptUrlH = (ticketTranscriptUrl as any)._handler;
 const markClosedH = (botMarkTicketChannelClosed as any)._handler;
+const touchH = (botTouchTickets as any)._handler;
 const updateH = (updateSettings as any)._handler;
 const listKindsH = (listKinds as any)._handler;
 const saveKindH = (saveKind as any)._handler;
@@ -79,6 +81,7 @@ const INDEX_LAST_FIELD: Record<string, string> = {
   by_guildId_status_createdAt: "createdAt",
   by_guildId_createdAt: "createdAt",
   by_guildId_openerId: "openerId",
+  by_guildId_channelId: "channelId",
 };
 
 // ─── Ctx giả: 5 bảng trên Map, withIndex mô phỏng đúng range của Convex ───
@@ -105,17 +108,29 @@ function makeCtx(opts: { seed?: string | null } = {}) {
   };
 
   let idSeq = 0;
+  // Đếm số document ĐỌC ĐƯỢC (cách Convex tính I/O) — để test khẳng định được
+  // "tra 1 ticket không collect() toàn bộ ticket của guild".
+  const stats = { ticketDocs: 0, collects: 0 };
   const ctx = {
     now: 1_700_000_000_000,
+    stats,
     db: {
       insert: async (table: string, doc: Row) => {
         const id = `${table}-${++idSeq}`;
         (tables[table] ?? (tables[table] = [])).push({ _id: id, ...doc });
         return id;
       },
-      get: async (id: string) =>
-        [...users, ...guilds, ...tickets, ...sessions, ...ticketKinds].find((r) => r._id === id) ??
-        null,
+      get: async (id: string) => {
+        const found =
+          [...users, ...guilds, ...tickets, ...sessions, ...ticketKinds].find(
+            (r) => r._id === id,
+          ) ?? null;
+        if (found && tickets.includes(found)) stats.ticketDocs += 1;
+        return found;
+      },
+      /** Convex: id hợp lệ của ĐÚNG bảng đó thì trả id, còn lại null. */
+      normalizeId: (table: string, id: string) =>
+        tables[table]?.some((r) => r._id === id) ? id : null,
       delete: async (id: string) => {
         const list = tables["ticketKinds"] ?? [];
         const i = list.findIndex((r) => r._id === id);
@@ -164,16 +179,26 @@ function makeCtx(opts: { seed?: string | null } = {}) {
                 : String(a[f]).localeCompare(String(b[f])),
             );
           };
+          const read = (list: Row[]) => {
+            if (table === "tickets") stats.ticketDocs += list.length;
+            return list;
+          };
           return {
-            first: async () => matched[0] ?? null,
-            collect: async () => [...matched],
-            take: async (n: number) => matched.slice(0, n),
+            first: async () => read(matched.slice(0, 1))[0] ?? null,
+            collect: async () => {
+              if (table === "tickets") stats.collects += 1;
+              return read([...matched]);
+            },
+            take: async (n: number) => read(matched.slice(0, n)),
             order: (dir: "asc" | "desc") => {
               const list = ordered(dir);
               return {
-                take: async (n: number) => list.slice(0, n),
-                first: async () => list[0] ?? null,
-                collect: async () => [...list],
+                take: async (n: number) => read(list.slice(0, n)),
+                first: async () => read(list.slice(0, 1))[0] ?? null,
+                collect: async () => {
+                  if (table === "tickets") stats.collects += 1;
+                  return read([...list]);
+                },
               };
             },
           };
@@ -605,6 +630,71 @@ const throws = async (fn: () => Promise<unknown>) => {
     check(
       "ticket thuộc guild khác → null",
       (await byIdH(e.ctx, { guildId: "g1", ticketId: "t1", botKey: BOT_KEY })) === null,
+    );
+  }
+
+  // ═══ Hiệu quả đọc: tra ticket bằng index/get, KHÔNG collect toàn guild ═══
+  // Bối cảnh: các mutation ticket trước đây `collect()` toàn bộ ticket của guild
+  // rồi tự `.find`. `botTouchTickets` chạy MỖI tin nhắn trong kênh ticket → server
+  // 300 ticket tốn ~300 lượt đọc document (kèm `body` dài) cho mỗi tin nhắn, tức
+  // I/O Convex phình theo bình phương số ticket (đốt hạn mức free tier).
+  console.log("\n── Hiệu quả đọc: tra ticket theo index/get (chống đốt I/O Convex) ──");
+  {
+    const e = env();
+    for (let i = 0; i < 50; i++) e.tickets.push(ticket(`t${i}`, { channelId: `ch-${i}` }));
+    e.ctx.stats.ticketDocs = 0;
+    e.ctx.stats.collects = 0;
+    const r = await touchH(e.ctx, { guildId: "g1", channelIds: ["ch-7"], botKey: BOT_KEY });
+    check("botTouchTickets: sửa đúng ticket của kênh", r.touched === 1, JSON.stringify(r));
+    check(
+      "botTouchTickets: chỉ đọc 1 document (bản cũ đọc cả 50) và KHÔNG collect",
+      e.ctx.stats.ticketDocs === 1 && e.ctx.stats.collects === 0,
+      JSON.stringify(e.ctx.stats),
+    );
+    check(
+      "botTouchTickets: ghi đúng bộ đếm tin nhắn",
+      e.tickets.find((t) => t._id === "t7")?.messageCount === 1,
+      JSON.stringify(e.tickets.find((t) => t._id === "t7")),
+    );
+  }
+  {
+    const e = env();
+    for (let i = 0; i < 50; i++) e.tickets.push(ticket(`t${i}`, { channelId: `ch-${i}` }));
+    e.ctx.stats.ticketDocs = 0;
+    e.ctx.stats.collects = 0;
+    const t = await byIdH(e.ctx, { guildId: "g1", ticketId: "t7", botKey: BOT_KEY });
+    check("botTicketById: đọc được ticket bằng id", t?.openerId === "u1", JSON.stringify(t));
+    check(
+      "botTicketById: đọc 1 document, không collect toàn guild",
+      e.ctx.stats.ticketDocs === 1 && e.ctx.stats.collects === 0,
+      JSON.stringify(e.ctx.stats),
+    );
+    check(
+      "botTicketById: id của BẢNG KHÁC bị từ chối (normalizeId)",
+      (await byIdH(e.ctx, { guildId: "g1", ticketId: "G", botKey: BOT_KEY })) === null,
+    );
+  }
+  {
+    const e = env();
+    for (let i = 0; i < 50; i++) e.tickets.push(ticket(`t${i}`, { channelId: `ch-${i}` }));
+    e.ctx.stats.ticketDocs = 0;
+    e.ctx.stats.collects = 0;
+    const r = await claimH(e.ctx, {
+      guildId: "g1",
+      ticketId: "t7",
+      staffId: "s1",
+      staffName: "Staff",
+      botKey: BOT_KEY,
+    });
+    check(
+      "botClaimTicket: nhận việc thành công",
+      r.ok === true && r.taken === true,
+      JSON.stringify(r),
+    );
+    check(
+      "botClaimTicket: đọc 1 document, không collect toàn guild",
+      e.ctx.stats.ticketDocs === 1 && e.ctx.stats.collects === 0,
+      JSON.stringify(e.ctx.stats),
     );
   }
 

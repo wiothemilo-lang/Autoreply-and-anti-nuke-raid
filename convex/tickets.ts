@@ -400,12 +400,13 @@ export const botTicketById = query({
   },
   handler: async (ctx, { guildId, ticketId, botKey }) => {
     await requireBotKeyStrict(ctx, botKey);
-    const rows = await ctx.db
-      .query("tickets")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .collect();
-    const ticket = rows.find((t) => t._id === ticketId);
-    if (!ticket) return null;
+    // `normalizeId` xác nhận chuỗi đúng định dạng id của bảng `tickets` (sai →
+    // null) rồi `get` đọc ĐÚNG 1 document. Bản cũ `collect()` toàn bộ ticket của
+    // guild rồi tự `.find` ở MỖI lần staff bấm nút trong kênh ticket. Vẫn kiểm
+    // `guildId` vì nút có thể bị dán sang kênh của guild khác.
+    const id = ctx.db.normalizeId("tickets", ticketId);
+    const ticket = id ? await ctx.db.get(id) : null;
+    if (!ticket || ticket.guildId !== guildId) return null;
     return {
       openerId: ticket.openerId,
       openerName: ticket.openerName,
