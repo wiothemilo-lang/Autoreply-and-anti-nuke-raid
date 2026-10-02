@@ -1856,5 +1856,78 @@ check(
   ),
 );
 
+// ══ T. Trần thời gian cho mọi lời gọi ra ngoài (đợt #3) ══
+// Sự cố CI 02/10 treo vì `Cdp.send()` chờ browser MÃI. Cùng mẫu bệnh đó nằm ở
+// `ConvexHttpClient` (không có trần mặc định) và ở hai chỗ `fetch` phía Convex.
+// Cổng này quét MỌI `fetch(` trong `bot/src` + `convex/` và đòi option `signal`
+// trong cùng lời gọi — vì `fetch` không có signal là treo vô hạn, và treo ở
+// luồng chống raid nghĩa là mất chống raid.
+const resilienceSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "resilience.js"), "utf8");
+const fetchSites = [];
+for (const dir of [path.join(ROOT, "bot", "src"), path.join(ROOT, "convex")]) {
+  const walk = (d) => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "_generated" || entry.name === "node_modules") continue;
+        walk(full);
+        continue;
+      }
+      if (!/\.(c|m)?[jt]s$/.test(entry.name)) continue;
+      const lines = fs.readFileSync(full, "utf8").split("\n");
+      lines.forEach((line, i) => {
+        // Chỉ lời gọi `fetch(` thật, không phải `guild.members.fetch(` của
+        // discord.js (thư viện đó đã tự có trần + retry riêng).
+        const m = /(?:^|[^\w.])fetch\(/.exec(line);
+        if (!m) return;
+        if (/^\s*(\/\/|\*)/.test(line)) return;
+        // KHỚP NGOẶC, không đếm dòng: lời gọi fetch thật trải 20+ dòng
+        // (headers + body + signal), cửa sổ N dòng sẽ báo nhầm. Từ dấu `(` của
+        // chính lời gọi này, đếm cho tới ngoặc đóng cân bằng → lấy đúng toàn
+        // bộ lời gọi rồi mới tìm `signal`.
+        const rest = lines.slice(i).join("\n");
+        const openAt = rest.indexOf("(", (m.index ?? 0) + m[0].indexOf("fetch"));
+        let depth = 0;
+        let endAt = -1;
+        for (let k = openAt; k < rest.length; k++) {
+          if (rest[k] === "(") depth++;
+          else if (rest[k] === ")") {
+            depth--;
+            if (depth === 0) {
+              endAt = k;
+              break;
+            }
+          }
+        }
+        const call = endAt > openAt ? rest.slice(openAt, endAt + 1) : rest.slice(0, 400);
+        if (/signal|Signal/.test(call)) return;
+        fetchSites.push(`${path.relative(ROOT, full)}:${i + 1}`);
+      });
+    }
+  };
+  walk(dir);
+}
+check(
+  "mọi `fetch(` trong bot/src + convex/ đều có trần thời gian (signal)",
+  fetchSites.length === 0,
+  fetchSites.slice(0, 4).join(" | "),
+);
+check(
+  "resilience.js không dùng AbortSignal.timeout (timer unref → chết im lặng)",
+  !/AbortSignal\.timeout/.test(stripComments(resilienceSrc)),
+);
+check(
+  "resilience.js có backoff có jitter (chống dồn cục khi thử lại)",
+  /backoffDelayMs/.test(resilienceSrc) && /jitter/.test(resilienceSrc),
+);
+check(
+  "lỗi quá hạn mang code ETIMEDOUT (khớp withRetry coi là đáng thử lại)",
+  /code = "ETIMEDOUT"|"ETIMEDOUT"/.test(resilienceSrc),
+);
+check(
+  "ConvexStore bọc fetch có trần cho ConvexHttpClient",
+  /new ConvexHttpClient\(url, \{/.test(convexClientSrc) && /wrapFetch/.test(convexClientSrc),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

@@ -68,6 +68,10 @@ export const githubPush = action({
           public: false,
           files: { [filename]: { content: args.backupJson } },
         }),
+        // TRẦN THỜI GIAN (đợt #3): gist chứa cả bản backup nên payload lớn, cho
+        // 20s (rộng hơn các lời gọi khác). Không có trần thì GitHub treo là
+        // action giữ kết nối tới trần Convex, bot tưởng đang sao lưu.
+        signal: AbortSignal.timeout(20_000),
       });
     } catch (e) {
       return { ok: false, error: `Không kết nối được GitHub: ${(e as Error).message}` };

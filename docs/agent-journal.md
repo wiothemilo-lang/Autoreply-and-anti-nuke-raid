@@ -4,6 +4,57 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 02/10/2026 (3) — #3 Trần thời gian cho MỌI lời gọi ra ngoài + backoff có jitter
+
+- 🎯 **Vì sao**: sự cố CI 02/10 treo vì `Cdp.send()` chờ browser MÃI. Cùng MẪU
+  BỆNH còn nằm ở đường sống còn của bot: `ConvexHttpClient` **mặc định không có
+  trần**, nên một lượt gọi Convex treo sẽ treo luôn luồng chống raid đang chờ nó.
+  Trần của tầng trên chỉ che lỗi, không sửa được — bài học y hệt đợt sửa CDP.
+- 🧱 **`bot/src/resilience.js` (mới)**: `withTimeout` · `fetchWithTimeout` ·
+  `wrapFetch` · `backoffDelayMs` (exponential **full jitter**) · `resolveTimeoutMs`.
+- 🔌 **Phủ hết đường Convex bằng MỘT dòng**: `ConvexHttpClient` nhận `fetch` tuỳ
+  biến → truyền `wrapFetch(...)` là phủ **mọi** query/mutation/action, không phải
+  sửa hàng trăm chỗ gọi. Lỗi quá hạn mang `code="ETIMEDOUT"` — **đúng mã mà
+  `withRetry()` đã coi là đáng thử lại**, nên treo tự động trở thành "chậm rồi thử
+  lại" mà không phải sửa gì thêm.
+- 🐛 **Test bắt 2 bug thật, cả hai đều cùng một loại "chết im lặng"**:
+  - `timer.unref()` trên chính timer timeout → khi nó là thứ duy nhất giữ event
+    loop (đúng cảnh treo), Node **thoát trước khi timer cháy** — biến "treo có báo
+    lỗi" thành "chết không dấu vết". ĐÃ BỎ `unref`.
+  - `AbortSignal.timeout()` của Node cũng dùng timer **unref** → mắc y hệt. Nay
+    tự dựng `AbortController` + timer thật, có `clear()` trong `finally`.
+  - Quy ước ngược nhau có chủ đích: vòng lặp NỀN (metrics, tick) thì `unref` (việc
+    thừa); trần thời gian thì KHÔNG (việc bắt buộc phải xảy ra). Đã ghi rõ trong code.
+- 🐛 **Test cũng bắt lỗi ở chính cái test**: mock `convex/browser` ở
+  `Module.prototype.load` KHÔNG BAO GIỜ trúng — tầng đó nhận **đường dẫn đã giải**
+  (`…/node_modules/convex/dist/cjs/browser/index-node.js`), phải mock ở
+  `Module._load` (nhận specifier thô). Mock im lặng không được dùng = test tưởng
+  đang kiểm thứ thật.
+- 🩹 **Vá 2 chỗ `fetch` phía Convex thiếu trần**: `convex/tickets.ts:441` (trước
+  đây **không có option nào**) và `convex/backup_github.ts` (gist, 20s vì payload lớn).
+- 🛡️ **Cổng chặn tái diễn** (mục T trong `test-web-contracts.cjs`): quét MỌI `fetch(`
+  trong `bot/src` + `convex/` và đòi có `signal` — **khớp NGOẶC** chứ không đếm
+  dòng, vì lời gọi fetch thật trải 20+ dòng (headers/body/signal) nên cửa sổ N
+  dòng báo nhầm (đã dính). Kèm check `resilience.js` KHÔNG dùng
+  `AbortSignal.timeout` nữa. **RED-PROOF**: gỡ `signal` khỏi `tickets.ts` → FAIL
+  đúng dòng; gỡ wrapper khỏi `ConvexStore` → 2 FAIL.
+- ⚡ **Suite nhanh hơn 40 lần**: test fallback 15s ban đầu _chờ thật_ hết trần mặc
+  định → `test-resilience` mất **15,4s**. Tách quy tắc ra `resolveTimeoutMs()`
+  để kiểm quy tắc thuần mà không phải chờ → **0,375s** (39 ca). CI bớt được 15s.
+- ⚠️ **Giới hạn phải nói rõ**: mutation Convex KHÔNG idempotent, nên thử lại sau
+  khi quá hạn có thể ghi hai lần. Thà vậy còn hơn treo mãi — rủi ro ghi lặp vốn
+  đã tồn tại (withRetry đã thử lại khi lỗi mạng) và cửa sổ được đặt rộng (15s)
+  để chỉ bắt TREO THẬT. Đặt `CONVEX_FETCH_TIMEOUT_MS` để chỉnh.
+- ✅ **Kiểm chứng**: `test:coverage` **85/85** (128,3s) · `test:ts` **21/21** ·
+  `test-resilience` **39** (sàn coverage mới `resilience.js: 90%`, đo được **94,5%**)
+  · `test-web-contracts` **281** · mutation **20/20** · `tsc` · `eslint` ·
+  `prettier` · repo-map · convex-contract · i18n --self-test ·
+  settings-signal --self-test · gitleaks no leaks. `CONTRACT_SUITES` 84 → **85**.
+- 📁 File đụng (10): `bot/src/resilience.js` (mới) · `bot/src/convex.js` ·
+  `convex/{tickets,backup_github}.ts` · `scripts/test-resilience.cjs` (mới) ·
+  `scripts/test-web-contracts.cjs` · `scripts/check-coverage-floor.cjs` ·
+  `docs/repo-map.md` · `AGENTS.md` · `.opencode/plugins/guardrails.js`.
+
 ## 02/10/2026 (2) — #2 Tiền AI: bảng giá + hạn mức ngày + cổng độ chính xác
 
 - 🎯 **Bắt đầu từ đâu**: #1 đã đo được `usage` nhưng chưa ai biết **tiền**. Câu
