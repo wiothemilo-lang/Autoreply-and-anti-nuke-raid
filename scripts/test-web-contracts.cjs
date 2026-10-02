@@ -1929,5 +1929,70 @@ check(
   /new ConvexHttpClient\(url, \{/.test(convexClientSrc) && /wrapFetch/.test(convexClientSrc),
 );
 
+// ══ U. Suite trình duyệt: MỌI lời chờ ngoài phải có trần (tiếp mục Q.3) ══
+// Sự cố CI 02/10: `test-browser-contracts` đỏ ở 300s, output dừng ở `ok 13`,
+// KHÔNG nói test nào treo. Mục Q.3 đã bọc trần `Cdp.send()` (sự cố 01/10) nhưng
+// suite vẫn treo lại được vì các lời chờ khác chưa có trần: mở WebSocket
+// DevTools, `fetch` tới `/json/new` + `/json/list`, và `listen` cổng server tĩnh.
+// Một trong số đó không bao giờ trả lời = cả suite đứng im; trần suite của runner
+// chỉ CHE lỗi. Cổng này canh từng chỗ, cộng trần riêng cho mỗi test để treo được
+// báo ĐÚNG TÊN test thay vì im lặng.
+const browserSuiteSrc2 = browserSuiteSrc; // đọc ở mục Q.3, dùng lại
+const sliceAt = (startMarker, endMarker) => {
+  const a = browserSuiteSrc2.indexOf(startMarker);
+  if (a === -1) return "";
+  const b = browserSuiteSrc2.indexOf(endMarker, a + startMarker.length);
+  return browserSuiteSrc2.slice(a, b === -1 ? a + 700 : b);
+};
+const withCeilingFn = sliceAt("function withCeiling", "\n}");
+check(
+  "withCeiling() dùng timer THẬT (không AbortSignal.timeout — timer unref → trần không cháy)",
+  /setTimeout\(/.test(withCeilingFn) &&
+    /clearTimeout\(timer\)/.test(withCeilingFn) &&
+    !/AbortSignal\.timeout/.test(withCeilingFn),
+);
+check(
+  "Cdp.connect() có trần khi mở WebSocket DevTools (không chờ vô hạn)",
+  /withCeiling\(/.test(sliceAt("static async connect", "_onMessage")) &&
+    /CDP_CONNECT_TIMEOUT_MS/.test(sliceAt("static async connect", "_onMessage")),
+);
+// Neo vào URL thật của lời gọi, không phải " /json/new" trong comment phía trên
+// (bản đầu neo vào lần xuất hiện ĐẦU TIÊN — câu comment — nên báo FAIL giả).
+const jsonNewAt = browserSuiteSrc2.indexOf("/json/new?about:blank");
+const jsonListAt = browserSuiteSrc2.indexOf("/json/list`");
+check(
+  "fetch /json/new (openPage) và /json/list (tìm cổng debug) đều có trần",
+  jsonNewAt > 0 &&
+    jsonListAt > 0 &&
+    browserSuiteSrc2.slice(jsonNewAt - 260, jsonNewAt).includes("withCeiling(") &&
+    browserSuiteSrc2.slice(jsonListAt - 260, jsonListAt).includes("withCeiling("),
+);
+check(
+  "listen cổng server tĩnh có trần (không treo ở setup)",
+  /withCeiling\(startServer\(port\)/.test(browserSuiteSrc2),
+);
+check(
+  "mỗi test trình duyệt có trần RIÊNG (treo báo đúng tên, không giết cả suite im lặng)",
+  /rawBrowserTest\(name,\s*\{\s*timeout:\s*BROWSER_TEST_TIMEOUT_MS/.test(browserSuiteSrc2),
+);
+const gotoFn = sliceAt("async goto(url)", "async tab()");
+check(
+  "goto() dọn timer 20s (không giữ event loop sau mỗi lần mở trang)",
+  /clearTimeout\(timer\)/.test(gotoFn) && /unref/.test(gotoFn),
+);
+const closeFn = browserSuiteSrc2.slice(
+  browserSuiteSrc2.indexOf("  async close() {"),
+  browserSuiteSrc2.indexOf("  async close() {") + 700,
+);
+check(
+  "Cdp.close() đóng WebSocket trong finally (socket mở giữ event loop sống)",
+  /finally\s*\{[\s\S]*this\.dispose\(\)/.test(closeFn),
+);
+const teardownFn = sliceAt("function teardown()", "\nconst OVERLAY_STATE");
+check(
+  "teardown đóng WebSocket CDP cấp trình duyệt + keep-alive (suite thoát, không treo phút cuối)",
+  /\.dispose\(\)/.test(teardownFn) && /closeAllConnections/.test(teardownFn),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

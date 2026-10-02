@@ -4,6 +4,49 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 02/10/2026 (4) — CI đỏ lại: suite trình duyệt treo 300s vì lời chờ NGOÀI còn thiếu trần
+
+- 🎯 **Triệu chứng**: run `36993470111` trên `main` (`9ff63f7`) — `test` ĐỎ,
+  `84/85 suites pass`. Log: `❌ test-browser-contracts — THẤT BẠI (quá 300s, đã
+giết nhóm tiến trình)`; lần xanh trước đó suite này chỉ **101,4s** (PR #34),
+  các lần khác 91–107s → nhảy >300s là TREO, không phải chậm.
+- 🔍 **Gốc rễ KHÔNG phải chậm — là các lời chờ ngoài CHƯA có trần.** Sự cố 01/10
+  đã bọc trần `Cdp.send()` nhưng chỉ MỘT chỗ; vẫn còn 4 lời chờ khác chờ vô hạn:
+  `Cdp.connect()` mở WebSocket DevTools, `fetch` tới `/json/new` (openPage) +
+  `/json/list` (tìm cổng debug), và `server.listen` cổng tĩnh. Một trong số đó
+  không bao giờ trả lời = cả suite đứng im, không test nào báo kết quả; trần
+  300s của runner chỉ CHE lỗi (đúng bài học đã ghi ở entry (3)).
+- 🧱 **`withCeiling(promise, ms, label)`** trong `test-browser-contracts.cjs`:
+  timer THẬT (KHÔNG `AbortSignal.timeout()` — timer của nó bị `unref()`, đúng lúc
+  lời chờ là thứ duy nhất giữ event loop thì trần KHÔNG cháy → chết im lặng).
+  Áp cho cả 4 chỗ trên; lỗi mang nhãn tiếng người (`"DevTools /json/new không
+xong trong 10000ms"`) để biết treo ở đâu.
+- ⏱️ **Trần RIÊNG cho từng test** (`browserTest` bọc `{ timeout: 90s }`):
+  node:test báo ĐÚNG TÊN test treo (`failureType: testTimeoutFailure`) và các
+  test sau VẪN chạy, thay vì giết cả suite mà output dừng ở `ok 13`.
+- 🧹 **Hai chỗ treo-nuốt-cuối**: (1) timer 20s trong `goto()` sống sót sau MỌI
+  lần mở trang thành công → giữ event loop, suite thoát chậm; nay `unref` +
+  `clearTimeout` ở `finally`. (2) `teardown()` chỉ `kill` Chromium rồi
+  `server.close()` — WebSocket CDP + kết nối keep-alive còn mở thì node:test
+  không thoát; nay `Cdp.dispose()` đóng socket (cả trong `Cdp.close()` finally)
+  và `closeAllConnections()`.
+- 🛡️ **Cổng chặn tái diễn — mục U** trong `test-web-contracts.cjs` (8 check):
+  `withCeiling` dùng timer thật + không `AbortSignal.timeout`; `Cdp.connect`/
+  `/json/new`/`/json/list`/`listen` đều có trần; mỗi test có `timeout`;
+  `goto` dọn timer; `teardown` đóng socket. **289 PASS / 0 FAIL** (281 → 289).
+  **RED-PROOF** 3/3: gỡ bọc `/json/new` + gỡ `timeout` per-test + gỡ
+  `clearTimeout` → đúng 3 FAIL, khôi phục lại xanh.
+- ⚠️ **Giới hạn phải nói rõ**: sandbox KHÔNG có Chromium nên không chạy được
+  `test-browser-contracts` thật (skip bằng `SKIP_BROWSER_TESTS=1`); chỉ CI mới
+  chứng minh được trong trình duyệt thật. Ở đây chứng minh bằng cổng tĩnh +
+  RED-PROOF, không claim "đã chạy Chromium".
+- 🧪 **Kiểm chứng**: tsc OK · lint OK · `format:check` OK · `bun run test`
+  (SKIP_BROWSER_TESTS=1) **85/85** (120,4s) · `test:ts` **21/21** · repo-map OK ·
+  convex-contract OK · check-i18n --self-test OK · settings-signal --self-test OK
+  · web-contracts **289/0**.
+- 📁 File đụng (3): `scripts/test-browser-contracts.cjs` ·
+  `scripts/test-web-contracts.cjs` · `docs/agent-journal.md`.
+
 ## 02/10/2026 (3) — #3 Trần thời gian cho MỌI lời gọi ra ngoài + backoff có jitter
 
 - 🎯 **Vì sao**: sự cố CI 02/10 treo vì `Cdp.send()` chờ browser MÃI. Cùng MẪU

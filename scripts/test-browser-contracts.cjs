@@ -34,7 +34,17 @@ const { test } = require("node:test");
  * Cửa thoát rõ ràng cho môi trường KHÔNG có trình duyệt (CI image lạ, box tối
  * thiểu). Mặc định vẫn FAIL kèm hướng dẫn — test im lặng skip là test dối.
  */
-const browserTest = process.env.SKIP_BROWSER_TESTS === "1" ? test.skip : test;
+const BROWSER_TEST_TIMEOUT_MS = Number(process.env.BROWSER_TEST_TIMEOUT_MS) || 90000;
+const rawBrowserTest = process.env.SKIP_BROWSER_TESTS === "1" ? test.skip : test;
+/**
+ * Trần cho MỘT test trình duyệt. Trần suite của runner (300s) chỉ CHE lỗi: một
+ * lời chờ treo ở bất kỳ test nào giết cả suite mà log KHÔNG nói test nào treo
+ * (sự cố CI 02/10 đỏ ở 300s, output dừng ở `ok 13`). Đặt trần ở node:test thì
+ * treo được báo ĐÚNG TÊN test (`failureType: testTimeoutFailure`) và các test
+ * sau vẫn chạy — biến "chết im lặng" thành lỗi có địa chỉ. 90s vì test nặng
+ * nhất (I1) có thể tới ~50s trên runner chậm.
+ */
+const browserTest = (name, fn) => rawBrowserTest(name, { timeout: BROWSER_TEST_TIMEOUT_MS }, fn);
 
 const ROOT = path.resolve(__dirname, "..");
 /**
@@ -45,6 +55,30 @@ const ROOT = path.resolve(__dirname, "..");
  */
 const CDP_COMMAND_TIMEOUT_MS = Number(process.env.CDP_COMMAND_TIMEOUT_MS) || 30000;
 const DIST = process.env.BROWSER_TEST_DIST || path.join(ROOT, "dist");
+/**
+ * Trần cho các lời chờ KHÁC ngoài `Cdp.send` (mở WebSocket DevTools, HTTP tới
+ * `/json/*`, mở cổng server tĩnh). `Cdp.send` đã có trần từ sự cố 01/10, NHƯNG
+ * suite vẫn treo lại được ở 300s (CI 02/10) vì những lời chờ này chưa có trần:
+ * một `fetch`/WebSocket không bao giờ trả lời là cả suite đứng im, không test
+ * nào báo kết quả. Trần của tầng trên chỉ che lỗi, không sửa — y hệt bài học CDP.
+ */
+const CDP_CONNECT_TIMEOUT_MS = Number(process.env.CDP_CONNECT_TIMEOUT_MS) || 15000;
+const DEVTOOLS_HTTP_TIMEOUT_MS = Number(process.env.DEVTOOLS_HTTP_TIMEOUT_MS) || 10000;
+const SERVER_LISTEN_TIMEOUT_MS = Number(process.env.SERVER_LISTEN_TIMEOUT_MS) || 10000;
+
+/**
+ * Trần cho MỘT lời chờ không tự có trần. KHÔNG dùng `AbortSignal.timeout()`:
+ * timer của nó bị `unref()` nên đúng lúc lời chờ là thứ DUY NHẤT còn giữ event
+ * loop (chính cảnh treo ta cần bắt) thì trần KHÔNG cháy → im lặng chết. Trần
+ * thời gian phải là việc bắt buộc xảy ra (xem bot/src/resilience.js).
+ */
+function withCeiling(promise, ms, label) {
+  let timer;
+  const ceiling = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} không xong trong ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, ceiling]).finally(() => clearTimeout(timer));
+}
 const MANIFEST = require("../src/lib/routes.json");
 const ROUTES = MANIFEST.routes;
 const CSP = [
@@ -187,12 +221,26 @@ class Cdp {
 
   static async connect(url) {
     const ws = new WebSocket(url);
-    await new Promise((resolve, reject) => {
-      ws.addEventListener("open", resolve, { once: true });
-      ws.addEventListener("error", () => reject(new Error("WebSocket tới DevTools thất bại")), {
-        once: true,
-      });
-    });
+    try {
+      // Không có trần thì một WebSocket không mở (cũng không lỗi) treo cả suite.
+      await withCeiling(
+        new Promise((resolve, reject) => {
+          ws.addEventListener("open", resolve, { once: true });
+          ws.addEventListener("error", () => reject(new Error("WebSocket tới DevTools thất bại")), {
+            once: true,
+          });
+        }),
+        CDP_CONNECT_TIMEOUT_MS,
+        "Mở WebSocket tới DevTools",
+      );
+    } catch (e) {
+      try {
+        ws.close();
+      } catch {
+        // chưa mở được — không còn gì để đóng
+      }
+      throw e;
+    }
     const cdp = new Cdp(ws);
     await cdp.send("Page.enable");
     await cdp.send("Runtime.enable");
@@ -279,12 +327,20 @@ class Cdp {
   async goto(url) {
     const loaded = this.once("Page.loadEventFired");
     await this.send("Page.navigate", { url });
-    await Promise.race([
-      loaded,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`timeout khi mở ${url}`)), 20000),
-      ),
-    ]);
+    let timer;
+    try {
+      await Promise.race([
+        loaded,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`timeout khi mở ${url}`)), 20000);
+          // `unref` + `clearTimeout` ở finally: bản cũ để timer 20s SỐNG SÓT sau
+          // mỗi lần mở trang thành công → nó giữ event loop và làm suite thoát chậm.
+          timer.unref?.();
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async tab() {
@@ -380,7 +436,11 @@ class Cdp {
       const deadline = Date.now() + 15000;
       while (Date.now() < deadline) {
         try {
-          const res = await fetch(`http://127.0.0.1:${port}/json/list`);
+          const res = await withCeiling(
+            fetch(`http://127.0.0.1:${port}/json/list`),
+            DEVTOOLS_HTTP_TIMEOUT_MS,
+            "DevTools /json/list",
+          );
           const targets = await res.json();
           const page = targets.find((t) => t.type === "page");
           if (page?.webSocketDebuggerUrl) return page.webSocketDebuggerUrl;
@@ -402,6 +462,20 @@ class Cdp {
       await this.send("Page.close", {}, 5000);
     } catch {
       // trang đã đóng — bỏ qua
+    } finally {
+      this.dispose();
+    }
+  }
+
+  /**
+   * Đóng WebSocket CDP. Không đóng thì socket còn mở giữ event loop sống và
+   * node:test không thoát — suite treo ở PHÚT CUỐI dù mọi test đã xong.
+   */
+  dispose() {
+    try {
+      this.ws.close();
+    } catch {
+      // đã đóng
     }
   }
 }
@@ -424,7 +498,7 @@ async function setup() {
     );
   }
   const port = 46000 + Math.floor(Math.random() * 3000);
-  const server = await startServer(port);
+  const server = await withCeiling(startServer(port), SERVER_LISTEN_TIMEOUT_MS, "Mở server tĩnh");
   const base = `http://127.0.0.1:${port}`;
   const launched = await Cdp.launch(bin);
   shared = {
@@ -435,9 +509,11 @@ async function setup() {
     launched,
     async openPage() {
       // Chromium hiện đại chỉ nhận PUT cho /json/new (GET bị từ chối).
-      const res = await fetch(`http://127.0.0.1:${launched.port}/json/new?about:blank`, {
-        method: "PUT",
-      });
+      const res = await withCeiling(
+        fetch(`http://127.0.0.1:${launched.port}/json/new?about:blank`, { method: "PUT" }),
+        DEVTOOLS_HTTP_TIMEOUT_MS,
+        "DevTools /json/new",
+      );
       const target = await res.json();
       const page = await Cdp.connect(target.webSocketDebuggerUrl);
       // Headless không có cửa sổ thật → phải bật "giả lập focus" để
@@ -453,6 +529,11 @@ async function setup() {
 function teardown() {
   if (!shared) return;
   shared.launched.child.kill("SIGKILL");
+  // Đóng thẳng WebSocket CDP cấp trình duyệt: còn mở là event loop chưa rỗng,
+  // node:test không thoát — suite treo im lặng sau khi mọi test đã xanh.
+  shared.launched.cdp.dispose();
+  // `close()` chỉ đóng cổng nghe; kết nối keep-alive còn sót vẫn giữ event loop.
+  shared.server.closeAllConnections?.();
   shared.server.close();
   shared = null;
 }
