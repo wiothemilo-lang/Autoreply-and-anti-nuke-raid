@@ -4,6 +4,39 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 02/10/2026 (6) — #5 Tách `handlers/backup.js` (2857 dòng) thành 8 module, không đổi hành vi
+
+- 🎯 **Vì sao**: một file 114 KB gánh cả chụp snapshot, giải mã .msc, dựng lại server,
+  import và vòng quét — sửa một nhánh phải đọc cả nghìn dòng, rủi ro lây chéo.
+- 🧩 **Tách theo nhóm chức năng, module lá trước**: `backupMedia.js` (tải media +
+  SSRF) · `backupCommon.js` (helper/trần dùng chung) · `backupNormalize.js` (chuẩn
+  hoá .msc/.json + giải mã) · `backupCapture.js` (snapshot + runBackup) ·
+  `backupRebuild.js` (dựng lại role/kênh/tin/emoji/sticker/thread/meta/ban/invite) ·
+  `backupRestore.js` (dry-run + restoreCore + runRestore) · `backupImport.js` ·
+  `backupJobs.js` (vòng quét/claim/auto/clone). Đồ thị phụ thuộc một chiều, không vòng.
+- 🔒 **`handlers/backup.js` giữ nguyên ĐƯỜNG DẪN + HÌNH DẠNG export** (callable +
+  đúng 35 khóa) — index.js/tick.js/localSnapshot.js và 2 mock theo chuỗi request
+  `./handlers/backup` không phải đổi dòng nào.
+- ✅ **Chứng minh không đổi hành vi (2 lớp)**: (1) script so hợp đồng export
+  before/after — 35 khóa, kiểu khớp, default vẫn callable; (2) script so TỪNG dòng
+  code cũ khớp verbatim trong module mới + không hàm nào bị định nghĩa trùng/thiếu.
+- 🧪 **Kiểm chứng**: `bun run test` **85/85** (119,8s) · `test:ts` **21/21** ·
+  tsc/lint/format sạch · repo-map OK (42 module bot) · convex-contract OK (104 call) ·
+  coverage **95,05%** + sàn OK · mutation **20/20** · web-contracts **289 PASS** ·
+  nhóm backup: pipeline **139** · import **102** · boost 43 · tick 46 · local-snapshot
+  34 · restore-e2e 36 · security-hardening **67/67**.
+- 🛡️ **RED-PROOF 2/2 cho 2 cổng tĩnh đổi đích**: gỡ `botRenewBackupClaim` khỏi
+  `backupRestore.js` → FAIL đúng check lease; đổi `skipNotice = false` trong
+  `backupCapture.js` → FAIL đúng check signature; khôi phục xanh lại.
+- ⚠️ **Nói rõ đã đổi test tĩnh**: 2 chỗ đọc NGUỒN theo đường dẫn cũ được trỏ sang
+  module mới (pipeline đọc cả chuỗi 9 file; security đọc `backupRestore.js`) — cùng
+  ngữ nghĩa kiểm, không nới lỏng check.
+- 📁 File đụng: 8 module mới trong `bot/src/` · `bot/src/handlers/backup.js` (facade)
+  · `scripts/test-backup-pipeline.cjs` · `scripts/test-security-hardening.cjs` ·
+  `docs/repo-map.md` (+ nhật ký).
+- ▶️ Tiếp theo: #5 các đích còn lại (`interactionCreate.js` 103KB · `convex/guilds.ts`
+  99KB · `bot_writes.ts` 75KB) → #4 chuyển `setInterval` sang Convex cron.
+
 ## 02/10/2026 (5) — #6 Lệnh `backup verify`: biết bản backup có khôi phục được không
 
 - 🎯 **Vì sao**: người dùng chỉ thấy "đã lưu cùng lúc" và số role/kênh trên danh

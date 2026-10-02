@@ -84,7 +84,8 @@ check(
   "backup/restore có lease renewal + claim fencing ở từng giai đoạn",
   read("convex/bot_writes.ts").includes("botRenewBackupClaim") &&
     read("convex/bot_writes.ts").includes("backupLeaseUntil") &&
-    read("bot/src/handlers/backup.js").includes("botRenewBackupClaim"),
+    // Đợt #5: restoreCore (nơi gia hạn claim ở từng giai đoạn) nằm ở backupRestore.js.
+    read("bot/src/backupRestore.js").includes("botRenewBackupClaim"),
 );
 check(
   "Discord bootstrap có timeout và rate-limit trước API",
