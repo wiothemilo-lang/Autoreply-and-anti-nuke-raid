@@ -1,5 +1,6 @@
 const { ConvexHttpClient } = require("convex/browser");
 const metrics = require("./metrics");
+const resilience = require("./resilience");
 
 // TTL mặc định 300s (tăng từ 180s): cấu hình hiếm khi đổi — giảm số query
 // getConfig thêm ~40% so với TTL 180s và ~10 lần so với TTL 30s ban đầu.
@@ -133,7 +134,26 @@ class ConvexStore {
           "Kiểm tra file .env ở thư mục bot hoặc biến môi trường trên VPS.",
       );
     }
-    this.client = new ConvexHttpClient(url);
+    // TRẦN CHO MỌI LỜI GỌI CONVEX (đợt #3). `ConvexHttpClient` mặc định KHÔNG
+    // có trần: một lượt gọi treo sẽ chờ mãi, nghĩa là luồng chống raid đang chờ
+    // nó cũng treo theo — đúng mẫu bệnh đã làm suite trình duyệt đứng im trong
+    // CI. Bọc `fetch` của client là chỗ DUY NHẤT phủ hết đường Convex, không
+    // phải sửa hàng trăm chỗ gọi.
+    //
+    // 15s là RỘNG RÃI có chủ đích: query/mutation bình thường xong trong vài
+    // trăm ms, nên trần này chỉ bắt được TREO THẬT, không cắt oan lượt chậm hợp
+    // lệ. Lỗi quá hạn mang `code="ETIMEDOUT"` — đúng mã mà `withRetry` bên dưới
+    // coi là đáng thử lại, nên treo trở thành "chậm rồi thử lại".
+    const fetchTimeoutMs = Number(process.env.CONVEX_FETCH_TIMEOUT_MS);
+    this.client = new ConvexHttpClient(url, {
+      fetch: resilience.wrapFetch(globalThis.fetch.bind(globalThis), {
+        ms:
+          Number.isFinite(fetchTimeoutMs) && fetchTimeoutMs > 0
+            ? fetchTimeoutMs
+            : resilience.DEFAULT_FETCH_TIMEOUT_MS,
+        label: "convex",
+      }),
+    });
     if (process.env.CONVEX_DEPLOY_KEY) {
       this.client.setAdminAuth(process.env.CONVEX_DEPLOY_KEY);
     }

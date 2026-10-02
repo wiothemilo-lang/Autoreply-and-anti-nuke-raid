@@ -435,7 +435,10 @@ export const ticketTranscript = action({
       at: number | null;
     } | null;
     if (!meta?.url) return null;
-    const res = await fetch(meta.url);
+    // TRẦN THỜI GIAN (đợt #3): trước đây `fetch` KHÔNG có signal nên nếu kho lưu
+    // trữ treo, action này giữ kết nối tới trần của Convex và dashboard quay vô
+    // hạn — người dùng không biết là đang chờ hay đã hỏng.
+    const res = await fetch(meta.url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return null;
     const parsed = (await res.json()) as {
       channelName?: string;

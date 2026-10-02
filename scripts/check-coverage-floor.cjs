@@ -15,6 +15,10 @@ const path = require("path");
 
 /** Sàn tối thiểu theo file (lines %) — key là đường dẫn tương đối từ bot/src. */
 const FLOORS = {
+  // Tran thoi gian + backoff (dot #3). Lop nay hong thi bot khong bao loi ma
+  // chi... dung im — dung kieu hong kho thay nhat, va la kieu hong da lam suite
+  // trinh duyet treo trong CI. 90% (do duoc ~97%).
+  "resilience.js": 90,
   // Tien AI + han muc ngan sach (dot #2). Logic nay khong lam bot do — no lam
   // chu bot tieu tien ma khong biet. Sai o day im lang, nen can san cao hon mat.
   // 90% (do duoc ~97%).
