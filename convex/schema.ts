@@ -958,6 +958,37 @@ export default defineSchema({
   }).index("by_kind", ["kind"]),
 
   /**
+   * Số đo toàn hệ thống bot (đẩy lên từ `bot/src/metrics.js` mỗi 5 phút).
+   *
+   * Vì sao có: trước đây bot không đo gì cả — không biết module nào chậm,
+   * không biết AI tốn bao nhiêu tiền, không biết RAM tăng hay không. Mọi lần
+   * chẩn đoán phải đoán. Bảng này là nơi DUY NHẤT giữ số đo đó phía server.
+   *
+   * Hai chế độ trong cùng bảng, phân biệt bằng `kind`:
+   *  - "latest": đúng MỘT dòng, upsert mỗi lần đẩy → dashboard đọc nhanh,
+   *    không tốn query dài.
+   *  - "sample": lịch sử để VẼ ĐƯỜNG. Giữ có trần (METRICS_HISTORY_CAP) để bảng
+   *    không phình vô hạn — bảng này ghi mỗi 5 phút, không dọn thì 100k dòng/năm.
+   *
+   * Khoá đếm được ghi sẵn theo định dạng Prometheus (`tên{nhãn="giá trị"}`) để
+   * dashboard không phải hiểu cấu trúc từng loại metric — chỉ cần biết tên là
+   * đủ để vẽ. Xem `snapshot()` ở bot/src/metrics.js.
+   */
+  botMetrics: defineTable({
+    kind: v.union(v.literal("latest"), v.literal("sample")),
+    /** Thời điểm bot đo (ms). Dùng làm trục thời gian và để dọn cũ. */
+    at: v.number(),
+    /** Counter tích luỹ từ đầu tiến trình, khoá = nhãn Prometheus đầy đủ. */
+    counters: v.record(v.string(), v.number()),
+    /** Gauge tại thời điểm đo (RSS, số server…). */
+    gauges: v.record(v.string(), v.number()),
+    /** Histogram đã gộp: chỉ count + sum cho mỗi cặp nhãn. */
+    histograms: v.record(v.string(), v.number()),
+  })
+    .index("by_kind_at", ["kind", "at"])
+    .index("by_at", ["at"]),
+
+  /**
    * Dấu "đã xử lý" cho 1 sự cố (gom từ antinukeEvents + modActions).
    * KHÔNG lưu bản ghi sự kiện ở đây — nguồn sự thật vẫn là 2 bảng đó; bảng này
    * chỉ giữ khoá tất định của cụm + ai đã xử lý, nên bấm hai lần vẫn một dòng.

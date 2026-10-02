@@ -1,4 +1,5 @@
 const { ConvexHttpClient } = require("convex/browser");
+const metrics = require("./metrics");
 
 // TTL mặc định 300s (tăng từ 180s): cấu hình hiếm khi đổi — giảm số query
 // getConfig thêm ~40% so với TTL 180s và ~10 lần so với TTL 30s ban đầu.
@@ -37,32 +38,47 @@ function isBotKeyRejection(err) {
 /**
  * Wraps a Convex HTTP call with retry + exponential backoff.
  * Transient network errors and 5xx are retried; 4xx (except 429) fail immediately.
+ *
+ * ĐÂY LÀ CHỖ DUY NHẤT mọi lời gọi Convex của bot đi qua — nên đo ở đây là rẻ
+ * nhất và đầy đủ nhất: một số đo bao phủ lời gọi nào chậm, lời gọi nào hỏng,
+ * lời gọi nào phải retry (tín hiệu sớm của Convex bắt đầu chậm) mà không phải
+ * sửa từng chỗ gọi. `outcome="retry"` đếm riêng từng lần thử lại — tách khỏi
+ * ok/error để "chậm nhưng không hỏng" không bị chôn vào nhóm lỗi.
  */
 async function withRetry(fn, label) {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const status = err?.statusCode ?? err?.status;
-      const isRetryable =
-        !status ||
-        status >= 500 ||
-        status === 429 ||
-        err?.code === "ECONNRESET" ||
-        err?.code === "ETIMEDOUT";
-      if (attempt === MAX_RETRIES || !isRetryable) {
-        console.error(
-          `[convex:${label}] attempt ${attempt}/${MAX_RETRIES} failed:`,
-          err?.message || err,
+  const started = process.hrtime.bigint();
+  try {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const out = await fn();
+        metrics.count("convex", label, metrics.OUTCOME_OK);
+        return out;
+      } catch (err) {
+        const status = err?.statusCode ?? err?.status;
+        const isRetryable =
+          !status ||
+          status >= 500 ||
+          status === 429 ||
+          err?.code === "ECONNRESET" ||
+          err?.code === "ETIMEDOUT";
+        if (attempt === MAX_RETRIES || !isRetryable) {
+          console.error(
+            `[convex:${label}] attempt ${attempt}/${MAX_RETRIES} failed:`,
+            err?.message || err,
+          );
+          metrics.count("convex", label, metrics.OUTCOME_ERROR);
+          throw err;
+        }
+        metrics.count("convex", label, "retry");
+        const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1) + Math.random() * 200;
+        console.warn(
+          `[convex:${label}] attempt ${attempt} failed, retrying in ${Math.round(delay)}ms...`,
         );
-        throw err;
+        await new Promise((r) => setTimeout(r, delay));
       }
-      const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1) + Math.random() * 200;
-      console.warn(
-        `[convex:${label}] attempt ${attempt} failed, retrying in ${Math.round(delay)}ms...`,
-      );
-      await new Promise((r) => setTimeout(r, delay));
     }
+  } finally {
+    metrics.observeDuration("convex", label, Number(process.hrtime.bigint() - started) / 1e9);
   }
 }
 
@@ -358,6 +374,34 @@ class ConvexStore {
     } catch (err) {
       this._heartbeatOk = false;
       console.error("[health] heartbeat failed:", err?.message);
+    }
+  }
+
+  /**
+   * Đẩy số đo đo lường lên Convex để dashboard đọc (bot/src/metrics.js).
+   *
+   * Cố ý NUỐT lỗi và chỉ ghi cảnh báo: đây là việc thừa theo định kỳ, không
+   * được phép làm phiền vòng gọi, và cũng không được báo lỗi mỗi 5 phút nếu
+   * Convex đang chập chờn. Counter trong metrics.js không bị ảnh hưởng vì
+   * snapshot lấy ở tiến trình bot, không phụ thuộc lần đẩy có thành công hay
+   * không — mất một lần đẩy chỉ mất một mốc lịch sử.
+   */
+  async recordMetrics(snapshot) {
+    try {
+      await withRetry(
+        () =>
+          this.client.mutation("bot_writes:botRecordMetrics", {
+            at: snapshot.at,
+            counters: snapshot.counters,
+            gauges: snapshot.gauges,
+            histograms: snapshot.histograms,
+          }),
+        "metrics",
+      );
+      return true;
+    } catch (err) {
+      console.warn(`[metrics] không đẩy được lên Convex: ${err?.message ?? err}`);
+      return false;
     }
   }
 

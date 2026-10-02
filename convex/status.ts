@@ -262,3 +262,57 @@ export const botStatus = query({
     };
   },
 });
+
+/**
+ * Số đo toàn hệ thống bot (đồng hồ metrics) — CHỈ chủ bot xem được (cửa sổ
+ * Admin), cùng lý do với `getHostHealth`: đây là số liệu hạ tầng (RAM, số
+ * server, provider AI, chi phí token) — lộ ra công khai là tự cho kẻ xấu bản
+ * đồ hạ tầng của bot.
+ *
+ * `null` = bot chưa đẩy số đo (bản cũ, hoặc bot mới deploy chưa tới kỳ đẩy
+ * đầu tiên). Dashboard phải hiện "chưa có dữ liệu", KHÔNG hiện 0 — 0 là số
+ * thật và sẽ khiến người dùng tưởng bot đang không làm gì.
+ */
+export const getMetrics = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const user = await getUserByToken(ctx, token);
+    if (!user) return null;
+    const row = await ctx.db
+      .query("botMetrics")
+      .withIndex("by_kind_at", (q) => q.eq("kind", "latest"))
+      .first();
+    if (!row) return null;
+    return {
+      at: row.at,
+      counters: row.counters,
+      gauges: row.gauges,
+      histograms: row.histograms,
+    };
+  },
+});
+
+/**
+ * Chuỗi lịch sử số đo để VẼ ĐƯỜNG (RAM, độ trễ, số lượt gọi...).
+ *
+ * Trả mốc cũ → mốc mới, tối đa `limit` mẫu (mặc định 288 ≈ 24 giờ ở nhịp đẩy
+ * 5 phút). Chỉ trả `at` + `gauges` + `histograms`: đường quan tâm là "diễn biến",
+ * còn counter thì lấy ở `getMetrics` (tích luỹ từ đầu tiến trình, đọc ở mẫu
+ * cuối là đủ và tránh kéo hàng trăm khoá nhãn qua dây mỗi lần vẽ).
+ */
+export const getMetricsHistory = query({
+  args: { token: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { token, limit }) => {
+    const user = await getUserByToken(ctx, token);
+    if (!user) return [];
+    const take = Math.min(Math.max(limit ?? 288, 1), 576);
+    const rows = await ctx.db
+      .query("botMetrics")
+      .withIndex("by_kind_at", (q) => q.eq("kind", "sample"))
+      .order("desc")
+      .take(take);
+    return rows
+      .map((r) => ({ at: r.at, gauges: r.gauges, histograms: r.histograms }))
+      .sort((a, b) => a.at - b.at);
+  },
+});

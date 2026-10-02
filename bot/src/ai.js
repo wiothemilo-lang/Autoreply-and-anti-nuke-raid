@@ -58,6 +58,16 @@ const FALLBACK_BUDGET_MS = 2_000;
  * đầu fail nhanh thì fallback vẫn có dư địa trong cùng lượt gọi.
  */
 const CLASSIFY_TIMEOUT_MS = 6_500;
+// Observability (đợt #1/#2): đo từng lượt gọi provider — số lượt, độ trễ, token.
+// Lazy-require như misfire bên dưới: giữ cho test require riêng ai.js không bị
+// kéo theo prom-client.
+function metricsModule() {
+  try {
+    return require("./metrics");
+  } catch {
+    return null;
+  }
+}
 /** Rate guard: đếm lượt gọi 60s gần nhất + số lượt đang chạy (xem chat()). */
 let aiCallTimestamps = [];
 let aiInFlight = 0;
@@ -348,7 +358,7 @@ function parseJsonBody(text) {
  * 429/5xx: RETRY ĐÚNG 1 LẦN trong cùng lượt (tôn trọng Retry-After khi có,
  * tối đa 2s — không vứt provider ngay khi gateway chớp mắt quá tải), sau đó
  * mới nhảy provider kế. */
-async function chatOne(p, messages, { maxTokens, temperature, timeoutMs }) {
+async function chatOneInner(p, messages, { maxTokens, temperature, timeoutMs }) {
   const models = p.model === FALLBACK_MODEL ? [p.model] : [p.model, FALLBACK_MODEL];
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -407,6 +417,61 @@ async function chatOne(p, messages, { maxTokens, temperature, timeoutMs }) {
     }
   }
   return null;
+}
+
+/**
+ * Bọc `chatOneInner` để GHI ĐO từng lượt gọi provider.
+ *
+ * Vì sao bọc chứ không rải `metrics` vào các nhánh return: chuỗi provider có
+ * 4 lối thoát (model chết, retry hết, body rác, exception) — chèn đo vào từng
+ * nhánh là chỗ sót chắc chắn, và sót ở đây là mất số liệu TIỀN (xem #2).
+ * Bọc ở cửa thì mọi lối thoát đều qua cùng một chỗ đo.
+ *
+ * `usage` là trường tuỳ chọn: gateway nào cũng trả, và thiếu thì bỏ trống chứ
+ * không được bịa số 0 — 0 trông giống "miễn phí" và làm sai báo cáo chi phí.
+ */
+async function chatOne(p, messages, opts) {
+  const metrics = metricsModule();
+  const started = process.hrtime.bigint();
+  let usage = null;
+  const originalFetch = globalThis.fetch;
+  // Bắt `usage` mà không sửa chatOneInner: chặn fetch trong đúng phạm vi lời
+  // gọi này, đọc usage từ body rồi trả nguyên fetch gốc cho code cũ dùng.
+  globalThis.fetch = async (...args) => {
+    const res = await originalFetch(...args);
+    try {
+      const clone = res.clone();
+      clone
+        .json()
+        .then((body) => {
+          if (body?.usage) usage = body.usage;
+        })
+        .catch(() => {});
+    } catch {
+      // không đọc được thì bỏ qua — đo lỗi không được phép làm hỏng lời gọi AI
+    }
+    return res;
+  };
+  try {
+    const content = await chatOneInner(p, messages, opts);
+    const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+    try {
+      if (content) {
+        metrics?.observeAiCall(p.label, {
+          durationSeconds: seconds,
+          promptTokens: Number(usage?.prompt_tokens) || undefined,
+          completionTokens: Number(usage?.completion_tokens) || undefined,
+        });
+      } else {
+        metrics?.observeAiFailure(p.label, seconds);
+      }
+    } catch {
+      // đo lỗi không được làm hỏng lời gọi AI
+    }
+    return content;
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 }
 
 /** Trích JSON object đầu tiên trong chuỗi trả lời của model.

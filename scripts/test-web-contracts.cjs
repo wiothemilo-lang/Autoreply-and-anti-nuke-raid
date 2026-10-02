@@ -1735,5 +1735,79 @@ check(
   docLeaks.slice(0, 3).join(" | "),
 );
 
+// ══ R. Đồng hồ hệ thống (đợt #1 observability) ══
+// Cái bẫy đã dính khi viết metrics.js: `registry.getMetricsAsJSON()` trả
+// histogram THEO TỪNG BUCKET (mỗi bucket một dòng, có `value` chứ không có
+// `count`/`sum`), và counter đặt nhãn ở tầng MetricObject chứ không ở từng
+// value. Đọc sai chỗ đó cho ra snapshot RỖNG mà không báo lỗi — số đo rỗng
+// nhìn y hệt "bot chưa làm gì", tức là im lặng đúng kiểu nguy hiểm nhất.
+// Nay module tự tích luỹ (agg), chỉ dùng prom-client cho đầu ra `/metrics`.
+const metricsSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "metrics.js"), "utf8");
+const runtimeSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "metricsRuntime.js"), "utf8");
+const logIdSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "logId.js"), "utf8");
+const convexClientSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "convex.js"), "utf8");
+const aiSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "ai.js"), "utf8");
+const botIndexSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "index.js"), "utf8");
+const botWritesSrc = fs.readFileSync(path.join(ROOT, "convex", "bot_writes.ts"), "utf8");
+const botPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "bot", "package.json"), "utf8"));
+
+check(
+  "bot/package.json khai báo prom-client (thiếu thì require() ném lúc khởi động)",
+  typeof botPkg.dependencies?.["prom-client"] === "string",
+);
+// Bỏ comment (dòng `//` và khối) trước khi kiểm tra mã — nếu không, chính dòng
+// comment giải thích "vì sao KHÔNG dùng X" sẽ làm check đỏ.
+function stripComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+check(
+  "metrics.js KHÔNG parse getMetricsAsJSON (trả số đo rỗng im lặng)",
+  !/getMetricsAsJSON/.test(stripComments(metricsSrc)),
+);
+check(
+  "metrics.js tự tích luỹ snapshot (có agg + đếm/sum)",
+  /\bagg\b/.test(metricsSrc) && /sumSec/.test(metricsSrc),
+);
+check(
+  "metrics.js có trần cardinality (nhãn động không phình RAM)",
+  /MAX_AGG_KEYS/.test(metricsSrc),
+);
+check(
+  "metricsRuntime in /metrics ra stdout và có nút tắt METRICS=0",
+  /render\(\)/.test(runtimeSrc) && /METRICS/.test(runtimeSrc),
+);
+check(
+  "logId.js dual-write (dòng text + dòng JSON có tiền tố lọc được)",
+  /AsyncLocalStorage/.test(logIdSrc) && /JSON_PREFIX/.test(logIdSrc),
+);
+check(
+  "withRetry đo TẬP TRUNG mọi lời gọi Convex (không rải từng chỗ gọi)",
+  /metrics\.count\("convex", label/.test(convexClientSrc),
+);
+check(
+  "AI đo từng lượt gọi provider (token + độ trễ + lỗi)",
+  /observeAiCall/.test(aiSrc) && /observeAiFailure/.test(aiSrc),
+);
+check(
+  "index.js bật metrics khi sẵn sàng và dừng (đẩy mẫu cuối) lúc thoát",
+  /startMetrics\(\{ client, store \}\)/.test(botIndexSrc) &&
+    /stopMetrics\?\.\(\)/.test(botIndexSrc),
+);
+check(
+  "schema.ts có bảng botMetrics (nơi DUY NHẤT giữ số đo phía server)",
+  /botMetrics: defineTable\(/.test(schemaSrc),
+);
+check(
+  "mutation botRecordMetrics có khoá botKey (không ai cũng ghi được số đo)",
+  /export const botRecordMetrics = mutation\(/.test(botWritesSrc) &&
+    /requireBotKeyStrict\(ctx, args\.botKey\)/.test(
+      botWritesSrc.slice(botWritesSrc.indexOf("export const botRecordMetrics")),
+    ),
+);
+check(
+  "mutation botRecordMetrics tự dọn lịch sử (bảng không phình vô hạn)",
+  /METRICS_HISTORY_CAP/.test(botWritesSrc),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);
