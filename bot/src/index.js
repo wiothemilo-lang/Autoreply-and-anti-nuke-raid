@@ -29,6 +29,11 @@ const joinGate = require("./handlers/joinGate");
 const { scanGuildForAltsAsync, sweepStaleGuilds } = require("./altDetection");
 const webhookHub = require("./webhookHub");
 const { registerSweeper, startMemGuard } = require("./memGuard");
+const { startMetrics } = require("./metricsRuntime");
+
+/** Hàm dừng đo lường — gán trong clientReady, dùng lúc thoát (xem shutdown). */
+let stopMetrics = null;
+const metricsModule = require("./metrics");
 
 // --- Client config: full-featured for powerful VPS ---
 const client = new Client({
@@ -206,7 +211,9 @@ client.once("clientReady", async () => {
   const runSyncLoop = () => {
     void (async () => {
       try {
-        const res = await guildSync.syncAll(client, store);
+        const res = await metricsModule.timeAsync("guildSync", "syncAll", () =>
+          guildSync.syncAll(client, store),
+        );
         console.log(
           `[sync] ${res?.count ?? "?"} server${res?.trustedFullList === false ? " (cache thiếu)" : ""}`,
         );
@@ -320,6 +327,12 @@ client.once("clientReady", async () => {
     30 * 60 * 1000,
   );
   memMonitorInterval.unref();
+
+  // Observability (đợt #1) — bật SAU khi client đã sẵn sàng, cùng chỗ với các
+  // vòng giám sát khác. `startMetrics` tự cắm: đo RAM/quy mô server, in
+  // `/metrics` ra stdout mỗi 5 phút, đẩy snapshot lên Convex cho dashboard.
+  // Tắt bằng biến môi trường `METRICS=0`.
+  stopMetrics = startMetrics({ client, store });
 });
 
 // --- Global error handlers ---
@@ -497,11 +510,17 @@ client.login(process.env.DISCORD_TOKEN).catch((err) => {
 });
 
 // Graceful shutdown
-process.on("SIGINT", () => {
+// Dừng metrics TRƯỚC khi thoát: `stopMetrics()` đẩy nốt mẫu cuối lên Convex,
+// nên deploy/restart không làm mất đúng số liệu của lúc tắt — mà lúc tắt
+// thường là lúc đáng nhìn nhất (sau khi đã thấy độ trễ tăng).
+function shutdown() {
+  try {
+    stopMetrics?.();
+  } catch {
+    // không để lỗi dọn dẹp chặn thoát
+  }
   client.destroy();
   process.exit(0);
-});
-process.on("SIGTERM", () => {
-  client.destroy();
-  process.exit(0);
-});
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

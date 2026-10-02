@@ -4,6 +4,68 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 02/10/2026 — #1 Observability: đồng hồ hệ thống + log có mã (nền cho #2/#3)
+
+- 🎯 **Vì sao làm trước**: repo có **không một số đo nào** — `rg "prom-client|metrics|
+opentelemetry" bot/src/ convex/` → 0 hit. Mọi lần chẩn đoán phải bắt đầu bằng
+  đoán. Đợt sửa CI vừa rồi là ví dụ đắt giá: log dừng im, phải tải log về đọc tay.
+  Chọn #1 làm nền vì #2/#3/#6 đều cần telemetry để biết mình có ăn không.
+- 📐 **Quyết định kiến trúc (user chọn)**: `prom-client` (dep chuẩn, không tự chế
+  registry) · lưu **cả hai**: in `/metrics` ra stdout + đẩy lên Convex cho
+  dashboard · log **dual-write**: giữ dòng text cũ (không phá gì đang đọc) và
+  thêm dòng JSON có tiền tố lọc được.
+- 🧱 **Bốn file mới, tách bạch để test hermetic**:
+  - `bot/src/metrics.js` — thư viện thuần (không discord.js/Convex).
+  - `bot/src/metricsRuntime.js` — lắp ráp: đo RAM/quy mô server, in stdout, đẩy
+    Convex. Tách riêng nên `index.js` chỉ gọi MỘT hàm và test được không cần login.
+  - `bot/src/logId.js` — `AsyncLocalStorage` gắn mã việc; `withId()` bọc xử lý
+    interaction nên code cũ cũng được gắn miễn phí, không phải sửa từng chỗ log.
+  - `scripts/test-metrics.cjs` — 56 ca (suite thứ 83; đã sửa CONTRACT_SUITES 82→83
+    ở **CẢ** `guardrails.js` lẫn `AGENTS.md`).
+- 🔴 **Bẫy suýt làm hỏng cả hệ thống đo: parse `getMetricsAsJSON()`**. prom-client
+  trả histogram **theo từng bucket** (mỗi bucket một dòng JSON, có `value` chứ
+  KHÔNG có `count`/`sum`), và counter đặt nhãn ở tầng MetricObject chứ không ở
+  từng value. Đọc sai chỗ đó cho ra snapshot **RỗNG mà không báo lỗi** — số đo rỗng
+  nhìn y hệt “bot chưa làm gì”, tức im lặng đúng kiểu nguy hiểm nhất. Vì vậy
+  `snapshot()` **tự tích luỹ** (Map `agg`), chỉ đẩy `registry.metrics()` cho
+  `/metrics`. Có check tĩnh trong `test-web-contracts.cjs` chặn quay lại.
+- 🐛 **Test bắt được 2 bug THẬT trong code của chính lần này** (đáng ghi — đều là
+  kiểu lỗi im lặng):
+  - `cache.reduce(...)` ném vì `client.guilds.cache` là `Map` trong test (chỉ
+    `Collection` của discord.js mới có `reduce`) → `members` + `uptime` **biến mất
+    im lặng**, và vì chung một `try` nên mất luôn các gauge phía sau. Nay mỗi
+    gauge một `try` riêng + duyệt `.values()` (chạy được với cả hai).
+  - `stop()` truyền **hàm dừng** vào `clearInterval` — `clearInterval` với một hàm
+    là **NO-OP** → vòng đẩy số đuoãng sống mãi sau khi bot đã thoát. Tách `timers`
+    và `stoppers`.
+  - Sai lầm khi viết test: kỳ vọng `+1` mẫu cuối trong khi `pushesAfterStop` đã đo
+    **sau** `stop()` nên đã gồm mẫu đó → tưởng code hỏng trong khi code đúng.
+- 🧪 **Đo tập trung, không rải**: `withRetry()` trong `convex.js` là **chỗ duy
+  nhất** mọi lời gọi Convex đi qua → một số đo phủ hết (kèm `outcome="retry"` tách
+  riêng khỏi ok/error, vì “chậm nhưng không hỏng” không được chôn vào nhóm lỗi).
+  `ai.js` bọc `chatOne` thay vì chèn đo vào 4 nhánh return (chèn vào từng nhánh là
+  chỗ sót chắc chắn, và sót ở đó là **mất số liệu tiền** — #2 sẽ dùng).
+- 🛡️ **Không đo được thứ đáng giao**: ba tầng bảo vệ — `never throw` mọi lời gọi
+  đo; trần cardinality (500 cặp nhãn) chống nhãn động phình RAM; mutation
+  `botRecordMetrics` có `botKey` + tự dọn lịch sử (trần 576 mẫu). Dashboard chỉ
+  chủ bot xem (cùng lý do `getHostHealth`) vì đây là bản đồ hạ tầng của bot.
+- ✅ **Kiểm chứng**: `test:coverage` **83/83** (124,0s) · `test:ts` **21/21** ·
+  `tsc -b --noEmit` · `eslint` · `prettier --check` · repo-map · convex-contract ·
+  i18n --self-test · settings-signal --self-test · `gitleaks git` toàn lịch sử →
+  no leaks. Coverage: `metrics.js` 95,2% · `metricsRuntime.js` 92,5% ·
+  `logId.js` 93,8% (trước khi test là **0%** — đã viết thêm vì repo này coi
+  engine không test là nợ).
+- ⚠️ **Còn lại**: dashboard mới hiện độ trễ TB (`sum/count`), **không phải p95** —
+  p95 cần giữ toàn bộ bucket (vài chục lần khoá hơn) nên nâng schema sau, đừng
+  ước lượng từ trung bình. Số đo chưa có lịch sử kiểu sparkline dù query đã có
+  sẵn (`getMetricsHistory`).
+- 📁 File đụng (16): `bot/src/{metrics,metricsRuntime,logId}.js` (mới) ·
+  `bot/src/{index,convex,ai}.js` · `bot/package.json` + `bot/bun.lock` ·
+  `convex/{schema,status,bot_writes}.ts` · `src/pages/Admin.tsx` ·
+  `src/lib/i18n.{en,de}.ts` · `scripts/test-metrics.cjs` (mới) ·
+  `scripts/test-web-contracts.cjs` · `docs/repo-map.md` · `AGENTS.md` ·
+  `.opencode/plugins/guardrails.js`.
+
 ## 01/10/2026 (4) — CI đỏ: 9 dương tính gitleaks + suite trình duyệt treo vô hạn
 
 - 🎯 **Cách làm**: user gửi 2 run đỏ. #286 (`security`, 40s) và #285 (`test`, 4m2s).

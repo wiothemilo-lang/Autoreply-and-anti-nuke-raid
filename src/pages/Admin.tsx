@@ -205,6 +205,7 @@ function AdminContent() {
               />
               <HostHealthCard />
               <AiHealthCard />
+              <MetricsCard />
               <ThreatIntelCard
                 threat={threat}
                 history={researchHistory}
@@ -410,6 +411,157 @@ function HostHealthCard() {
             <b className="tabular-nums">{health.uptimeHours} h</b>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * ĐỒNG HỒ HỆ THỐNG — bảng số đo bot tự đo (bot/src/metrics.js đẩy lên mỗi
+ * 5 phút qua `botRecordMetrics`).
+ *
+ * Không lặp lại `HostHealthCard` (đã hiện RAM/uptime): card này trả lời câu
+ * hỏi khác — THAO TÁC NÀO CHẬM, THAO TÁC NÀO ĐANG LỖI, AI TỐN BAO NHIÊU.
+ * Trước đợt này bot không đo gì nên ba câu hỏi đó không có cách nào trả lời
+ * ngoài việc đọc log thủ công.
+ *
+ * Cố ý rút gọn: lấy độ trễ TRUNG BÌNH (sum/count) thay vì phân vị. p95 chính
+ * xác là thứ quyết định "cảm giác chậm" của người dùng, nhưng sum/count đã đủ
+ * để phát hiện module nào CHẬM DẦN — còn p95 sẽ cần giữ toàn bộ bucket, tức
+ * vài chục lần khoá hơn mà bảng `botMetrics` hiện cố tình gộp phẳng. Nếu sau
+ * này cần p95 thì nâng schema, đừng ước lượng từ trung bình.
+ */
+function MetricsCard() {
+  const token = getSessionToken();
+  const metrics = useQuery(api.status.getMetrics, token ? { token } : "skip");
+
+  if (metrics === undefined) return null;
+
+  const counters = metrics?.counters ?? {};
+  const gauges = metrics?.gauges ?? {};
+  const histograms = metrics?.histograms ?? {};
+
+  // Khoá histogram có dạng …_count{subsystem="…",op="…"} và …_sum{cùng nhãn}.
+  // Gộp lại theo nhãn để tính độ trễ trung bình mỗi thao tác.
+  const ops = new Map<string, { count: number; sum: number }>();
+  for (const [key, value] of Object.entries(histograms)) {
+    const isCount = key.includes("_count{");
+    const label = key.replace(/_count\{/, "{").replace(/_sum\{/, "{");
+    const entry = ops.get(label) ?? { count: 0, sum: 0 };
+    if (isCount) entry.count = value;
+    else entry.sum = value;
+    ops.set(label, entry);
+  }
+
+  const slowest = [...ops.entries()]
+    .filter(([, v]) => v.count > 0)
+    .map(([label, v]) => {
+      // Tên thao tác nằm trong nhãn, ví dụ
+      // bot_operation_duration_seconds{subsystem="convex",op="botSyncGuilds"}
+      const subsystem = /subsystem="([^"]*)"/.exec(label)?.[1] ?? "";
+      const op = /op="([^"]*)"/.exec(label)?.[1] ?? label;
+      return {
+        // Tên thao tác là MÃ MÁY (`convex/botSyncGuilds`), không phải chữ
+        // hiển thị — nên đặt tên `display` chứ không phải `label`: gate i18n
+        // bắt mọi `{x.label}`, và bọc translate() cho một mã kỹ thuật là nói dối.
+        display: `${subsystem}/${op}`,
+        avgMs: (v.sum / v.count) * 1000,
+        calls: v.count,
+        errors:
+          counters[
+            `bot_operations_total{subsystem=${JSON.stringify(subsystem)},op=${JSON.stringify(op)},outcome="error"}`
+          ] ?? 0,
+      };
+    })
+    .sort((a, b) => b.avgMs - a.avgMs)
+    .slice(0, 5);
+
+  const aiCalls = Object.entries(counters)
+    .filter(([k]) => k.startsWith("bot_ai_calls_total"))
+    .reduce((sum, [, v]) => sum + v, 0);
+  const aiCost = Object.entries(counters)
+    .filter(([k]) => k.startsWith("bot_ai_cost_usd_total"))
+    .reduce((sum, [, v]) => sum + v, 0);
+  const rssMb = Math.round((gauges.bot_memory_rss_bytes ?? 0) / 1024 / 1024);
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <Gauge className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="font-display text-sm font-bold">{translate("Đồng hồ hệ thống")}</h3>
+            <p className="text-[11px] text-muted-foreground">
+              {translate("Bot tự đo mỗi 5 phút · chỉ chủ bot nhìn thấy")}{" "}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {!metrics ? (
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          {translate("Bot chưa đẩy số đo nào — thường chỉ xảy ra ngay sau khi deploy.")}{" "}
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+            <div className="rounded-lg bg-secondary/40 px-2.5 py-1.5">
+              <span className="text-muted-foreground">{translate("RAM tiến trình:")}</span>{" "}
+              <b className="tabular-nums">{rssMb} MB</b>
+            </div>
+            <div className="rounded-lg bg-secondary/40 px-2.5 py-1.5">
+              <span className="text-muted-foreground">{translate("Số server:")}</span>{" "}
+              <b className="tabular-nums">{gauges.bot_guilds ?? "—"}</b>
+            </div>
+            <div className="rounded-lg bg-secondary/40 px-2.5 py-1.5">
+              <span className="text-muted-foreground">{translate("Lượt gọi AI:")}</span>{" "}
+              <b className="tabular-nums">{aiCalls}</b>
+            </div>
+            <div className="rounded-lg bg-secondary/40 px-2.5 py-1.5">
+              <span className="text-muted-foreground">{translate("Chi phí AI:")}</span>{" "}
+              <b className="tabular-nums">${aiCost.toFixed(4)}</b>
+            </div>
+          </div>
+
+          {slowest.length > 0 ? (
+            <table className="mt-3 w-full text-[11px]">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="font-medium pb-1">{translate("Thao tác")}</th>
+                  <th className="font-medium pb-1 text-right">{translate("Độ trễ TB")}</th>
+                  <th className="font-medium pb-1 text-right">{translate("Số lần")}</th>
+                  <th className="font-medium pb-1 text-right">{translate("Lỗi")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slowest.map((op) => (
+                  <tr key={op.display} className="border-t border-border/60">
+                    <td className="py-1 font-mono text-[10px] text-muted-foreground">
+                      {op.display}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">
+                      {op.avgMs < 1000
+                        ? `${Math.round(op.avgMs)} ms`
+                        : `${(op.avgMs / 1000).toFixed(2)} s`}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">{op.calls}</td>
+                    <td
+                      className={cn("py-1 text-right tabular-nums", op.errors > 0 && "text-danger")}
+                    >
+                      {op.errors}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              {translate("Chưa có thao tác nào được đo — bot vừa khởi động.")}{" "}
+            </p>
+          )}
+        </>
       )}
     </div>
   );

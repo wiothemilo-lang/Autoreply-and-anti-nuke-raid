@@ -110,6 +110,24 @@ export const EN: Record<string, string> = {
   "Còn trống:": "Free:",
   "RAM bot:": "Bot RAM:",
   "Đã chạy:": "Uptime:",
+
+  /* ==== Đồng hồ hệ thống (đợt #1 observability) ==== Bảng số đo bot tự đo:
+     thao tác nào chậm/lỗi, AI tốn bao nhiêu. Bổ sung cho card sức khoẻ máy chủ
+     ở trên (card đó đo MÁY CHỦ, card này đo BOT). */
+  "Đồng hồ hệ thống": "System clock",
+  "Bot tự đo mỗi 5 phút · chỉ chủ bot nhìn thấy": "Self-measured every 5 minutes · owner only",
+  "Bot chưa đẩy số đo nào — thường chỉ xảy ra ngay sau khi deploy.":
+    "The bot has not reported any metrics yet — usually right after a deploy.",
+  "RAM tiến trình:": "Process RAM:",
+  "Số server:": "Servers:",
+  "Lượt gọi AI:": "AI calls:",
+  "Chi phí AI:": "AI cost:",
+  "Thao tác": "Operation",
+  "Độ trễ TB": "Avg latency",
+  "Số lần": "Calls",
+  Lỗi: "Errors",
+  "Chưa có thao tác nào được đo — bot vừa khởi động.":
+    "No operations measured yet — the bot just started.",
   "Bot đang offline hoặc mất kết nối Convex — số liệu máy chủ tạm dừng cập nhật.":
     "The bot is offline or lost its Convex connection — server readings are paused.",
   "Máy chủ bot đang chịu tải nặng — có thể gián đoạn.":

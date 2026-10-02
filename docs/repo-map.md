@@ -66,6 +66,8 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `webhookHub.js`, `relayClient.js`                              | Relay/log sang webhook                                                      |
 | `localSnapshot.js`, `backupUtils.js`, `backupAudit.js`         | Backup                                                                      |
 | `actionBudget.js`, `memGuard.js`                               | Giới hạn hành động/bộ nhớ                                                   |
+| `metrics.js`, `metricsRuntime.js`                              | Đồng hồ hệ thống (prom-client) + lắp ráp đẩy số đo                          |
+| `logId.js`                                                     | Mã việc trong log + log song song text/JSON                                 |
 | `captchaStore.js`, `joinGate`                                  | Join Gate captcha chống selfbot                                             |
 | `externalAppGuard.js`, `flaggedMessages.js`                    | Chặn app ngoài + tin nhắn khả nghi                                          |
 | `moduleActions.js`, `tick.js`, `timeoutWatch.js`, `misfire.js` | Điều phối module + chu kỳ + theo dõi timeout + misfire AI (vòng 11)         |
