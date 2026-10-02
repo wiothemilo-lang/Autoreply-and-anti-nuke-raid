@@ -158,6 +158,9 @@ export const botAuditBackups = query({
         // cho script tưởng là dữ liệu hỏng.
         backupJson: await reassembleBackupJsonForRead(ctx, b._id, b.backupJson, b.backupChunkCount),
         backupChecksum: b.backupChecksum ?? null,
+        // Số chunk đã lưu: để lệnh /backup verify nói RÕ "thiếu chunk" (kèm bao
+        // nhiêu phần) thay vì báo chung chung là JSON hỏng khi backupJson null.
+        backupChunkCount: b.backupChunkCount ?? 0,
       });
     }
     return out;

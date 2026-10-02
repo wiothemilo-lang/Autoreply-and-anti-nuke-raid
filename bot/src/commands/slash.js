@@ -490,6 +490,19 @@ const commands = applyLocalizations([
         ],
       },
       {
+        name: "verify",
+        description: "Kiểm tra 1 bản backup có khôi phục được không (chỉ đọc)",
+        type: 1,
+        options: [
+          {
+            name: "index",
+            description: "Số thứ tự trong /backup list (1 = bản mới nhất)",
+            type: 4,
+            required: true,
+          },
+        ],
+      },
+      {
         name: "auto",
         description: "Bật/tắt tự động backup định kỳ (2-30 ngày, 0 = tắt)",
         type: 1,

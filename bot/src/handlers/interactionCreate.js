@@ -20,6 +20,7 @@ const {
   unbanMember,
   unwarnMember,
 } = require("./modTools");
+const { verifyBackup, formatVerifyReport } = require("../backupAudit");
 
 const MODULES = [
   "massBan",
@@ -2167,6 +2168,41 @@ module.exports = async function onInteractionCreate(client, interaction, store, 
         }
       }
 
+      // /backup verify <index> — CHỈ ĐỌC: bung JSON, kiểm chunk đủ chưa, đếm
+      // thật role/kênh/emoji/sticker/tin và báo từng sai lệch so với số đã lưu.
+      // KHÔNG gọi mutation, KHÔNG tạo gì — verify không đụng guild.
+      if (sub === "verify") {
+        if (!canManageGuild(interaction.member)) return needPerm(interaction);
+        const idx = interaction.options.getInteger("index", true);
+        // botAuditBackups trả NỘI DUNG đầy đủ (đã ghép chunk) + checksum —
+        // listGuild cố tình bỏ backupJson nên KHÔNG kiểm tra được gì.
+        const rows = await store.client
+          .query("backup:botAuditBackups", { guildId })
+          .catch(() => null);
+        if (!rows || rows.length === 0) {
+          return interaction.reply({
+            content: "Chưa có backup nào của server này.",
+            ephemeral: true,
+          });
+        }
+        const backup = rows[idx - 1];
+        if (!backup) {
+          return interaction.reply({
+            content: `Không tìm thấy backup số ${idx} — chạy /backup list để xem danh sách.`,
+            ephemeral: true,
+          });
+        }
+        const report = verifyBackup(backup);
+        const embed = new EmbedBuilder()
+          .setColor(
+            report.ok ? (report.deviations.length ? Colors.Yellow : Colors.Green) : Colors.Red,
+          )
+          .setTitle(`🔎 Kiểm tra backup #${idx} — ${backup.guildName || "server"}`)
+          .setDescription(formatVerifyReport(report).join("\n"))
+          .setFooter({ text: "Chỉ kiểm tra — không thay đổi gì trong server" });
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
       if (sub === "auto") {
         if (!canManageGuild(interaction.member)) return needPerm(interaction);
         const days = interaction.options.getInteger("days", true);
@@ -2267,7 +2303,7 @@ module.exports = async function onInteractionCreate(client, interaction, store, 
       // liệu + đẩy ra ngoài mà họ không hề được hỏi.
       return interaction.reply({
         content:
-          "Subcommand `/backup` không hợp lệ. Dùng: `now` · `list` · `restore <số>` · `auto <2-30|0>` · `keep <2-50> [ngày]`.",
+          "Subcommand `/backup` không hợp lệ. Dùng: `now` · `list` · `verify <số>` · `restore <số>` · `auto <2-30|0>` · `keep <2-50> [ngày]`.",
         ephemeral: true,
       });
     }

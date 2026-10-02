@@ -220,6 +220,152 @@ function makeSnapshot(overrides = {}) {
     check("production path: bản từ backupUtils thật → real (chống xóa nhầm)", v.verdict === "real");
   }
 
+  // ── verifyBackup: báo cáo cho lệnh /backup verify (chỉ đọc) ──
+  {
+    const snap = makeSnapshot({
+      emojis: [
+        { id: "e1", name: "pepe" },
+        { id: "e2", name: "cat" },
+      ],
+      stickers: [{ id: "s1", name: "wave" }],
+      channels: [
+        { id: "c1", name: "general", type: 0, overwrites: [], messages: [{}, {}] },
+        { id: "c2", name: "chat", type: 0, overwrites: [], messages: [{}] },
+      ],
+    });
+    const row = {
+      _id: "v1",
+      guildName: "G1",
+      backupJson: pack(snap),
+      roleCount: 1,
+      channelCount: 2,
+      emojiCount: 2,
+      stickerCount: 1,
+      messageCount: 3,
+      backupChecksum: sha(JSON.stringify(snap)),
+    };
+    const r = audit.verifyBackup(row);
+    check(
+      "verify: bản chuẩn → ok, đếm đúng 1 role/2 kênh/2 emoji/1 sticker/3 tin",
+      r.ok &&
+        r.verdict === "real" &&
+        r.counts.roles === 1 &&
+        r.counts.channels === 2 &&
+        r.counts.emojis === 2 &&
+        r.counts.stickers === 1 &&
+        r.counts.messages === 3 &&
+        r.deviations.length === 0 &&
+        r.checksumOk === true,
+    );
+  }
+  {
+    // Số đã lưu sai vs nội dung → CẢNH BÁO (khôi phục được, nhưng danh sách hiển thị sai).
+    const snap = makeSnapshot();
+    const row = {
+      _id: "v2",
+      backupJson: pack(snap),
+      roleCount: 9,
+      channelCount: 1,
+      emojiCount: 0,
+      stickerCount: 0,
+      messageCount: 0,
+      backupChecksum: sha(JSON.stringify(snap)),
+    };
+    const r = audit.verifyBackup(row);
+    check(
+      "verify: roleCount lệch → độ lệch ghi rõ, vẫn OK, verdict suspect",
+      r.ok &&
+        r.verdict === "suspect" &&
+        r.deviations.some((d) => d.includes("role")) &&
+        r.problems.length === 0,
+    );
+  }
+  {
+    const r = audit.verifyBackup({
+      _id: "v3",
+      backupJson: pack({ guildId: "g1", roles: "không-mảng", channels: [] }),
+    });
+    check(
+      "verify: thiếu mảng roles → KHÔNG khôi phục được",
+      !r.ok && r.verdict === "fake" && r.problems.some((p) => p.includes("roles")),
+    );
+  }
+  {
+    const r = audit.verifyBackup({ _id: "v4", backupJson: "z:!!!hỏng!!!" });
+    check(
+      "verify: nén hỏng → KHÔNG khôi phục được kèm lý do",
+      !r.ok && r.verdict === "fake" && r.problems.length > 0,
+    );
+  }
+  {
+    const snap = makeSnapshot();
+    const row = {
+      _id: "v5",
+      backupJson: pack(snap),
+      roleCount: 1,
+      channelCount: 1,
+      backupChecksum: sha("nội-dung-khác"),
+    };
+    const r = audit.verifyBackup(row);
+    check(
+      "verify: checksum lệch → nêu rõ, KHÔNG khôi phục tin cậy",
+      !r.ok && r.checksumOk === false && r.problems.some((p) => p.includes("checksum")),
+    );
+  }
+  {
+    // Backup tách chunk: Convex ghép sẵn; thiếu chunk → backupJson null.
+    const r = audit.verifyBackup({ _id: "v6", backupChunkCount: 3, backupJson: null });
+    check(
+      "verify: thiếu chunk → báo RÕ 'thiếu chunk' chứ không phải JSON hỏng",
+      !r.ok && r.chunked && r.problems.some((p) => p.includes("thiếu chunk")),
+    );
+  }
+  {
+    const snap = makeSnapshot();
+    const row = {
+      _id: "v7",
+      backupJson: pack(snap),
+      backupChunkCount: 2,
+      roleCount: 1,
+      channelCount: 1,
+    };
+    const r = audit.verifyBackup(row);
+    check(
+      "verify: ghép đủ chunk → ghi chú số phần, vẫn OK",
+      r.ok && r.chunked && r.chunkCount === 2 && r.notes.some((n) => n.includes("2 chunk")),
+    );
+  }
+  {
+    const r = audit.verifyBackup(null);
+    check("verify: không có row → không crash, báo không tìm thấy", !r.ok && r.problems.length > 0);
+  }
+
+  // ── formatVerifyReport: một nguồn chữ cho cả /backup verify lẫn !backup verify ──
+  {
+    const snap = makeSnapshot({ emojis: [{ id: "e1", name: "pepe" }] });
+    const ok = audit.formatVerifyReport(
+      audit.verifyBackup({
+        backupJson: pack(snap),
+        roleCount: 1,
+        channelCount: 1,
+        emojiCount: 1,
+        stickerCount: 0,
+        messageCount: 0,
+        backupChecksum: sha(JSON.stringify(snap)),
+      }),
+    );
+    check(
+      "format: dòng đếm có đủ role/kênh/emoji/sticker/tin + kết luận khôi phục được",
+      ok.some((l) => l.includes("1 role") && l.includes("1 kênh") && l.includes("1 emoji")) &&
+        ok.some((l) => l.includes("khôi phục được")),
+    );
+    const bad = audit.formatVerifyReport(audit.verifyBackup({ backupJson: "z:!!!" }));
+    check(
+      "format: bản hỏng → có dòng ❌ và kết luận KHÔNG khôi phục được",
+      bad.some((l) => l.startsWith("❌")) && bad.some((l) => l.includes("KHÔNG khôi phục được")),
+    );
+  }
+
   console.log(`\n${pass}/${pass + fail} ✅`);
   process.exit(fail > 0 ? 1 : 0);
 })();
