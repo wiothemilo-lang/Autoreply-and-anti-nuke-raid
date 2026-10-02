@@ -172,6 +172,17 @@ jobs:
         run: bun run coverage:floor
       - name: Mutation test — mutants phải bị giết hết (test không lỏng)
         run: bun run test:mutation
+      # ĐỘ CHÍNH XÁC AI trên key THẬT (đợt #2). Chỉ chạy khi repo CÓ secret
+      # provider; không có thì bỏ qua chứ không đỏ. Lý do không cho nó là cổng
+      # cứng mặc định: độ chính xác phụ thuộc chuỗi provider BÊN NGOÀI (429/hết
+      # hạn mức làm `offline`), nên bắt đỏ theo nó là bắt đỏ oan. Muốn chặt
+      # thì bật `AI_EVAL_GATE=1` sau khi đã cấu hình secret.
+      - name: Đánh giá AI chống raid (live — bỏ qua nếu thiếu key provider)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          KIRA_API_KEY: ${{ secrets.KIRA_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: node scripts/test-ai-raid-eval.mjs
       - name: Tóm tắt coverage vào Job Summary
         if: always()
         run: |

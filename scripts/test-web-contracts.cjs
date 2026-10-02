@@ -1809,5 +1809,52 @@ check(
   /METRICS_HISTORY_CAP/.test(botWritesSrc),
 );
 
+// ══ S. Tiền AI + hạn mức ngân sách (đợt #2) ══
+// Điều kiện mà cổng này canh là điều kiện làm MẤT TIỀN MÀ KHÔNG BIẾT:
+//  1. provider chưa có trong bảng giá phải trả `known:false` chứ KHÔNG phải 0
+//     (0 trông y hệt "miễn phí" và làm hạn mức không bao giờ kích hoạt);
+//  2. vượt hạn mức chỉ được HẠ provider trả phí, tuyệt đối không chặn gọi —
+//     chặn cứng biến "hết tiền" thành "mất chống raid".
+const pricingSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "aiPricing.js"), "utf8");
+const evalSrc = fs.readFileSync(path.join(ROOT, "scripts", "test-ai-raid-eval.mjs"), "utf8");
+check(
+  "aiPricing: gateway tùy chỉnh để giá NULL (không bị điền 0)",
+  /"custom-gateway":\s*\{\s*prompt:\s*null/.test(pricingSrc),
+);
+check(
+  "aiPricing: estimateCost trả known=false khi thiếu usage (không bịa 0)",
+  /known:\s*false/.test(pricingSrc) && /gateway không trả usage/.test(stripComments(pricingSrc)),
+);
+check(
+  "aiPricing: có hạn mức ngày + cờ overBudget",
+  /AI_DAILY_BUDGET_USD/.test(pricingSrc) && /overBudget/.test(pricingSrc),
+);
+check(
+  "ai.js chỉ HẠ provider trả phí khi vượt hạn mức, KHÔNG chặn lời gọi",
+  /shouldDeprioritizeForBudget/.test(aiSrc) && !/if \(overBudget\(\)\) return null/.test(aiSrc),
+);
+check("ai.js đưa tiền vào metrics (costUsd) chứ không chỉ đo thời gian", /costUsd/.test(aiSrc));
+check("aiStats() trả budget cho dashboard", /budget: aiPricing\(\)\.budgetSummary\(\)/.test(aiSrc));
+check(
+  "schema khai báo budget (số tiền có chỗ lưu, không bị chặn validator)",
+  /budget: v\.optional\(/.test(schemaSrc),
+);
+check(
+  "Cổng độ chính xác tách OFFLINE (hạ tầng) khỏi SAI (độ chính xác)",
+  /offlineCount/.test(evalSrc) && /AI_EVAL_GATE/.test(evalSrc),
+);
+check(
+  "test-ai-accuracy có ngân sách prompt (chặn prompt phình làm tăng hoá đơn)",
+  /PROMPT_BUDGET_CHARS/.test(
+    fs.readFileSync(path.join(ROOT, "scripts", "test-ai-accuracy.cjs"), "utf8"),
+  ),
+);
+check(
+  "ci.yml chạy đánh giá AI live (bỏ qua khi thiếu key)",
+  /test-ai-raid-eval\.mjs/.test(
+    fs.readFileSync(path.join(ROOT, ".github", "workflows", "ci.yml"), "utf8"),
+  ),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

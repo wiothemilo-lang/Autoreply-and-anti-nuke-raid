@@ -933,6 +933,61 @@ function check(name, fn) {
     });
   });
 
+  // ══ CỔNG HỒI QUY PROMPT + NGÂN SÁCH PROMPT (đợt #2) ══
+  //
+  // Trước #2, sửa prompt là việc KHÔNG CÓ KIỂM SOÁT: dán thêm một đoạn corpus
+  // vào prompt là hàng trăm nghìn token mỗi lượt, tức tiền tăng gấp vài lần mà
+  // CI vẫn xanh. Cổng này chặn đúng việc đó, đồng thời chốt lại các mệnh lệnh
+  // chống phạt nhầm — xoá nhầm một mệnh lệnh làm độ chính xác tụt mà test khác
+  // không thấy (vì test khác chỉ mock, không đo độ đúng của prompt).
+  const PROMPT_BUDGET_CHARS = 8000;
+  {
+    await check("Prompt nằm trong ngân sách ký tự (chặn prompt phình vô hạn)", async () => {
+      globalThis.fetch = suiteMock;
+      replyContent = '{"classification":"benign","confidence":0.9}';
+      await ai.classifyViolation({
+        module: "spam",
+        samples: Array.from({ length: 8 }, (_, i) => `mẫu ${i}`),
+        count: 9,
+        windowSeconds: 10,
+        threshold: 5,
+        evidence: ["GIỐNG HỆT: 9/9 tin có nội dung giống hệt"],
+      });
+      const last = calls[calls.length - 1];
+      const total = last.system.length + last.user.length;
+      assert.ok(
+        total <= PROMPT_BUDGET_CHARS,
+        `prompt ${total} ký tự vượt ngân sách ${PROMPT_BUDGET_CHARS}`,
+      );
+    });
+
+    await check("maxTokens có trần (đổi model không tự ý nhân lên)", async () => {
+      const last = calls[calls.length - 1];
+      assert.ok(last.maxTokens > 0 && last.maxTokens <= 512, `maxTokens=${last.maxTokens}`);
+    });
+
+    await check("Prompt giữ mệnh lệnh chống phạt nhầm (3 bước + JSON + bằng chứng)", async () => {
+      const sys = calls[calls.length - 1].system;
+      // 3 bước suy luận: cổng hồi quy số 2 trong suite này đã kiểm, ở đây chốt
+      // luôn vì đây là thứ đổi prompt hay làm mất nhất.
+      assert.ok(/JSON/.test(sys), "prompt phải yêu cầu trả JSON");
+      assert.ok(
+        /bằng chứng|BẰNG CHỨNG/i.test(sys) || /evidence/i.test(sys),
+        "prompt phải nhắc bằng chứng",
+      );
+    });
+
+    await check("aiStats() có trường budget (cầu nối #1 đo → #2 đo tiền)", async () => {
+      const s = ai.aiStats();
+      assert.ok("budget" in s, "aiStats() phải trả về budget");
+      // budget có thể null (không nạp được bảng giá) nhưng KHÔNG được thiếu hẳn.
+      if (s.budget) {
+        assert.strictEqual(typeof s.budget.spentUsd, "number");
+        assert.strictEqual(typeof s.budget.budgetUsd, "number");
+      }
+    });
+  }
+
   globalThis.fetch = realFetch;
   console.log(`\nKết quả AI accuracy: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);

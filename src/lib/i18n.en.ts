@@ -128,6 +128,15 @@ export const EN: Record<string, string> = {
   Lỗi: "Errors",
   "Chưa có thao tác nào được đo — bot vừa khởi động.":
     "No operations measured yet — the bot just started.",
+
+  /* ==== Tiền AI + hạn mức ngày (đợt #2) ==== */
+  "Chi AI hôm nay:": "AI cost today:",
+  "chưa biết giá": "price unknown",
+  lượt: "calls",
+  "đã cũ": "stale",
+  "Bảng giá AI lần rà gần nhất:": "AI price table last reviewed:",
+  "Đã vượt hạn mức tiền AI hôm nay — provider trả phí đã bị hạ xuống cuối danh sách, bot vẫn chống raid bằng provider miễn phí.":
+    "Today's AI budget is exceeded — paid providers were moved to the end of the list; the bot still protects servers using free providers.",
   "Bot đang offline hoặc mất kết nối Convex — số liệu máy chủ tạm dừng cập nhật.":
     "The bot is offline or lost its Convex connection — server readings are paused.",
   "Máy chủ bot đang chịu tải nặng — có thể gián đoạn.":

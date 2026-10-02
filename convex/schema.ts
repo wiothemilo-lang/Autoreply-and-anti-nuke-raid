@@ -952,6 +952,38 @@ export default defineSchema({
           misfires7d: v.number(),
           pending: v.number(),
         }),
+        /**
+         * Tiền + hạn mức ngày (đợt #2, bot/src/aiPricing.js).
+         *
+         * `spentUsd` CHỈ tính phần giá ĐÃ BIẾT — provider không có trong bảng
+         * giá trả `known:false` và KHÔNG được gộp vào tổng (xem nguyên tắc 1
+         * trong aiPricing.js). `byProvider` giữ chi tiết để chủ bot thấy tiền
+         * đi đâu, không chỉ thấy một con số.
+         *
+         * `optional` vì bot bản cũ không có trường này — KHÔNG được coi là 0
+         * (0 nghĩa là "miễn phí" và sẽ khiến chủ bot tin nhầm).
+         */
+        budget: v.optional(
+          v.object({
+            day: v.string(),
+            spentUsd: v.number(),
+            /** 0 = không đặt hạn mức. */
+            budgetUsd: v.number(),
+            overBudget: v.boolean(),
+            byProvider: v.array(
+              v.object({
+                label: v.string(),
+                calls: v.number(),
+                promptTokens: v.number(),
+                completionTokens: v.number(),
+                usd: v.number(),
+              }),
+            ),
+            /** Số ngày bảng giá đã cũ; null = chưa có ngày kiểm tra. */
+            pricingStaleDays: v.optional(v.number()),
+            pricingChecked: v.optional(v.string()),
+          }),
+        ),
         reportedAt: v.number(),
       }),
     ),

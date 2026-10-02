@@ -15,6 +15,10 @@ const path = require("path");
 
 /** Sàn tối thiểu theo file (lines %) — key là đường dẫn tương đối từ bot/src. */
 const FLOORS = {
+  // Tien AI + han muc ngan sach (dot #2). Logic nay khong lam bot do — no lam
+  // chu bot tieu tien ma khong biet. Sai o day im lang, nen can san cao hon mat.
+  // 90% (do duoc ~97%).
+  "aiPricing.js": 90,
   "altDetection.js": 75,
   "actionBudget.js": 80,
   "externalAppGuard.js": 90,
