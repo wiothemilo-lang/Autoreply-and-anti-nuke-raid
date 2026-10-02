@@ -132,6 +132,138 @@ function computeChecksumFromUnpacked(json) {
 }
 
 /**
+ * verifyBackup(row) — kiểm tra MỘT bản backup có KHÔI PHỤC ĐƯỢC không, và ĐẾM
+ * thật số role/kênh/emoji/sticker/tin để so với metadata đã lưu.
+ *
+ * Khác `classifyBackup` (chỉ trả thật/fake/suspect để script audit tự động
+ * dọn), hàm này trả BÁO CÁO CHI TIẾT cho người đọc — lệnh `/backup verify`:
+ * bung được JSON chưa, chunk có đủ không, đếm thật từng loại, và liệt kê từng
+ * độ lệch so với số đã ghi lúc lưu. THUẦN HÀM: không gọi mạng/DB, KHÔNG sửa gì
+ * (đúng yêu cầu "verify không đụng guild").
+ *
+ * `ok` = khôi phục được (không có `problems`). `deviations` (số lưu ≠ nội dung)
+ * chỉ là CẢNH BÁO: bản vẫn khôi phục được nhưng số hiển thị ở `/backup list` sai.
+ *
+ * `row.backupJson` phía bot đã được Convex ghép chunk sẵn; khi thiếu chunk thì
+ * nó là null — phải báo RÕ "thiếu chunk" chứ đừng để người dùng tưởng bản hỏng.
+ */
+function verifyBackup(row) {
+  const problems = [];
+  const notes = [];
+  const report = {
+    ok: false,
+    verdict: "fake",
+    chunked: false,
+    chunkCount: 0,
+    checksumOk: null,
+    counts: { roles: 0, channels: 0, emojis: 0, stickers: 0, messages: 0 },
+    stored: { roles: 0, channels: 0, emojis: 0, stickers: 0, messages: 0 },
+    deviations: [],
+    problems,
+    notes,
+  };
+  if (!row || typeof row !== "object") {
+    problems.push("không tìm thấy bản backup");
+    return report;
+  }
+  report.stored = {
+    roles: Number(row.roleCount ?? 0),
+    channels: Number(row.channelCount ?? 0),
+    emojis: Number(row.emojiCount ?? 0),
+    stickers: Number(row.stickerCount ?? 0),
+    messages: Number(row.messageCount ?? 0),
+  };
+
+  report.chunkCount = Number(row.backupChunkCount ?? 0);
+  report.chunked = report.chunkCount > 0;
+  if (report.chunked) {
+    if (!row.backupJson) {
+      problems.push(`thiếu chunk — bản này gồm ${report.chunkCount} phần nhưng không ghép đủ`);
+      return report;
+    }
+    notes.push(`đã ghép đủ ${report.chunkCount} chunk`);
+  }
+
+  const { json, error } = unpackBackupJson(row.backupJson);
+  if (!json || typeof json !== "object") {
+    problems.push(error ?? "nội dung không phải object");
+    return report;
+  }
+
+  const arr = (v) => (Array.isArray(v) ? v : null);
+  const roles = arr(json.roles);
+  const channels = arr(json.channels);
+  if (!roles) problems.push("thiếu mảng roles — không khôi phục được phân quyền role");
+  if (!channels) problems.push("thiếu mảng channels — không khôi phục được kênh");
+  if (!roles || !channels) return report;
+
+  report.counts = {
+    roles: roles.length,
+    channels: channels.length,
+    emojis: (arr(json.emojis) ?? []).length,
+    stickers: (arr(json.stickers) ?? []).length,
+    messages: channels.reduce(
+      (n, c) => n + (Array.isArray(c?.messages) ? c.messages.length : 0),
+      0,
+    ),
+  };
+
+  if (row.backupChecksum) {
+    report.checksumOk = computeChecksumFromUnpacked(json) === row.backupChecksum;
+    if (!report.checksumOk) {
+      problems.push("checksum không khớp nội dung (dữ liệu đã bị đổi sau khi lưu)");
+    }
+  }
+
+  for (const [label, stored, actual] of [
+    ["role", report.stored.roles, report.counts.roles],
+    ["kênh", report.stored.channels, report.counts.channels],
+    ["emoji", report.stored.emojis, report.counts.emojis],
+    ["sticker", report.stored.stickers, report.counts.stickers],
+    ["tin nhắn", report.stored.messages, report.counts.messages],
+  ]) {
+    if (stored !== actual)
+      report.deviations.push(`${label}: đã lưu ${stored} ≠ nội dung ${actual}`);
+  }
+
+  // Thiếu guildId chỉ mất quyền @everyone — vẫn khôi phục được role/kênh, nên
+  // là GHI CHÚ chứ không phải lỗi (khớp luật của classifyBackup).
+  if (!json.guildId) notes.push("thiếu guildId — mất quyền @everyone khi khôi phục");
+
+  report.verdict = problems.length > 0 || report.deviations.length > 0 ? "suspect" : "real";
+  report.ok = problems.length === 0;
+  return report;
+}
+
+/**
+ * formatVerifyReport(report) — biến báo cáo của `verifyBackup` thành các DÒNG
+ * chữ cho người đọc. THUẦN HÀM, không phụ thuộc discord.js: cả `/backup verify`
+ * (slash) lẫn `!backup verify` (prefix) ghép cùng các dòng này vào embed → một
+ * nguồn chữ duy nhất, không lệch nhau giữa hai lối vào.
+ */
+function formatVerifyReport(report) {
+  const c = report.counts;
+  const lines = [
+    `**Đếm thật trong bản:** ${c.roles} role · ${c.channels} kênh · ${c.emojis} emoji · ${c.stickers} sticker · ${c.messages} tin nhắn`,
+  ];
+  if (report.chunked) lines.push(`🧩 Bản tách chunk: đã ghép đủ **${report.chunkCount}** phần`);
+  if (report.checksumOk === true) lines.push("🔐 Checksum: khớp nội dung");
+  else if (report.checksumOk === false) lines.push("🔐 Checksum: **KHÔNG khớp** nội dung");
+  else lines.push("🔐 Checksum: bản cũ không có (bỏ qua)");
+  for (const d of report.deviations) lines.push(`⚠️ Lệch số đã lưu — ${d}`);
+  for (const p of report.problems) lines.push(`❌ ${p}`);
+  for (const n of report.notes) lines.push(`ℹ️ ${n}`);
+  lines.push(
+    report.ok
+      ? report.deviations.length > 0
+        ? "✅ Khôi phục được, nhưng số hiển thị ở danh sách có thể sai."
+        : "✅ Bản này khôi phục được."
+      : "❌ KHÔNG khôi phục được (xem lỗi ở trên).",
+  );
+  return lines;
+}
+
+/**
  * Chấm sức khỏe 1 guild: { real, fake, suspect, total }.
  */
 function summarize(rows) {
@@ -148,5 +280,7 @@ module.exports = {
   unpackBackupJson,
   classifyBackup,
   computeChecksum,
+  verifyBackup,
+  formatVerifyReport,
   summarize,
 };

@@ -1271,6 +1271,109 @@ Module._load = function (request, parent) {
       calls.mutations.some((m) => m.name === "bot_writes:botSetRestoreRequest"),
     );
 
+    // ── /backup verify: CHỈ ĐỌC — bung, đếm, báo lệch; tuyệt đối không mutation ──
+    reset();
+    ctl.perms.manage = false;
+    await run({
+      isChatInputCommand: true,
+      commandName: "backup",
+      subcommand: "verify",
+      integers: { index: 1 },
+    });
+    check("backup verify thiếu quyền → needPerm", replies[0].content.includes("không có quyền"));
+
+    reset();
+    ctl.queryResult = [];
+    await run({
+      isChatInputCommand: true,
+      commandName: "backup",
+      subcommand: "verify",
+      integers: { index: 1 },
+    });
+    check(
+      "backup verify chưa có bản nào → thông báo",
+      replies[0].content.includes("Chưa có backup"),
+    );
+
+    reset();
+    ctl.queryResult = [
+      {
+        _id: "b1",
+        guildName: "G",
+        roleCount: 1,
+        channelCount: 1,
+        backupJson: JSON.stringify({ guildId: "g1", roles: [{}], channels: [{}] }),
+      },
+    ];
+    await run({
+      isChatInputCommand: true,
+      commandName: "backup",
+      subcommand: "verify",
+      integers: { index: 3 },
+    });
+    check(
+      "backup verify index sai → từ chối",
+      replies[0].content.includes("Không tìm thấy backup"),
+    );
+
+    reset();
+    ctl.queryResult = [
+      {
+        _id: "b1",
+        guildName: "G",
+        roleCount: 1,
+        channelCount: 1,
+        emojiCount: 0,
+        stickerCount: 0,
+        messageCount: 0,
+        backupJson: JSON.stringify({
+          guildId: "g1",
+          roles: [{}],
+          channels: [{}],
+          emojis: [],
+          stickers: [],
+        }),
+      },
+    ];
+    await run({
+      isChatInputCommand: true,
+      commandName: "backup",
+      subcommand: "verify",
+      integers: { index: 1 },
+    });
+    check(
+      "backup verify đọc nội dung bằng botAuditBackups (listGuild không có backupJson)",
+      calls.queries.includes("backup:botAuditBackups"),
+    );
+    check(
+      "backup verify → embed có số đếm THẬT (role/kênh), không chỉ số đã lưu",
+      (replies[0].embeds?.[0]?.data?.description || "").includes("1 role") &&
+        (replies[0].embeds?.[0]?.data?.description || "").includes("1 kênh"),
+    );
+    check("backup verify KHÔNG đụng guild (không gọi mutation nào)", calls.mutations.length === 0);
+
+    reset();
+    ctl.queryResult = [
+      {
+        _id: "b2",
+        guildName: "G",
+        backupChunkCount: 4,
+        backupJson: null,
+        roleCount: 1,
+        channelCount: 1,
+      },
+    ];
+    await run({
+      isChatInputCommand: true,
+      commandName: "backup",
+      subcommand: "verify",
+      integers: { index: 1 },
+    });
+    check(
+      "backup verify thiếu chunk → nói RÕ 'thiếu chunk' (không báo chung là JSON hỏng)",
+      (replies[0].embeds?.[0]?.data?.description || "").includes("thiếu chunk"),
+    );
+
     reset();
     await run({
       isChatInputCommand: true,
@@ -1477,6 +1580,41 @@ Module._load = function (request, parent) {
         "/backup keep: handler đọc đúng option đã khai báo",
         readNames.length > 0 && missing.length === 0,
         `đọc=[${readNames}] khai báo=[${defined}] thiếu=[${missing}]`,
+      );
+    }
+
+    // HỢP ĐỒNG /backup verify: handler đọc `index` thì slash PHẢI khai báo
+    // `index`, và thông báo "subcommand không hợp lệ" PHẢI có `verify` — thiếu
+    // thì người dùng gõ đúng lệnh đã đăng ký lại nhận "không hợp lệ" (lệch cây
+    // lệnh giữa 2 file — đúng lớp lỗi đã có với /backup keep).
+    {
+      const src = fs.readFileSync(
+        path.join(__dirname, "..", "bot", "src", "handlers", "interactionCreate.js"),
+        "utf8",
+      );
+      const verifyAt = src.indexOf('if (sub === "verify")');
+      const verifyBranch = src.slice(verifyAt, src.indexOf('if (sub === "auto")', verifyAt));
+      const { commands } = require("../bot/src/commands/slash.js");
+      const declared =
+        (commands.find((c) => c.name === "backup")?.options ?? [])
+          .find((o) => o.name === "verify")
+          ?.options?.map((o) => o.name) ?? [];
+      const readNames = [...verifyBranch.matchAll(/getInteger\("([a-z]+)"/g)].map((m) => m[1]);
+      check(
+        "/backup verify: handler đọc đúng option `index` đã khai báo",
+        verifyAt !== -1 && readNames.includes("index") && declared.includes("index"),
+        `đọc=[${readNames}] khai báo=[${declared}]`,
+      );
+      // Soi ĐÚNG dòng thông báo, không lấy cửa sổ N ký tự: cửa sổ 320 ký tự
+      // vô tình chứa `case "verify"` của lệnh xác minh thành viên nằm ngay sau
+      // → guard luôn xanh dù thông báo thiếu `verify` (RED-PROOF đã bắt).
+      const fallbackLine = src
+        .split("\n")
+        .find((l) => l.includes("Subcommand `/backup` không hợp lệ"));
+      check(
+        "/backup verify: thông báo subcommand hợp lệ có `verify`",
+        !!fallbackLine && fallbackLine.includes("verify"),
+        fallbackLine,
       );
     }
 

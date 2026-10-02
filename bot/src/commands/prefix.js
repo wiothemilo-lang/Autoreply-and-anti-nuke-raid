@@ -21,6 +21,7 @@ const {
 
 const { isLocked, markLocked, unlockGuild } = require("../lockdown");
 const { emojiKeyOf } = require("../handlers/hidden");
+const { verifyBackup, formatVerifyReport } = require("../backupAudit");
 const { reportInteractive } = require("../handlers/incidentReport");
 const researchHandlers = require("../handlers/researchCommands");
 
@@ -136,6 +137,7 @@ async function handleHelp(client, message) {
         "!setlog #kênh          - đặt kênh log",
         "!backup now            - tạo backup server (đẩy lên GitHub chủ bot)",
         "!backup list           - danh sách backup của server",
+        "!backup verify <số>    - kiểm tra 1 bản backup (chỉ đọc, không đụng server)",
         "!backup restore <số>   - khôi phục cấu trúc server từ backup",
         "!backup auto <2-30|off> - tự động backup mỗi N ngày",
         "!backup keep <2-50> [ngày] - giữ N bản gần nhất, xoá bản cũ hơn N ngày",
@@ -1011,6 +1013,36 @@ async function handleBackup(client, message, args, config, store) {
     }
   }
 
+  // !backup verify <số thứ tự> — CHỈ ĐỌC: bung JSON, kiểm chunk đủ chưa, đếm
+  // thật role/kênh/emoji/sticker/tin và báo từng sai lệch so với số đã lưu.
+  // KHÔNG gọi mutation, KHÔNG tạo role/kênh — "verify không đụng guild".
+  if (sub === "verify") {
+    if (!canManageGuild(message.member)) return noPerm(message);
+    const target = (args[1] || "").trim();
+    if (!/^\d+$/.test(target)) {
+      return message.reply(
+        "Cú pháp: `!backup verify <số thứ tự trong !backup list>` (1 = bản mới nhất).",
+      );
+    }
+    // botAuditBackups trả NỘI DUNG đầy đủ (đã ghép chunk) + checksum — listGuild
+    // cố tình bỏ backupJson nên KHÔNG kiểm tra được gì.
+    const rows = await store.client.query("backup:botAuditBackups", { guildId }).catch(() => null);
+    if (!rows || rows.length === 0) {
+      return message.reply("Chưa có backup nào của server này.");
+    }
+    const backup = rows[parseInt(target, 10) - 1];
+    if (!backup) {
+      return message.reply(`Không tìm thấy backup số ${target} — xem \`!backup list\`.`);
+    }
+    const report = verifyBackup(backup);
+    const embed = new EmbedBuilder()
+      .setColor(report.ok ? (report.deviations.length ? Colors.Yellow : Colors.Green) : Colors.Red)
+      .setTitle(`🔎 Kiểm tra backup #${target} — ${backup.guildName || "server"}`)
+      .setDescription(formatVerifyReport(report).join("\n"))
+      .setFooter({ text: "Chỉ kiểm tra — không thay đổi gì trong server" });
+    return message.reply({ embeds: [embed] });
+  }
+
   // !backup auto <số ngày 2-30> | off — bật/tắt tự động backup định kỳ
   if (sub === "auto") {
     if (!canManageGuild(message.member)) return noPerm(message);
@@ -1089,7 +1121,7 @@ async function handleBackup(client, message, args, config, store) {
   // !backup / !backup now → tạo backup; !backup local → chỉ lưu Convex (không đẩy GitHub)
   if (sub !== "" && sub !== "now" && sub !== "local") {
     return message.reply(
-      "Cú pháp: `!backup` (tạo ngay) · `!backup local` (không đẩy GitHub) · `!backup list` · `!backup restore <số>` · `!backup auto <2-30|off>` · `!backup keep <2-50> [ngày]`",
+      "Cú pháp: `!backup` (tạo ngay) · `!backup local` (không đẩy GitHub) · `!backup list` · `!backup verify <số>` · `!backup restore <số>` · `!backup auto <2-30|off>` · `!backup keep <2-50> [ngày]`",
     );
   }
   if (!canManageGuild(message.member)) return noPerm(message);

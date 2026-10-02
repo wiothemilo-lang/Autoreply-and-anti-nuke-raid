@@ -405,6 +405,17 @@ const LOCALIZATIONS = {
           },
         },
       },
+      verify: {
+        d: [
+          "Check that one backup can be restored (read-only)",
+          "Prüfen, ob ein Backup wiederherstellbar ist",
+        ],
+        opts: {
+          index: {
+            d: ["Position in /backup list (1 = newest)", "Position in /backup list (1 = neuestes)"],
+          },
+        },
+      },
       auto: {
         d: [
           "Toggle scheduled automatic backups (2-30 days, 0 = off)",

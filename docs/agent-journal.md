@@ -4,6 +4,43 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 02/10/2026 (5) — #6 Lệnh `backup verify`: biết bản backup có khôi phục được không
+
+- 🎯 **Vì sao**: người dùng chỉ thấy "đã lưu cùng lúc" và số role/kênh trên danh
+  sách. Khi cần khôi phục sau nuke mới phát hiện bản đó hỏng (JSON cắt cụt,
+  thiếu chunk, checksum lệch) — quá muộn. `audit-backups.cjs` đã tự dọn trên VPS
+  nhưng KHÔNG có cách nào để người quản lý kiểm tra tại chỗ.
+- ✨ **`backupAudit.verifyBackup(row)` (thuần hàm)**: bung JSON (z:/e:), **kiểm
+  chunk đủ** (Convex ghép sẵn; thiếu → báo RÕ "thiếu chunk — bản này gồm N phần"
+  thay vì "JSON hỏng" chung chung), **đếm THẬT** role/kênh/emoji/sticker/tin,
+  so từng số với metadata đã lưu → `deviations`, và so checksum. `ok` = khôi
+  phục được; `deviations` chỉ là CẢNH BÁO (bản vẫn khôi phục được nhưng số hiển
+  thị sai). Kèm `formatVerifyReport()` trả các DÒNG chữ — một nguồn duy nhất, cả
+  slash lẫn prefix dùng chung nên không lệch nhau.
+- 🔒 **KHÔNG đụng guild**: lệnh chỉ `query` (không `mutation`), không tạo role/
+  kênh — có test chốt "không gọi mutation nào".
+- 🔌 **Đọc nội dung bằng `backup:botAuditBackups`** (đã có, kèm backupJson + checksum)
+  chứ KHÔNG dùng `listGuild` (cố tình bỏ backupJson → verify sẽ vô nghĩa). Bổ sung
+  `backupChunkCount` vào kết quả query để nói được "thiếu chunk".
+- 🧩 **Hai lối vào như các subcommand khác**: `/backup verify index:<1..n>` (slash
+  - bản dịch en-US/de) và `!backup verify <số>` (prefix), cập nhật cả dòng cú
+    pháp "subcommand không hợp lệ" và `!help`.
+- 🐛 **RED-PROOF bắt được guard CỦA CHÍNH MÌNH**: check "thông báo có `verify`"
+  lấy cửa sổ 320 ký tự sau chuỗi → vô tình chứa `case "verify"` (xác minh thành
+  viên) nằm ngay sau → guard luôn XANH dù thiếu. Đã đổi sang soi ĐÚNG dòng thông
+  báo; gỡ `verify` khỏi thông báo → FAIL đúng chỗ.
+- 🧪 **Kiểm chứng**: `test-backup-audit` **30/30** (20 → 30) · `test-interaction-create`
+  **182 PASS/0 FAIL** (173 → 182: +7 nhánh verify +2 hợp đồng), RED-PROOF 2/2 ·
+  `bun run test` **85/85** (119,1s) · `test:ts` **21/21** · tsc/lint/prettier sạch ·
+  repo-map · convex-contract (104 call) · i18n/settings-signal self-test ·
+  coverage **95,01%** + sàn OK (`interactionCreate.js` 95,53%) · mutation **20/20** ·
+  `bun convex dev --once` OK.
+- 📁 File đụng (8): `bot/src/backupAudit.js` · `bot/src/commands/{slash,localizations,prefix}.js`
+  · `bot/src/handlers/interactionCreate.js` · `convex/backup.ts` ·
+  `scripts/test-backup-audit.cjs` · `scripts/test-interaction-create.cjs` (+ nhật ký).
+- ▶️ Tiếp theo: #5 tách monolith (`backup.js` 114KB · `interactionCreate.js` 103KB ·
+  `convex/guilds.ts` 99KB · `bot_writes.ts` 75KB) → #4 chuyển `setInterval` sang Convex cron.
+
 ## 02/10/2026 (4) — CI đỏ lại: suite trình duyệt treo 300s vì lời chờ NGOÀI còn thiếu trần
 
 - 🎯 **Triệu chứng**: run `36993470111` trên `main` (`9ff63f7`) — `test` ĐỎ,
