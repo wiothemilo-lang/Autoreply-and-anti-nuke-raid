@@ -200,10 +200,21 @@ const check = (label, ok) => {
   // Mô phỏng runBackup với checksum trùng: cần guild giả đủ để snapshot chạy.
   // (runBackup gọi sendToLog → sendLog thật sẽ lỗi im lặng; dùng embed capture qua store.getConfig null + guild không có webhook → an toàn.)
   // Kiểm qua nguồn: skipNotice chỉ được truyền khi web bấm chủ động — kiểm tham số tồn tại trong signature.
-  const src = fs.readFileSync(
-    path.join(__dirname, "..", "bot", "src", "handlers", "backup.js"),
-    "utf8",
-  );
+  // Đợt #5 tách handlers/backup.js thành các module trong bot/src/ — đọc TOÀN BỘ chuỗi
+  // module backup (facade + ruột) để các check nguồn không bám vào một file duy nhất.
+  const src = [
+    "bot/src/handlers/backup.js",
+    "bot/src/backupMedia.js",
+    "bot/src/backupCommon.js",
+    "bot/src/backupNormalize.js",
+    "bot/src/backupCapture.js",
+    "bot/src/backupRebuild.js",
+    "bot/src/backupRestore.js",
+    "bot/src/backupImport.js",
+    "bot/src/backupJobs.js",
+  ]
+    .map((p) => fs.readFileSync(path.join(__dirname, "..", p), "utf8"))
+    .join("\n");
   check(
     "runBackup có tham số skipNotice",
     /const \{\s*pushToGithub: pushToGithubOpt = false,\s*includeMessages = false,\s*skipNotice = false,\s*claimAt,?\s*\} = opts;/.test(

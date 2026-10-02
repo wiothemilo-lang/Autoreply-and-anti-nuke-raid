@@ -57,29 +57,32 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 
 ## bot/ — Discord bot (CommonJS, chạy pm2 `protogon`)
 
-| Nhóm                                                           | Vai trò                                                                     |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `index.js`                                                     | Khởi động + login                                                           |
-| `threatEngine.js`, `heat.js`, `altDetection.js`, `lockdown.js` | Nhóm antinuke/raid                                                          |
-| `commands/`, `handlers/`                                       | Slash commands + event handlers                                             |
-| `convex.js`                                                    | Client Convex của bot                                                       |
-| `webhookHub.js`, `relayClient.js`                              | Relay/log sang webhook                                                      |
-| `localSnapshot.js`, `backupUtils.js`, `backupAudit.js`         | Backup                                                                      |
-| `actionBudget.js`, `memGuard.js`                               | Giới hạn hành động/bộ nhớ                                                   |     | `metrics.js`, `metricsRuntime.js` | Đồng hồ hệ thống (prom-client) + lắp ráp đẩy số đo |     | `aiPricing.js` | Bảng giá AI + hạn mức chi tiền theo ngày |
-| `resilience.js`                                                | Trần thời gian cho mọi lời gọi ra ngoài + backoff có jitter                 |
-| `logId.js`                                                     | Mã việc trong log + log song song text/JSON                                 |
-| `captchaStore.js`, `joinGate`                                  | Join Gate captcha chống selfbot                                             |
-| `externalAppGuard.js`, `flaggedMessages.js`                    | Chặn app ngoài + tin nhắn khả nghi                                          |
-| `moduleActions.js`, `tick.js`, `timeoutWatch.js`, `misfire.js` | Điều phối module + chu kỳ + theo dõi timeout + misfire AI (vòng 11)         |
-| `caseLog.js`, `register-slash.js`, `loadenv.js`                | Log case + đăng ký slash + nạp env                                          |
-| `research.js`                                                  | Tra cứu/threat research hỗ trợ AI                                           |
-| `channelLock.js`                                               | Lệnh `/lock`: khoá chat theo kênh/role, lưu & khôi phục quyền cũ, tự mở hạn |
-| `ticketCore.js`                                                | Hàm thuần ticket: tên kênh, hàng rào chống spam, escape mention, tự đóng    |
-| `handlers/tickets.js`, `handlers/ticketJobs.js`                | Tương tác ticket (nút/modal/panel) + job tự đóng & dọn kênh                 |
-| `handlers/ticketActivity.js`                                   | Đẩy lùi đồng hồ tự đóng khi có người chat trong kênh ticket                 |
-| `ai.js`                                                        | Client AI trực tiếp từ VPS (Kira gateway + fallback Groq/NVIDIA)            |
-| `util.js`                                                      | Tiện ích dùng chung: quyền, định dạng, helper                               |
-| `logDedupe.js`                                                 | Chống gửi trùng log (cùng embed + cùng kênh trong 3s)                       |
+| Nhóm                                                           | Vai trò                                                                               |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `index.js`                                                     | Khởi động + login                                                                     |
+| `threatEngine.js`, `heat.js`, `altDetection.js`, `lockdown.js` | Nhóm antinuke/raid                                                                    |
+| `commands/`, `handlers/`                                       | Slash commands + event handlers                                                       |
+| `convex.js`                                                    | Client Convex của bot                                                                 |
+| `webhookHub.js`, `relayClient.js`                              | Relay/log sang webhook                                                                |
+| `localSnapshot.js`, `backupUtils.js`, `backupAudit.js`         | Backup: engine chụp cục bộ + nén/kiểm tra + lệnh verify (facade `handlers/backup.js`) |
+| `backupMedia.js`, `backupCommon.js`, `backupNormalize.js`      | Backup: tải media + chặn SSRF, helper/trần chung, chuẩn hoá .msc/.json + giải mã      |
+| `backupCapture.js`, `backupRebuild.js`                         | Backup: chụp snapshot + runBackup, dựng lại role/kênh/tin/emoji/sticker/thread        |
+| `backupRestore.js`, `backupImport.js`, `backupJobs.js`         | Backup: dry-run + restoreCore/runRestore, import file dashboard, vòng quét/claim/auto |
+| `actionBudget.js`, `memGuard.js`                               | Giới hạn hành động/bộ nhớ                                                             |     | `metrics.js`, `metricsRuntime.js` | Đồng hồ hệ thống (prom-client) + lắp ráp đẩy số đo |     | `aiPricing.js` | Bảng giá AI + hạn mức chi tiền theo ngày |
+| `resilience.js`                                                | Trần thời gian cho mọi lời gọi ra ngoài + backoff có jitter                           |
+| `logId.js`                                                     | Mã việc trong log + log song song text/JSON                                           |
+| `captchaStore.js`, `joinGate`                                  | Join Gate captcha chống selfbot                                                       |
+| `externalAppGuard.js`, `flaggedMessages.js`                    | Chặn app ngoài + tin nhắn khả nghi                                                    |
+| `moduleActions.js`, `tick.js`, `timeoutWatch.js`, `misfire.js` | Điều phối module + chu kỳ + theo dõi timeout + misfire AI (vòng 11)                   |
+| `caseLog.js`, `register-slash.js`, `loadenv.js`                | Log case + đăng ký slash + nạp env                                                    |
+| `research.js`                                                  | Tra cứu/threat research hỗ trợ AI                                                     |
+| `channelLock.js`                                               | Lệnh `/lock`: khoá chat theo kênh/role, lưu & khôi phục quyền cũ, tự mở hạn           |
+| `ticketCore.js`                                                | Hàm thuần ticket: tên kênh, hàng rào chống spam, escape mention, tự đóng              |
+| `handlers/tickets.js`, `handlers/ticketJobs.js`                | Tương tác ticket (nút/modal/panel) + job tự đóng & dọn kênh                           |
+| `handlers/ticketActivity.js`                                   | Đẩy lùi đồng hồ tự đóng khi có người chat trong kênh ticket                           |
+| `ai.js`                                                        | Client AI trực tiếp từ VPS (Kira gateway + fallback Groq/NVIDIA)                      |
+| `util.js`                                                      | Tiện ích dùng chung: quyền, định dạng, helper                                         |
+| `logDedupe.js`                                                 | Chống gửi trùng log (cùng embed + cùng kênh trong 3s)                                 |
 
 ## convex/ — backend
 
