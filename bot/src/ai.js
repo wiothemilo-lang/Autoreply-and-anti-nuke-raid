@@ -83,6 +83,25 @@ function misfireModule() {
 }
 
 /**
+ * Bảng giá + hạn mức ngân sách (đợt #2). Lazy-require cùng lý do với misfire:
+ * giữ cho test require riêng ai.js không bị kéo theo cả nhánh tiền.
+ * Trả MỘT object rỗng khi require lỗi để caller không phải kiểm null — mọi
+ * hàm bên dưới đều trả giá trị vô hại khi thiếu.
+ */
+function aiPricing() {
+  try {
+    return require("./aiPricing");
+  } catch {
+    return {
+      overBudget: () => false,
+      shouldDeprioritizeForBudget: () => false,
+      recordUsage: () => ({ usd: null, known: false }),
+      budgetSummary: () => null,
+    };
+  }
+}
+
+/**
  * VERDICT CACHE — cùng 1 vụ việc (module + mẫu tin giống nhau) trong 90s không
  * gọi AI lặp: raid spam tạo hàng chục sự kiện, mỗi sự kiện vượt ngưỡng đều dựng
  * prompt GẦN NHƯ TỰT NGƯỜI (cùng mẫu, cùng số liệu) → trả kết quả đã có, tiết
@@ -287,10 +306,24 @@ async function chat(messages, { maxTokens = 250, temperature = 0.2, timeoutMs = 
   if (fullChain.length === 0) return null;
   // PROVIDER HEALTH: provider đang cooldown bị đẩy xuống cuối (soft — vẫn thử
   // khi mọi provider khỏe khác đều fail, không bao giờ từ chối gọi vì health).
-  const chain = [
+  let chain = [
     ...fullChain.filter((p) => !providerInCooldown(p)),
     ...fullChain.filter((p) => providerInCooldown(p)),
   ];
+  // NGÂN SÁCH (đợt #2): khi hôm nay đã vượt hạn mức thì provider TRẢ PHÍ (hoặc
+  // chưa biết giá) bị đẩy xuống CUỐI — cùng kiểu soft penalty như cooldown
+  // sức khoẻ, KHÔNG chặn gọi. Chặn cứng ở đây sẽ biến "hết tiền" thành
+  // "mất chống raid", đổi lấy một khoản tiền rất nhỏ.
+  const pricing = aiPricing();
+  if (pricing.overBudget()) {
+    const cheap = (p) => !pricing.shouldDeprioritizeForBudget(p.label);
+    chain = [
+      ...chain.filter((p) => cheap(p) && !providerInCooldown(p)),
+      ...chain.filter((p) => cheap(p) && providerInCooldown(p)),
+      ...chain.filter((p) => !cheap(p) && !providerInCooldown(p)),
+      ...chain.filter((p) => !cheap(p) && providerInCooldown(p)),
+    ];
+  }
 
   // RATE GUARD — chống hạn mức cháy đột ngột: raid lớn tạo hàng chục sự kiện
   // trong vài giây, mỗi sự kiện hết ngưỡng đều gọi AI; nếu không chặn thì cả
@@ -457,10 +490,16 @@ async function chatOne(p, messages, opts) {
     const seconds = Number(process.hrtime.bigint() - started) / 1e9;
     try {
       if (content) {
+        const promptTokens = Number(usage?.prompt_tokens) || undefined;
+        const completionTokens = Number(usage?.completion_tokens) || undefined;
+        // Tiền: tính TỪ usage thật, không suy đoán từ độ dài chuỗi. Gateway
+        // không trả usage thì `known:false` — xem aiPricing.js nguyên tắc 1.
+        const cost = aiPricing().recordUsage(p.label, { promptTokens, completionTokens });
         metrics?.observeAiCall(p.label, {
           durationSeconds: seconds,
-          promptTokens: Number(usage?.prompt_tokens) || undefined,
-          completionTokens: Number(usage?.completion_tokens) || undefined,
+          promptTokens,
+          completionTokens,
+          costUsd: cost?.known ? cost.usd : undefined,
         });
       } else {
         metrics?.observeAiFailure(p.label, seconds);
@@ -1004,6 +1043,9 @@ function aiStats() {
     inFlight: aiInFlight,
     verdictsLastHour: verdictCountsLastHour(),
     misfire: mfStats,
+    // Tiền + hạn mức (đợt #2). null khi bảng giá không tải được — dashboard
+    // hiện "chưa có dữ liệu", KHÔNG hiện 0 (0 nghĩa là "miễn phí" và sẽ dối).
+    budget: aiPricing().budgetSummary(),
   };
 }
 

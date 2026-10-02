@@ -4,6 +4,61 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 02/10/2026 (2) — #2 Tiền AI: bảng giá + hạn mức ngày + cổng độ chính xác
+
+- 🎯 **Bắt đầu từ đâu**: #1 đã đo được `usage` nhưng chưa ai biết **tiền**. Câu
+  hỏi "tháng này OpenAI tốn bao nhiêu" trước đây không có cách trả lời nào ngoài
+  việc mở dashboard của nhà cung cấp và đoán xem lượt gọi nào là của bot.
+- 💰 **`bot/src/aiPricing.js` — 3 nguyên tắc, đều là bài học từ lỗi im lặng**:
+  - **Giá KHÔNG rõ thì KHÔNG phải 0.** Gateway tùy chỉnh trả `known:false` +
+    `usd:null`. Vì 0 trông y hệt "miễn phí": nó làm báo cáo sai lệch VÀ làm hạn
+    mức **không bao giờ kích hoạt**. Có **RED-PROOF**: điền 0 cho gateway → FAIL đúng.
+  - **Free tier CÓ HẠN.** Ghi rõ hạn mức (Kira 30M token/ngày…) để lúc hết hạn
+    mức ta biết đang đi qua ranh giới đó, không tưởng vẫn miễn phí.
+  - **Vượt hạn mức KHÔNG được làm hỏng chống raid.** Hành động khi vượt là **hạ
+    provider trả phí xuống cuối chuỗi** (soft penalty, y hệt cooldown sức khoẻ),
+    KHÔNG phải từ chối gọi. Chặn cứng sẽ biến "hết tiền" thành "mất chống raid".
+- 🐛 **Test bắt 1 lỗ hổng thật**: `estimateCost(label, usage = {})` — giá trị mặc
+  định chỉ áp dụng cho `undefined`, gặp `null` **ném TypeError NGAY TẠI CHỮ KÝ**,
+  tức ngoài mọi `try/catch` bên trong. Đếm tiền phải chịu được dữ liệu rác từ
+  gateway. Đã tách destructure ra trong thân hàm. (`dayKey()` cũng vậy: `toISOString`
+  ném `RangeError` với ts rác, mà nó được gọi TỪ `rollover` trước mọi try/catch.)
+- 📊 **Cổng hồi quy prompt (offline, chạy được trong CI)**:
+  - **Ngân sách prompt 8.000 ký tự.** Trước #2, dán một đoạn corpus vào prompt là
+    hàng trăm nghìn token mỗi lượt — tức tiền tăng gấp vài lần mà CI vẫn xanh.
+    **RED-PROOF**: hạ trần xuống 2.000 → FAIL đúng chỗ.
+  - Chốt `maxTokens` có trần (≤512) + prompt phải giữ mệnh lệnh chống phạt nhầm.
+  - `test-ai-accuracy.cjs`: 40 → **44** ca.
+- 🔴 **Phát hiện quan trọng khi làm cổng độ chính xác: đo SAI BẢN CHẤT.**
+  `test-ai-raid-eval.mjs` chạy **trên key thật**. Tôi cắm cổng "accuracy ≥
+  baseline" rồi chạy thử → **2/6**, có vẻ AI tụt chính xác. Hoá ra **4/6 case rơi
+  vào `offline`** (không provider nào trả lời: 429/hết hạn mức khi tôi bấm liên
+  tục vài chục lượt). Đó là tín hiệu **HẠ TẦNG**, không phải độ chính xác — và nó
+  không phải thứ mã của ta kiểm soát. Sửa:
+  - Tách `offlineCount` khỏi `pass`/`fail`; độ chính xác chỉ tính trên **các ca
+    thật sự có câu trả lời**; availability báo riêng.
+  - Cổng **CẢNH BÁO mặc định**, chỉ chặt khi `AI_EVAL_GATE=1`. Cổng cứng phụ thuộc
+    chuỗi provider bên ngoài = đỏ oan.
+  - Baseline ghi **6/6** (số case thật của file) + trần trễ 12s. Lần đầu tôi viết
+    `8/9` — **đoán mò**, đã sửa theo số đo thật.
+  - `ci.yml` thêm bước chạy eval live, **bỏ qua** khi thiếu key secret.
+- 🧪 **Test**: `scripts/test-ai-cost.cjs` (mới) — **36 ca**, sàn coverage riêng
+  `aiPricing.js: 90%` (đo được **92,2%**). Tiền là thứ sai âm thầm nên có sàn riêng.
+  Cập nhật `CONTRACT_SUITES` 83 → **84** ở **CẢ** `guardrails.js` lẫn `AGENTS.md`.
+- 📈 **Dashboard**: card "Sức khỏe AI" giờ hiện chi AI hôm nay / hạn mức, chip chi
+  tiết từng provider (lượt · token · tiền, ghi rõ **"chưa biết giá"** thay vì
+  $0), cảnh báo vượt hạn mức và nhắc ngày rà bảng giá. Đủ bản dịch vi/en/de.
+- ✅ **Kiểm chứng**: `test:coverage` **84/84** (128,5s) · `test:ts` **21/21** ·
+  `test-ai-cost` 36 · `test-ai-accuracy` 44 · `test-web-contracts` **276** ·
+  mutation **20/20** · `tsc` · `eslint` · `prettier` · repo-map · convex-contract ·
+  i18n --self-test · settings-signal --self-test · gitleaks no leaks.
+- 📁 File đụng (12): `bot/src/aiPricing.js` (mới) · `bot/src/ai.js` ·
+  `convex/schema.ts` · `src/pages/Admin.tsx` · `src/lib/i18n.{en,de}.ts` ·
+  `scripts/test-ai-cost.cjs` (mới) · `scripts/test-ai-accuracy.cjs` ·
+  `scripts/test-ai-raid-eval.mjs` · `scripts/test-web-contracts.cjs` ·
+  `scripts/check-coverage-floor.cjs` · `.github/workflows/ci.yml` ·
+  `docs/repo-map.md` · `AGENTS.md` · `.opencode/plugins/guardrails.js`.
+
 ## 02/10/2026 — #1 Observability: đồng hồ hệ thống + log có mã (nền cho #2/#3)
 
 - 🎯 **Vì sao làm trước**: repo có **không một số đo nào** — `rg "prom-client|metrics|

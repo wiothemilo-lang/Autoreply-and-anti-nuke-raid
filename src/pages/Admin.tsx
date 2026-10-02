@@ -646,7 +646,48 @@ function AiHealthCard() {
               <span className="text-muted-foreground">{translate("Phạt nhầm 7 ngày:")}</span>{" "}
               <b className={mf >= 5 ? "text-danger" : undefined}>{mf}</b>
             </div>
+            <div className="rounded-lg bg-secondary/40 px-2.5 py-1.5">
+              <span className="text-muted-foreground">{translate("Chi AI hôm nay:")}</span>{" "}
+              <b className={cn("tabular-nums", ai.budget?.overBudget && "text-danger")}>
+                {ai.budget ? `$${ai.budget.spentUsd.toFixed(4)}` : translate("chưa có dữ liệu")}
+              </b>
+              {ai.budget && ai.budget.budgetUsd > 0 && (
+                <span className="text-muted-foreground"> / ${ai.budget.budgetUsd.toFixed(2)}</span>
+              )}
+            </div>
           </div>
+          {/* Chi tiết tiền theo từng provider + cảnh báo bảng giá đã cũ.
+              `spentUsd` CHỈ gồm phần giá đã biết (xem bot/src/aiPricing.js), nên
+              dòng này ghi rõ "chưa biết giá" thay vì im lặng coi như 0 USD. */}
+          {ai.budget && ai.budget.byProvider.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              {ai.budget.byProvider.map((p) => (
+                <span
+                  key={p.label}
+                  className="rounded-full bg-secondary px-2 py-0.5 text-muted-foreground"
+                >
+                  {p.label}: {p.calls} {translate("lượt")} · {p.promptTokens + p.completionTokens}{" "}
+                  tok
+                  {p.usd > 0 ? ` · $${p.usd.toFixed(4)}` : ` · ${translate("chưa biết giá")}`}
+                </span>
+              ))}
+            </div>
+          )}
+          {ai.budget?.overBudget && (
+            <p className="mt-2 text-[11px] text-danger">
+              {translate(
+                "Đã vượt hạn mức tiền AI hôm nay — provider trả phí đã bị hạ xuống cuối danh sách, bot vẫn chống raid bằng provider miễn phí.",
+              )}{" "}
+            </p>
+          )}
+          {ai.budget &&
+            ai.budget.pricingStaleDays !== null &&
+            ai.budget.pricingStaleDays !== undefined && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {translate("Bảng giá AI lần rà gần nhất:")} {ai.budget.pricingChecked}
+                {ai.budget.pricingStaleDays > 90 ? ` (${translate("đã cũ")})` : ""}{" "}
+              </p>
+            )}
           {decided > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
               <span className="rounded-full bg-danger/10 px-2 py-0.5 text-danger">
