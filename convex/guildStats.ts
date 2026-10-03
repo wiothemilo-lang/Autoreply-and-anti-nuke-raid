@@ -110,6 +110,85 @@ export function summarize(
   };
 }
 
+/** Một ô giờ trong ngày (giờ Việt Nam, 0–23). */
+export interface HourBucket {
+  hour: number;
+  joins: number;
+  events: number;
+  blocked: number;
+}
+
+/** Một ngày trong tuần (mốc = 00:00 giờ VN của ngày đó). */
+export interface DayBucket {
+  dayStart: number;
+  joins: number;
+  blocked: number;
+}
+
+/**
+ * Nhịp 24 giờ của hôm nay + 7 ngày gần nhất (A6 — "heat theo giờ" và "ngày
+ * nhận đông nhất"). Hàm thuần để test, giống `summarize`.
+ *
+ * Vì sao cần: chủ server muốn biết RẤT HAY TẤN CÔNG lúc nào (bật chống nuke
+ * đúng giờ) và ngày nào server đông nhất. Tổng số "hôm nay 120 người vào"
+ * không trả lời được câu hỏi đó.
+ *
+ * `dayStart` phải là mốc 00:00 giờ VN (xem `startOfDayVietnam`) — ô giờ tính
+ * theo giờ VN nên số liệu khớp với con số "Tính từ 00:00 hôm nay theo giờ
+ * Việt Nam" mà trang Thống kê đang ghi.
+ */
+export function hourlyProfile(
+  events: StatEvent[],
+  joins: StatJoin[],
+  dayStart: number,
+): HourBucket[] {
+  const buckets: HourBucket[] = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    joins: 0,
+    events: 0,
+    blocked: 0,
+  }));
+  const hourOf = (ts: number) => {
+    const h = Math.floor((ts - dayStart) / 3_600_000);
+    return h >= 0 && h < 24 ? h : -1;
+  };
+  for (const e of events) {
+    const h = hourOf(e.createdAt);
+    if (h < 0) continue;
+    buckets[h].events += 1;
+    buckets[h].blocked += e.count || 0;
+  }
+  for (const j of joins) {
+    const h = hourOf(j.createdAt);
+    if (h < 0) continue;
+    buckets[h].joins += 1;
+  }
+  return buckets;
+}
+
+/** 7 ngày VN gần nhất (cũ nhất trước), số người vào + lượt chặn theo ngày. */
+export function weeklyProfile(events: StatEvent[], joins: StatJoin[], now: number): DayBucket[] {
+  const today = startOfDayVietnam(now);
+  const out: DayBucket[] = Array.from({ length: 7 }, (_, i) => ({
+    dayStart: today - i * 86_400_000,
+    joins: 0,
+    blocked: 0,
+  }));
+  const indexOf = (ts: number) => {
+    const d = Math.round((today - startOfDayVietnam(ts)) / 86_400_000);
+    return d >= 0 && d < 7 ? d : -1;
+  };
+  for (const e of events) {
+    const d = indexOf(e.createdAt);
+    if (d >= 0) out[d].blocked += e.count || 0;
+  }
+  for (const j of joins) {
+    const d = indexOf(j.createdAt);
+    if (d >= 0) out[d].joins += 1;
+  }
+  return out.reverse(); // cũ nhất trước
+}
+
 /**
  * Số liệu "Tình hình server" hôm nay (quản lý server — manager-gated).
  *
@@ -127,7 +206,9 @@ export const todaySummary = query({
       .first();
     if (!guild || !canManageGuild(user, guild)) return null;
 
-    const weekAgo = Date.now() - 7 * 86_400_000;
+    const now = Date.now();
+    const dayStart = startOfDayVietnam(now);
+    const weekAgo = now - 7 * 86_400_000;
     const [events, joins] = await Promise.all([
       ctx.db
         .query("antinukeEvents")
@@ -146,26 +227,25 @@ export const todaySummary = query({
     // Field nằm thẳng trên document guild (xem convex/guilds.ts:500), không
     // phải trong `settings` — nếu sai chỗ này luôn rơi về 70 im lặng.
     const maxRisk = Number(guild.altMaxRiskScore ?? 70);
+    const statEvents = events.map((e) => ({
+      module: e.module,
+      action: e.action,
+      count: e.count,
+      createdAt: e.createdAt,
+      punish: e.punish,
+    }));
+    const statJoins = joins.map((j) => ({
+      createdAt: j.joinedAt,
+      riskScore: j.riskScore,
+      action: j.action ?? null,
+      riskFactors: j.riskFactors,
+    }));
     return {
-      ...summarize(
-        events.map((e) => ({
-          module: e.module,
-          action: e.action,
-          count: e.count,
-          createdAt: e.createdAt,
-          punish: e.punish,
-        })),
-        joins.map((j) => ({
-          createdAt: j.joinedAt,
-          riskScore: j.riskScore,
-          action: j.action ?? null,
-          riskFactors: j.riskFactors,
-        })),
-        startOfDayVietnam(Date.now()),
-        Number.isFinite(maxRisk) ? maxRisk : 70,
-      ),
+      ...summarize(statEvents, statJoins, dayStart, Number.isFinite(maxRisk) ? maxRisk : 70),
       /** Mốc bắt đầu ngày VN — UI hiện "tính từ HH:MM giờ VN" cho minh bạch. */
-      dayStart: startOfDayVietnam(Date.now()),
+      dayStart,
+      hourly: hourlyProfile(statEvents, statJoins, dayStart),
+      weekly: weeklyProfile(statEvents, statJoins, now),
     };
   },
 });

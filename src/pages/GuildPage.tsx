@@ -44,6 +44,8 @@ import CommandPalette, {
 } from "../components/CommandPalette";
 import { confirmLeave } from "../lib/useUnsavedChanges";
 import { syncState } from "../lib/syncState";
+import MobilePanelSheet from "../components/MobilePanelSheet";
+import { HOME_SECTION, shouldUsePanelSheet, useNarrowViewport } from "../lib/mediaQuery";
 
 import LangSwitch from "../components/LangSwitch";
 import SkipLink from "../components/SkipLink";
@@ -179,6 +181,16 @@ export default function GuildPage() {
     // panel mới thay vì đứng ở vị trí cuộn cũ.
     if (window.innerWidth < 1024) window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
+
+  // ── Sheet panel trên mobile (đợt #4) ──
+  // Màn hình hẹp thì panel cấu hình nằm trong sheet full-screen thay vì cuộn
+  // trong trang; desktop giữ nguyên bố cục cột bên cạnh.
+  const narrow = useNarrowViewport();
+  const sheetOpen = shouldUsePanelSheet(narrow, section);
+  // `useCallback` BẮT BUỘC: MobilePanelSheet dùng `onClose` làm dep của effect
+  // khoá cuộn nền — nếu callback đổi mỗi lần render thì effect chạy lại
+  // liên tục, khoá/hoá cuộn nền và giành focus nút đóng liên tục.
+  const closeSheet = useCallback(() => goToSection(HOME_SECTION as SectionKey), [goToSection]);
 
   // Ghi lại panel đang mở. Đồng thời nạp lại khi đổi server: `useState` chỉ
   // khởi tạo MỘT lần nên điều hướng /dashboard/A → /dashboard/B sẽ mang theo
@@ -317,6 +329,60 @@ export default function GuildPage() {
     "--primary": theme.primary,
     "--ring": theme.ring,
   } as React.CSSProperties;
+
+  // Thân panel — TẠO MỘT LẦN rồi chọn chỗ hiển thị (trong trang ở desktop,
+  // trong sheet ở mobile). Tách ra biến vì nếu viết cùng một khối JSX ở cả hai
+  // nhánh thì React sẽ mount panel HAI lần: mỗi panel chạy `useQuery` của
+  // Convex riêng ⇒ hai lần đọc dữ liệu, hai lần subscribe, hai bộ id trùng.
+  const panelNode = (
+    <PanelErrorBoundary key={`${section}:${data.guild.discordId}`}>
+      <Suspense fallback={<PanelFallback />}>
+        {/* key theo section: đổi panel = phần tử mới, AnimatePresence
+            nhận ra là chuyển cảnh thật. Chỉ trượt 8px + mờ trong
+            0.2s — đủ để mắt bám theo, không đủ để cảm như chờ. */}
+        <motion.div key={section} variants={motionSet.panel} initial="hidden" animate="show">
+          {section === "overview" && (
+            <OverviewPanel data={data} onNavigate={(target) => goToSection(target as SectionKey)} />
+          )}
+          {section === "automod" && <AutoModPanel data={data} />}
+          {section === "moderation" && <ModerationPanel data={data} />}
+          {section === "joingate" && <JoinGatePanel data={data} />}
+          {section === "welcome" && <WelcomePanel data={data} />}
+          {section === "altdetect" && <AltDetectionPanel data={data} />}
+          {section === "antinuke" && <AntiNukePanel data={data} />}
+          {section === "externalapp" && <ExternalAppRaidsPanel data={data} />}
+          {section === "whitelist" && <WhitelistPanel data={data} />}
+          {section === "backup" && <BackupPanel data={data} />}
+          {section === "punishments" && <ModActionsPanel data={data} />}
+          {section === "verify" && <VerifyPanel data={data} />}
+          {section === "webhooks" && <WebhookPanel data={data} />}
+          {section === "tickets" && <TicketPanel data={data} />}
+          {section === "settings" && <SettingsPanel data={data} />}
+          {section === "hidden" &&
+            (!data.guild.isBotOwner || (data.guild.hiddenPasswordSet && !hiddenUnlocked) ? (
+              <UnlockPanel data={data} onUnlocked={() => setHiddenUnlocked(true)} />
+            ) : (
+              <>
+                {data.guild.hiddenPasswordSet && (
+                  <div className="mb-4 flex justify-end">
+                    <button
+                      onClick={() => {
+                        sessionStorage.removeItem(hiddenUnlockKey());
+                        setHiddenUnlocked(false);
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <Lock className="h-3.5 w-3.5" /> {translate("Khóa lại")}{" "}
+                    </button>
+                  </div>
+                )}
+                <HiddenPanel data={data} />
+              </>
+            ))}
+        </motion.div>
+      </Suspense>
+    </PanelErrorBoundary>
+  );
 
   return (
     <div className="relative min-h-screen overflow-x-clip" style={themeVars}>
@@ -516,62 +582,16 @@ export default function GuildPage() {
                   />
                 </div>
               )}
-              <PanelErrorBoundary key={`${section}:${data.guild.discordId}`}>
-                <Suspense fallback={<PanelFallback />}>
-                  {/* key theo section: đổi panel = phần tử mới, AnimatePresence
-                      nhận ra là chuyển cảnh thật. Chỉ trượt 8px + mờ trong
-                      0.2s — đủ để mắt bám theo, không đủ để cảm như chờ. */}
-                  <motion.div
-                    key={section}
-                    variants={motionSet.panel}
-                    initial="hidden"
-                    animate="show"
-                  >
-                    {section === "overview" && (
-                      <OverviewPanel
-                        data={data}
-                        onNavigate={(target) => goToSection(target as SectionKey)}
-                      />
-                    )}
-                    {section === "automod" && <AutoModPanel data={data} />}
-                    {section === "moderation" && <ModerationPanel data={data} />}
-                    {section === "joingate" && <JoinGatePanel data={data} />}
-                    {section === "welcome" && <WelcomePanel data={data} />}
-                    {section === "altdetect" && <AltDetectionPanel data={data} />}
-                    {section === "antinuke" && <AntiNukePanel data={data} />}
-                    {section === "externalapp" && <ExternalAppRaidsPanel data={data} />}
-                    {section === "whitelist" && <WhitelistPanel data={data} />}
-                    {section === "backup" && <BackupPanel data={data} />}
-                    {section === "punishments" && <ModActionsPanel data={data} />}
-                    {section === "verify" && <VerifyPanel data={data} />}
-                    {section === "webhooks" && <WebhookPanel data={data} />}
-                    {section === "tickets" && <TicketPanel data={data} />}
-                    {section === "settings" && <SettingsPanel data={data} />}
-                    {section === "hidden" &&
-                      (!data.guild.isBotOwner ||
-                      (data.guild.hiddenPasswordSet && !hiddenUnlocked) ? (
-                        <UnlockPanel data={data} onUnlocked={() => setHiddenUnlocked(true)} />
-                      ) : (
-                        <>
-                          {data.guild.hiddenPasswordSet && (
-                            <div className="mb-4 flex justify-end">
-                              <button
-                                onClick={() => {
-                                  sessionStorage.removeItem(hiddenUnlockKey());
-                                  setHiddenUnlocked(false);
-                                }}
-                                className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                              >
-                                <Lock className="h-3.5 w-3.5" /> {translate("Khóa lại")}{" "}
-                              </button>
-                            </div>
-                          )}
-                          <HiddenPanel data={data} />
-                        </>
-                      ))}
-                  </motion.div>
-                </Suspense>
-              </PanelErrorBoundary>
+              {sheetOpen ? (
+                <MobilePanelSheet
+                  title={translate(NAV_ITEMS.find((i) => i.key === section)?.label ?? "")}
+                  onClose={closeSheet}
+                >
+                  {panelNode}
+                </MobilePanelSheet>
+              ) : (
+                panelNode
+              )}
 
               <div className="mt-10 flex justify-center">
                 <a

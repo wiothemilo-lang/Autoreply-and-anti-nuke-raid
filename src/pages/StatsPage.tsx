@@ -35,7 +35,7 @@ import type { MeData } from "../lib/types";
 import LangSwitch from "../components/LangSwitch";
 import SkipLink from "../components/SkipLink";
 
-import { translate } from "../lib/i18n";
+import { dateLocale, translate } from "../lib/i18n";
 /** 1 dòng bảng xếp hạng trả về từ convex/reports.ts heatLeaderboard. */
 interface HeatRow {
   userId: string;
@@ -57,6 +57,53 @@ interface Summary {
   threatsBlocked: number;
   topRiskFactors: [string, number][];
   dayStart: number;
+  /** 24 ô giờ VN của hôm nay + 7 ngày VN gần nhất (A6). */
+  hourly: { hour: number; joins: number; events: number; blocked: number }[];
+  weekly: { dayStart: number; joins: number; blocked: number }[];
+}
+
+/**
+ * Biểu đồ cột thuần CSS — KHÔNG kéo thêm thư viện chart cho hai bảng số nhỏ.
+ *
+ * Vì sao tự vẽ: thêm thư viện = thêm hàng trăm KB vào chunk Thống kê chỉ để vẽ
+ * 24 thanh. Cột dùng `height` phần trăm nên tự co theo giá trị lớn nhất; nhỏ quá
+ * thì đặt một vạch tối thiểu 2px để vẫn thấy "có gì đó vào khung giờ này".
+ */
+function BarRow({
+  values,
+  labels,
+  ariaLabel,
+}: {
+  values: number[];
+  labels: string[];
+  ariaLabel: string;
+}) {
+  const max = Math.max(1, ...values);
+  return (
+    <div>
+      <div
+        className="flex h-24 items-end gap-[2px]"
+        role="img"
+        aria-label={ariaLabel}
+        title={labels.map((l, i) => `${l}: ${values[i]}`).join(" · ")}
+      >
+        {values.map((v, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-t bg-primary/70 transition-all"
+            style={{
+              height: v === 0 ? "2px" : `${Math.max(4, (v / max) * 100)}%`,
+              opacity: v === 0 ? 0.25 : 1,
+            }}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+        <span>{labels[0]}</span>
+        <span>{labels[1]}</span>
+      </div>
+    </div>
+  );
 }
 
 /** Ô số: nhãn + giá trị + ghi chú nhỏ. Màu chỉ ở trường `danger`. */
@@ -217,6 +264,43 @@ export default function StatsPage() {
                   danger={summary.suspectedFalsePositives > 0}
                 />
               </div>
+
+              {summary.hourly && summary.weekly && (
+                <Card className="mt-3">
+                  <CardContent className="space-y-5 p-4 sm:p-5">
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        {translate("Người vào theo giờ hôm nay")}
+                      </h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {translate("Giờ Việt Nam — bật chống nuke sớm ở khung giờ đông nhất")}
+                      </p>
+                      <div className="mt-3">
+                        <BarRow
+                          values={summary.hourly.map((h) => h.joins)}
+                          labels={["00h", "23h"]}
+                          ariaLabel={translate("Người vào theo giờ hôm nay")}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        {translate("Người vào 7 ngày gần nhất")}
+                      </h3>
+                      <div className="mt-3">
+                        <BarRow
+                          values={summary.weekly.map((d) => d.joins)}
+                          labels={[
+                            new Date(summary.weekly[0].dayStart).toLocaleDateString(dateLocale()),
+                            translate("Hôm nay"),
+                          ]}
+                          ariaLabel={translate("Người vào 7 ngày gần nhất")}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {summary.topRiskFactors.length > 0 && (
                 <Card className="mt-3">

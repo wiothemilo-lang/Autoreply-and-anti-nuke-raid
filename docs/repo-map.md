@@ -17,44 +17,47 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 
 ## src/ — dashboard web
 
-| Trang                       | Vai trò                                                |
-| --------------------------- | ------------------------------------------------------ |
-| `pages/Landing.tsx`         | Trang chủ mono + Taskbar pill trái + hero stagger      |
-| `pages/AuthPage.tsx`        | Đăng nhập Discord OAuth                                |
-| `pages/Dashboard.tsx`       | Danh sách server của user                              |
-| `pages/GuildPage.tsx`       | Trang cấu hình 1 server (tabs → các panel dưới)        |
-| `pages/Monitor.tsx`         | Giám sát thời gian thực (chart, sự cố)                 |
-| `pages/StatsPage.tsx`       | Thống kê tổng                                          |
-| `pages/Admin.tsx`           | Trang admin                                            |
-| `pages/GuildHistory.tsx`    | Lịch sử sự kiện server                                 |
-| `pages/GuildIncidents.tsx`  | Sự cố gom cụm (nhóm 15 phút) + đánh dấu đã xử lý       |
-| `pages/DiscordCallback.tsx` | Bắt callback OAuth                                     |
-| `pages/LegalPage.tsx`       | Văn bản pháp lý (/terms, /privacy, /data-deletion)     |
-| `pages/FeaturesPage.tsx`    | Trang tính năng công khai (/features, SEO 3 thứ tiếng) |
-| `pages/DonatePage.tsx`      | Trang ủng hộ nhà phát triển (/donate)                  |
-| `pages/PremiumPage.tsx`     | Trang gói Premium (/premium) — chưa mở bán             |
-| `pages/NotFound.tsx`        | 404                                                    |
+| Trang                       | Vai trò                                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `pages/Landing.tsx`         | Trang chủ mono + Taskbar pill trái + hero stagger                                                           |
+| `pages/AuthPage.tsx`        | Đăng nhập Discord OAuth                                                                                     |
+| `pages/Dashboard.tsx`       | Danh sách server của user                                                                                   |
+| `pages/GuildPage.tsx`       | Trang cấu hình 1 server (tabs → các panel dưới)                                                             |
+| `pages/Monitor.tsx`         | Giám sát thời gian thực (chart, sự cố)                                                                      |
+| `pages/StatsPage.tsx`       | Thống kê tổng; **biểu đồ người vào theo giờ hôm nay + 7 ngày** (cột CSS, không thêm thư viện) — đợt #4      |
+| `pages/Admin.tsx`           | Trang admin (khoẻ máy chủ, AI, đồng hồ hệ thống, **hàng đợi việc**)                                         |
+| `pages/GuildHistory.tsx`    | Lịch sử sự kiện server                                                                                      |
+| `pages/GuildIncidents.tsx`  | Sự cố gom cụm (nhóm 15 phút) + đánh dấu đã xử lý; **gom theo ngày + drill-down + so 2 kỳ 14 ngày** — đợt #4 |
+| `pages/DiscordCallback.tsx` | Bắt callback OAuth                                                                                          |
+| `pages/LegalPage.tsx`       | Văn bản pháp lý (/terms, /privacy, /data-deletion)                                                          |
+| `pages/FeaturesPage.tsx`    | Trang tính năng công khai (/features, SEO 3 thứ tiếng)                                                      |
+| `pages/DonatePage.tsx`      | Trang ủng hộ nhà phát triển (/donate)                                                                       |
+| `pages/PremiumPage.tsx`     | Trang gói Premium (/premium) — chưa mở bán                                                                  |
+| `pages/NotFound.tsx`        | 404                                                                                                         |
 
-| Component nhóm               | Vai trò                                                                                                                                        |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `components/dashboard/`      | Các panel cấu hình: Overview (có thẻ **Điểm cấu hình** `ConfigHealthCard`), Webhook, Verify, JoinGate, Ticket, Settings (theme xám), Branding… |
-| `components/landing/`        | Nav, Footer, sections trang chủ                                                                                                                |
-| `components/ui/`             | shadcn/ui nền tảng (button border-first, card mono)                                                                                            |
-| `components/Taskbar.tsx`     | Pill dọc trái + panel điều hướng nhanh (Escape/click-outside)                                                                                  |
-| `components/HaimiyaChat.tsx` | Chat nhân vật Haimiya (giữ màu brand illustration)                                                                                             |
-| `components/LangSwitch.tsx`  | Công tắc ngôn ngữ VI/EN/DE — nhúng vào chrome mọi trang (nav, taskbar, header dashboard, trang auth)                                           |
-| `components/SkipLink.tsx`    | Lối tắt "Bỏ qua tới nội dung" (WCAG 2.4.1) — mọi trang, chỉ hiện khi focus bàn phím                                                            |
-| `lib/i18n.tsx`               | Lõi đa ngôn ngữ gettext: LangProvider/useT, `translate()`, `ensureDictionary` (nạp lười EN/DE)                                                 |
-| `lib/i18n.dict.*.ts`         | Gộp 3 file từ điển mỗi ngôn ngữ thành MỘT chunk nạp lười                                                                                       |
-| `lib/i18n.en.ts`             | Từ điển EN (key = nguyên chuỗi tiếng Việt); thiếu key thì rơi về VI                                                                            |
-| `lib/legalContent.ts`        | Nội dung 3 văn bản pháp lý × VI/EN/DE (cổng 3f check-i18n kiểm cấu trúc)                                                                       |
-| `lib/useBotMonitor.ts`       | Hook trạng thái bot realtime                                                                                                                   |
-| `lib/routes.json`            | **BẢNG TUYẾN ĐƯỜNG** — nguồn duy nhất: path, public/private, index, sitemap, SPA fallback, alias redirect                                      |
-| `lib/routes.ts`              | Lớp kiểu + hàm đọc bảng (`routeForPath`, `canonicalPathFor`, `SITEMAP_ROUTES`…) — seo.ts + test đều đọc từ đây                                 |
-| `lib/bootOverlay.ts`         | `finishBootOverlay()` — đường ra THỨ HAI cho preloader khi /boot.js hỏng (fail-open, không phụ thuộc file ngoài)                               |
-| `lib/staleChunk.ts`          | Tab cũ sau deploy: `vite:preloadError` → tải lại đúng 1 lần/10s (sessionStorage chống lặp)                                                     |
-| `lib/configHealth.ts`        | HÀM THUẦN chấm "Điểm cấu hình" 0–100 (thiếu antinuke/log/backup/…) + danh sách vấn đề có `target` để mở thẳng panel — đợt #4                   |
-| `lib/constants.ts`           | SERVER_THEMES (đã mono xám), hằng số                                                                                                           |
+| Component nhóm                    | Vai trò                                                                                                                                                                                                                                                     |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/dashboard/`           | Các panel cấu hình: Overview (có thẻ **Điểm cấu hình** `ConfigHealthCard`), Webhook, Verify, JoinGate, Ticket, Settings (theme xám), Branding…                                                                                                              |
+| `components/landing/`             | Nav, Footer, sections trang chủ                                                                                                                                                                                                                             |
+| `components/ui/`                  | shadcn/ui nền tảng (button border-first, card mono)                                                                                                                                                                                                         |
+| `components/Taskbar.tsx`          | Pill dọc trái + panel điều hướng nhanh (Escape/click-outside)                                                                                                                                                                                               |
+| `components/HaimiyaChat.tsx`      | Chat nhân vật Haimiya (giữ màu brand illustration)                                                                                                                                                                                                          |
+| `components/LangSwitch.tsx`       | Công tắc ngôn ngữ VI/EN/DE — nhúng vào chrome mọi trang (nav, taskbar, header dashboard, trang auth)                                                                                                                                                        |
+| `components/SkipLink.tsx`         | Lối tắt "Bỏ qua tới nội dung" (WCAG 2.4.1) — mọi trang, chỉ hiện khi focus bàn phím                                                                                                                                                                         |
+| `components/MobilePanelSheet.tsx` | Sheet full-screen bọc panel cấu hình khi màn hình < `lg` (đợt #4). Render qua **portal** ra `document.body` vì `PageReveal` đặt `transform` trên `<main>` — `fixed` bên trong sẽ bám `<main>` thay vì viewport. Khoá cuộn nền, Esc đóng, focus vào nút đóng |
+| `lib/i18n.tsx`                    | Lõi đa ngôn ngữ gettext: LangProvider/useT, `translate()`, `ensureDictionary` (nạp lười EN/DE)                                                                                                                                                              |
+| `lib/i18n.dict.*.ts`              | Gộp 3 file từ điển mỗi ngôn ngữ thành MỘT chunk nạp lười                                                                                                                                                                                                    |
+| `lib/i18n.en.ts`                  | Từ điển EN (key = nguyên chuỗi tiếng Việt); thiếu key thì rơi về VI                                                                                                                                                                                         |
+| `lib/legalContent.ts`             | Nội dung 3 văn bản pháp lý × VI/EN/DE (cổng 3f check-i18n kiểm cấu trúc)                                                                                                                                                                                    |
+| `lib/useBotMonitor.ts`            | Hook trạng thái bot realtime                                                                                                                                                                                                                                |
+| `lib/routes.json`                 | **BẢNG TUYẾN ĐƯỜNG** — nguồn duy nhất: path, public/private, index, sitemap, SPA fallback, alias redirect                                                                                                                                                   |
+| `lib/routes.ts`                   | Lớp kiểu + hàm đọc bảng (`routeForPath`, `canonicalPathFor`, `SITEMAP_ROUTES`…) — seo.ts + test đều đọc từ đây                                                                                                                                              |
+| `lib/bootOverlay.ts`              | `finishBootOverlay()` — đường ra THỨ HAI cho preloader khi /boot.js hỏng (fail-open, không phụ thuộc file ngoài)                                                                                                                                            |
+| `lib/staleChunk.ts`               | Tab cũ sau deploy: `vite:preloadError` → tải lại đúng 1 lần/10s (sessionStorage chống lặp)                                                                                                                                                                  |
+| `lib/configHealth.ts`             | HÀM THUẦN chấm "Điểm cấu hình" 0–100 (thiếu antinuke/log/backup/…) + danh sách vấn đề có `target` để mở thẳng panel — đợt #4                                                                                                                                |
+| `lib/incidentStats.ts`            | HÀM THUẦN gom sự cố theo ngày + so 2 kỳ 14 ngày + tổng hợp theo module (chốt theo `lastAt`) — đợt #4                                                                                                                                                        |
+| `lib/mediaQuery.ts`               | Ngưỡng `lg` 1024px + `NARROW_MEDIA_QUERY`, hàm thuần `isNarrowViewport` / `shouldUsePanelSheet`, hook `useNarrowViewport` — đợt #4                                                                                                                          |
+| `lib/constants.ts`                | SERVER_THEMES (đã mono xám), hằng số                                                                                                                                                                                                                        |
 
 ## bot/ — Discord bot (CommonJS, chạy pm2 `protogon`)
 
@@ -110,7 +113,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `webhooks.ts`                                                     | Cấu hình webhook ngoài                                                                                                                                                                       |
 | `incidents.ts`                                                    | Gom antinukeEvents + modActions thành sự cố 15 phút; dấu "đã xử lý" (bảng incidentMarks)                                                                                                     |
 | `guildConfig.ts`                                                  | Allowlist + hàm thuần xuất/nhập cấu hình server (mang cấu hình sang host khác)                                                                                                               |
-| `guildStats.ts`                                                   | Số liệu "Tình hình server" hôm nay: đe doạ đã chặn, người mới vào, nghi phạm phạt nhầm                                                                                                       |
+| `guildStats.ts`                                                   | Số liệu "Tình hình server" hôm nay: đe doạ đã chặn, người mới vào, nghi phạm phạt nhầm; kèm `hourlyProfile` (24 ô) + `weeklyProfile` (7 ngày VN) — đợt #4                                    |
 | `channelLocks.ts`                                                 | Lệnh `/lock`: bản ghi kênh đang khoá chat (quyền cũ để mở đúng) + khoá hết hạn                                                                                                               |
 | `tickets.ts`                                                      | Ticket/khiếu nại: web đọc danh sách + đóng từ dashboard; `botTicketState` cho bot                                                                                                            |
 | `ticketKinds.ts`                                                  | Loại ticket TUỲ CHỈNH (thay 2 loại cứng): CRUD cho dashboard + `botKinds` cho bot                                                                                                            |
@@ -123,7 +126,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `geoGuard.ts`                                                     | Chặn đốt usage cho `/geo_lang`: chỉ IP công cộng + trần mỗi IP/toàn cục                                                                                                                      |
 | `selfDiagnose.ts`                                                 | Tự chẩn đoán bot báo về dashboard                                                                                                                                                            |
 | `sha256.ts`                                                       | Hash dùng chung (botKey, session)                                                                                                                                                            |
-| `audit.ts`, `reports.ts`, `status.ts`                             | Log/sự kiện/trạng thái; getAiHealth chỉ owner đọc                                                                                                                                            |
+| `audit.ts`, `reports.ts`, `status.ts`                             | Log/sự kiện/trạng thái; getAiHealth + **`getJobBacklog`** (hàng đợi việc, cờ cron quá 15 phút) chỉ owner đọc                                                                                 |
 | `_generated/`                                                     | Sinh tự động — không sửa tay, `bun convex dev --once`                                                                                                                                        |
 
 ## Vòng lặp làm việc

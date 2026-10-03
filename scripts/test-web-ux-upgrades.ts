@@ -18,6 +18,19 @@ import { ensureDictionary, lookupTranslation, translate } from "../src/lib/i18n"
 import { safeRedirectPath } from "../src/lib/discord";
 import { CHUNK_RELOAD_COOLDOWN_MS, installStaleChunkRecovery } from "../src/lib/staleChunk";
 import { evaluateConfigHealth, healthGrade, HEALTH_TARGETS } from "../src/lib/configHealth";
+import {
+  compareIncidentPeriods,
+  groupIncidentsByDay,
+  summarizeByModule,
+  type IncidentLike,
+} from "../src/lib/incidentStats";
+import {
+  DESKTOP_BREAKPOINT_PX,
+  HOME_SECTION,
+  NARROW_MEDIA_QUERY,
+  isNarrowViewport,
+  shouldUsePanelSheet,
+} from "../src/lib/mediaQuery";
 import { EN } from "../src/lib/i18n.en";
 import { EN_PANELS } from "../src/lib/i18n.en.panels";
 import { EN_LABELS } from "../src/lib/i18n.en.labels";
@@ -444,6 +457,213 @@ console.log("── #8 điểm cấu hình (đợt #4) ──");
   check(
     "mọi target của điểm cấu hình đều có panel thật trong NAV_ITEMS",
     HEALTH_TARGETS.every((t) => new RegExp(`key: "${t}"`).test(guildPage)),
+  );
+}
+
+// ── #9 dò thời gian + so sánh kỳ cho trang Sự cố (đợt #4) ──
+console.log("── #9 thống kê sự cố ──");
+{
+  const DAY = 86_400_000;
+  const now = Date.UTC(2026, 9, 3, 12, 0, 0);
+  const mk = (key: string, agoDays: number, over: Partial<IncidentLike> = {}): IncidentLike => ({
+    key,
+    module: "massBan",
+    kind: "antinuke",
+    action: "mass ban",
+    punish: null,
+    executors: [],
+    targets: [],
+    firstAt: now - agoDays * DAY,
+    lastAt: now - agoDays * DAY,
+    events: 1,
+    blocked: 1,
+    resolved: false,
+    ...over,
+  });
+
+  // So kỳ: 14 ngày gần nhất vs 14 ngày trước.
+  const list = [
+    mk("a", 1, { events: 3, blocked: 3 }),
+    mk("b", 5, { events: 2, blocked: 2, resolved: true }),
+    mk("c", 10, { events: 4, blocked: 4 }),
+    mk("d", 20), // kỳ trước
+    mk("e", 25), // kỳ trước
+  ];
+  const cmp = compareIncidentPeriods(list, now);
+  check(
+    "kỳ này đếm 3 sự cố / 9 lượt chặn / 9 sự kiện",
+    cmp.current.incidents === 3 && cmp.current.blocked === 9 && cmp.current.events === 9,
+  );
+  check(
+    "kỳ trước đếm 2 sự cố / 2 lượt chặn",
+    cmp.previous.incidents === 2 && cmp.previous.blocked === 2,
+  );
+  check("chênh lệch = hiện tại − trước", cmp.delta.incidents === 1 && cmp.delta.blocked === 7);
+  check("đếm cả sự cố đã xử lý trong kỳ", cmp.current.resolved === 1);
+  check(
+    "sự cố ngoài 28 ngày không vào kỳ nào",
+    compareIncidentPeriods([mk("old", 40)], now).current.incidents === 0 &&
+      compareIncidentPeriods([mk("old", 40)], now).previous.incidents === 0,
+  );
+
+  // Mốc chốt theo lastAt (sự cố kéo dài qua đêm tính vào ngày kết thúc).
+  const crossMidnight = [
+    mk("s", 1, { firstAt: now - DAY - 3600_000, lastAt: now - DAY + 3600_000 }),
+  ];
+  check(
+    "sự cố qua đêm vẫn tính vào kỳ gần nhất",
+    compareIncidentPeriods(crossMidnight, now).current.incidents === 1,
+  );
+
+  // Gom theo ngày: mọi sự cố phải xuất hiện đúng một lần, ngày mới trước.
+  const spread = [mk("x", 0.2), mk("y", 1.5), mk("z", 0.3), mk("w", 3)];
+  const days = groupIncidentsByDay(spread, "vi-VN", now);
+  check("gom ra nhiều nhóm ngày", days.length >= 2, String(days.length));
+  check("mọi sự cố xuất hiện đúng một lần", days.flatMap((d) => d.items).length === spread.length);
+  check("ngày mới nhất đứng trước", days[0].key > days[days.length - 1].key);
+  check(
+    "trong nhóm, sự cố mới hơn đứng trước",
+    (() => {
+      const first = days[0].items;
+      return first.length < 2 || first[0].lastAt >= first[first.length - 1].lastAt;
+    })(),
+  );
+  check(
+    "ngày của hôm nay được gắn nhãn riêng",
+    groupIncidentsByDay([mk("t", 0.1)], "vi-VN", now)[0].label === "Hôm nay",
+  );
+  check("danh sách rỗng → không có nhóm nào", groupIncidentsByDay([]).length === 0);
+
+  // Tổng hợp theo module.
+  const byMod = summarizeByModule([
+    mk("1", 1, { module: "massKick", blocked: 5 }),
+    mk("2", 2, { module: "massBan", blocked: 9 }),
+  ]);
+  check(
+    "module nhiều sự cố nhất đứng đầu",
+    byMod[0].module === "massBan" && byMod[0].incidents === 1 && byMod[0].blocked === 9,
+  );
+  check(
+    "tổng hợp khớp số sự cố đưa vào",
+    summarizeByModule(list).reduce((n, m) => n + m.incidents, 0) === list.length,
+  );
+}
+
+// ── #10 hàng đợi việc ở trang Admin (đợt #4) ──
+console.log("── #10 hàng đợi việc (Admin) ──");
+{
+  const statusSrc = readFileSync(new URL("../convex/status.ts", import.meta.url).pathname, "utf8");
+  const adminSrc = readFileSync(
+    new URL("../src/pages/Admin.tsx", import.meta.url).pathname,
+    "utf8",
+  );
+
+  // getJobBacklog phải là QUERY (chỉ đọc) và tự guard owner — trả null thay vì
+  // lộ hàng đợi của mọi server cho tài khoản thường.
+  const backlogBody = statusSrc.slice(
+    statusSrc.indexOf("export const getJobBacklog"),
+    statusSrc.indexOf("export const getHostHealth"),
+  );
+  check("getJobBacklog là query", /export const getJobBacklog = query\(/.test(statusSrc));
+  check(
+    "getJobBacklog guard owner (isBotOwnerUser) → null",
+    /isBotOwnerUser\(user, status\)\) return null/.test(backlogBody),
+  );
+  check("getJobBacklog nhận token qua args", /args: \{ token: v\.string\(\) \}/.test(backlogBody));
+  check(
+    "ngưỡng kẹt nằm ở hằng số STUCK_AFTER_MS = 15 phút",
+    /const STUCK_AFTER_MS = 15 \* 60_000;/.test(statusSrc),
+  );
+  check("danh sách kẹt cắt còn tối đa 20 dòng", /stuck: stuck\.slice\(0, 20\)/.test(backlogBody));
+
+  // Thẻ trên UI phải gọi đúng query (có token, không owner thì skip).
+  check(
+    "thẻ hàng đợi gọi api.status.getJobBacklog kèm token",
+    /useQuery\(api\.status\.getJobBacklog, token \? \{ token \} : "skip"\)/.test(adminSrc),
+  );
+  check("thẻ hàng đợi được render trong trang Admin", /<JobBacklogCard \/>/.test(adminSrc));
+}
+
+// ── #11 sheet panel trên mobile (đợt #4) ──
+console.log("── #11 sheet panel mobile ──");
+{
+  check("ngưỡng desktop khớp Tailwind lg (1024px)", DESKTOP_BREAKPOINT_PX === 1024);
+  check(
+    "media query loại trừ chắc với lg (1023.98px)",
+    NARROW_MEDIA_QUERY === "(max-width: 1023.98px)" && isNarrowViewport(1023.98),
+  );
+  check(
+    "rộng < lg → hẹp",
+    isNarrowViewport(375) && isNarrowViewport(768) && isNarrowViewport(1023),
+  );
+  check("rộng >= lg → không hẹp", !isNarrowViewport(1024) && !isNarrowViewport(1440));
+  check(
+    "không đo được bề rộng (SSR/test) → coi như desktop, KHÔNG mở sheet",
+    !isNarrowViewport(undefined) && !isNarrowViewport(NaN),
+  );
+
+  check("panel mặc định là overview", HOME_SECTION === "overview");
+  check(
+    "mở sheet: hẹp + panel khác overview",
+    shouldUsePanelSheet(true, "antinuke") && shouldUsePanelSheet(true, "settings"),
+  );
+  check(
+    "KHÔNG mở sheet: panel mặc định (vào app là phải thấy dashboard)",
+    !shouldUsePanelSheet(true, HOME_SECTION),
+  );
+  check("KHÔNG mở sheet: màn hình rộng", !shouldUsePanelSheet(false, "antinuke"));
+
+  const sheetSrc = readFileSync(
+    new URL("../src/components/MobilePanelSheet.tsx", import.meta.url).pathname,
+    "utf8",
+  );
+  const guildPageSrc = readFileSync(
+    new URL("../src/pages/GuildPage.tsx", import.meta.url).pathname,
+    "utf8",
+  );
+
+  // Portal là bắt buộc: PageReveal đặt `transform` trên <main>, theo đặc tả CSS
+  // thì `fixed` bên trong sẽ bám vào <main> thay vì viewport → sheet cắt/kệch.
+  check(
+    "sheet render qua portal ra document.body (nép transform của PageReveal)",
+    /createPortal\(/.test(sheetSrc) && /document\.body/.test(sheetSrc),
+  );
+  check("sheet phủ kín màn hình", /fixed inset-0 z-50/.test(sheetSrc));
+  check(
+    "sheet khoá cuộn trang nền khi mở",
+    /document\.body\.style\.overflow = "hidden"/.test(sheetSrc),
+  );
+  check("Esc đóng được sheet", /e\.key === "Escape"/.test(sheetSrc));
+  check(
+    "sheet khai báo role/aria-modal + nhãn tên panel",
+    /role="dialog"/.test(sheetSrc) &&
+      /aria-modal="true"/.test(sheetSrc) &&
+      /aria-label=\{title\}/.test(sheetSrc),
+  );
+  check(
+    "vùng cuộn của sheet không kéo theo trang nền",
+    /overscroll-contain/.test(sheetSrc) && /min-h-0 flex-1 overflow-y-auto/.test(sheetSrc),
+  );
+
+  // Panel chỉ được mount MỘT lần — vẽ cùng khối ở cả hai nhánh sẽ khiến mỗi
+  // panel chạy đôi useQuery của Convex.
+  const panelNodeUses = guildPageSrc.match(/panelNode/g)?.length ?? 0;
+  check(
+    "thân panel tạo một lần và dùng ở cả hai nhánh",
+    panelNodeUses === 3 && /const panelNode = \(/.test(guildPageSrc),
+  );
+  check(
+    "đóng sheet đi qua goToSection (không bỏ qua hỏi 'còn thay đổi chưa lưu')",
+    /goToSection\(HOME_SECTION as SectionKey\)/.test(guildPageSrc) &&
+      /const closeSheet = useCallback\(/.test(guildPageSrc),
+  );
+  check(
+    "GuildPage bám breakpoint: bố cục desktop 2 cột vẫn còn",
+    /lg:grid-cols-\[230px_1fr\]/.test(guildPageSrc),
+  );
+  check(
+    "tiêu đề nhóm vẫn ẩn ở mobile (nav là hàng cuộn ngang)",
+    /hidden px-3 pb-1 pt-2[^"]*lg:block/.test(guildPageSrc),
   );
 }
 

@@ -1433,4 +1433,45 @@ export const DE: Record<string, string> = {
   "Chưa bật xác minh thành viên": "Mitglieder-Verifizierung ist aus",
   "Acc ảo vào là có role ngay, không cần đợi con người duyệt.":
     "Alts bekommen sofort Rollen, ohne dass jemand sie freigeben muss.",
+  // ── Seite Vorfälle: Zeitachse + Periodenvergleich (Runde #4) ──
+  "Chi tiết": "Details",
+  "Hành động": "Aktion",
+  "Khoảng thời gian": "Dauer",
+  phút: "Min.",
+  "Thủ phạm": "Verursacher",
+  "Không rõ (sự kiện tự động)": "Unbekannt (automatisiertes Ereignis)",
+  "Đối tượng bị tác động": "Betroffene Ziele",
+  "sự cố": "Vorfälle",
+  "Hôm nay": "Heute",
+  "Lượt bị chặn": "Blockierte Aktionen",
+  "Sự kiện": "Ereignisse",
+  "không đổi": "unverändert",
+  "so với kỳ trước": "ggü. Vorperiode",
+  "ngày gần nhất so với": "Tage gegenüber den vorherigen",
+  "ngày trước": "Tagen",
+  "Ước lượng trên dữ liệu bot còn lưu (tối đa 500 sự kiện mỗi nguồn)":
+    "Geschätzt aus den noch gespeicherten Daten (max. 500 Ereignisse je Quelle)",
+  // ── Statistik: 24-Stunden-Rhythmus + 7 Tage (Runde #4) ──
+  "Người vào theo giờ hôm nay": "Beitritte nach Stunde heute",
+  "Giờ Việt Nam — bật chống nuke sớm ở khung giờ đông nhất":
+    "Vietnamesische Zeit — Anti-Nuke vor den stärksten Stunden aktivieren",
+  "Người vào 7 ngày gần nhất": "Beitritte der letzten 7 Tage",
+  // ── Admin: Auftragswarteschlange (Runde #4) ──
+  "Hàng đợi việc": "Auftragswarteschlange",
+  "Việc bot được giao · chỉ chủ bot nhìn thấy":
+    "Dem Bot zugewiesene Aufträge · nur für den Bot-Eigentümer",
+  "server kẹt": "festhängende Server",
+  "Đang chờ": "Wartend",
+  Sạch: "Leer",
+  Backup: "Backup",
+  "Báo cáo": "Bericht",
+  "Panel xác minh": "Bestätigungs-Panel",
+  "Panel ticket": "Ticket-Panel",
+  DM: "DM",
+  "Server đang kẹt việc (lâu nhất trước)":
+    "Server mit festhängenden Aufträgen (längste Wartezeit zuerst)",
+  việc: "Aufträge",
+  "Không có việc nào bị kẹt.": "Keine festhängenden Aufträge.",
+  "Chỉ tính việc chờ quá 15 phút — tick bot chạy mỗi 3 phút, quá ngưỡng là đứt mắt xích.":
+    "Zählt nur Aufträge mit mehr als 15 Minuten Wartezeit — der Bot tickt alle 3 Minuten, darüber ist die Kette gerissen.",
 };

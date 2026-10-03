@@ -131,6 +131,82 @@ export const reportCardCapability = mutation({
  * Sức khoẻ máy chủ — CHỈ chủ bot xem được (cửa sổ Admin), vì đây là số liệu
  * hạ tầng: % đĩa, GB trống, RAM. Trang Monitor công khai chỉ nhận MỨC.
  */
+/**
+ * HÀNG ĐỢI VIỆC — bao nhiêu việc đang chờ bot xử lý, và việc nào BỊ KẸT.
+ *
+ * Vì sao cần (đợt #4): từ khi chuyển việc quét sang Convex cron, phần lớn
+ * việc đi theo mẫu "cron đặt cờ → bot xử lý ở tick". Khi một mắt xích đứt
+ * (bot offline, tick lỗi, cấu hình sai) thì cờ sẽ nằm im — và im lặng là
+ * kiểu hỏng nguy hiểm nhất. Số liệu này biến "chờ" thành "đang kẹt 3 việc
+ * từ 2 tiếng trước ở server X", tức là nhìn thấy được.
+ *
+ * Ngưỡng `STUCK_AFTER_MS`: tick chạy mỗi 3 phút, nên 15 phút = 5 nhịp mà
+ * vẫn chưa xử lý thì coi như kẹt (không phải chỉ nhiễu).
+ */
+const STUCK_AFTER_MS = 15 * 60_000;
+
+export const getJobBacklog = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const user = await getUserByToken(ctx, token);
+    if (!user) return null;
+    const status = await ctx.db
+      .query("botStatus")
+      .withIndex("by_kind", (q) => q.eq("kind", "status"))
+      .first();
+    if (!isBotOwnerUser(user, status)) return null;
+
+    const now = Date.now();
+    const guilds = await ctx.db.query("guilds").collect();
+    const totals = { backup: 0, report: 0, verifyPanel: 0, ticketPanel: 0, dm: 0 };
+    const stuck: {
+      guildId: string;
+      name: string;
+      jobs: number;
+      oldestAt: number;
+      ageMin: number;
+    }[] = [];
+
+    for (const g of guilds) {
+      // Mỗi cờ có thể là boolean (chỉ "có/không") hoặc số mốc thời gian (đặt lúc
+      // nào). Cờ boolean không mang mốc ⇒ dùng `updatedAt` là xấp nhất.
+      const marks: { job: keyof typeof totals; pending: boolean; at?: number }[] = [
+        { job: "backup", pending: !!g.backupRequested },
+        { job: "report", pending: g.reportRequestedAt !== undefined, at: g.reportRequestedAt },
+        { job: "verifyPanel", pending: g.verifySendPanel === true },
+        { job: "ticketPanel", pending: g.ticketSendPanel === true },
+        { job: "dm", pending: g.dmRequested === true },
+      ];
+      let jobs = 0;
+      let oldest = now;
+      for (const m of marks) {
+        if (!m.pending) continue;
+        totals[m.job] += 1;
+        jobs += 1;
+        oldest = Math.min(oldest, m.at ?? g.updatedAt ?? now);
+      }
+      if (jobs > 0 && now - oldest >= STUCK_AFTER_MS) {
+        stuck.push({
+          guildId: g.discordId,
+          name: g.name ?? g.discordId,
+          jobs,
+          oldestAt: oldest,
+          ageMin: Math.round((now - oldest) / 60_000),
+        });
+      }
+    }
+
+    stuck.sort((a, b) => b.ageMin - a.ageMin);
+    return {
+      totals,
+      total: Object.values(totals).reduce((s, n) => s + n, 0),
+      stuck: stuck.slice(0, 20),
+      stuckAfterMin: STUCK_AFTER_MS / 60_000,
+      checkedAt: now,
+    };
+  },
+});
+
 export const getHostHealth = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
