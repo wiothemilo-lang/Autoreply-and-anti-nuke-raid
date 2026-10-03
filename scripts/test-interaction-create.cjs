@@ -132,6 +132,7 @@ let altAnalysisCalls = 0;
 const altMock = {
   analyzeNewMember: async () => {
     altAnalysisCalls++;
+    if (ctl.altAnalysisThrows) throw new Error("AI analysis fail");
     return altAnalysis;
   },
   executePunishment: async () => punishResult,
@@ -148,7 +149,11 @@ const altMock = {
 
 const origLoad = Module._load;
 Module._load = function (request, parent) {
-  const fromIC = parent && /handlers[\\/]interactionCreate\.js$/.test(parent.filename);
+  // Sau #5 tách monolith (03/10/2026), code của interactionCreate nằm trong
+  // "họ" module interaction* (interactionCreate + interactionVerify /
+  // TicketFlow / Cmd* / Common) — mock phủ cả họ, cùng ngữ nghĩa: mọi require
+  // của code handler đều nhận mock như trước khi tách.
+  const fromIC = parent && /handlers[\\/]interaction[A-Za-z]*\.js$/.test(parent.filename);
   if (fromIC) {
     if (request === "../util") return utilMock;
     if (request === "../lockdown") return lockdownMock;
@@ -218,6 +223,7 @@ Module._load = function (request, parent) {
     ctl.queryResult = null;
     ctl.mutationResult = null;
     ctl.giveawayEndOk = true;
+    ctl.altAnalysisThrows = false;
     altAnalysis = { riskScore: 0, action: "pass", riskFactors: [] };
     punishResult = { executed: false };
     altAnalysisCalls = 0;
@@ -362,6 +368,32 @@ Module._load = function (request, parent) {
       "captcha: không gửi được DM → hướng dẫn bật DM",
       replies[0].content.includes("cho phép tin nhắn trực tiếp"),
     );
+
+    // Rate-limit 3 lần/10 phút: lần thứ 4 phải chặn và KHÔNG gửi thêm DM —
+    // thiếu chặn này bot thành "vòi" DM cho kẻ bấm nút liên tục.
+    reset();
+    const spamMember = mkMember("spam1");
+    const spamUser = { id: "spam1", username: "spam" };
+    for (let i = 0; i < 3; i++) {
+      await run({
+        isButton: true,
+        customId: "verify_request_captcha",
+        member: spamMember,
+        user: spamUser,
+      });
+    }
+    const dmsBefore = calls.dms.length;
+    await run({
+      isButton: true,
+      customId: "verify_request_captcha",
+      member: spamMember,
+      user: spamUser,
+    });
+    check(
+      "captcha: bấm quá 3 lần/10 phút → chặn, không gửi thêm DM",
+      calls.dms.length === dmsBefore &&
+        replies[replies.length - 1].content.includes("quá nhiều lần"),
+    );
   }
 
   // ── 2. verify_confirm ──
@@ -381,6 +413,17 @@ Module._load = function (request, parent) {
     check(
       "confirm: thiếu verified role → từ chối",
       replies[0].content.includes("Chưa cấu hình role"),
+    );
+
+    reset();
+    configs.set("g1", { verifyEnabled: true, unverifiedRoleId: "r-unv", verifiedRoleId: "r-ver" });
+    const confirmNoMemberGuild = mkGuild("g1", mkMember());
+    confirmNoMemberGuild.members.cache = new Map();
+    confirmNoMemberGuild.members.fetch = async () => null;
+    await run({ isButton: true, customId: "verify_confirm", guild: confirmNoMemberGuild });
+    check(
+      "confirm: không tìm thấy member → từ chối, không kẹt",
+      replies[0].content.includes("Không tìm thấy"),
     );
 
     reset();
@@ -453,6 +496,21 @@ Module._load = function (request, parent) {
     await run({ isButton: true, customId: "verify_confirm" });
     check(
       "confirm: phạt thất bại → fail-open cho xác minh",
+      replies[0].content.includes("Đã xác minh thành công"),
+    );
+
+    // AI phân tích lỗi → fail-open: vẫn cho xác minh (không để người dùng kẹt)
+    reset();
+    ctl.altAnalysisThrows = true;
+    configs.set("g1", {
+      verifyEnabled: true,
+      unverifiedRoleId: "r-unv",
+      verifiedRoleId: "r-ver",
+      altDetectionEnabled: true,
+    });
+    await run({ isButton: true, customId: "verify_confirm" });
+    check(
+      "confirm: AI phân tích lỗi → fail-open, vẫn xác minh",
       replies[0].content.includes("Đã xác minh thành công"),
     );
 
@@ -1561,8 +1619,10 @@ Module._load = function (request, parent) {
     // tên đó. Lệch 1 chữ là `/backup keep` không nhận được giá trị (getInteger
     // trả null) — chạy không lỗi nhưng cấu hình không bao giờ được đặt.
     {
+      // Sau #5 tách monolith, thân `case "backup"` nằm ở interactionCmdBackup.js —
+      // đọc đúng file mới, cùng ngữ nghĩa kiểm (hợp đồng option ↔ slash.js).
       const slashSrc = fs.readFileSync(
-        path.join(__dirname, "..", "bot", "src", "handlers", "interactionCreate.js"),
+        path.join(__dirname, "..", "bot", "src", "handlers", "interactionCmdBackup.js"),
         "utf8",
       );
       const branch = slashSrc.slice(
@@ -1589,7 +1649,7 @@ Module._load = function (request, parent) {
     // lệnh giữa 2 file — đúng lớp lỗi đã có với /backup keep).
     {
       const src = fs.readFileSync(
-        path.join(__dirname, "..", "bot", "src", "handlers", "interactionCreate.js"),
+        path.join(__dirname, "..", "bot", "src", "handlers", "interactionCmdBackup.js"),
         "utf8",
       );
       const verifyAt = src.indexOf('if (sub === "verify")');

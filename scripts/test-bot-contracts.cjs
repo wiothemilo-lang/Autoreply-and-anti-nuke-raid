@@ -12,6 +12,8 @@
  *     được ghi → tickUnlocks không bao giờ mở khóa → server khóa kênh vĩnh viễn.
  *  3. interactionCreate khai báo verifyAttempts (rate-limit captcha DM) nhưng
  *     KHÔNG BAO GIỜ kiểm tra → spam nút "Nhận mã xác minh" = bot DM vô hạn.
+ *     (Sau #5 nhánh nút nằm ở handlers/interactionVerify.js — guard đọc file
+ *     mới, cùng ngữ nghĩa kiểm.)
  *  4. captchaStore.verifyCode không hủy mã khi sai → brute-force 10^6 tổ hợp
  *     trong cửa sổ 5 phút đoán trúng mã 6 chữ số không cần DM.
  *
@@ -66,12 +68,14 @@ check(
 );
 
 // ─── 3. Rate-limit captcha DM phải được KIỂM TRA, không chỉ khai báo ─────────
-const interactionSrc = read("bot/src/handlers/interactionCreate.js");
+// Sau #5 tách monolith, hàm nhận nút captcha nằm ở interactionVerify.js —
+// đọc đúng file mới, cùng ngữ nghĩa kiểm.
+const interactionSrc = read("bot/src/handlers/interactionVerify.js");
 const hasMap = /const verifyAttempts = new Map\(\)/.test(interactionSrc);
-// Kiểm tra thật: trong nhánh verify_request_captcha, trước khi setCode phải có
+// Kiểm tra thật: trong hàm xử lý nút, trước khi setCode phải có
 // check verifyAttempts.get + trả lời chặn khi vượt hạn mức.
 const captchaBranch = interactionSrc.slice(
-  interactionSrc.indexOf('customId === "verify_request_captcha"'),
+  interactionSrc.indexOf("async function handleVerifyRequestCaptcha"),
   interactionSrc.indexOf("// Tạo mã captcha và gửi DM"),
 );
 check("verifyAttempts được khai báo", hasMap);

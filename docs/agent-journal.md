@@ -4,6 +4,46 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 03/10/2026 (7) — #5 Tách `handlers/interactionCreate.js` (2551 dòng) thành 8 module, không đổi hành vi
+
+- 🎯 **Vì sao**: file 103 KB gánh cả định tuyến nút/modal, luồng xác minh, lớp
+  dẫn ticket và 20 lệnh slash — sửa một nhánh phải cuộn cả nghìn dòng.
+- 🧩 **Tách theo nhóm chức năng**: `interactionVerify.js` (nút captcha DM +
+  cổng alt khi verify) · `interactionTicketFlow.js` (nút/modal/`/ticket`) ·
+  `interactionCommon.js` (`needPerm`) · `interactionCmdGeneral.js` (11 lệnh:
+  report/research/ticket/ping/language/health/help/prefix/autoreply/badword/heat) ·
+  `interactionCmdMod.js` (lock+lockCommand/antinuke+MODULES/mod) ·
+  `interactionCmdCommunity.js` (giveaway/reactionrole + parsePairs) ·
+  `interactionCmdBackup.js` (backup) · `interactionCmdSetup.js` (verify/setup/alt).
+  Phụ thuộc một chiều, không vòng.
+- 🔒 **`handlers/interactionCreate.js` còn ~135 dòng — GIỮ NGUYÊN export +
+  MỌI `case "…"`**: test tĩnh đọc chính file này (`test-slash-command-contract`,
+  `test-commands-flow-e2e`) nên routing vẫn nằm ở facade theo đúng cây lệnh.
+- ✅ **Chứng minh không đổi hành vi (2 lớp)**: (1) script tạm so dòng gốc ↔
+  module mới — 22/2552 dòng không khớp verbatim và ĐỀU được giải thích: 7
+  call-site ticket thêm namespace `ticketFlow.`, 15 dòng bị prettier gộp khi
+  thụt lề giảm (đối chiếu từng dòng — nội dung y nguyên); (2) 2 suite hành vi
+  qua facade: interaction-create **185 PASS/0 FAIL** (182 → 185: +3 assert
+  rate-limit DM / confirm no-member / alt fail-open) · ticket-interactions **95/0**.
+- 🧪 **Kiểm chứng**: `bun run test` **85/85** (118,4s) · `test:ts` **21/21** ·
+  tsc/lint/format sạch · repo-map OK (42 module bot) · convex-contract OK (104
+  call) · coverage **95,16%** + sàn OK (facade 99,25 · ticket 97,67 · verify
+  94,75) · mutation **20/20** · web-contracts **289 PASS** (file mới vẫn qua
+  cổng signal-fetch).
+- 🛡️ **RED-PROOF 4/4 cho các đích đổi**: (1) `verifyAttempts.get` → `lookup`
+  → bot-contracts FAIL đúng check rate-limit; (2) ngưỡng 3→4 → assert "bấm quá
+  3 lần" FAIL; (3) `count`→`counts` + `index`→`idx` trong interactionCmdBackup
+  → 2 check hợp đồng option FAIL; (4) thu hẹp mock về đúng interactionCreate.js
+  → suite interaction FAIL hàng loạt (mock family là load-bearing). Khôi phục xanh.
+- 📁 File đụng: 8 module mới trong `bot/src/handlers/` · facade
+  `handlers/interactionCreate.js` · `scripts/test-interaction-create.cjs` ·
+  `scripts/test-ticket-interactions.cjs` · `scripts/test-bot-contracts.cjs` ·
+  `scripts/check-coverage-floor.cjs` · `docs/repo-map.md` (+ nhật ký).
+- ⏳ **Deploy VPS**: sandbox không tới được VPS — nếu production chưa pull từ
+  #1–#6, chạy `/deploy` (pull → kiểm chứng đủ → `pm2 restart protogon-bot`).
+- ▶️ Tiếp theo: #5 các đích còn lại (`convex/guilds.ts` 99KB · `bot_writes.ts`
+  75KB) → #4 chuyển `setInterval` sang Convex cron.
+
 ## 02/10/2026 (6) — #5 Tách `handlers/backup.js` (2857 dòng) thành 8 module, không đổi hành vi
 
 - 🎯 **Vì sao**: một file 114 KB gánh cả chụp snapshot, giải mã .msc, dựng lại server,

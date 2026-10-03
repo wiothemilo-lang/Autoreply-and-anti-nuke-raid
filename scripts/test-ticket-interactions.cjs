@@ -202,7 +202,10 @@ const utilMock = {
 
 const origLoad = Module._load;
 Module._load = function (request, parent) {
-  const fromIC = parent && /handlers[\\/]interactionCreate\.js$/.test(parent.filename);
+  // Sau #5 tách monolith (03/10/2026), lớp dẫn ticket nằm ở
+  // interactionTicketFlow.js (cùng "họ" interaction*) — mock phủ cả họ, cùng
+  // ngữ nghĩa: mọi require của code handler đều nhận mock như trước khi tách.
+  const fromIC = parent && /handlers[\\/]interaction[A-Za-z]*\.js$/.test(parent.filename);
   if (fromIC) {
     if (request === "../util") return utilMock;
     if (request === "../lockdown")
