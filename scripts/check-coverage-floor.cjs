@@ -81,9 +81,13 @@ const FLOORS = {
   // Lớp dẫn log dùng chung: quyết định log moderation rơi vào kênh nào và
   // có bị mất không khi webhook chết. Sàn 95 (đo 100%).
   "util.js": 95,
-  // Nút/modal/lệnh ticket trong interactionCreate: rẫy customId, quyền staff,
-  // điều kiện lỗi. Sàn 90 (đo 95.2% sau khi có test-ticket-interactions).
+  // Tương tác (đợt #5 tách monolith 03/10/2026): facade định tuyến + lớp dẫn
+  // ticket + nút xác minh. Rẫy customId, quyền staff, rate-limit DM, cổng alt —
+  // sai ở đây là ticket/verify chết câm hoặc bot thành vòi DM.
+  // Sàn 90 (đo 99,3% facade · 97,7% ticket · 94,8% verify).
   "handlers/interactionCreate.js": 90,
+  "handlers/interactionTicketFlow.js": 90,
+  "handlers/interactionVerify.js": 90,
   // Reaction role + giveaway + panel xác minh. Sàn 95 (đo 100% sau khi phủ
   // postPanel/postGiveaway/endGiveaway + đường DM trực tiếp của admin).
   "handlers/hidden.js": 95,
