@@ -1525,4 +1525,20 @@ export const EN: Record<string, string> = {
   "Giờ Việt Nam — bật chống nuke sớm ở khung giờ đông nhất":
     "Vietnam time — turn anti-nuke on ahead of the busiest hours",
   "Người vào 7 ngày gần nhất": "Joins over the last 7 days",
+  // ── Admin: hàng đợi việc (đợt #4) ──
+  "Hàng đợi việc": "Job backlog",
+  "Việc bot được giao · chỉ chủ bot nhìn thấy": "Jobs assigned to the bot · owner only",
+  "server kẹt": "stuck guilds",
+  "Đang chờ": "Waiting",
+  Sạch: "Clear",
+  Backup: "Backup",
+  "Báo cáo": "Report",
+  "Panel xác minh": "Verification panel",
+  "Panel ticket": "Ticket panel",
+  DM: "DM",
+  "Server đang kẹt việc (lâu nhất trước)": "Guilds with stuck jobs (longest waiting first)",
+  việc: "jobs",
+  "Không có việc nào bị kẹt.": "No stuck jobs.",
+  "Chỉ tính việc chờ quá 15 phút — tick bot chạy mỗi 3 phút, quá ngưỡng là đứt mắt xích.":
+    "Only counts jobs waiting more than 15 minutes — the bot ticks every 3 minutes, past that the chain is broken.",
 };

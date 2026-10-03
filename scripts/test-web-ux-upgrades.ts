@@ -24,6 +24,13 @@ import {
   summarizeByModule,
   type IncidentLike,
 } from "../src/lib/incidentStats";
+import {
+  DESKTOP_BREAKPOINT_PX,
+  HOME_SECTION,
+  NARROW_MEDIA_QUERY,
+  isNarrowViewport,
+  shouldUsePanelSheet,
+} from "../src/lib/mediaQuery";
 import { EN } from "../src/lib/i18n.en";
 import { EN_PANELS } from "../src/lib/i18n.en.panels";
 import { EN_LABELS } from "../src/lib/i18n.en.labels";
@@ -539,6 +546,124 @@ console.log("── #9 thống kê sự cố ──");
   check(
     "tổng hợp khớp số sự cố đưa vào",
     summarizeByModule(list).reduce((n, m) => n + m.incidents, 0) === list.length,
+  );
+}
+
+// ── #10 hàng đợi việc ở trang Admin (đợt #4) ──
+console.log("── #10 hàng đợi việc (Admin) ──");
+{
+  const statusSrc = readFileSync(new URL("../convex/status.ts", import.meta.url).pathname, "utf8");
+  const adminSrc = readFileSync(
+    new URL("../src/pages/Admin.tsx", import.meta.url).pathname,
+    "utf8",
+  );
+
+  // getJobBacklog phải là QUERY (chỉ đọc) và tự guard owner — trả null thay vì
+  // lộ hàng đợi của mọi server cho tài khoản thường.
+  const backlogBody = statusSrc.slice(
+    statusSrc.indexOf("export const getJobBacklog"),
+    statusSrc.indexOf("export const getHostHealth"),
+  );
+  check("getJobBacklog là query", /export const getJobBacklog = query\(/.test(statusSrc));
+  check(
+    "getJobBacklog guard owner (isBotOwnerUser) → null",
+    /isBotOwnerUser\(user, status\)\) return null/.test(backlogBody),
+  );
+  check("getJobBacklog nhận token qua args", /args: \{ token: v\.string\(\) \}/.test(backlogBody));
+  check(
+    "ngưỡng kẹt nằm ở hằng số STUCK_AFTER_MS = 15 phút",
+    /const STUCK_AFTER_MS = 15 \* 60_000;/.test(statusSrc),
+  );
+  check("danh sách kẹt cắt còn tối đa 20 dòng", /stuck: stuck\.slice\(0, 20\)/.test(backlogBody));
+
+  // Thẻ trên UI phải gọi đúng query (có token, không owner thì skip).
+  check(
+    "thẻ hàng đợi gọi api.status.getJobBacklog kèm token",
+    /useQuery\(api\.status\.getJobBacklog, token \? \{ token \} : "skip"\)/.test(adminSrc),
+  );
+  check("thẻ hàng đợi được render trong trang Admin", /<JobBacklogCard \/>/.test(adminSrc));
+}
+
+// ── #11 sheet panel trên mobile (đợt #4) ──
+console.log("── #11 sheet panel mobile ──");
+{
+  check("ngưỡng desktop khớp Tailwind lg (1024px)", DESKTOP_BREAKPOINT_PX === 1024);
+  check(
+    "media query loại trừ chắc với lg (1023.98px)",
+    NARROW_MEDIA_QUERY === "(max-width: 1023.98px)" && isNarrowViewport(1023.98),
+  );
+  check(
+    "rộng < lg → hẹp",
+    isNarrowViewport(375) && isNarrowViewport(768) && isNarrowViewport(1023),
+  );
+  check("rộng >= lg → không hẹp", !isNarrowViewport(1024) && !isNarrowViewport(1440));
+  check(
+    "không đo được bề rộng (SSR/test) → coi như desktop, KHÔNG mở sheet",
+    !isNarrowViewport(undefined) && !isNarrowViewport(NaN),
+  );
+
+  check("panel mặc định là overview", HOME_SECTION === "overview");
+  check(
+    "mở sheet: hẹp + panel khác overview",
+    shouldUsePanelSheet(true, "antinuke") && shouldUsePanelSheet(true, "settings"),
+  );
+  check(
+    "KHÔNG mở sheet: panel mặc định (vào app là phải thấy dashboard)",
+    !shouldUsePanelSheet(true, HOME_SECTION),
+  );
+  check("KHÔNG mở sheet: màn hình rộng", !shouldUsePanelSheet(false, "antinuke"));
+
+  const sheetSrc = readFileSync(
+    new URL("../src/components/MobilePanelSheet.tsx", import.meta.url).pathname,
+    "utf8",
+  );
+  const guildPageSrc = readFileSync(
+    new URL("../src/pages/GuildPage.tsx", import.meta.url).pathname,
+    "utf8",
+  );
+
+  // Portal là bắt buộc: PageReveal đặt `transform` trên <main>, theo đặc tả CSS
+  // thì `fixed` bên trong sẽ bám vào <main> thay vì viewport → sheet cắt/kệch.
+  check(
+    "sheet render qua portal ra document.body (nép transform của PageReveal)",
+    /createPortal\(/.test(sheetSrc) && /document\.body/.test(sheetSrc),
+  );
+  check("sheet phủ kín màn hình", /fixed inset-0 z-50/.test(sheetSrc));
+  check(
+    "sheet khoá cuộn trang nền khi mở",
+    /document\.body\.style\.overflow = "hidden"/.test(sheetSrc),
+  );
+  check("Esc đóng được sheet", /e\.key === "Escape"/.test(sheetSrc));
+  check(
+    "sheet khai báo role/aria-modal + nhãn tên panel",
+    /role="dialog"/.test(sheetSrc) &&
+      /aria-modal="true"/.test(sheetSrc) &&
+      /aria-label=\{title\}/.test(sheetSrc),
+  );
+  check(
+    "vùng cuộn của sheet không kéo theo trang nền",
+    /overscroll-contain/.test(sheetSrc) && /min-h-0 flex-1 overflow-y-auto/.test(sheetSrc),
+  );
+
+  // Panel chỉ được mount MỘT lần — vẽ cùng khối ở cả hai nhánh sẽ khiến mỗi
+  // panel chạy đôi useQuery của Convex.
+  const panelNodeUses = guildPageSrc.match(/panelNode/g)?.length ?? 0;
+  check(
+    "thân panel tạo một lần và dùng ở cả hai nhánh",
+    panelNodeUses === 3 && /const panelNode = \(/.test(guildPageSrc),
+  );
+  check(
+    "đóng sheet đi qua goToSection (không bỏ qua hỏi 'còn thay đổi chưa lưu')",
+    /goToSection\(HOME_SECTION as SectionKey\)/.test(guildPageSrc) &&
+      /const closeSheet = useCallback\(/.test(guildPageSrc),
+  );
+  check(
+    "GuildPage bám breakpoint: bố cục desktop 2 cột vẫn còn",
+    /lg:grid-cols-\[230px_1fr\]/.test(guildPageSrc),
+  );
+  check(
+    "tiêu đề nhóm vẫn ẩn ở mobile (nav là hàng cuộn ngang)",
+    /hidden px-3 pb-1 pt-2[^"]*lg:block/.test(guildPageSrc),
   );
 }
 

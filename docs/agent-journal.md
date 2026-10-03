@@ -4,6 +4,16 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 03/10/2026 (14) — #4 Nâng cấp UI phần A (nốt): dò thời gian sự cố, nhịp 24 giờ, hàng đợi việc, sheet mobile
+
+- 🎯 **Vì sao**: đợt (13) làm A2. Lượt này làm nốt **A4 → A3 → A6 → A5** theo thứ tự đã chốt (giá trị cao → dễ → khó).
+- 🧩 **A4 — `src/lib/incidentStats.ts` (MỚI, hàm thuần)**: `groupIncidentsByDay` (nhóm theo ngày, nhãn "Hôm nay", ngày mới trước), `compareIncidentPeriods` (so 2 kỳ 14 ngày, chốt theo `lastAt`), `summarizeByModule`. `GuildIncidents.tsx` thêm drill-down (Hành động / Khoảng thời gian / Thủ phạm / Đối tượng). Ghi rõ trên UI rằng số liệu là **ƯỚC LƯỢNG** (bot chỉ giữ tối đa 500 sự kiện mỗi nguồn) — không để người dùng tưởng là số đầy đủ.
+- 🧩 **A6 — `convex/guildStats.ts`**: `hourlyProfile` (24 ô, bỏ ngoài 24h/trước `dayStart`) + `weeklyProfile` (7 ngày VN, hôm nay là ô cuối); `todaySummary` trả thêm `hourly`/`weekly`. Biểu đồ vẽ bằng **CSS** (`height` %) — **không thêm thư viện**.
+- 🧩 **A3 — `status.getJobBacklog` + `JobBacklogCard`**: đo cái mới được sinh ra từ #4 (cron đặt cờ → bot tick xử lý). Hỏng kiểu âm thầm nhất. Ngưỡng `STUCK_AFTER_MS = 15 phút` = 5 nhịp tick; cờ boolean không mang mốc ⇒ fallback `g.updatedAt` (ghi rõ trong mã). Owner-gated như `getAiHealth`.
+- 🧩 **A5 — sheet mobile (`MobilePanelSheet` + `mediaQuery.ts`)**: portal ra `document.body` vì `PageReveal` đặt `transform` trên `<main>` — `fixed inset-0` bên trong sẽ bám `<main>` thay vì viewport. Thân panel tách thành `panelNode` tạo MỘT lần rồi chọn chỗ hiển thị, tránh mount hai lần (double `useQuery` Convex). Panel mặc định (`overview`) **không** bọc sheet — vào app phải thấy dashboard ngay.
+- 🧪 **Kiểm chứng**: `tsc` 0 · lint 0 · `format:check` 0 (sau `format`) · 6 cổng tĩnh 0 · **86/86 suites** (118,6s) · **21/21 suite TS** (4,3s). `test-web-ux-upgrades.ts` 71 → **125 PASS**; `test-guild-stats.ts` 53 → **67 PASS**.
+- 🚧 **Chưa làm được ở sandbox**: xem thẻ mới trong trình duyệt thật (thiếu Chromium) ⇒ kiểm chứng UI là typecheck + test hàm thuần + cổng i18n, **không phải** kiểm tra thị giác.
+
 ## 03/10/2026 (13) — Nâng cấp UI phần A: thẻ "Điểm cấu hình" trên panel Tổng quan
 
 - 🎯 **Vì sao**: trong 6 hạng mục UI đã đề xuất, khảo sát lại cho thấy **A1 (gom panel) ĐÃ CÓ** (`GuildPage` đã có `NAV_GROUPS` 3 nhóm, mobile không nhóm) — không làm lại. Đề xuất còn lại: điểm cấu hình, trang trạng thái hệ thống, drill-down sự cố, sheet mobile, heat theo giờ. Lượt này làm **A2 — điểm cấu hình**, giá trị cao nhất và test được tốt nhất.

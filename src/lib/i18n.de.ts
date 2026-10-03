@@ -1456,4 +1456,22 @@ export const DE: Record<string, string> = {
   "Giờ Việt Nam — bật chống nuke sớm ở khung giờ đông nhất":
     "Vietnamesische Zeit — Anti-Nuke vor den stärksten Stunden aktivieren",
   "Người vào 7 ngày gần nhất": "Beitritte der letzten 7 Tage",
+  // ── Admin: Auftragswarteschlange (Runde #4) ──
+  "Hàng đợi việc": "Auftragswarteschlange",
+  "Việc bot được giao · chỉ chủ bot nhìn thấy":
+    "Dem Bot zugewiesene Aufträge · nur für den Bot-Eigentümer",
+  "server kẹt": "festhängende Server",
+  "Đang chờ": "Wartend",
+  Sạch: "Leer",
+  Backup: "Backup",
+  "Báo cáo": "Bericht",
+  "Panel xác minh": "Bestätigungs-Panel",
+  "Panel ticket": "Ticket-Panel",
+  DM: "DM",
+  "Server đang kẹt việc (lâu nhất trước)":
+    "Server mit festhängenden Aufträgen (längste Wartezeit zuerst)",
+  việc: "Aufträge",
+  "Không có việc nào bị kẹt.": "Keine festhängenden Aufträge.",
+  "Chỉ tính việc chờ quá 15 phút — tick bot chạy mỗi 3 phút, quá ngưỡng là đứt mắt xích.":
+    "Zählt nur Aufträge mit mehr als 15 Minuten Wartezeit — der Bot tickt alle 3 Minuten, darüber ist die Kette gerissen.",
 };

@@ -10,6 +10,7 @@ import {
   Bug,
   Gauge,
   GraduationCap,
+  ListChecks,
   Loader2,
   Play,
   Server,
@@ -204,6 +205,7 @@ function AdminContent() {
                 onToggle={(enabled) => setDiag({ token, enabled }).catch(() => {})}
               />
               <HostHealthCard />
+              <JobBacklogCard />
               <AiHealthCard />
               <MetricsCard />
               <ThreatIntelCard
@@ -412,6 +414,109 @@ function HostHealthCard() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * HÀNG ĐỢI VIỆC — bao nhiêu việc bot chưa xử lý, và việc nào BỊ KẸT quá lâu
+ * (chỉ chủ bot xem được: `status:getJobBacklog` tự guard owner).
+ *
+ * Vì sao cần (đợt #4): từ khi việc quét chuyển sang Convex cron, phần lớn việc
+ * đi theo mẫu "cron đặt cờ → bot xử lý ở tick". Hỏng âm thầm đúng kiểu này: bot
+ * offline hoặc cấu hình sai ⇒ cờ nằm im, không tiếng kêu, không log. Thẻ này biến
+ * "đang chờ" thành "3 server kẹt việc, lâu nhất 47 phút".
+ *
+ * Ngưỡng 15 phút = 5 nhịp tick (tick mỗi 3 phút) — quá ngưỡng thì coi là kẹt
+ * chứ không phải nhiễu. Cũng là lý do không hiện danh sách dài: 20 dòng là đủ
+ * để biết cần đi sửa cái gì.
+ */
+function JobBacklogCard() {
+  const token = getSessionToken();
+  const backlog = useQuery(api.status.getJobBacklog, token ? { token } : "skip");
+
+  if (backlog === undefined || backlog === null) return null;
+
+  const kinds: { key: keyof typeof backlog.totals; label: string }[] = [
+    { key: "backup", label: "Backup" },
+    { key: "report", label: "Báo cáo" },
+    { key: "verifyPanel", label: "Panel xác minh" },
+    { key: "ticketPanel", label: "Panel ticket" },
+    { key: "dm", label: "DM" },
+  ];
+  const stuckCount = backlog.stuck.length;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <ListChecks className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="font-display text-sm font-bold">{translate("Hàng đợi việc")}</h3>
+            <p className="text-[11px] text-muted-foreground">
+              {translate("Việc bot được giao · chỉ chủ bot nhìn thấy")}{" "}
+            </p>
+          </div>
+        </div>
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-1 text-[11px] font-bold",
+            stuckCount > 0
+              ? "bg-danger/15 text-danger"
+              : backlog.total > 0
+                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+          )}
+        >
+          {stuckCount > 0
+            ? `${stuckCount} ${translate("server kẹt")}`
+            : backlog.total > 0
+              ? translate("Đang chờ")
+              : translate("Sạch")}
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] sm:grid-cols-5">
+        {kinds.map((k) => (
+          <div key={k.key} className="rounded-lg bg-secondary/40 px-2.5 py-1.5">
+            <span className="block text-muted-foreground">{translate(k.label)}</span>
+            <b className="tabular-nums">{backlog.totals[k.key]}</b>
+          </div>
+        ))}
+      </div>
+
+      {stuckCount > 0 ? (
+        <>
+          <p className="mt-3 text-[11px] font-semibold text-foreground">
+            {translate("Server đang kẹt việc (lâu nhất trước)")}{" "}
+          </p>
+          <ul className="mt-1.5 space-y-1 text-[11px]">
+            {backlog.stuck.map((s) => (
+              <li
+                key={s.guildId}
+                className="flex items-center justify-between gap-2 rounded-lg bg-secondary/40 px-2.5 py-1.5"
+              >
+                <span className="min-w-0 truncate">{s.name}</span>
+                <span className="shrink-0 tabular-nums text-danger">
+                  {s.jobs} {translate("việc")} · {s.ageMin} {translate("phút")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          {translate("Không có việc nào bị kẹt.")}{" "}
+        </p>
+      )}
+
+      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+        {translate(
+          "Chỉ tính việc chờ quá 15 phút — tick bot chạy mỗi 3 phút, quá ngưỡng là đứt mắt xích.",
+        )}{" "}
+      </p>
     </div>
   );
 }
