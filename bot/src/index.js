@@ -248,17 +248,15 @@ client.once("clientReady", async () => {
   }, 60_000);
   presenceInterval.unref();
 
-  // Daily report — mỗi 15 phút (query per-guild chỉ khi đến hạn)
+  // Daily report — lịch đã chuyển sang cron Convex (đợt #4):
+  // `convex/crons.ts` → reports:sweepDueDailyReports mỗi 30 phút đặt cờ
+  // `reportRequestedAt`; tick gửi embed rồi xoá cờ. Giữ lượt chạy đầu sau 15s
+  // như cũ để guild "còn nợ" báo cáo được gửi ngay khi bot online.
   const { runDailyReports } = require("./handlers/dailyReport");
   setTimeout(
     () => runDailyReports(client, store, heat).catch((e) => console.error("[report]", e.message)),
     15_000,
   );
-  const reportInterval = setInterval(
-    () => runDailyReports(client, store, heat).catch((e) => console.error("[report]", e.message)),
-    15 * 60 * 1000,
-  );
-  reportInterval.unref();
 
   // Heat flush — mỗi 30s (batch 1 mutation/guild — rẻ mà heat cập nhật nhanh,
   // dashboard thấy "nhiệt độ" thành viên gần như realtime).
@@ -268,23 +266,17 @@ client.once("clientReady", async () => {
   );
   heatInterval.unref();
 
-  // Vòng quét TỔNG HỢP — mỗi 60s, 1 query batch (bot_tick:getPendingJobs) trả
-  // { hidden, verifyPanels, backups } cho mọi guild: panel reaction role,
-  // giveaway, DM chờ, webhook log mặc định, panel xác minh, backup/restore/import.
-  // Thay 3 vòng quét riêng cũ (hidden 120s + verify 120s + backup 60s) — tiết kiệm
-  // ~50% function calls nhóm này trên Convex free tier, hidden/verify nhanh hơn.
-  require("./tick").setupTick(client, store);
+  // Vòng quét TỔNG HỢP — mỗi 180s, 1 query batch (bot_tick:getPendingJobs) trả
+  // { hidden, verifyPanels, backups, reports } cho mọi guild: panel reaction role,
+  // giveaway, DM chờ, webhook log mặc định, panel xác minh, backup/restore/import,
+  // báo cáo ngày (cờ cron). Thay 3 vòng quét riêng cũ (hidden 120s + verify 120s
+  // + backup 60s) — tiết kiệm ~50% function calls nhóm này trên Convex free tier,
+  // hidden/verify nhanh hơn. `heat` để vòng tick chèn bảng nhiệt vào báo cáo ngày.
+  require("./tick").setupTick(client, store, heat);
 
-  // Auto backup — mỗi 1 giờ (đặt cờ yêu cầu; việc backup thực hiện trong tick).
-  const pollBackups = require("./handlers/backup");
-  const autoBackupInterval = setInterval(
-    () =>
-      pollBackups
-        .autoBackupSweep(client, store)
-        .catch((e) => console.error("[backup:auto]", e.message)),
-    1 * 60 * 60 * 1000,
-  );
-  autoBackupInterval.unref();
+  // Auto backup — lịch đã chuyển sang cron Convex (đợt #4): `convex/crons.ts` →
+  // backup:sweepDueAutoBackups mỗi giờ đặt cờ `backupRequested`; bot chỉ thực
+  // thi trong tick. Không còn vòng setInterval phía bot.
 
   // Threat Intel research — mỗi 4 giờ (6 lần/ngày), tải nguồn mở MIỄN PHÍ
   // (Reddit JSON API + CISA KEV) + AI tổng hợp tối đa 1 lần/tuần (~15k tokens/tháng).

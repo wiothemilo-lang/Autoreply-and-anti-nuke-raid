@@ -33,6 +33,7 @@ import type * as bot_writes_settings from "../bot_writes/settings.js";
 import type * as bot_writes_shared from "../bot_writes/shared.js";
 import type * as bot_writes_tickets from "../bot_writes/tickets.js";
 import type * as channelLocks from "../channelLocks.js";
+import type * as crons from "../crons.js";
 import type * as geoGuard from "../geoGuard.js";
 import type * as guildConfig from "../guildConfig.js";
 import type * as guildStats from "../guildStats.js";
@@ -94,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   "bot_writes/shared": typeof bot_writes_shared;
   "bot_writes/tickets": typeof bot_writes_tickets;
   channelLocks: typeof channelLocks;
+  crons: typeof crons;
   geoGuard: typeof geoGuard;
   guildConfig: typeof guildConfig;
   guildStats: typeof guildStats;

@@ -1,8 +1,9 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild, guildAccessibleBy } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { reassembleBackupJsonForRead } from "./backupChunks";
+import { claimIsActive } from "./bot_writes/shared";
 
 /**
  * Backup server → đám mây GitHub.
@@ -606,6 +607,62 @@ export const botGetDueAuto = query({
       }
     }
     return due;
+  },
+});
+
+/**
+ * Cron Convex (đợt #4): thay vòng `autoBackupInterval` 1 giờ của bot.
+ * Đồng hồ "đến hạn tự động backup" thuộc SERVER — bot chỉ còn thực thi khi cờ
+ * `backupRequested` xuất hiện trong batch tick.
+ *
+ * Gương trung thực của `botGetDueAuto` + `autoBackupSweep` cũ: cùng điều kiện
+ * đến hạn (bật lịch 2–30 ngày, chưa có yêu cầu chờ, chưa backup trong khoảng
+ * đó) và cùng cách kế thừa "kèm tin nhắn" từ BẢN GẦN NHẤT (checksum incremental
+ * phải cùng chế độ với bản trước, nếu không server không đổi vẫn sinh bản trùng
+ * hoặc bỏ nhầm).
+ *
+ * Khác duy nhất: nhận không tham số (internalMutation — chỉ cron gọi được) và
+ * guild đang trong lượt backup/restore thì BỎ QUA vòng này (vòng sau thử lại) —
+ * đúng như `botSetBackupRequest` trả `in_flight` khi có claim đang sống.
+ */
+export const sweepDueAutoBackups = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const all = await ctx.db
+      .query("guilds")
+      .withIndex("by_botInGuild", (q) => q.eq("botInGuild", true))
+      .collect();
+    let requested = 0;
+    let skippedInFlight = 0;
+    for (const g of all) {
+      const days = g.backupAutoDays ?? 0;
+      if (days <= 0 || !g.botInGuild || g.backupRequested) continue;
+      if (g.lastBackupAt !== undefined && now - g.lastBackupAt < days * 86_400_000) continue;
+      if (
+        claimIsActive(g.backupClaimedAt, g.backupLeaseUntil) ||
+        claimIsActive(g.restoreClaimedAt, g.restoreLeaseUntil)
+      ) {
+        skippedInFlight++;
+        continue;
+      }
+      const last = await ctx.db
+        .query("guildBackups")
+        .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", g.discordId))
+        .order("desc")
+        .first();
+      const includeMessages = (last?.messageCount ?? 0) > 0;
+      await ctx.db.patch(g._id, {
+        backupRequested: true,
+        backupPushToGithub: true,
+        backupIncludeMessages: includeMessages,
+        backupClaimedAt: undefined,
+        backupLeaseUntil: undefined,
+        updatedAt: now,
+      });
+      requested++;
+    }
+    return { requested, skippedInFlight };
   },
 });
 

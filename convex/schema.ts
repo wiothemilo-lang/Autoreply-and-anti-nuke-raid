@@ -203,6 +203,13 @@ export default defineSchema({
     lockdownRequested: v.optional(v.boolean()),
     dailyReportEnabled: v.optional(v.boolean()),
     lastReportAt: v.optional(v.number()),
+    /**
+     * Cờ "đến hạn báo cáo ngày" do cron Convex đặt (đợt #4 — thay vòng
+     * `reportInterval` 15 phút của bot). Bot đọc cờ qua batch tick
+     * (`bot_tick.getPendingJobs.reports` — TƯƠI, KHÔNG đi qua bundle cache
+     * `getBotConfig`) rồi gửi báo cáo và gọi `botSetReportAt` để xoá cờ.
+     */
+    reportRequestedAt: v.optional(v.number()),
     /** AI Incident Report: bật/tắt cảnh báo khẩn khi raid/nuke được xác nhận. */
     emergencyAlertEnabled: v.optional(v.boolean()),
     /** AI Incident Report: cảnh báo khẩn có ping @everyone không. */

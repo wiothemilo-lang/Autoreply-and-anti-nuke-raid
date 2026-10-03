@@ -29,6 +29,7 @@ import {
   requestRestorePlan,
   restorePlanStatus,
   botGetPending,
+  sweepDueAutoBackups,
 } from "../convex/backup";
 import { computeBotKey } from "../convex/botAuth";
 import { reassembleBackupJsonForRead } from "../convex/backupChunks";
@@ -51,6 +52,7 @@ const requestBackupHandler = (requestBackup as any)._handler;
 const requestRestorePlanHandler = (requestRestorePlan as any)._handler;
 const restorePlanStatusHandler = (restorePlanStatus as any)._handler;
 const botGetPendingHandler = (botGetPending as any)._handler;
+const sweepDueAutoBackupsHandler = (sweepDueAutoBackups as any)._handler;
 const reportPlanHandler = (botReportRestorePlan as any)._handler;
 const setRetentionHandler = (botSetBackupRetention as any)._handler;
 const setRetentionBotHandler = (botSetBackupRetention as any)._handler;
@@ -145,36 +147,26 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
           }
           const rows =
             table === "guilds" ? guildRows : table === "backupChunks" ? chunkRows : backupRows;
+          // `by_botInGuild` (cron đợt #4) lọc theo cờ botInGuild thay vì guildId.
+          const match = (r: Row) => {
+            if ("botInGuild" in capture) return r.botInGuild === capture.botInGuild;
+            return (
+              (r.discordId ?? r.guildId) === capture.discordId ||
+              (r.discordId ?? r.guildId) === capture.guildId
+            );
+          };
           return {
-            first: async () =>
-              rows.find(
-                (r) =>
-                  (r.discordId ?? r.guildId) === capture.discordId ||
-                  (r.discordId ?? r.guildId) === capture.guildId,
-              ) ?? null,
-            collect: async () =>
-              rows.filter(
-                (r) =>
-                  (r.discordId ?? r.guildId) === capture.discordId ||
-                  (r.discordId ?? r.guildId) === capture.guildId,
-              ),
+            first: async () => rows.find(match) ?? null,
+            collect: async () => rows.filter(match),
             order: () => ({
               take: async (n: number) =>
                 [...rows]
-                  .filter(
-                    (r) =>
-                      (r.discordId ?? r.guildId) === capture.discordId ||
-                      (r.discordId ?? r.guildId) === capture.guildId,
-                  )
+                  .filter(match)
                   .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
                   .slice(0, n),
               first: async () =>
                 [...rows]
-                  .filter(
-                    (r) =>
-                      (r.discordId ?? r.guildId) === capture.discordId ||
-                      (r.discordId ?? r.guildId) === capture.guildId,
-                  )
+                  .filter(match)
                   .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0] ?? null,
             }),
           };
@@ -1124,6 +1116,127 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
       "slash keep: bỏ trống ngày → giữ nguyên quy tắc tuổi",
       kept.keepDays === 30 && guildRows.find((g) => g._id === "gslash")?.backupKeepDays === 30,
       JSON.stringify(kept),
+    );
+  }
+
+  console.log("\n── cron sweepDueAutoBackups (đợt #4 — thay autoBackupSweep của bot) ──");
+  {
+    const { ctx, guildRows, backupRows } = makeCtx({ seed: BOT_KEY });
+    const NOW = Date.now();
+    const day = 86_400_000;
+    guildRows.push(
+      {
+        _id: "g1",
+        discordId: "g1",
+        name: "Đến hạn",
+        botInGuild: true,
+        backupAutoDays: 7,
+        lastBackupAt: NOW - 8 * day,
+        backupRequested: false,
+      },
+      {
+        _id: "g2",
+        discordId: "g2",
+        name: "Chưa đến hạn",
+        botInGuild: true,
+        backupAutoDays: 7,
+        lastBackupAt: NOW - day,
+        backupRequested: false,
+      },
+      {
+        _id: "g3",
+        discordId: "g3",
+        name: "Tắt lịch",
+        botInGuild: true,
+        backupAutoDays: 0,
+        backupRequested: false,
+      },
+      {
+        _id: "g4",
+        discordId: "g4",
+        name: "Đang chờ lượt trước",
+        botInGuild: true,
+        backupAutoDays: 7,
+        lastBackupAt: NOW - 10 * day,
+        backupRequested: true,
+      },
+      {
+        _id: "g5",
+        discordId: "g5",
+        name: "Đang claim",
+        botInGuild: true,
+        backupAutoDays: 7,
+        lastBackupAt: NOW - 10 * day,
+        backupRequested: false,
+        backupClaimedAt: NOW - 1_000,
+        backupLeaseUntil: NOW + 600_000,
+      },
+      {
+        _id: "g6",
+        discordId: "g6",
+        name: "Bot đã rời",
+        botInGuild: false,
+        backupAutoDays: 7,
+        lastBackupAt: NOW - 30 * day,
+        backupRequested: false,
+      },
+      {
+        _id: "g7",
+        discordId: "g7",
+        name: "Chưa từng backup",
+        botInGuild: true,
+        backupAutoDays: 3,
+        backupRequested: false,
+      },
+    );
+    // Bản gần nhất của g1 CÓ tin nhắn → auto phải kế thừa includeMessages=true
+    // (checksum incremental phải cùng chế độ với bản trước).
+    backupRows.push({
+      _id: "b1",
+      guildId: "g1",
+      guildName: "Đến hạn",
+      backupJson: "z:x",
+      roleCount: 1,
+      channelCount: 1,
+      pushedToGithub: false,
+      messageCount: 12,
+      createdAt: NOW - 8 * day,
+    });
+    const res = (await sweepDueAutoBackupsHandler(ctx as any, {})) as any;
+    check("chỉ đặt cờ cho guild đến hạn (g1 + g7)", res.requested === 2, JSON.stringify(res));
+    const g1 = guildRows.find((g) => g._id === "g1")!;
+    check(
+      "g1: cờ + đẩy GitHub + KẾ THỪA includeMessages từ bản gần nhất",
+      g1.backupRequested === true &&
+        g1.backupPushToGithub === true &&
+        g1.backupIncludeMessages === true,
+    );
+    const g7 = guildRows.find((g) => g._id === "g7")!;
+    check(
+      "g7 chưa từng backup → includeMessages=false",
+      g7.backupRequested === true && g7.backupIncludeMessages === false,
+    );
+    check(
+      "g2 chưa đến hạn → không đụng",
+      guildRows.find((g) => g._id === "g2")!.backupRequested === false,
+    );
+    check(
+      "g3 tắt lịch (days=0) → không đụng",
+      guildRows.find((g) => g._id === "g3")!.backupRequested === false,
+    );
+    check(
+      "g4 đang chờ cờ sẵn → bỏ qua",
+      guildRows.find((g) => g._id === "g4")!.backupRequested === true &&
+        guildRows.find((g) => g._id === "g4")!.backupPushToGithub === undefined,
+    );
+    check(
+      "g5 claim đang sống → chưa đặt yêu cầu (vòng sau thử lại)",
+      guildRows.find((g) => g._id === "g5")!.backupRequested === false,
+    );
+    check("g5 được đếm vào skippedInFlight", res.skippedInFlight === 1, JSON.stringify(res));
+    check(
+      "g6 bot đã rời → không đụng (index by_botInGuild)",
+      guildRows.find((g) => g._id === "g6")!.backupRequested === false,
     );
   }
 

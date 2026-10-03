@@ -82,59 +82,46 @@ const check = (label, ok) => {
     round.guildName === "Test Guild" && round.roles.length === 1,
   );
 
-  // ---- 2. Auto-backup đồng bộ includeMessages theo bản gần nhất (fix checksum lệch) ----
-  const mutations = [];
-  const store = {
-    client: {
-      mutation: async (name, args) => {
-        mutations.push({ name, args });
-        return { ok: true, backupId: "bk1" };
-      },
-      query: async (name, _args = {}) => {
-        if (name === "backup:botGetDueAuto") {
-          return [{ guildId: "123456789012345678", days: 7 }];
-        }
-        if (name === "backup:botGetLastChecksum") {
-          // Bản gần nhất CÓ tin nhắn → auto phải đặt includeMessages=true
-          return { backupSnapshotChecksum: "abc", backupMessageCount: 42 };
-        }
-        return null;
-      },
-      action: async () => ({ ok: true }),
-    },
-    getConfig: async () => null,
-  };
-  mutations.length = 0;
-  await backup.autoBackupSweep({ guilds: { cache: new Map() } }, store);
-  const req = mutations.find((m) => m.name === "bot_writes:botSetBackupRequest");
-  check("auto sweep đặt yêu cầu backup", !!req);
-  check(
-    "auto sweep KẾ THỪA includeMessages=true từ bản gần nhất (trước đây luôn false → checksum lệch)",
-    req?.args?.includeMessages === true,
-  );
-
-  // Bản gần nhất KHÔNG tin nhắn → auto không kèm tin
-  store.client.query = async (name) => {
-    if (name === "backup:botGetDueAuto") return [{ guildId: "g2", days: 3 }];
-    if (name === "backup:botGetLastChecksum")
-      return { backupSnapshotChecksum: "x", backupMessageCount: 0 };
-    return null;
-  };
-  mutations.length = 0;
-  await backup.autoBackupSweep({ guilds: { cache: new Map() } }, store);
-  const req2 = mutations.find((m) => m.name === "bot_writes:botSetBackupRequest");
-  check("bản gần nhất không tin → includeMessages=false", req2?.args?.includeMessages === false);
-
-  // Chưa có backup nào (last null) → false (bản đầu không tin, khớp snapshot mặc định)
-  store.client.query = async (name) => {
-    if (name === "backup:botGetDueAuto") return [{ guildId: "g3", days: 2 }];
-    if (name === "backup:botGetLastChecksum") return null;
-    return null;
-  };
-  mutations.length = 0;
-  await backup.autoBackupSweep({ guilds: { cache: new Map() } }, store);
-  const req3 = mutations.find((m) => m.name === "bot_writes:botSetBackupRequest");
-  check("chưa có backup nào → includeMessages=false", req3?.args?.includeMessages === false);
+  // ---- 2. Lịch auto-backup đã chuyển sang cron Convex (đợt #4) ----
+  // Logic đến hạn + includeMessages giờ nằm ở convex/backup.ts
+  // (sweepDueAutoBackups) — unit test ở scripts/test-backup-convex.ts. Ở đây
+  // chặn hồi quy KIẾN TRÚC: cron phải có, bot không được mọc lại vòng quét.
+  {
+    const cronSrc = fs.readFileSync(path.join(__dirname, "..", "convex", "crons.ts"), "utf8");
+    check(
+      "convex/crons.ts: lịch auto-backup mỗi giờ → internal.backup.sweepDueAutoBackups",
+      /crons\.interval\(\s*"auto-backup-sweep",\s*\{\s*hours:\s*1\s*\},\s*internal\.backup\.sweepDueAutoBackups/.test(
+        cronSrc,
+      ),
+    );
+    const idxSrc = fs.readFileSync(path.join(__dirname, "..", "bot", "src", "index.js"), "utf8");
+    check(
+      "bot/src/index.js không còn autoBackupInterval/autoBackupSweep (lịch thuộc Convex cron)",
+      !idxSrc.includes("autoBackupInterval") && !idxSrc.includes("autoBackupSweep"),
+    );
+    const jobsSrc = fs.readFileSync(
+      path.join(__dirname, "..", "bot", "src", "backupJobs.js"),
+      "utf8",
+    );
+    check(
+      "backupJobs.js không còn autoBackupSweep (một nguồn sự thật phía Convex)",
+      !jobsSrc.includes("autoBackupSweep"),
+    );
+    const convexSrc = fs.readFileSync(path.join(__dirname, "..", "convex", "backup.ts"), "utf8");
+    const sweepBlock = convexSrc.slice(
+      convexSrc.indexOf("export const sweepDueAutoBackups"),
+      convexSrc.indexOf("export const botGetLastChecksum"),
+    );
+    check(
+      "sweep Convex kế thừa includeMessages từ messageCount bản gần nhất (checksum không lệch)",
+      sweepBlock.includes('order("desc")') && sweepBlock.includes("(last?.messageCount ?? 0) > 0"),
+    );
+    check(
+      "sweep Convex bỏ qua guild đang có claim backup/restore (in_flight)",
+      sweepBlock.includes("claimIsActive(g.backupClaimedAt, g.backupLeaseUntil)") &&
+        sweepBlock.includes("claimIsActive(g.restoreClaimedAt, g.restoreLeaseUntil)"),
+    );
+  }
 
   // ---- 3. Import file 'z:' (tải từ Gist) giờ đọc được ----
   const zContent = enc.backupJson;
@@ -237,7 +224,7 @@ const check = (label, ok) => {
   );
   const pollBlock = src.slice(
     src.indexOf("async function pollBackups"),
-    src.indexOf("async function autoBackupSweep"),
+    src.indexOf("async function cloneToServer("),
   );
   check(
     "lỗi backup/restore đi qua mutation báo lỗi, không clear như thành công",
@@ -944,60 +931,7 @@ const check = (label, ok) => {
     }
   }
 
-  // ══════════ 10. autoBackupSweep: lỗi + cloneToServer ══════════
-  {
-    let err = null;
-    try {
-      await backup.autoBackupSweep(
-        { guilds: { cache: new Map() } },
-        {
-          client: {
-            query: async () => {
-              throw new Error("Convex chết");
-            },
-            mutation: async () => ({}),
-          },
-          getConfig: async () => null,
-        },
-      );
-    } catch (e) {
-      err = e;
-    }
-    check("auto: query lỗi → nuốt lỗi, không crash", err === null);
-  }
-  {
-    // Một server hỏng không được làm hỏng các server còn lại trong cùng lượt quét.
-    const muts = [];
-    await backup.autoBackupSweep(
-      { guilds: { cache: new Map() } },
-      {
-        client: {
-          query: async (name) => {
-            if (name === "backup:botGetDueAuto")
-              return [
-                { guildId: "bad", days: 7 },
-                { guildId: "good", days: 7 },
-              ];
-            if (name === "backup:botGetLastChecksum") {
-              if (this._n === undefined) this._n = 0;
-              return { backupMessageCount: 0 };
-            }
-            return null;
-          },
-          mutation: async (name, args) => {
-            muts.push({ name, args });
-            return {};
-          },
-        },
-        getConfig: async () => null,
-      },
-    );
-    check(
-      "auto: vẫn đặt yêu cầu cho server hợp lệ",
-      muts.some((m) => m.args?.guildId === "good"),
-      JSON.stringify(muts.map((m) => m.args?.guildId)),
-    );
-  }
+  // ══════════ 10. cloneToServer ══════════
   {
     // cloneToServer chưa từng có test: chép cấu trúc từ server nguồn sang server đích.
     const tg = makeTarget();

@@ -102,44 +102,11 @@ async function pollBackups(client, store) {
 }
 
 /**
- * Bot quét mỗi giờ: tìm server đã bật lịch tự động backup (2-30 ngày) và đã đến
- * hạn → đặt cờ yêu cầu để vòng tick thực hiện (đẩy lên GitHub chủ bot).
- * "Kèm tin nhắn" của bản auto theo bản backup gần nhất của từng server (đọc
- * backupMessageCount từ backup:botGetLastChecksum), để incremental backup so
- * checksum cùng chế độ — không tạo bản trùng lặp khi server không đổi.
+ * Lịch tự động backup đã chuyển sang cron Convex (đợt #4):
+ * `convex/crons.ts` → backup:sweepDueAutoBackups mỗi giờ tự tính guild đến hạn
+ * và đặt cờ `backupRequested` (kèm chế độ "kèm tin nhắn" kế thừa từ bản gần
+ * nhất). Bot chỉ còn THỰC THI trong vòng tick — vòng quét phía bot đã bỏ.
  */
-async function autoBackupSweep(client, store) {
-  let due;
-  try {
-    due = await store.client.query("backup:botGetDueAuto", {});
-  } catch (e) {
-    console.error(`[backup:auto]`, e.message);
-    return;
-  }
-  if (!due || due.length === 0) return;
-  for (const item of due) {
-    try {
-      // Đồng bộ lựa chọn "Kèm tin nhắn" theo BẢN BACKUP GẦN NHẤT của server:
-      // bản gần nhất có tin nhắn (messageCount > 0) → auto backup cũng kèm tin.
-      // Quan trọng cho incremental: checksum snapshot phải cùng chế độ với bản
-      // trước, ngược lại server không đổi vẫn tạo bản trùng lặp (hoặc bỏ nhầm).
-      const last = await store.client
-        .query("backup:botGetLastChecksum", { guildId: item.guildId })
-        .catch(() => null);
-      const includeMessages = (last?.backupMessageCount ?? 0) > 0;
-      await store.client.mutation("bot_writes:botSetBackupRequest", {
-        guildId: item.guildId,
-        pushToGithub: true,
-        includeMessages,
-      });
-      console.log(
-        `[backup:auto] ${item.guildId}: lịch mỗi ${item.days} ngày → đã đặt yêu cầu backup`,
-      );
-    } catch (e) {
-      console.error(`[backup:auto] ${item.guildId}:`, e.message);
-    }
-  }
-}
 
 /**
  * Clone server structure to another server.
@@ -178,6 +145,5 @@ async function cloneToServer(
 module.exports = {
   pollBackups,
   claim,
-  autoBackupSweep,
   cloneToServer,
 };

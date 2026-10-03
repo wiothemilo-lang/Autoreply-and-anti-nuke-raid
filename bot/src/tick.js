@@ -18,6 +18,8 @@
  *  - backup       → backup.runBackup / runRestore / runImportRestore + claimAt fencing
  *  - settings đổi → xóa cache config + cache webhook của guild vừa được dashboard sửa
  *    (settingsChanges)
+ *  - báo cáo ngày → dailyReport.processReportJobs (cờ reportRequestedAt do cron
+ *    Convex `reports:sweepDueDailyReports` đặt — đợt #4, thay vòng 15 phút)
  */
 
 // TỐI ƯU I/O: 180s (trước 120s, ban đầu 60s) — các cờ backup/restore/panel vẫn
@@ -248,7 +250,7 @@ async function runBackupJobs(client, store, items) {
 }
 
 /** Một lượt tick: 1 query batch → xử lý toàn bộ việc chờ của mọi guild. */
-async function runTickOnce(client, store) {
+async function runTickOnce(client, store, heat) {
   let jobs = null;
   if (Date.now() >= batchBrokenUntil) {
     try {
@@ -274,6 +276,17 @@ async function runTickOnce(client, store) {
     try {
       require("./handlers/selfDiagnose").setEnabledFromJobs(jobs.selfDiagnose);
     } catch {}
+    try {
+      // Báo cáo ngày: gửi cho guild có cờ cron rồi xoá cờ (botSetReportAt).
+      await require("./handlers/dailyReport").processReportJobs(
+        client,
+        store,
+        heat,
+        jobs.reports ?? [],
+      );
+    } catch (e) {
+      console.error("[tick:reports]", e?.message || e);
+    }
     try {
       await hiddenMod.processHiddenJobsData(client, store, jobs.hidden ?? []);
     } catch (e) {
@@ -331,6 +344,13 @@ async function runTickOnce(client, store) {
   } catch (e) {
     console.error("[tick:channelLock:fallback]", e?.message || e);
   }
+  // Batch hỏng: vẫn giữ đường báo cáo cũ (quét theo cache config) — nếu không,
+  // báo cáo ngày sẽ đứng im suốt thời gian batch lỗi.
+  try {
+    await require("./handlers/dailyReport").runDailyReports(client, store, heat);
+  } catch (e) {
+    console.error("[tick:reports:fallback]", e?.message || e);
+  }
 }
 
 /**
@@ -347,13 +367,13 @@ async function runTickOnce(client, store) {
  * → chạy ngay; chỉ khi chưa ready mới chờ clientReady. Dùng đúng tên event
  * `clientReady` (không dùng `ready` đã deprecated).
  */
-function setupTick(client, store) {
+function setupTick(client, store, heat) {
   const start = () => {
     // Chạy ngay 1 lượt sau 15s (đợi gateway ổn định) — việc chờ từ lúc bot
     // offline (backup/panel/webhook log) được xử lý sớm, không đợi hết chu kỳ.
-    setTimeout(() => runTickOnce(client, store).catch(() => {}), 15_000).unref?.();
+    setTimeout(() => runTickOnce(client, store, heat).catch(() => {}), 15_000).unref?.();
     const interval = setInterval(() => {
-      runTickOnce(client, store).catch((e) => console.error("[tick]", e?.message || e));
+      runTickOnce(client, store, heat).catch((e) => console.error("[tick]", e?.message || e));
     }, TICK_INTERVAL_MS);
     interval.unref?.();
   };

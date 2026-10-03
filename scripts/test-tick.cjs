@@ -34,6 +34,8 @@ const calls = {
   queries: [],
   invalidate: [],
   webhookCache: [],
+  reports: [],
+  reportsAll: [],
 };
 let batchResponse = null;
 let batchShouldThrow = false;
@@ -86,6 +88,16 @@ const selfDiagnoseMock = {
     calls.selfDiagnose.push(v);
   },
 };
+// Báo cáo ngày (đợt #4): tick xử lý cờ cron qua processReportJobs; batch hỏng thì
+// rơi về runDailyReports (quét theo cache config) như hành vi cũ.
+const dailyReportMock = {
+  async processReportJobs(_client, _store, _heat, items) {
+    calls.reports.push(items);
+  },
+  async runDailyReports(_client, _store, _heat) {
+    calls.reportsAll.push(true);
+  },
+};
 
 const origLoad = Module._load;
 Module._load = function (request, parent) {
@@ -94,6 +106,7 @@ Module._load = function (request, parent) {
     if (request === "./handlers/hidden") return hiddenMock;
     if (request === "./handlers/backup") return backupMock;
     if (request === "./handlers/selfDiagnose") return selfDiagnoseMock;
+    if (request === "./handlers/dailyReport") return dailyReportMock;
     if (request === "./webhookHub") return webhookMock;
   }
   return origLoad.apply(this, arguments);
@@ -157,6 +170,7 @@ globalThis.fetch = async () => {
       hidden: [{ id: "h1" }],
       verifyPanels: [{ id: "v1" }],
       backups: [],
+      reports: [{ guildId: "rep-g1" }],
     };
     await runTickOnce(client, store);
     check("batch thành công → gọi batch query", calls.queries.includes("bot_tick:getPendingJobs"));
@@ -169,6 +183,10 @@ globalThis.fetch = async () => {
       calls.verify.length === 1 && calls.verify[0][0].id === "v1",
     );
     check("batch thành công → đồng bộ selfDiagnose", calls.selfDiagnose.length === 1);
+    check(
+      "batch thành công → xử lý báo cáo ngày từ cờ cron (jobs.reports)",
+      calls.reports.length === 1 && calls.reports[0][0].guildId === "rep-g1",
+    );
     check(
       "batch thành công → KHÔNG dùng fallback",
       !calls.queries.includes("hidden:getBotHiddenJobs"),
@@ -251,6 +269,10 @@ globalThis.fetch = async () => {
       calls.queries.includes("guilds:getVerifySendPanelGuilds"),
     );
     check("batch null → fallback backup", calls.queries.includes("backup:botGetPending"));
+    check(
+      "batch null → vẫn chạy vòng báo cáo theo cache config (không đứng im)",
+      calls.reportsAll.length === 1,
+    );
   }
 
   // ── 3. Batch lỗi → fallback + tạm bỏ batch lượt sau (10 phút) ──
