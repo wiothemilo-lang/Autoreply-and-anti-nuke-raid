@@ -26,7 +26,8 @@
  *
  * ── LUẬT B (bot ⇄ Convex) ───────────────────────────────────────────────────
  *   Tập `CONFIG_WRITE_MUTATIONS` trong `bot/src/convex.js` phải khớp CHÍNH XÁC
- *   tập mutation trong `convex/bot_writes.ts` ghi field bot đọc. Thêm mutation
+ *   tập mutation ghi field bot đọc, suy từ wrapper trong `convex/bot_writes.ts`
+ *   + thân handler ở `convex/bot_writes/*` (đợt #5 tách file). Thêm mutation
  *   cấu hình mới ở bot mà quên thêm vào danh sách → cache không được xoá → lỗi
  *   im lặng quay lại. Hai chiều đều bị kiểm (thừa và thiếu).
  *
@@ -41,7 +42,10 @@
  * script quét ĐỆ QUY và nhận cả helper dạng `export (async) function` — nhưng
  * chỉ với helper THẬT SỰ gọi `ctx.db.patch/insert/replace` (helper thuần dựng
  * object patch không tính: tín hiệu settingsChangedAt thuộc unit thực hiện
- * ghi). Hàm dùng chung nằm ngoài convex/ (ví dụ bot/) vẫn ngoài phạm vi.
+ * ghi). Từ đợt tách `convex/bot_writes.ts`, LUẬT B giải thêm `handler: X` của
+ * wrapper sang function ở module con (không giải được → báo LỖI, không im lặng);
+ * toàn bộ nhóm file bot_writes được LUẬT B phủ nên miễn LUẬT A. Hàm dùng chung
+ * nằm ngoài convex/ (ví dụ bot/) vẫn ngoài phạm vi.
  */
 
 const fs = require("fs");
@@ -148,8 +152,55 @@ function botConfigWriteSet() {
 }
 
 /**
- * Liệt kê mọi mutation export ghi field bot đọc trong một nguồn Convex.
- * Trả [{name, line, fields, hasSignal, hasComputedKeys}].
+ * Phân tích THÂN hàm đã strip comment → field bot đọc bị ghi + tín hiệu
+ * `settingsChangedAt` + dấu hiệu key tính toán. Dùng chung cho cả mutation
+ * inline lẫn helper tách file (đợt #5).
+ */
+function analyzeWrites(body, fieldSet) {
+  const written = new Set();
+  let computed = false;
+  // (a) object literal trong ctx.db.patch/insert/replace
+  const writeRe =
+    /ctx\.db\.(?:patch|insert|replace)\(\s*(?:"guilds"\s*,\s*|[A-Za-z_$][A-Za-z0-9_$.]*\s*,\s*)/g;
+  let wm;
+  while ((wm = writeRe.exec(body))) {
+    const openRel = body.indexOf("{", wm.index + wm[0].length - 1);
+    if (openRel < 0 || openRel - (wm.index + wm[0].length) > 40) continue;
+    const close = matchBlock(body, openRel);
+    if (close < 0) continue;
+    const lit = body.slice(openRel, close + 1);
+    for (const km of lit.matchAll(/(?:^|[\s,{])([A-Za-z][A-Za-z0-9_]*)\s*:/g)) {
+      if (fieldSet.has(km[1])) written.add(km[1]);
+    }
+    // Key tính toán `[k]:` — không biết chắc ghi field nào. CHỈ tính khi thân
+    // hàm thật sự đụng bảng guilds (nếu không thì đó là bảng khác, ví dụ
+    // botStatus, và báo vào sẽ là báo nhầm).
+    if (body.includes('"guilds"') && /(?:^|[\s,{])\[[^\]]+\]\s*:/.test(lit)) computed = true;
+  }
+  // (b)/(c) gán vào biến dạng patch/update: patch.x = … hoặc patch[k] = …
+  const assignRe =
+    /\b(patch|globalPatch|updates?|changes|fields)\s*(?:\.\s*([A-Za-z][A-Za-z0-9_]*)|\[)/g;
+  let am;
+  while ((am = assignRe.exec(body))) {
+    if (am[2]) {
+      if (fieldSet.has(am[2])) written.add(am[2]);
+    } else if (
+      body.slice(am.index + am[0].length - 1, am.index + am[0].length + 40).includes("=")
+    ) {
+      computed = true;
+    }
+  }
+  return {
+    fields: [...written].sort(),
+    computed,
+    // Đòi đúng cú pháp GHI (key trong object hoặc phép gán), không chỉ nhắc tên.
+    hasSignal: /settingsChangedAt\s*:/.test(body) || /settingsChangedAt\s*=/.test(body),
+  };
+}
+
+/**
+ * Liệt kê mọi mutation/helper export ghi field bot đọc trong một nguồn Convex.
+ * Trả [{name, line, fields, hasSignal, computed}].
  */
 function collectConfigWrites(src, fields) {
   const fieldSet = new Set(fields);
@@ -170,59 +221,93 @@ function collectConfigWrites(src, fields) {
     const body = stripComments(src.slice(braceAt, end + 1));
     if (isHelper && !/ctx\.db\.(?:patch|insert|replace)\(/.test(body)) continue;
     const line = src.slice(0, m.index).split("\n").length;
-
-    const written = new Set();
-    let computed = false;
-    // (a) object literal trong ctx.db.patch/insert/replace
-    const writeRe =
-      /ctx\.db\.(?:patch|insert|replace)\(\s*(?:"guilds"\s*,\s*|[A-Za-z_$][A-Za-z0-9_$.]*\s*,\s*)/g;
-    let wm;
-    while ((wm = writeRe.exec(body))) {
-      const openRel = body.indexOf("{", wm.index + wm[0].length - 1);
-      if (openRel < 0 || openRel - (wm.index + wm[0].length) > 40) continue;
-      const close = matchBlock(body, openRel);
-      if (close < 0) continue;
-      const lit = body.slice(openRel, close + 1);
-      for (const km of lit.matchAll(/(?:^|[\s,{])([A-Za-z][A-Za-z0-9_]*)\s*:/g)) {
-        if (fieldSet.has(km[1])) written.add(km[1]);
-      }
-      // Key tính toán `[k]:` — không biết chắc ghi field nào. CHỈ tính khi thân
-      // hàm thật sự đụng bảng guilds (nếu không thì đó là bảng khác, ví dụ
-      // botStatus, và báo vào sẽ là báo nhầm).
-      if (body.includes('"guilds"') && /(?:^|[\s,{])\[[^\]]+\]\s*:/.test(lit)) computed = true;
-    }
-    // (b)/(c) gán vào biến dạng patch/update: patch.x = … hoặc patch[k] = …
-    const assignRe =
-      /\b(patch|globalPatch|updates?|changes|fields)\s*(?:\.\s*([A-Za-z][A-Za-z0-9_]*)|\[)/g;
-    let am;
-    while ((am = assignRe.exec(body))) {
-      if (am[2]) {
-        if (fieldSet.has(am[2])) written.add(am[2]);
-      } else if (
-        body.slice(am.index + am[0].length - 1, am.index + am[0].length + 40).includes("=")
-      ) {
-        computed = true;
-      }
-    }
-
-    if (written.size === 0 && !computed) continue;
-    out.push({
-      name,
-      line,
-      fields: [...written].sort(),
-      computed,
-      // Đòi đúng cú pháp GHI (key trong object hoặc phép gán), không chỉ nhắc tên.
-      hasSignal: /settingsChangedAt\s*:/.test(body) || /settingsChangedAt\s*=/.test(body),
-    });
+    const w = analyzeWrites(body, fieldSet);
+    if (w.fields.length === 0 && !w.computed) continue;
+    out.push({ name, line, fields: w.fields, computed: w.computed, hasSignal: w.hasSignal });
   }
   return out;
 }
 
-/** LUẬT B — tập bot-side phải khớp chính xác tập suy ra từ convex/bot_writes.ts. */
-function checkBotSet(botSet, convexDir) {
-  const src = fs.readFileSync(path.join(convexDir, BOT_WRITES_FILE), "utf8");
-  const derived = new Set(collectConfigWrites(src, botFields()).map((w) => `bot_writes:${w.name}`));
+/** Toàn bộ nguồn bot-side: `bot_writes.ts` + module con `convex/bot_writes/*.ts`. */
+function botWritesSources(convexDir) {
+  const out = new Map();
+  out.set(BOT_WRITES_FILE, fs.readFileSync(path.join(convexDir, BOT_WRITES_FILE), "utf8"));
+  const dir = path.join(convexDir, "bot_writes");
+  if (fs.existsSync(dir)) {
+    for (const e of fs.readdirSync(dir).sort()) {
+      if (e.endsWith(".ts")) {
+        out.set(`bot_writes/${e}`, fs.readFileSync(path.join(dir, e), "utf8"));
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Thân một function export — bỏ qua cả danh sách tham số để `{ destructure }`
+ * trong signature không bị nhầm là thân hàm (bẫy của brace-matching đơn giản).
+ */
+function findExportedFunction(src, name) {
+  const m = new RegExp(`export (?:async )?function ${name}\\s*\\(`).exec(src);
+  if (!m) return null;
+  let depth = 0;
+  let i = m.index + m[0].length - 1; // đang ở '('
+  for (; i < src.length; i++) {
+    if (src[i] === "(") depth++;
+    else if (src[i] === ")") {
+      depth--;
+      if (depth === 0) break;
+    }
+  }
+  const braceAt = src.indexOf("{", i);
+  if (braceAt < 0) return null;
+  const end = matchBlock(src, braceAt);
+  return end < 0 ? null : src.slice(braceAt, end + 1);
+}
+
+/**
+ * Tập mutation bot-side ghi field bot đọc — suy từ WRAPPER trong bot_writes.ts,
+ * đi theo `handler:` sang module con (đợt #5 tách file). Không giải được handler
+ * → trả LỖI (cổng không được im lặng cho qua).
+ */
+function derivedBotWriteSet(convexDir, fields = botFields()) {
+  const fieldSet = new Set(fields);
+  const sources = botWritesSources(convexDir);
+  const wrapperSrc = sources.get(BOT_WRITES_FILE) ?? "";
   const errors = [];
+  const derived = new Set();
+  const wrapperRe = /export const ([A-Za-z0-9_]+) = (?:internalMutation|mutation|query)\(\{/g;
+  let m;
+  while ((m = wrapperRe.exec(wrapperSrc))) {
+    const name = m[1];
+    const braceAt = wrapperSrc.indexOf("{", m.index + m[0].length - 1);
+    const end = matchBlock(wrapperSrc, braceAt);
+    if (end < 0) continue;
+    let implBody = stripComments(wrapperSrc.slice(braceAt, end + 1));
+    const handler = implBody.match(/handler:\s*([A-Za-z0-9_]+)\s*,/);
+    if (handler) {
+      let found = null;
+      for (const src of sources.values()) {
+        found = findExportedFunction(src, handler[1]);
+        if (found) break;
+      }
+      if (!found) {
+        errors.push(
+          `không giải được thân handler ${handler[1]} của bot_writes:${name} — kiểm tra tên export ở module con`,
+        );
+        continue;
+      }
+      implBody = stripComments(found);
+    }
+    const w = analyzeWrites(implBody, fieldSet);
+    if (w.fields.length > 0 || w.computed) derived.add(`bot_writes:${name}`);
+  }
+  return { derived, errors };
+}
+
+/** LUẬT B — tập bot-side phải khớp chính xác tập suy ra từ bot_writes (+ module con). */
+function checkBotSet(botSet, convexDir) {
+  const { derived, errors } = derivedBotWriteSet(convexDir);
   for (const name of [...derived].sort()) {
     if (!botSet.has(name))
       errors.push(
@@ -395,6 +480,50 @@ function runSelfTest(fields) {
       `${ok ? "✅" : "❌"} self-test: ${c.desc} — mong ≥${c.expect} lỗi, nhận ${errs.length}`,
     );
   }
+  // Đợt #5: wrapper trỏ handler ở module con (`convex/bot_writes/*`) — cổng phải
+  // giải được và vẫn bắt đúng, không mù sau khi tách file.
+  const WRAPPER = `export const botNewThing = mutation({
+  args: botNewThingArgs,
+  handler: botNewThingHandler,
+});`;
+  const HANDLER = `export const botNewThingArgs = { guildId: v.string() };
+export async function botNewThingHandler(ctx: any, { guildId }: { guildId: string }) {
+  const guild = await ctx.db.query("guilds").first();
+  await ctx.db.patch(guild._id, { logChannelId: "1", updatedAt: Date.now() });
+}`;
+  const moduleCases = [
+    {
+      desc: "luật B giải wrapper→handler module con, bắt mutation mới chưa thêm danh sách",
+      handler: HANDLER,
+      botSet: [`bot_writes:botOther`],
+      minErrors: 1,
+    },
+    {
+      desc: "luật B wrapper→handler khớp danh sách → không báo",
+      handler: HANDLER,
+      botSet: [`bot_writes:botNewThing`],
+      minErrors: 0,
+      exactZero: true,
+    },
+    {
+      desc: "luật B handler không giải được → báo lỗi (cổng không mù)",
+      handler: null,
+      botSet: [`bot_writes:botNewThing`],
+      minErrors: 1,
+    },
+  ];
+  for (const c of moduleCases) {
+    const dir = fs.mkdtempSync(path.join(tmp, "module-"));
+    fs.writeFileSync(path.join(dir, BOT_WRITES_FILE), WRAPPER);
+    fs.mkdirSync(path.join(dir, "bot_writes"));
+    if (c.handler) fs.writeFileSync(path.join(dir, "bot_writes", "newthing.ts"), c.handler);
+    const errs = checkBotSet(new Set(c.botSet), dir);
+    const ok = c.exactZero ? errs.length === 0 : errs.length >= c.minErrors;
+    if (!ok) failed++;
+    console.log(
+      `${ok ? "✅" : "❌"} self-test: ${c.desc} — mong ${c.exactZero ? "0" : `≥${c.minErrors}`} lỗi, nhận ${errs.length}`,
+    );
+  }
   fs.rmSync(tmp, { recursive: true, force: true });
   return failed;
 }
@@ -417,6 +546,11 @@ function listConvexFiles(dir, base = dir) {
     out.push(path.relative(base, p));
   }
   return out;
+}
+
+/** File bot-side (wrapper `bot_writes.ts` + module con) — LUẬT B phủ, miễn LUẬT A. */
+function isBotWritesFile(f) {
+  return f === BOT_WRITES_FILE || f.startsWith("bot_writes/");
 }
 
 function main() {
@@ -446,7 +580,9 @@ function main() {
     const writes = collectConfigWrites(fs.readFileSync(path.join(CONVEX_DIR, f), "utf8"), fields);
     for (const w of writes) {
       if (w.hasSignal) continue;
-      if (f === BOT_WRITES_FILE && botSet.has(`bot_writes:${w.name}`)) {
+      // Nhóm file bot-side: LUẬT B phủ toàn bộ — nó suy từ wrapper → handler →
+      // đối chiếu chính xác với CONFIG_WRITE_MUTATIONS (kể cả module con đợt #5).
+      if (isBotWritesFile(f)) {
         exemptByBotSet++;
         continue;
       }
@@ -465,7 +601,7 @@ function main() {
 
   if (violations.length === 0 && botSetErrors.length === 0) {
     console.log(
-      `settings-signal OK — ${fields.length} field bot đọc; ${exemptByBotSet} mutation bot-side tự xoá cache, ${exemptByAllowlist} miễn trừ có lý do; danh sách CONFIG_WRITE_MUTATIONS khớp bot_writes.ts`,
+      `settings-signal OK — ${fields.length} field bot đọc; ${exemptByBotSet} mutation bot-side tự xoá cache, ${exemptByAllowlist} miễn trừ có lý do; danh sách CONFIG_WRITE_MUTATIONS khớp bot_writes (+ module con)`,
     );
     process.exit(0);
   }
@@ -513,7 +649,14 @@ function main() {
  * trên nguồn Convex THẬT (không chỉ snippet giả) — bộ tự kiểm trong file này
  * chỉ chạy ở chế độ CLI.
  */
-module.exports = { botFields, collectConfigWrites, botConfigWriteSet, checkBotSet, ALLOWLIST };
+module.exports = {
+  botFields,
+  collectConfigWrites,
+  botConfigWriteSet,
+  checkBotSet,
+  derivedBotWriteSet,
+  ALLOWLIST,
+};
 
 // Chỉ chạy khi gọi trực tiếp (`node scripts/check-settings-signal.cjs`) — để
 // `require()` từ test không kích hoạt kiểm tra + process.exit.

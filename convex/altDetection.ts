@@ -2,7 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
-import { TRIM_BATCH, dropBeyondCap, shouldTrim } from "./bot_writes";
+import { TRIM_BATCH, dropBeyondCap, shouldTrim } from "./bot_writes/shared";
 
 /** Alt detection configuration per guild. */
 export const getAltConfig = query({

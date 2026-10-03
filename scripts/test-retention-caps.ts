@@ -11,12 +11,9 @@
 //   1. BỊ CHẶN: ghi đều đặn hàng nghìn dòng thì bảng không vượt trần + ~TRIM_ODDS.
 //   2. HỘI TỤ: bảng tồn đọng từ bản cũ (hàng nghìn dòng) co dần về trần.
 //   3. AN TOÀN: chỉ xoá dòng CŨ NHẤT của ĐÚNG server đó, không đụng dòng mới.
-import {
-  botRecordAntinukeEvent,
-  botRecordModAction,
-  TRIM_BATCH,
-  TRIM_ODDS,
-} from "../convex/bot_writes";
+import { botRecordAntinukeEvent, botRecordModAction } from "../convex/bot_writes";
+// Đợt #5: helper retention tách sang `convex/bot_writes/shared.ts`.
+import { TRIM_BATCH, TRIM_ODDS } from "../convex/bot_writes/shared";
 import { recordJoin } from "../convex/altDetection";
 import { computeBotKey } from "../convex/botAuth";
 

@@ -37,7 +37,8 @@ check(
 const sensitive = [
   ["convex/backup.ts", "botGetPending (đọc toàn bộ backup JSON)"],
   ["convex/backup_github.ts", "githubPush (đẩy Gist)"],
-  ["convex/bot_writes.ts", "botStoreBackup / botClaimBackup / botClearBackup"],
+  ["convex/bot_writes/backup.ts", "botStoreBackup (backup)"],
+  ["convex/bot_writes/restore.ts", "botClaimBackup / botClearBackup (claim + dọn cờ)"],
   ["convex/guilds.ts", "getBotConfig (lộ whitelist + autoReplies)"],
   ["convex/webhooks.ts", "botGetWebhooks (lộ token webhook)"],
   ["convex/hidden.ts", "getBotHiddenJobs / botSetOwner"],
@@ -82,9 +83,10 @@ check(
 );
 check(
   "backup/restore có lease renewal + claim fencing ở từng giai đoạn",
+  // Đợt #5: wrapper giữ ở bot_writes.ts, thân handler ở bot_writes/restore.ts
+  // (nơi gia hạn lease); restoreCore phía bot nằm ở backupRestore.js.
   read("convex/bot_writes.ts").includes("botRenewBackupClaim") &&
-    read("convex/bot_writes.ts").includes("backupLeaseUntil") &&
-    // Đợt #5: restoreCore (nơi gia hạn claim ở từng giai đoạn) nằm ở backupRestore.js.
+    read("convex/bot_writes/restore.ts").includes("backupLeaseUntil") &&
     read("bot/src/backupRestore.js").includes("botRenewBackupClaim"),
 );
 check(
