@@ -158,6 +158,10 @@ function botConfigWriteSet() {
  */
 function analyzeWrites(body, fieldSet) {
   const written = new Set();
+  /** Field chỉ được ghi với giá trị `undefined` (xoá/nhả) — KHÔNG phải viết state. */
+  const cleared = new Set();
+  /** Field được ghi giá trị THẬT (không phải `undefined`) — mới là "ghi trạng thái". */
+  const valued = new Set();
   let computed = false;
   // (a) object literal trong ctx.db.patch/insert/replace
   const writeRe =
@@ -171,6 +175,14 @@ function analyzeWrites(body, fieldSet) {
     const lit = body.slice(openRel, close + 1);
     for (const km of lit.matchAll(/(?:^|[\s,{])([A-Za-z][A-Za-z0-9_]*)\s*:/g)) {
       if (fieldSet.has(km[1])) written.add(km[1]);
+    }
+    // Phân biệt "ghi giá trị" với "xoá bằng undefined": hai loại khác nhau về ý
+    // nghĩa sở hữu (bot xoá cờ `backupRequested` ≠ bot tự đặt cờ đó). Cổng cron
+    // (đợt #4) dựa vào đúng phân biệt này.
+    for (const km of lit.matchAll(/(?:^|[{,\n])\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*:\s*([^,{}]+),?/g)) {
+      if (!fieldSet.has(km[1])) continue;
+      if (km[2].trim() === "undefined") cleared.add(km[1]);
+      else valued.add(km[1]);
     }
     // Key tính toán `[k]:` — không biết chắc ghi field nào. CHỈ tính khi thân
     // hàm thật sự đụng bảng guilds (nếu không thì đó là bảng khác, ví dụ
@@ -192,6 +204,9 @@ function analyzeWrites(body, fieldSet) {
   }
   return {
     fields: [...written].sort(),
+    // Field chỉ bị xoá (undefined), chưa bao giờ bị ghi giá trị — bot không sở
+    // hữu trạng thái này, chỉ "trả lại" nó.
+    clearedOnly: [...cleared].filter((k) => !valued.has(k)).sort(),
     computed,
     // Đòi đúng cú pháp GHI (key trong object hoặc phép gán), không chỉ nhắc tên.
     hasSignal: /settingsChangedAt\s*:/.test(body) || /settingsChangedAt\s*=/.test(body),
@@ -215,15 +230,35 @@ function collectConfigWrites(src, fields) {
   while ((m = exportRe.exec(src))) {
     const name = m[1] ?? m[2];
     const isHelper = m[1] === undefined;
-    const braceAt = src.indexOf("{", m.index + m[0].length - 1);
-    const end = matchBlock(src, braceAt);
-    if (end < 0) continue;
-    const body = stripComments(src.slice(braceAt, end + 1));
+    let body;
+    if (isHelper) {
+      // BỎ QUA danh sách tham số: handler dạng
+      // `export async function botSetReportAtHandler(ctx, { botKey, guildId, at })`
+      // có `{...}` ngay sau `(` — brace-matching đơn giản bắt nhầm khối đó làm
+      // thân hàm ⇒ thân hàm thật (chứa `ctx.db.patch`) bị bỏ qua im lặng, cổng
+      // báo SẠCH sai. Đã xảy ra: `botSetReportAtHandler` ghi `lastReportAt`
+      // không hề được phân tích.
+      body = findExportedFunction(src, name);
+      if (body == null) continue;
+      body = stripComments(body);
+    } else {
+      const braceAt = src.indexOf("{", m.index + m[0].length - 1);
+      const end = matchBlock(src, braceAt);
+      if (end < 0) continue;
+      body = stripComments(src.slice(braceAt, end + 1));
+    }
     if (isHelper && !/ctx\.db\.(?:patch|insert|replace)\(/.test(body)) continue;
     const line = src.slice(0, m.index).split("\n").length;
     const w = analyzeWrites(body, fieldSet);
     if (w.fields.length === 0 && !w.computed) continue;
-    out.push({ name, line, fields: w.fields, computed: w.computed, hasSignal: w.hasSignal });
+    out.push({
+      name,
+      line,
+      fields: w.fields,
+      clearedOnly: w.clearedOnly,
+      computed: w.computed,
+      hasSignal: w.hasSignal,
+    });
   }
   return out;
 }
@@ -656,6 +691,10 @@ module.exports = {
   checkBotSet,
   derivedBotWriteSet,
   ALLOWLIST,
+  // Tiện ích phân tích nguồn — cổng `check-cron-boundary.cjs` dùng lại để
+  // không phải viết trùng bộ bóc comment / cân bằng ngoặc (đợt #4).
+  stripComments,
+  matchBlock,
 };
 
 // Chỉ chạy khi gọi trực tiếp (`node scripts/check-settings-signal.cjs`) — để

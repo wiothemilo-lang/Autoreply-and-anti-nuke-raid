@@ -3,6 +3,7 @@
  * Used by interactionCreate.js (send captcha) and messageCreate.js (verify code).
  */
 const store = new Map();
+const { registerSweep } = require("./sweeper");
 
 function genCaptcha() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -44,12 +45,27 @@ function verifyCode(guildId, userId, input) {
   return { ok: true };
 }
 
-// Dọn entry hết hạn mỗi 5 phút
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of store) {
-    if (now > v.expiresAt) store.delete(k);
-  }
-}, 300_000);
+// Dọn entry hết hạn mỗi 5 phút — qua vòng sweep CHUNG (đợt #4): module này
+// không tự dựng timer nữa.
+const CAPTCHA_TTL_MS = 5 * 60_000;
 
-module.exports = { genCaptcha, setCode, verifyCode, MAX_WRONG_ATTEMPTS };
+function sweepExpiredCaptchas(now = Date.now()) {
+  let removed = 0;
+  for (const [k, v] of store) {
+    if (now > v.expiresAt) {
+      store.delete(k);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+registerSweep("captchaStore", () => sweepExpiredCaptchas(), CAPTCHA_TTL_MS);
+
+module.exports = {
+  genCaptcha,
+  setCode,
+  verifyCode,
+  MAX_WRONG_ATTEMPTS,
+  sweepExpiredCaptchas,
+  CAPTCHA_TTL_MS,
+};

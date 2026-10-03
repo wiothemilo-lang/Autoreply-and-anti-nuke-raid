@@ -87,8 +87,18 @@ const state = {
   sweepMemory: () => calls.push({ name: "sweepMemory", args: [] }),
 };
 const origLoad = Module._load;
+// Đợt #4: antinuke không tự dựng timer nữa, mà đăng ký vào vòng dọn CHUNG
+// (bot/src/sweeper.js). Bắt hàm đăng ký để test vẫn bắn được vòng 20s.
+const sweeps = [];
+const sweeperMock = {
+  registerSweep(name, fn, everyMs) {
+    sweeps.push({ name, fn, everyMs });
+    return name;
+  },
+};
 Module._load = function (request, parent) {
   if (parent && /antinuke[\\/]index\.js$/.test(parent.filename)) {
+    if (request === "../../sweeper") return sweeperMock;
     if (request === "./shared") return { MODULE_LABELS: {}, messageFingerprint: () => "fp" };
     if (request === "./state") return () => state;
     if (request === "./ai") return () => ({});
@@ -172,19 +182,13 @@ const reset = () => {
   }
 
   // ── attach() định tuyến từng sự kiện Discord ──
-  // setInterval thật sẽ giữ process sống 20s/lần và treo test → bắt callback.
-  let tick = null;
-  const realSetInterval = global.setInterval;
-  global.setInterval = (fn, ms) => {
-    tick = { fn, ms };
-    return 0;
-  };
-  try {
-    api.attach();
-  } finally {
-    global.setInterval = realSetInterval;
-  }
-  check("attach đăng ký setInterval 20s", !!tick && tick.ms === 20_000, JSON.stringify(tick?.ms));
+  api.attach();
+  const tick = sweeps.find((s) => s.name === "antinuke");
+  check(
+    "attach đăng ký sweep 20s vào vòng dọn chung",
+    !!tick && tick.everyMs === 20_000,
+    JSON.stringify(tick?.everyMs),
+  );
   for (const ev of [
     "guildBanAdd",
     "guildMemberRemove",

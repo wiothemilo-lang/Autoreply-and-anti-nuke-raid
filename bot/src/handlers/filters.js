@@ -3,6 +3,7 @@ const { sendCaseLog } = require("../caseLog");
 const { heatSettings, punishMember, choosePunish } = require("../heat");
 const { actionsOf, cleanupMessages } = require("../moduleActions");
 const { automodEnabled } = require("./antinuke/shared");
+const { registerSweep } = require("../sweeper");
 
 const MODULE_LABELS = {
   badword: "Từ ngữ xấu",
@@ -603,21 +604,30 @@ const attachmentBuckets = new Map();
 // `${guildId}:${userId}` -> [timestamps của tin có mention]
 const mentionBuckets = new Map();
 
-/** Dọn bucket cũ định kỳ để RAM không tăng mãi (chạy mỗi 5 phút). */
-setInterval(() => {
-  const now = Date.now();
-  const cutoff = now - 600_000; // giữ tối đa 10 phút
+/** Dọn bucket cũ định kỳ để RAM không tăng mãi (chạy mỗi 5 phút) — qua vòng
+ * sweep CHUNG (đợt #4), không tự dựng timer. Giữ tối đa 10 phút dữ liệu như cũ. */
+const BUCKET_KEEP_MS = 600_000;
+
+function sweepMessageBuckets(now = Date.now()) {
+  const cutoff = now - BUCKET_KEEP_MS;
+  let removed = 0;
   for (const [k, arr] of attachmentBuckets) {
     const fresh = arr.filter((t) => t >= cutoff);
-    if (fresh.length === 0) attachmentBuckets.delete(k);
-    else attachmentBuckets.set(k, fresh);
+    if (fresh.length === 0) {
+      attachmentBuckets.delete(k);
+      removed += 1;
+    } else attachmentBuckets.set(k, fresh);
   }
   for (const [k, arr] of mentionBuckets) {
     const fresh = arr.filter((t) => t >= cutoff);
-    if (fresh.length === 0) mentionBuckets.delete(k);
-    else mentionBuckets.set(k, fresh);
+    if (fresh.length === 0) {
+      mentionBuckets.delete(k);
+      removed += 1;
+    } else mentionBuckets.set(k, fresh);
   }
-}, 300_000);
+  return removed;
+}
+registerSweep("filters", () => sweepMessageBuckets(), 5 * 60_000);
 
 module.exports = scanMessage;
 module.exports.MODULE_LABELS = MODULE_LABELS;
