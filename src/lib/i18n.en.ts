@@ -1475,4 +1475,31 @@ export const EN: Record<string, string> = {
   "Nhắn một câu trong Discord là được. Mình sẽ báo trước ít nhất một tuần trước khi mở, và cho bạn giữ nguyên mức giá này nếu bạn đã đăng ký.":
     "Just send a message on Discord. I will announce it at least a week before launch, and you keep this price if you sign up.",
   "Đăng ký qua Discord": "Sign up via Discord",
+  // ── Điểm cấu hình (panel Tổng quan, đợt #4) ──
+  "Điểm cấu hình": "Configuration score",
+  "Đã bật đủ các lớp bảo vệ chính.": "All main protection layers are enabled.",
+  "lớp bảo vệ chưa bật": "protection layers not enabled yet",
+  "Xem chi tiết": "See details",
+  "Thu gọn": "Collapse",
+  "Mở panel": "Open panel",
+  Tốt: "Good",
+  "Cần xem lại": "Needs review",
+  "Chưa bật chống nuke": "Anti-nuke is off",
+  "Không có lớp phòng thủ đầu tiên khi bị raid: bot sẽ không chặn mass ban, mass role hay xoá kênh hàng loạt.":
+    "No first line of defence during a raid: the bot will not stop mass bans, mass role changes or mass channel deletions.",
+  "Chưa chọn kênh nhận log": "No log channel selected",
+  "Mọi cảnh báo nuke, hình phạt và kết quả backup đều cần kênh log — không có kênh log thì bot xử lý xong mà bạn không thấy gì.":
+    "Every nuke alert, punishment and backup result needs a log channel — without one the bot acts and you never see it.",
+  "Chưa bật backup tự động": "Automatic backup is off",
+  "Bị nuke hoặc xoá nhầm mà không có bản backup gần nhất thì khôi phục gần như không thể.":
+    "Getting nuked or deleting something by mistake is almost impossible to recover from without a recent backup.",
+  "Chưa bật auto-mod nội dung": "Content auto-mod is off",
+  "Link độc, spam và từ cấm sẽ tới tận người dùng trước khi mod kịp xử lý.":
+    "Malicious links, spam and banned words reach members before a moderator can react.",
+  "Chưa bật Join Gate": "Join Gate is off",
+  "Tài khoản ảo mới lập lọt vào được server, làm loãng thành viên thật và tốn công xử lý.":
+    "Fresh alt accounts walk right in, cluttering real members and costing moderation time.",
+  "Chưa bật xác minh thành viên": "Member verification is off",
+  "Acc ảo vào là có role ngay, không cần đợi con người duyệt.":
+    "Alts get roles immediately, with nobody to approve them.",
 };

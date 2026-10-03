@@ -1406,4 +1406,31 @@ export const DE: Record<string, string> = {
   "Nhắn một câu trong Discord là được. Mình sẽ báo trước ít nhất một tuần trước khi mở, và cho bạn giữ nguyên mức giá này nếu bạn đã đăng ký.":
     "Schreib einfach eine Nachricht auf Discord. Ich kündige es mindestens eine Woche vorher an, und du behältst diesen Preis.",
   "Đăng ký qua Discord": "Über Discord anmelden",
+  // ── Konfigurations-Score (Übersicht, Runde #4) ──
+  "Điểm cấu hình": "Konfigurations-Score",
+  "Đã bật đủ các lớp bảo vệ chính.": "Alle wichtigen Schutzebenen sind aktiv.",
+  "lớp bảo vệ chưa bật": "Schutzebenen noch nicht aktiv",
+  "Xem chi tiết": "Details ansehen",
+  "Thu gọn": "Einklappen",
+  "Mở panel": "Panel öffnen",
+  Tốt: "Gut",
+  "Cần xem lại": "Prüfen",
+  "Chưa bật chống nuke": "Anti-Nuke ist aus",
+  "Không có lớp phòng thủ đầu tiên khi bị raid: bot sẽ không chặn mass ban, mass role hay xoá kênh hàng loạt.":
+    "Keine erste Verteidigungslinie bei einem Raid: der Bot stoppt weder Massen-Banns noch Massen-Rollenwechsel oder Kanallöschungen.",
+  "Chưa chọn kênh nhận log": "Kein Log-Kanal gewählt",
+  "Mọi cảnh báo nuke, hình phạt và kết quả backup đều cần kênh log — không có kênh log thì bot xử lý xong mà bạn không thấy gì.":
+    "Jede Nuke-Warnung, Strafe und jedes Backup-Ergebnis braucht einen Log-Kanal — sonst arbeitet der Bot, ohne dass du etwas siehst.",
+  "Chưa bật backup tự động": "Automatisches Backup ist aus",
+  "Bị nuke hoặc xoá nhầm mà không có bản backup gần nhất thì khôi phục gần như không thể.":
+    "Nach einem Nuke oder einem Versehen ist ohne aktuelles Backup fast nichts wiederherstellbar.",
+  "Chưa bật auto-mod nội dung": "Inhalts-Auto-Mod ist aus",
+  "Link độc, spam và từ cấm sẽ tới tận người dùng trước khi mod kịp xử lý.":
+    "Schädliche Links, Spam und verbotene Wörter erreichen Mitglieder, bevor ein Moderator reagieren kann.",
+  "Chưa bật Join Gate": "Join Gate ist aus",
+  "Tài khoản ảo mới lập lọt vào được server, làm loãng thành viên thật và tốn công xử lý.":
+    "Frische Alts kommen direkt hinein, verschmutzen echte Mitglieder und kosten Moderationszeit.",
+  "Chưa bật xác minh thành viên": "Mitglieder-Verifizierung ist aus",
+  "Acc ảo vào là có role ngay, không cần đợi con người duyệt.":
+    "Alts bekommen sofort Rollen, ohne dass jemand sie freigeben muss.",
 };

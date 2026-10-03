@@ -4,6 +4,19 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 03/10/2026 (13) — Nâng cấp UI phần A: thẻ "Điểm cấu hình" trên panel Tổng quan
+
+- 🎯 **Vì sao**: trong 6 hạng mục UI đã đề xuất, khảo sát lại cho thấy **A1 (gom panel) ĐÃ CÓ** (`GuildPage` đã có `NAV_GROUPS` 3 nhóm, mobile không nhóm) — không làm lại. Đề xuất còn lại: điểm cấu hình, trang trạng thái hệ thống, drill-down sự cố, sheet mobile, heat theo giờ. Lượt này làm **A2 — điểm cấu hình**, giá trị cao nhất và test được tốt nhất.
+- 🧩 **`src/lib/configHealth.ts` (MỚI, hàm thuần)**: 6 luật, tổng điểm trừ = 100 ⇒ "tắt hết" ra đúng 0 chứ không âm. `noAntiNuke` 30 (critical) · `noLogChannel` 25 (critical, chấp nhận cả `modLogChannelId`) · `noAutoBackup` 15 · `noAutoMod`/`noJoinGate`/`noVerify` 10 mỗi cái.
+- 🚧 **Một luật phải bỏ**: `altDetectionEnabled` không nằm trong `getGuild` mà ở query riêng `altDetection.getAltConfig` — kéo vào sẽ phá ranh giới "hàm thuần chỉ cần 1 query" của panel Tổng quan. Ghi rõ lý do trong mã thay vì im lặng bỏ.
+- 🧠 **Edge case quan trọng**: bot CHƯA ở trong server thì **không chấm** (trả 100, không vấn đề) — cấu hình chưa có ý nghĩa, chấm điểm sẽ khiến chủ server thấy "Rủi ro cao" một cách vô lý.
+- 🧪 **Test chặn (+14 case, `scripts/test-web-ux-upgrades.ts` 71 → 85)**: bật đủ = 100; từng luật trừ đúng điểm; thứ tự ưu tiên nghiêm trọng trước; `target` luôn có và chỉ trong danh sách khoá hợp lệ; chỉ có kênh log mod vẫn tính là có log; bot chưa ở server không chấm; tắt hết = 0 **không âm**; ngưỡng nhãn 80/50; và case đọc nguồn `GuildPage.tsx` khẳng định **mọi `target` đều có panel thật trong `NAV_ITEMS`** (gõ sai khoá ⇒ bấm mở panel không tồn tại).
+- 🌐 **i18n**: 17 chuỗi mới có bản EN + DE. Bỏ template literal `` `${n} lớp bảo vệ…` `` vì key động sẽ không tra được từ điển; tách thành `` `${n} ${translate("lớp bảo vệ chưa bật")}` ``.
+- 🔌 **Nối UI**: `ConfigHealthCard` đặt ĐẦU `OverviewPanel`; `OverviewPanel` nhận `onNavigate`, `GuildPage` truyền `goToSection` ⇒ bấm lỗi là mở thẳng panel cần sửa (kèm hỏi "còn thay đổi chưa lưu?" sẵn có của `goToSection`).
+- ✅ **Kiểm chứng**: `bun run test` **86/86** (120,5s, `SKIP_BROWSER_TESTS=1`) · `test:ts` **21/21** (`test-web-ux-upgrades` **85 PASS**) · tsc · lint · format:check · repo-map 43 module bot · convex-contract · settings-signal · cron-boundary · timer-allowlist · i18n 2060 key EN/DE.
+- ⏳ **Còn lại trong phần A** (chưa làm, đã xếp hạng): trạng thái hệ thống ở Admin, drill-down + so sánh kỳ trước ở Sự cố, sheet mobile, heat theo giờ ở Thống kê.
+- 📁 File đụng (8): `src/lib/configHealth.ts` (mới) · `src/components/dashboard/ConfigHealthCard.tsx` (mới) · `src/components/dashboard/OverviewPanel.tsx` · `src/pages/GuildPage.tsx` · `src/lib/{i18n.en.ts,i18n.de.ts}` · `scripts/test-web-ux-upgrades.ts` · `docs/{repo-map.md,decision-log.md,agent-journal.md}`.
+
 ## 03/10/2026 (12) — #4 Cổng tĩnh: allowlist `setInterval` toàn `bot/src` (so hai chiều)
 
 - 🎯 **Vì sao**: sau khi gom 5 vòng dọn RAM về `sweeper.js`, quyết định "việc dọn/trạng thái trong RAM không tự dựng timer" chỉ sống trong tài liệu — chỉ cần một module mới gọi `setInterval` là lùi kiến trúc mà không ai thấy.
