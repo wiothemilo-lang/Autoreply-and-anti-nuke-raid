@@ -1502,4 +1502,27 @@ export const EN: Record<string, string> = {
   "Chưa bật xác minh thành viên": "Member verification is off",
   "Acc ảo vào là có role ngay, không cần đợi con người duyệt.":
     "Alts get roles immediately, with nobody to approve them.",
+  // ── Trang Sự cố: dò thời gian + so sánh kỳ (đợt #4) ──
+  "Chi tiết": "Details",
+  "Hành động": "Action",
+  "Khoảng thời gian": "Duration",
+  phút: "min",
+  "Thủ phạm": "Perpetrator",
+  "Không rõ (sự kiện tự động)": "Unknown (automated event)",
+  "Đối tượng bị tác động": "Affected targets",
+  "sự cố": "incidents",
+  "Hôm nay": "Today",
+  "Lượt bị chặn": "Blocked actions",
+  "Sự kiện": "Events",
+  "không đổi": "no change",
+  "so với kỳ trước": "vs previous period",
+  "ngày gần nhất so với": "days vs the previous",
+  "ngày trước": "days",
+  "Ước lượng trên dữ liệu bot còn lưu (tối đa 500 sự kiện mỗi nguồn)":
+    "Estimated from the data the bot still stores (max 500 events per source)",
+  // ── Thống kê: nhịp 24 giờ + 7 ngày (đợt #4) ──
+  "Người vào theo giờ hôm nay": "Joins by hour today",
+  "Giờ Việt Nam — bật chống nuke sớm ở khung giờ đông nhất":
+    "Vietnam time — turn anti-nuke on ahead of the busiest hours",
+  "Người vào 7 ngày gần nhất": "Joins over the last 7 days",
 };

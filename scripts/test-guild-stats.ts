@@ -9,7 +9,14 @@
 //  - Đếm "phạm nhầm": sai biên là báo động giả hoặc bỏ sót thật.
 //  - Ngày VN (UTC+7): dùng UTC sẽ lệch 7 tiếng → "hôm nay" sai.
 import { explainRiskFactor, explainPunishment, formatLabel } from "../src/lib/riskExplain";
-import { summarize, startOfDayVietnam, type StatEvent, type StatJoin } from "../convex/guildStats";
+import {
+  hourlyProfile,
+  startOfDayVietnam,
+  summarize,
+  weeklyProfile,
+  type StatEvent,
+  type StatJoin,
+} from "../convex/guildStats";
 
 let pass = 0;
 let fail = 0;
@@ -267,6 +274,70 @@ console.log("── summarize: top yếu tố ──");
   check("rỗng → mọi số = 0", s.events === 0 && s.blocked === 0 && s.joins === 0);
   check("rỗng → không có yếu tố", s.topRiskFactors.length === 0);
   check("rỗng → không có nghi phạm", s.suspectedFalsePositives === 0);
+}
+
+console.log("── hourlyProfile / weeklyProfile (A6) ──");
+
+{
+  // Mốc 00:00 giờ VN cố định để test không phụ thuộc múi giờ máy.
+  const dayStart = startOfDayVietnam(Date.UTC(2026, 8, 27, 12, 0, 0));
+  const H = 3_600_000;
+  const e = (at: number, count = 1): StatEvent => ({
+    module: "massBan",
+    action: "mass ban",
+    count,
+    createdAt: at,
+    punish: null,
+  });
+  const j = (at: number): StatJoin => ({
+    createdAt: at,
+    riskScore: 10,
+    action: "pass",
+    riskFactors: [],
+  });
+
+  const hourly = hourlyProfile(
+    [
+      e(dayStart + 2 * H + 10 * 60_000, 5),
+      e(dayStart + 2 * H + 50 * 60_000, 3),
+      e(dayStart + 23 * H),
+    ],
+    [j(dayStart + 2 * H), j(dayStart + 2 * H), j(dayStart + 9 * H)],
+    dayStart,
+  );
+  check("luôn có đúng 24 ô", hourly.length === 24);
+  check("ô 2 gộp cả sự kiện lẫn người vào", hourly[2].events === 2 && hourly[2].joins === 2);
+  check("ô 2 gộp lượt chặn theo count", hourly[2].blocked === 8);
+  check("ô 23 có 1 sự kiện", hourly[23].events === 1);
+  check("ô không có gì vẫn là 0", hourly[5].events === 0 && hourly[5].joins === 0);
+  check(
+    "sự kiện ngoài 24h bị bỏ qua",
+    hourlyProfile([e(dayStart + 25 * H)], [], dayStart).every((b) => b.events === 0),
+  );
+  check(
+    "sự kiện trước dayStart bị bỏ qua",
+    hourlyProfile([e(dayStart - H)], [], dayStart).every((b) => b.events === 0),
+  );
+
+  const weekly = weeklyProfile(
+    [e(dayStart + 3 * H, 2), e(dayStart - 86_400_000 + H, 4)],
+    [j(dayStart + H), j(dayStart - 2 * 86_400_000 + H)],
+    dayStart + 10 * H,
+  );
+  check("luôn có đúng 7 ngày", weekly.length === 7);
+  check("ngày cũ nhất đứng trước", weekly[0].dayStart < weekly[6].dayStart);
+  check("ngày hôm nay là ô cuối", weekly[6].dayStart === dayStart);
+  check("ngày hôm nay gom lượt chặn của hôm nay", weekly[6].blocked === 2 && weekly[6].joins === 1);
+  check("ngày hôm qua đếm đúng", weekly[5].blocked === 4 && weekly[5].joins === 0);
+  check("2 ngày trước chỉ có người vào", weekly[4].joins === 1 && weekly[4].blocked === 0);
+  check(
+    "sự kiện ngoài 7 ngày không vào ô nào",
+    weeklyProfile([e(dayStart - 9 * 86_400_000)], [], dayStart + H).every((d) => d.blocked === 0),
+  );
+  check(
+    "rỗng → 7 ngày toàn 0",
+    weeklyProfile([], [], dayStart + H).every((d) => d.joins === 0 && d.blocked === 0),
+  );
 }
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);

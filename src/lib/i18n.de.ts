@@ -1433,4 +1433,27 @@ export const DE: Record<string, string> = {
   "Chưa bật xác minh thành viên": "Mitglieder-Verifizierung ist aus",
   "Acc ảo vào là có role ngay, không cần đợi con người duyệt.":
     "Alts bekommen sofort Rollen, ohne dass jemand sie freigeben muss.",
+  // ── Seite Vorfälle: Zeitachse + Periodenvergleich (Runde #4) ──
+  "Chi tiết": "Details",
+  "Hành động": "Aktion",
+  "Khoảng thời gian": "Dauer",
+  phút: "Min.",
+  "Thủ phạm": "Verursacher",
+  "Không rõ (sự kiện tự động)": "Unbekannt (automatisiertes Ereignis)",
+  "Đối tượng bị tác động": "Betroffene Ziele",
+  "sự cố": "Vorfälle",
+  "Hôm nay": "Heute",
+  "Lượt bị chặn": "Blockierte Aktionen",
+  "Sự kiện": "Ereignisse",
+  "không đổi": "unverändert",
+  "so với kỳ trước": "ggü. Vorperiode",
+  "ngày gần nhất so với": "Tage gegenüber den vorherigen",
+  "ngày trước": "Tagen",
+  "Ước lượng trên dữ liệu bot còn lưu (tối đa 500 sự kiện mỗi nguồn)":
+    "Geschätzt aus den noch gespeicherten Daten (max. 500 Ereignisse je Quelle)",
+  // ── Statistik: 24-Stunden-Rhythmus + 7 Tage (Runde #4) ──
+  "Người vào theo giờ hôm nay": "Beitritte nach Stunde heute",
+  "Giờ Việt Nam — bật chống nuke sớm ở khung giờ đông nhất":
+    "Vietnamesische Zeit — Anti-Nuke vor den stärksten Stunden aktivieren",
+  "Người vào 7 ngày gần nhất": "Beitritte der letzten 7 Tage",
 };
