@@ -54,7 +54,7 @@ const TOKEN = () => getSessionToken();
 
 type Kind = "welcome" | "goodbye";
 
-/** Sáu ô ảnh hợp lệ — khớp đúng union trong convex/guilds.ts (saveGreetingImage). */
+/** Sáu ô ảnh hợp lệ — khớp đúng union trong convex/guilds/greetingImages.ts (saveGreetingImage). */
 type ImageSlot =
   | "welcomeEmbedImage"
   | "welcomeEmbedThumbnail"

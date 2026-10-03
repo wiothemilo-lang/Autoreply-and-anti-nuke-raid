@@ -5,9 +5,9 @@
  * Phía bot tạo kênh / bấm nút nằm ở `bot/src/handlers/tickets.js` và ghi qua
  * `bot_writes:botOpenTicket` / `bot_writes:botCloseTicket`.
  *
- * Vì sao tách khỏi `guilds.ts`: `guilds.ts` đã 1800+ dòng và là file cấu
- * hình. Ticket có vòng đời riêng, cần index riêng, tách ra để không làm file
- * cấu hình phình thêm.
+ * Vì sao tách khỏi `guilds.ts`: file cấu hình vốn đã phình to (1800+ dòng
+ * trước đợt #5; nay thân hàm cấu hình nằm ở `guilds/*`). Ticket có vòng đời
+ * riêng, cần index riêng, tách ra để không làm file cấu hình phình thêm.
  *
  * ⚠️ Luật chung của mọi mutation ở đây: `canManageGuild` + ghi
  * `settingsChangedAt` khi đụng cấu hình. Cổng `check-settings-signal.cjs` và

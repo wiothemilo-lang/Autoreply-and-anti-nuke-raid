@@ -37,10 +37,11 @@
  * Chạy `--self-test` để chứng minh cổng không mù và không báo nhầm.
  *
  * Giới hạn có chủ đích: phân tích tĩnh theo văn bản (brace-matching), không
- * phải compiler. Mutation gọi hàm dùng chung ở file khác rồi hàm đó mới ghi cấu
- * hình sẽ không bị bắt — chấp nhận, vì mọi mutation cấu hình hiện tại đều ghi
- * trực tiếp; nếu có, false-positive lộ ra ngay ở CI và cách xử lý là thêm tín
- * hiệu (đúng) hoặc thêm allowlist kèm lý do.
+ * phải compiler. Từ đợt #5 (tách `convex/guilds.ts` thành `convex/guilds/*`),
+ * script quét ĐỆ QUY và nhận cả helper dạng `export (async) function` — nhưng
+ * chỉ với helper THẬT SỰ gọi `ctx.db.patch/insert/replace` (helper thuần dựng
+ * object patch không tính: tín hiệu settingsChangedAt thuộc unit thực hiện
+ * ghi). Hàm dùng chung nằm ngoài convex/ (ví dụ bot/) vẫn ngoài phạm vi.
  */
 
 const fs = require("fs");
@@ -153,14 +154,21 @@ function botConfigWriteSet() {
 function collectConfigWrites(src, fields) {
   const fieldSet = new Set(fields);
   const out = [];
-  const exportRe = /export const ([A-Za-z0-9_]+) = (?:internalMutation|mutation)\(\{/g;
+  // Hai dạng khai báo:
+  //  - mutation đăng ký với Convex: `export const X = mutation({` — kiểm như cũ.
+  //  - helper đã TÁCH FILE (đợt #5): `export (async) function X(` — chỉ kiểm khi
+  //    thân hàm THẬT SỰ ghi db; helper thuần dựng object patch không thuộc cổng.
+  const exportRe =
+    /export const ([A-Za-z0-9_]+) = (?:internalMutation|mutation)\(\{|export (?:async )?function ([A-Za-z0-9_]+)\(/g;
   let m;
   while ((m = exportRe.exec(src))) {
-    const name = m[1];
+    const name = m[1] ?? m[2];
+    const isHelper = m[1] === undefined;
     const braceAt = src.indexOf("{", m.index + m[0].length - 1);
     const end = matchBlock(src, braceAt);
     if (end < 0) continue;
     const body = stripComments(src.slice(braceAt, end + 1));
+    if (isHelper && !/ctx\.db\.(?:patch|insert|replace)\(/.test(body)) continue;
     const line = src.slice(0, m.index).split("\n").length;
 
     const written = new Set();
@@ -315,6 +323,34 @@ const SELF_TEST = [
 });`,
     expect: 0,
   },
+  // ── Đợt #5 tách convex/guilds.ts: helper tách file — cổng phải VẪN bắt ──
+  {
+    desc: "helper tách file ghi cấu hình thiếu tín hiệu → cổng báo (đợt #5)",
+    src: `export async function updateSettingsCore(ctx, args) {
+  const guild = await ctx.db.query("guilds").first();
+  await ctx.db.patch(guild._id, { welcomeEnabled: args.welcomeEnabled, updatedAt: Date.now() });
+}`,
+    expect: 1,
+  },
+  {
+    desc: "helper tách file có settingsChangedAt → không báo",
+    src: `export async function updateSettingsCore(ctx, args) {
+  const guild = await ctx.db.query("guilds").first();
+  await ctx.db.patch(guild._id, {
+    welcomeEnabled: args.welcomeEnabled,
+    updatedAt: Date.now(),
+    settingsChangedAt: Date.now(),
+  });
+}`,
+    expect: 0,
+  },
+  {
+    desc: "helper THUẦN dựng patch (không gọi ctx.db) → không báo, tín hiệu ở unit ghi",
+    src: `export function buildUpdateSettingsPatch(args, patch) {
+  patch.welcomeEnabled = args.welcomeEnabled;
+}`,
+    expect: 0,
+  },
 ];
 
 function runSelfTest(fields) {
@@ -363,6 +399,26 @@ function runSelfTest(fields) {
   return failed;
 }
 
+/**
+ * Liệt kê .ts dưới convex/ (ĐỆ QUY — từ đợt #5, `convex/guilds/*` là helper ghi
+ * cấu hình): bỏ `_generated` + tsconfig, trả path TƯƠNG ĐỐI so với convex/ để
+ * khoá allowlist vẫn đọc được (`guilds.ts::x` giữ nguyên, `guilds/y.ts::z` mới).
+ */
+function listConvexFiles(dir, base = dir) {
+  const out = [];
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if (e.name === "_generated") continue;
+      out.push(...listConvexFiles(p, base));
+      continue;
+    }
+    if (!e.name.endsWith(".ts") || e.name === "tsconfig.ts") continue;
+    out.push(path.relative(base, p));
+  }
+  return out;
+}
+
 function main() {
   const fields = botFields();
   const botSet = botConfigWriteSet();
@@ -377,10 +433,7 @@ function main() {
     console.log("✅ self-test PASS — cổng bắt đúng bug thật, không báo nhầm chỗ sạch");
   }
 
-  const files = fs
-    .readdirSync(CONVEX_DIR)
-    .filter((f) => f.endsWith(".ts") && !f.startsWith("_"))
-    .sort();
+  const files = listConvexFiles(CONVEX_DIR).sort();
 
   // LUẬT B
   const botSetErrors = checkBotSet(botSet, CONVEX_DIR);

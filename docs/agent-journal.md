@@ -4,6 +4,51 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 03/10/2026 (8) — #5 Tách `convex/guilds.ts` (99KB/2210 dòng) thành 4 module, giữ nguyên hợp đồng tên
+
+- 🎯 **Vì sao**: file 99 KB gánh 26 function (cấu hình + sync phía bot + ảnh chào
+  - xuất/nhập cấu hình) — sửa một nhánh phải cuộn cả nghìn dòng.
+- 🔒 **Giữ NGUYÊN 26 wrapper + validator trong `guilds.ts`** (bot gọi chuỗi
+  `guilds:<fn>`, dashboard gọi `api.guilds.*`), chỉ chuyển THÂN hàm sang module
+  con export `XArgs`/`XHandler` — không dùng re-export (0 tiền lệ trong `convex/`).
+  `guilds.ts` 2210 → **1315 dòng**.
+- 🧩 **4 module mới**: `guilds/updateSettings.ts` (573 dòng — thân updateSettings +
+  `cleanGreetingField` + vòng dọn ảnh) · `guilds/greetingImages.ts` (184 — trần
+  8MB, `storageIdFromUrl`, `GREETING_IMAGE_SLOTS`, 3 handler ảnh chào) ·
+  `guilds/botGuilds.ts` (243 — 7 handler phía bot: list/gone/stats/heartbeat +
+  sync channels/roles/emojis) · `guilds/configPortability.ts` (86 — export/import
+  cấu hình). `botSyncGuilds` CỐ Ý ở lại `guilds.ts` (có allowlist riêng ở cổng
+  settings-signal).
+- ✅ **Chống trôi nội dung**: script tạm so TỪNG DÒNG module mới với
+  `git show HEAD:convex/guilds.ts` — mọi dòng lệch đều là scaffolding
+  (import/header/signature/wrapper), **0 dòng nội dung sai/thiếu**; script đã xoá
+  trước commit.
+- 🛡️ **Nâng cổng `check-settings-signal.cjs`** cho code đã tách: quét ĐỆ QUY
+  `convex/**` + nhận dạng helper `export (async) function X(` khi thân hàm THẬT SỰ
+  gọi `ctx.db.patch|insert|replace(` (helper dựng object patch thuần không tính),
+  +3 self-test (13/13 PASS). Chạy thật: 129 field, 9 mutation bot-side tự xoá cache,
+  5 miễn trừ có lý do, `CONFIG_WRITE_MUTATIONS` khớp `bot_writes.ts`;
+  `test-settings-signal` 33/0.
+- ⚠️ **Sửa 1 cổng tĩnh đọc nguồn** (nói rõ, không nới lỏng):
+  `test-convex-arg-contract.cjs` gặp `args: xArgs` thì hết đọc được validator →
+  parser nay giải object export ở file con (`convex/guilds/*`); không tra được →
+  set RỖNG để FAIL to. **RED-PROOF**: xoá `channels` khỏi `syncChannelsArgs` →
+  FAIL đúng "guilds:syncChannels gửi channels nhưng validator không nhận";
+  khôi phục xanh.
+- 🧪 **Kiểm chứng**: `bun run test` **85/85** (115,1s) · `test:ts` **21/21** ·
+  `bun convex dev --once` OK · tsc · lint · format:check sạch · repo-map OK
+  (15 trang, 40 convex, 42 module bot) · convex-contract OK (104 call, 313
+  exports) · settings-signal + self-test + test **33/0**.
+- 📁 File đụng (13): `convex/guilds.ts` · 4 module `convex/guilds/*.ts` (mới) ·
+  `convex/guildConfig.ts` · `convex/tickets.ts` (comment trỏ file mới) ·
+  `convex/_generated/api.d.ts` (codegen) · `scripts/check-settings-signal.cjs` ·
+  `scripts/test-convex-arg-contract.cjs` · `src/components/dashboard/WelcomePanel.tsx`
+  (comment) · `docs/repo-map.md` (thêm dòng `guilds/*` + sửa số suite 82→85).
+- ⏳ **Deploy VPS**: sandbox không tới được VPS — nếu production chưa pull từ
+  #1–#6, chạy `/deploy` (pull → kiểm chứng đủ → `pm2 restart protogon-bot`).
+- ▶️ Tiếp theo: #5 `convex/bot_writes.ts` (75KB/1955 dòng) → #4 chuyển
+  `setInterval` sang Convex cron.
+
 ## 03/10/2026 (7) — #5 Tách `handlers/interactionCreate.js` (2551 dòng) thành 8 module, không đổi hành vi
 
 - 🎯 **Vì sao**: file 103 KB gánh cả định tuyến nút/modal, luồng xác minh, lớp
