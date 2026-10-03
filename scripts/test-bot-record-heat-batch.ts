@@ -15,8 +15,8 @@
 //   3. Biên số: heat âm/0/lớn vô hạn và warnStrikes âm — mọi giá trị rác từ
 //      bot phải bị chặn lại ở đây vì bảng này quyết định ai bị phạt.
 //
-// LƯU Ý: hàm này nằm trong convex/bot_writes.ts (không có file
-// convex/bot_record_heat.ts riêng) — test import từ đúng nơi thật.
+// LƯU Ý: wrapper giữ ở convex/bot_writes.ts (đợt #5: thân hàm ở
+// convex/bot_writes/antinuke.ts) — test import từ đúng nơi thật.
 import { botRecordHeatBatch } from "../convex/bot_writes";
 import { computeBotKey } from "../convex/botAuth";
 import { getBotConfig } from "../convex/guilds";

@@ -58,13 +58,15 @@ check(
   "thiếu botLockState — server sẽ bị khóa kênh vĩnh viễn sau burst",
 );
 // botUpdateLockdown không đặt lockdownUntil phía Convex — chỉ là cờ tính năng.
-const botWritesSrc = read("convex/bot_writes.ts");
-const updateLockdownBody = botWritesSrc.match(
-  /export const botUpdateLockdown = mutation\(\{[\s\S]*?\n\}\);/,
-)?.[0];
+// Đợt #5: thân hàm ở convex/bot_writes/settings.ts (wrapper giữ ở bot_writes.ts).
+const settingsSrc = read("convex/bot_writes/settings.ts");
+const updateLockdownBody = settingsSrc.slice(
+  settingsSrc.indexOf("export async function botUpdateLockdownHandler("),
+  settingsSrc.indexOf("export async function botLockStateHandler("),
+);
 check(
   "botUpdateLockdown KHÔNG ghi lockdownUntil (đặc tính — nên luồng khóa thật phải qua botLockState)",
-  !!updateLockdownBody && !updateLockdownBody.includes("lockdownUntil"),
+  updateLockdownBody.includes("lockdownEnabled") && !updateLockdownBody.includes("lockdownUntil"),
 );
 
 // ─── 3. Rate-limit captcha DM phải được KIỂM TRA, không chỉ khai báo ─────────

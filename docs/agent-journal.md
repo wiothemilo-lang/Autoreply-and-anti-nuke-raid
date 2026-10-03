@@ -4,6 +4,45 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 03/10/2026 (9) — #5 Tách `convex/bot_writes.ts` (75KB/1955 dòng) thành 10 module, giữ nguyên hợp đồng tên
+
+- 🎯 **Vì sao**: 1955 dòng gánh 41 mutation bot gọi (cấu hình, antinuke/heat,
+  backup/restore, ticket, auto-reply, metrics, ngôn ngữ) — sửa một nhánh phải cuộn
+  cả nghìn dòng. Nay `bot_writes.ts` còn **336 dòng**.
+- 🔒 **Giữ NGUYÊN 41 wrapper + validator trong `bot_writes.ts`** (bot gọi chuỗi
+  `bot_writes:<fn>`, dashboard gọi `api.bot_writes.*`, `convex/backup_github.ts`
+  gọi `api.bot_writes.botSetBackupGithub`), chỉ chuyển THÂN hàm sang module con
+  export `XArgs`/`XHandler` — không dùng re-export.
+- 🧩 **10 module mới**: `shared.ts` (TRIM_ODDS/TRIM_BATCH, TTL claim backup 600s +
+  helper claim dùng chung cả `convex/altDetection.ts`) · `settings.ts` (6 fn) ·
+  `antinuke.ts` (6) · `autoReplies.ts` (2) · `backup.ts` (7) · `restore.ts` (8) ·
+  `tickets.ts` (8) · `modActions.ts` (1) · `metrics.ts` (1) · `language.ts` (2).
+- ✅ **Chống trôi nội dung**: script tạm so TỪNG DÒNG 41 thân hàm + 10 helper với
+  `git show HEAD:convex/bot_writes.ts` — 41/41 + 10 khớp, **0 dòng nội dung
+  sai/thiếu**; script đã xoá trước commit.
+- 🛡️ **Nâng cổng `check-settings-signal.cjs`**: wrapper `handler: XHandler` được
+  giải sang module con (`derivedBotWriteSet`); không giải được handler → báo lỗi
+  (cổng không mù); nhóm `bot_writes/*` được miễn LUẬT A vì LUẬT B phủ toàn nhóm;
+  +3 self-test (**16 case PASS**). **RED-PROOF trên nguồn thật**: gỡ
+  `"bot_writes:botClearHeatReset"` khỏi `CONFIG_WRITE_MUTATIONS` → FAIL đúng
+  "thiếu trong CONFIG_WRITE_MUTATIONS của bot: bot_writes:botClearHeatReset" →
+  khôi phục → xanh.
+- 🧪 **Kiểm chứng**: `bun run test` **85/85** (118,6s) · `test:ts` **21/21** (4,1s)
+  · tsc · lint · format:check sạch (chạy SAU format) · repo-map OK (15 trang,
+  40 convex, 42 module bot — readdir không đệ quy nên `bot_writes/*` không thành
+  mục riêng) · convex-contract OK (104 call, 408 exports) · settings-signal 129
+  field khớp `CONFIG_WRITE_MUTATIONS` (+ module con) · 6 test tĩnh trỏ file con
+  **33/0 · 14/0 · 28/0 · 68/0 · 9/0 · 289/0**. Codegen `bun convex dev --once` OK.
+- 📁 File đụng (23): `convex/bot_writes.ts` · 10 module `convex/bot_writes/*.ts`
+  (mới) · `convex/altDetection.ts` · `convex/_generated/api.d.ts` (codegen) ·
+  `scripts/check-settings-signal.cjs` ·
+  `scripts/test-{settings-signal,bot-contracts,module-defaults,security-hardening,web-contracts}.cjs`
+  · `scripts/test-retention-caps.ts` · `scripts/test-bot-record-heat-batch.ts` ·
+  `docs/repo-map.md` (thêm dòng `bot_writes/*`).
+- ⏳ **Deploy VPS**: sandbox không tới được VPS — chạy `/deploy` (pull → kiểm
+  chứng đủ 4 lớp → `pm2 restart protogon-bot`).
+- ▶️ Tiếp theo: #4 chuyển `setInterval` sang Convex cron.
+
 ## 03/10/2026 (8) — #5 Tách `convex/guilds.ts` (99KB/2210 dòng) thành 4 module, giữ nguyên hợp đồng tên
 
 - 🎯 **Vì sao**: file 99 KB gánh 26 function (cấu hình + sync phía bot + ảnh chào

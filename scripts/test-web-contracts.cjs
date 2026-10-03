@@ -1749,6 +1749,11 @@ const convexClientSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "convex.js
 const aiSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "ai.js"), "utf8");
 const botIndexSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "index.js"), "utf8");
 const botWritesSrc = fs.readFileSync(path.join(ROOT, "convex", "bot_writes.ts"), "utf8");
+// Đợt #5: thân hàm tách sang convex/bot_writes/metrics.ts (wrapper giữ nguyên).
+const botMetricsSrc = fs.readFileSync(
+  path.join(ROOT, "convex", "bot_writes", "metrics.ts"),
+  "utf8",
+);
 const botPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "bot", "package.json"), "utf8"));
 
 check(
@@ -1801,12 +1806,12 @@ check(
   "mutation botRecordMetrics có khoá botKey (không ai cũng ghi được số đo)",
   /export const botRecordMetrics = mutation\(/.test(botWritesSrc) &&
     /requireBotKeyStrict\(ctx, args\.botKey\)/.test(
-      botWritesSrc.slice(botWritesSrc.indexOf("export const botRecordMetrics")),
+      botMetricsSrc.slice(botMetricsSrc.indexOf("export async function botRecordMetricsHandler")),
     ),
 );
 check(
   "mutation botRecordMetrics tự dọn lịch sử (bảng không phình vô hạn)",
-  /METRICS_HISTORY_CAP/.test(botWritesSrc),
+  /METRICS_HISTORY_CAP/.test(botMetricsSrc),
 );
 
 // ══ S. Tiền AI + hạn mức ngân sách (đợt #2) ══

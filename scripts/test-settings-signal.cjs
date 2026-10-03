@@ -9,7 +9,7 @@
 //
 //   1. Cổng chạy trên repo hiện tại → phải sạch (0 vi phạm).
 //   2. `--self-test` của cổng → mọi case phải đúng (cổng không mù, không báo nhầm).
-//   3. Luật B: CONFIG_WRITE_MUTATIONS của bot khớp chính xác bot_writes.ts.
+//   3. Luật B: CONFIG_WRITE_MUTATIONS của bot khớp chính xác bot_writes (+ module con).
 //   4. Hồi quy THẬT: gỡ `settingsChangedAt` khỏi updateLockdown / resetHeat /
 //      requestUnlock / applyPreset trong file thật → cổng phải báo đúng field đó.
 //      (Đây là bằng chứng cổng bắt được đúng lớp bug, không phải chỉ "chạy được".)
@@ -80,17 +80,14 @@ check(
 
 // ── 3. Luật B trên nguồn thật ──
 const botSet = guard.botConfigWriteSet();
-const derived = new Set(
-  guard
-    .collectConfigWrites(
-      fs.readFileSync(path.join(ROOT, "convex", "bot_writes.ts"), "utf8"),
-      fields,
-    )
-    .map((w) => `bot_writes:${w.name}`),
-);
+// Đợt #5: suy tập bot-side từ wrapper ở bot_writes.ts → thân handler ở module con.
+const derivedResult = guard.derivedBotWriteSet(path.join(ROOT, "convex"), fields);
+const derived = derivedResult.derived;
 check(
-  `luật B: danh sách bot khớp bot_writes.ts (${botSet.size} mutation)`,
-  botSet.size === derived.size && [...derived].every((n) => botSet.has(n)),
+  `luật B: danh sách bot khớp bot_writes (+ module con) (${botSet.size} mutation)`,
+  derivedResult.errors.length === 0 &&
+    botSet.size === derived.size &&
+    [...derived].every((n) => botSet.has(n)),
 );
 check(
   "luật B: checkBotSet() trên nguồn thật không báo lỗi",

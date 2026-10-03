@@ -34,10 +34,14 @@ const check = (label, ok) => {
 
 (async () => {
   // ---- 1. Convex source: botEnsureModules mặc định TẮT (server mới) ----
-  const bw = fs.readFileSync(path.join(__dirname, "..", "convex", "bot_writes.ts"), "utf8");
+  // Đợt #5: thân hàm ở convex/bot_writes/antinuke.ts (wrapper giữ ở bot_writes.ts).
+  const bw = fs.readFileSync(
+    path.join(__dirname, "..", "convex", "bot_writes", "antinuke.ts"),
+    "utf8",
+  );
   const ensureBlock = bw.slice(
-    bw.indexOf("export const botEnsureModules"),
-    bw.indexOf("export const botSetAntinuke"),
+    bw.indexOf("export async function botEnsureModulesHandler("),
+    bw.indexOf("export async function botRecordHeatHandler("),
   );
   check("botEnsureModules chèn module mới với enabled: false", /enabled: false/.test(ensureBlock));
   check(
