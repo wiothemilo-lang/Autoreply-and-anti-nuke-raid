@@ -120,6 +120,13 @@ jobs:
       # --self-test (dựng lại đúng các bug thật để chứng minh không mù).
       - name: Tín hiệu cấu hình dashboard ⇄ bot (thay đổi không được "đứng im")
         run: node scripts/check-settings-signal.cjs --self-test
+      # Cron Convex chạy ở môi trường KHÔNG có tiến trình bot. Cron chỉ được
+      # TÍNH + ĐẶT CỜ; việc chạm Discord/RAM/đĩa thuộc bot. Một cron "thông
+      # minh" (tự gửi embed, tự ghi trạng thái bot) không chỉ hỏng mà hỏng
+      # ÂM THẦM — cổng chặn ngay ở lint, kèm --self-test dựng lại từng cách phá
+      # ranh giới trên nguồn thật.
+      - name: Ranh giới cron (chỉ đặt cờ, không gọi hàm bot/không ghi state bot)
+        run: node scripts/check-cron-boundary.cjs --self-test
 
   test:
     needs: [lint, security]

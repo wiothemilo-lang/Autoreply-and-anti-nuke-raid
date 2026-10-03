@@ -17,6 +17,7 @@
 
 const https = require("https");
 const http = require("http");
+const { registerSweep } = require("./sweeper");
 
 const DAY_MS = 86_400_000;
 
@@ -965,29 +966,33 @@ async function scanGuildForAltsAsync(
   };
 }
 
-// Cleanup old voice data periodically (every hour)
-setInterval(
-  () => {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000; // 24 hours
-    for (const [guildId, users] of voiceIpMap) {
-      for (const [userId, data] of users) {
-        if (data.joinedAt < cutoff) {
-          users.delete(userId);
-          const guildIps = ipToUsers.get(guildId);
-          if (guildIps) {
-            const set = guildIps.get(data.ip);
-            if (set) {
-              set.delete(userId);
-              if (set.size === 0) guildIps.delete(data.ip);
-            }
+// Dọn dữ liệu voice cũ (mốc 24h) mỗi giờ — qua vòng sweep CHUNG (đợt #4),
+// không tự dựng timer nữa.
+const VOICE_DATA_TTL_MS = 24 * 60 * 60 * 1000;
+
+function sweepVoiceIpMap(now = Date.now()) {
+  const cutoff = now - VOICE_DATA_TTL_MS;
+  let removed = 0;
+  for (const [guildId, users] of voiceIpMap) {
+    for (const [userId, data] of users) {
+      if (data.joinedAt < cutoff) {
+        users.delete(userId);
+        removed += 1;
+        const guildIps = ipToUsers.get(guildId);
+        if (guildIps) {
+          const set = guildIps.get(data.ip);
+          if (set) {
+            set.delete(userId);
+            if (set.size === 0) guildIps.delete(data.ip);
           }
         }
       }
-      if (users.size === 0) voiceIpMap.delete(guildId);
     }
-  },
-  60 * 60 * 1000,
-);
+    if (users.size === 0) voiceIpMap.delete(guildId);
+  }
+  return removed;
+}
+registerSweep("altDetection", () => sweepVoiceIpMap(), 60 * 60_000);
 
 /**
  * Dọn dữ liệu của guild bot đã rời (memGuard gọi định kỳ): burstTracker giữ
@@ -1033,4 +1038,7 @@ module.exports = {
   scanGuildForAltsAsync,
   // Đợt 7: dọn guild đã rời (memGuard)
   sweepStaleGuilds,
+  // Đợt #4: dọn dữ liệu voice cũ (qua vòng sweep chung)
+  sweepVoiceIpMap,
+  VOICE_DATA_TTL_MS,
 };

@@ -8,6 +8,7 @@
 
 const { EmbedBuilder, Colors } = require("discord.js");
 const { genCaptcha, setCode } = require("../captchaStore");
+const { registerSweep } = require("../sweeper");
 const { analyzeNewMember, executePunishment, buildRiskEmbed } = require("../altDetection");
 
 // Rate limiting for verify attempts: Map<userId, { attempts: number, lastAttemptAt: number }>
@@ -16,16 +17,19 @@ const { analyzeNewMember, executePunishment, buildRiskEmbed } = require("../altD
 const verifyAttempts = new Map();
 const VERIFY_RATE_WINDOW_MS = 10 * 60 * 1000;
 
-// Cleanup old entries every 5 minutes
-setInterval(
-  () => {
-    const cutoff = Date.now() - VERIFY_RATE_WINDOW_MS;
-    for (const [userId, data] of verifyAttempts) {
-      if (data.lastAttemptAt < cutoff) verifyAttempts.delete(userId);
+// Dọn entry quá hạn — qua vòng sweep CHUNG (đợt #4), không tự dựng timer.
+function sweepVerifyAttempts(now = Date.now()) {
+  const cutoff = now - VERIFY_RATE_WINDOW_MS;
+  let removed = 0;
+  for (const [userId, data] of verifyAttempts) {
+    if (data.lastAttemptAt < cutoff) {
+      verifyAttempts.delete(userId);
+      removed += 1;
     }
-  },
-  5 * 60 * 1000,
-);
+  }
+  return removed;
+}
+registerSweep("interactionVerify", () => sweepVerifyAttempts(), 5 * 60_000);
 
 /**
  * Nút `verify_request_captcha` — gửi mã xác minh qua DM.

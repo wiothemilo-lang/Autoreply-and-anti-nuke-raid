@@ -237,6 +237,12 @@ client.once("clientReady", async () => {
     })();
   }, 5_000);
 
+  // Vòng dọn CHUNG của tiến trình (đợt #4): một `setInterval` 20 giây gọi mọi
+  // việc dọn đã đăng ký (captcha, bucket spam, rate-limit verify, antinuke,
+  // voice IP); 5 module này trước đây tự dựng timer riêng lúc require.
+  // Gọi ở đây (sau client sẵn sàng) để bot đang offline không tạo timer thừa.
+  require("./sweeper").startSweeper();
+
   // Presence update — mỗi 60s (nhẹ: chỉ Discord cache, không gọi Convex)
   const presenceInterval = setInterval(() => {
     client.user.setPresence({

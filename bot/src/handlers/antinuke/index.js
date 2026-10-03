@@ -15,6 +15,7 @@ const createAntiNukeExternalApp = require("./externalApp");
 const createAntiNukeMembers = require("./members");
 const createAntiNukeMessages = require("./messages");
 const createAntiNukeAudit = require("./audit");
+const { registerSweep } = require("../../sweeper");
 
 module.exports = function createAntiNuke(client, store, heat) {
   const state = createAntiNukeState({ client, store });
@@ -207,19 +208,22 @@ module.exports = function createAntiNuke(client, store, heat) {
       });
     }
 
-    setInterval(() => {
-      void tickUnlocks().catch((e) => console.error("[antinuke:tick]", e.message));
-      void tickHeatResets().catch((e) => console.error("[heat:resetTick]", e.message));
-      // S4: gỡ role cách ly hết hạn (vandalBudget).
-      void tickVandalReleases().catch((e) => console.error("[vandalBudget:tick]", e.message));
-      // Dọn RAM không bao giờ được làm sập bot: lỗi ném đồng bộ trong setInterval
-      // đi thẳng tới uncaughtException → exit(1).
-      try {
+    // Mở khoá/reset heat/gỡ role cách ly + dọn RAM — chu kỳ NHỎ NHẤT (20 giây)
+    // nên đây là việc quyết định nhịp quét của vòng sweep CHUNG (đợt #4).
+    registerSweep(
+      "antinuke",
+      () => {
+        void tickUnlocks().catch((e) => console.error("[antinuke:tick]", e.message));
+        void tickHeatResets().catch((e) => console.error("[heat:resetTick]", e.message));
+        // S4: gỡ role cách ly hết hạn (vandalBudget).
+        void tickVandalReleases().catch((e) => console.error("[vandalBudget:tick]", e.message));
+        // Dọn RAM không bao giờ được làm sập bot: lỗi ném đồng bộ trong timer
+        // đi thẳng tới uncaughtException → exit(1) (runDueSweeps đã bọc
+        // try/catch cho từng việc nên không cần bọc lần nữa ở đây).
         sweepMemory();
-      } catch (e) {
-        console.error("[antinuke:sweep]", e.message);
-      }
-    }, 20_000);
+      },
+      20_000,
+    );
   }
 
   // Raid bằng NÚT BẤM: kẻ raid spam bấm nút của app ngoài (tin mồi) để kích hoạt

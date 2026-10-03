@@ -63,7 +63,7 @@ function looksLikeInfraLeak(command) {
 // ⚠️ Đếm theo `bun run test` (suite .cjs). Suite .ts chạy ở `bun run test:ts`
 // và KHÔNG cộng vào đây — nếu cộng nhầm thì con số lệch 1 và cả hai chỗ
 // cùng sai.
-const CONTRACT_SUITES = 85;
+const CONTRACT_SUITES = 86;
 let verifiedAt = 0;
 const VERIFY_WINDOW_MS = 15 * 60 * 1000;
 
