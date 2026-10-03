@@ -3,7 +3,24 @@ import { useBotStatus, type BotStatus } from "./useBotStatus";
 import { dateLocale } from "./i18n";
 import { convexPingUrl } from "./convexUrl";
 
-const PING_URL = convexPingUrl();
+/**
+ * URL ping — TÍNH LÚC CẦN, không gọi `convexPingUrl()` ở top-level.
+ *
+ * Vì sao: `convexPingUrl()` ném ngay khi env sai/mất, và ở top-level thì cả
+ * MODULE không import được — kể cả trong script test (`import.meta.env.DEV`
+ * luôn false ngoài Vite). Điều đó làm các hàm thuần cùng file
+ * (`latencyLabel`, `fmtVietnam`) không test được.
+ *
+ * Không mất gì về fail-closed: chỗ chặn đúng là bootstrap `src/main.tsx`
+ * (`resolveConvexUrl()` ném trước khi React mount — xem comment ở file đó).
+ * Ở đây chỉ cần đừng chặn việc import; lỗi env sẽ nổi lên ở lần ping đầu
+ * và vào danh sách sự cố như mọi lỗi kết nối khác.
+ */
+let pingUrl: string | null = null;
+function pingEndpoint(): string {
+  pingUrl ??= convexPingUrl();
+  return pingUrl;
+}
 
 export const LATENCY_FAST = 300;
 export const LATENCY_SLOW = 800;
@@ -37,7 +54,7 @@ export function fmtVietnam(ts: number): string {
 
 async function pingBackend(): Promise<number> {
   const t0 = performance.now();
-  const res = await fetch(PING_URL, {
+  const res = await fetch(pingEndpoint(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path: "status:botStatus", format: "json", args: {} }),
