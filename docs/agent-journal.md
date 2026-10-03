@@ -4,6 +4,17 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 03/10/2026 (12) — #4 Cổng tĩnh: allowlist `setInterval` toàn `bot/src` (so hai chiều)
+
+- 🎯 **Vì sao**: sau khi gom 5 vòng dọn RAM về `sweeper.js`, quyết định "việc dọn/trạng thái trong RAM không tự dựng timer" chỉ sống trong tài liệu — chỉ cần một module mới gọi `setInterval` là lùi kiến trúc mà không ai thấy.
+- 🛡️ **`scripts/check-timer-allowlist.cjs` (MỚI)**: quét `bot/src/**` (86 file), định danh mỗi `setInterval` bằng **TÊN BIẾN được gán** (`presenceInterval`, `timer`, `slowInterval`, `timers.push(…)` → `<push>`, trần → `<anon>`) — không theo số dòng vì số dòng trôi mỗi lần sửa. Hợp đồng **HAI CHIỀU**: (1) timer trong code phải có trong allowlist; (2) mục trong allowlist phải còn trong code ⇒ "xoá 1 rồi thêm 1 trong cùng file" vẫn bị bắt. 21 timer / 12 file, **mỗi mục bắt buộc kèm lý do**; `sweeper.js` là nơi DUY NHẤT được phép thêm timer.
+- 🧠 **Máy trạng thái thay regex**: bot có rất nhiều URL trong chuỗi (`https://…`). Regex `//[^\n]*` sẽ nuốt phần còn lại của dòng ⇒ cổng BỎ SÓT một `setInterval` thật nằm sau URL. `blankComments()` đi qua chuỗi `"` `'` `` ` `` và escape, giữ nguyên độ dài + số dòng.
+- 🧪 **Self-test 8/8**: nguồn thật sạch; comment giải thích luật không tính; chuỗi `https://` cùng dòng **vẫn bắt được** timer; timer mới trong file đã có allowlist; file mới chưa có allowlist; đổi tên/xoá timer (2 lỗi hai chiều); timer trần lặp lần 2 (đánh số thứ tự); dùng `registerSweep` thì không cần khai.
+- 🪤 **Lỗi tự làm rồi bắt được**: bản đầu suy tên sai (cắt `head.split("\n").slice(-1)` luôn ra chuỗi rỗng) khiến **mọi** timer thành `<anon>` → cổng báo 40 lỗi. Đã sửa + siết: khi một tên lặp thì đánh số thứ tự cho **tất cả** bản sao (`<push>#1`, `<push>#2`) thay vì cái đầu không hậu tố.
+- 🔌 **Wiring**: CI job `lint` thêm step `node scripts/check-timer-allowlist.cjs --self-test`; `AGENTS.md` mục 4 thêm dòng; `docs/repo-map.md` (6 cổng) + `docs/cron-migration.md` mục riêng; `docs/decision-log.md` thêm quyết định.
+- 📁 File đụng (7): `scripts/check-timer-allowlist.cjs` (mới) · `.github/workflows/ci.yml` · `AGENTS.md` · `docs/{cron-migration.md,repo-map.md,decision-log.md,agent-journal.md}`.
+- ▶️ Tiếp theo: deploy bot trên VPS qua `/deploy` (pull → 4 lớp → `pm2 restart protogon-bot`) — sandbox không tới VPS.
+
 ## 03/10/2026 (11) — #4 Gom 5 vòng dọn RAM về 1 sweep chung + cổng tĩnh chặn cron vượt ranh giới
 
 - 🎯 **Vì sao (3 việc người dùng chỉ định)**: (1) gom 5 `setInterval` dọn RAM về 1; (2) xác minh cron đã lên production; (3) cổng tĩnh chặn cron mutation vượt ranh giới.

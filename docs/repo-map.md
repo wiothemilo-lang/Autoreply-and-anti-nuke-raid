@@ -136,8 +136,9 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
   Convex) +
   `scripts/check-i18n.cjs` (mọi chuỗi người dùng có bản EN) +
   `scripts/check-settings-signal.cjs` (thay đổi từ dashboard không được "đứng im") +
-  `scripts/check-cron-boundary.cjs` (cron chỉ đặt cờ, không gọi hàm bot) —
-  CI chạy cả 5 trong job lint.
+  `scripts/check-cron-boundary.cjs` (cron chỉ đặt cờ, không gọi hàm bot) +
+  `scripts/check-timer-allowlist.cjs` (mọi `setInterval` phải có trong allowlist
+  kèm lý do, so hai chiều) — CI chạy cả 6 trong job lint.
 - Đa ngôn ngữ: UI viết chuỗi tiếng Việt thẳng trong JSX rồi bọc
   `translate("…")` (key = chuỗi VI). Thêm chuỗi mới → chạy
   `node scripts/check-i18n.cjs` để biết key nào còn thiếu bản EN; hằng số
