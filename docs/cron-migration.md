@@ -162,6 +162,27 @@ nhận `botKey`, gọi `fetch`, ghi field bot tự ghi, ghi bảng khác, key đ
 `internalMutation`→`mutation`, xoá sạch lịch…) và một case chứng minh cổng
 **không bị comment lừa**.
 
+## Cổng `check-timer-allowlist.cjs` — timer mới phải qua review
+
+Đợt #4 chuyển/gom được phần việc có thể, nhưng quyết định "việc dọn RAM không
+tự dựng timer nữa" chỉ sống trong tài liệu — chỉ cần một module mới gọi
+`setInterval` là quyết định bị lùi mà không ai thấy. Cổng đóng 20 timer còn lại
+thành **hợp đồng hai chiều**:
+
+1. Mọi `setInterval` trong `bot/src/**` phải khớp một mục allowlist, định danh
+   bằng **tên biến được gán** (`presenceInterval`, `timer`, `slowInterval`…) chứ
+   không phải số dòng — số dòng trôi mỗi lần sửa file.
+2. Mọi mục allowlist phải còn tồn tại trong code. Xoá timer mà quên sửa allowlist
+   ⇒ FAIL, nên "xoá một cái rồi thêm một cái khác trong cùng file" cũng bị bắt.
+3. Mỗi mục bắt buộc kèm lý do; `bot/src/sweeper.js` là **nơi duy nhất** được
+   phép thêm timer.
+4. Comment không tính, và chuỗi chứa `//` (URL) không được hiểu là comment —
+   nên dùng máy trạng thái thay regex, tránh cổng bỏ sót timer thật nằm sau URL.
+
+Self-test **8/8**: thêm timer vào file có allowlist, file mới chưa có allowlist,
+xoá/đổi tên timer, timer trần lặp lần hai, chuỗi `https://…` cùng dòng, và ca
+"comment giải thích luật không tính là timer".
+
 Sửa `collectConfigWrites` (dùng chung) trong đợt này cũng đóng một điểm mù thật:
 handler dạng `export async function X(ctx, { botKey, guildId, at })` bị bỏ qua
 im lặng vì brace-matching bắt nhầm khối `{...}` của tham số làm thân hàm. Sau
@@ -185,6 +206,7 @@ vì 4 (vẫn xanh — 5 cái mới đều có tín hiệu đúng).
   `npx convex run reports:sweepDueDailyReports '{}'` — cron callable (chạy được
   trên deployment).
 - `node scripts/check-cron-boundary.cjs --self-test` — 11/11 case.
+- `node scripts/check-timer-allowlist.cjs --self-test` — 8/8 case.
 
 ## Giới hạn đã biết
 

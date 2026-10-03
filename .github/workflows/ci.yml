@@ -127,6 +127,12 @@ jobs:
       # ranh giới trên nguồn thật.
       - name: Ranh giới cron (chỉ đặt cờ, không gọi hàm bot/không ghi state bot)
         run: node scripts/check-cron-boundary.cjs --self-test
+      # Quyết định "timer mới phải vào sweeper chung, không tự dựngsetInterval"
+      # chỉ sống trong tài liệu thì không giữ được: chỉ cần một module mới tự dựng
+      # timer là lùi kiến trúc mà không ai thấy. Allowlist so HAI CHIỀU (thêm và
+      # xoá) nên timer chỉ giảm được sau khi review.
+      - name: Allowlist setInterval (timer mới phải qua review, không tự dựng)
+        run: node scripts/check-timer-allowlist.cjs --self-test
 
   test:
     needs: [lint, security]
