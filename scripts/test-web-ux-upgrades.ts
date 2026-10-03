@@ -31,6 +31,15 @@ import {
   isNarrowViewport,
   shouldUsePanelSheet,
 } from "../src/lib/mediaQuery";
+import { simulateAutoReply, type SimInput, type SimRule } from "../src/lib/autoreplySim";
+import {
+  INCIDENT_SLOW,
+  LATENCY_FAST,
+  LATENCY_SLOW,
+  SYNC_INTERVAL_MS,
+  fmtVietnam,
+  latencyLabel,
+} from "../src/lib/useBotMonitor";
 import { EN } from "../src/lib/i18n.en";
 import { EN_PANELS } from "../src/lib/i18n.en.panels";
 import { EN_LABELS } from "../src/lib/i18n.en.labels";
@@ -664,6 +673,185 @@ console.log("── #11 sheet panel mobile ──");
   check(
     "tiêu đề nhóm vẫn ẩn ở mobile (nav là hàng cuộn ngang)",
     /hidden px-3 pb-1 pt-2[^"]*lg:block/.test(guildPageSrc),
+  );
+}
+
+// ── #12 mô phỏng auto-reply trên web (đợt #15) ──
+console.log("── #12 mô phỏng auto-reply ──");
+{
+  const rule = (over: Partial<SimRule> = {}): SimRule => ({
+    _id: "r1",
+    name: "Rule",
+    triggerType: "keyword",
+    keywords: ["xin"],
+    response: "chào",
+    channels: [],
+    ...over,
+  });
+  const msg = (over: Partial<SimInput> = {}): SimInput => ({
+    content: "cho mình xin file",
+    mentioned: false,
+    channelId: "c1",
+    username: "An",
+    ...over,
+  });
+
+  // Khớp keyword: substring, KHÔNG phân biệt hoa thường (bot cũng lowercase cả 2 phía).
+  check(
+    "keyword khớp theo substring và không phân biệt hoa thường",
+    simulateAutoReply([rule()], msg({ content: "CHO MÌNH XIN FILE" })).length === 1 &&
+      simulateAutoReply([rule({ keywords: ["XIN"] })], msg()).length === 1,
+  );
+  check(
+    "nội dung không chứa keyword → không khớp",
+    simulateAutoReply([rule({ keywords: ["bánh"] })], msg()).length === 0,
+  );
+  // Guard: keyword rỗng phải bị bỏ, nếu không thì MỌI tin nhắn đều khớp.
+  check(
+    "keyword rỗng trong danh sách không làm mọi tin nhắn khớp",
+    simulateAutoReply([rule({ keywords: [""] })], msg({ content: "xyz" })).length === 0,
+  );
+  check(
+    "trigger mention chỉ khớp khi tin nhắn có tag bot",
+    simulateAutoReply([rule({ triggerType: "mention" })], msg({ mentioned: true })).length === 1 &&
+      simulateAutoReply([rule({ triggerType: "mention" })], msg({ mentioned: false })).length === 0,
+  );
+  check(
+    "rule mention KHÔNG khớp chỉ vì có chứa keyword của rule khác",
+    simulateAutoReply([rule({ triggerType: "mention", keywords: ["xin"] })], msg()).length === 0,
+  );
+  check("rule tắt bị bỏ qua", simulateAutoReply([rule({ enabled: false })], msg()).length === 0);
+
+  // Lọc kênh.
+  check(
+    "rule không chọn kênh nào → áp dụng mọi kênh",
+    simulateAutoReply([rule({ channels: [] })], msg({ channelId: "bat-ky" })).length === 1,
+  );
+  check(
+    "rule có chọn kênh: khớp khi đúng kênh, không khớp khi khác kênh",
+    simulateAutoReply([rule({ channels: ["c1", "c2"] })], msg({ channelId: "c2" })).length === 1 &&
+      simulateAutoReply([rule({ channels: ["c9"] })], msg({ channelId: "c1" })).length === 0,
+  );
+  check(
+    "channelId = null (chưa đánh giá được) → bỏ qua lọc kênh",
+    simulateAutoReply([rule({ channels: ["c9"] })], msg({ channelId: null })).length === 1,
+  );
+
+  // Bot chỉ gửi rule ĐẦU TIÊN khớp (return sau reply đầu) — phần tử đầu là rule thắng.
+  const twoMatches = simulateAutoReply(
+    [rule({ _id: "thang", name: "Thắng" }), rule({ _id: "thua", name: "Thua" })],
+    msg(),
+  );
+  check("nhiều rule khớp → trả về tất cả", twoMatches.length === 2);
+  check(
+    "rule thắng (khớp trước) đứng đầu danh sách",
+    twoMatches[0].rule._id === "thang" && twoMatches[1].rule._id === "thua",
+  );
+
+  // Placeholder: web thay {user} bằng @tên (không có id Discord), {username} bằng tên.
+  check(
+    "{user} → @tên và {username} → tên",
+    simulateAutoReply([rule({ response: "{user} / {username}" })], msg({ username: "An" }))[0]
+      .response === "@An / An",
+  );
+  check(
+    "placeholder lạ giữ nguyên (không nuốt mất chữ)",
+    simulateAutoReply([rule({ response: "giữ {unknown} nhé" })], msg())[0].response ===
+      "giữ {unknown} nhé",
+  );
+  check(
+    "username rỗng/toàn khoảng trắng → tên dự phòng",
+    simulateAutoReply([rule({ response: "{user}" })], msg({ username: "   " }))[0].response ===
+      "@Minh",
+  );
+  check(
+    "không rule nào khớp → mảng rỗng",
+    simulateAutoReply([rule({ keywords: ["z"] })], msg()).length === 0,
+  );
+  check("danh sách rule rỗng → mảng rỗng", simulateAutoReply([], msg()).length === 0);
+
+  // HỢP ĐỒNG 1:1 với bot: đổi logic bot mà quên sửa bản web thì mô phỏng bịa
+  // ra kết quả sai. TS không bắt được, nên khóa bằng đọc nguồn bot.
+  const botMsg = readFileSync(
+    new URL("../bot/src/handlers/messageCreate.js", import.meta.url).pathname,
+    "utf8",
+  );
+  const botUtil = readFileSync(new URL("../bot/src/util.js", import.meta.url).pathname, "utf8");
+  check(
+    "bot vẫn bỏ qua rule tắt + lọc kênh (khớp `enabled === false` vì schema bắt buộc)",
+    /if \(!rule\.enabled\) continue;/.test(botMsg) &&
+      /if \(!channelAllowed\(rule, message\)\) continue;/.test(botMsg),
+  );
+  check(
+    "bot lọc kênh: rỗng = áp dụng mọi kênh",
+    /if \(!rule\.channels \|\| rule\.channels\.length === 0\) return true;/.test(botMsg),
+  );
+  check(
+    "bot khớp keyword giống hệt (bỏ keyword rỗng, lowercase 2 phía)",
+    /\(rule\.keywords \|\| \[\]\)\.some\(\(k\) => k && content\.includes\(k\.toLowerCase\(\)\)\)/.test(
+      botMsg,
+    ),
+  );
+  check("bot chỉ trả lời rule ĐẦU TIÊN khớp", /return; \/\/ reply once per message/.test(botMsg));
+  check(
+    "bot thay placeholder {user}/{username} bằng replaceAll",
+    /replaceAll\("\{user\}"/.test(botUtil) && /replaceAll\("\{username\}"/.test(botUtil),
+  );
+}
+
+// ── #13 nhãn độ trễ + giờ Việt Nam (đợt #15) ──
+console.log("── #13 độ trễ và giờ Việt Nam ──");
+{
+  check(
+    "ngưỡng tăng dần: nhanh < trung bình < sự cố",
+    LATENCY_FAST < LATENCY_SLOW && LATENCY_SLOW < INCIDENT_SLOW,
+  );
+  check("bot sync mỗi 60s", SYNC_INTERVAL_MS === 60_000);
+
+  // Biên đúng bằng số phải rơi vào nhóm kế tiếp — `<` chứ không phải `<=`.
+  check(
+    `dưới ${LATENCY_FAST}ms → Nhanh`,
+    latencyLabel(LATENCY_FAST - 1).label === "Nhanh" && latencyLabel(0).label === "Nhanh",
+  );
+  check(
+    `từ ${LATENCY_FAST}ms → Trung bình (biên kín)`,
+    latencyLabel(LATENCY_FAST).label === "Trung bình" &&
+      latencyLabel(LATENCY_SLOW - 1).label === "Trung bình",
+  );
+  check(
+    `từ ${LATENCY_SLOW}ms → Chậm (biên kín)`,
+    latencyLabel(LATENCY_SLOW).label === "Chậm" && latencyLabel(9999).label === "Chậm",
+  );
+  check(
+    "ba mức có ba nhãn khác nhau",
+    new Set([0, LATENCY_FAST, LATENCY_SLOW].map((ms) => latencyLabel(ms).label)).size === 3,
+  );
+  check(
+    "mức Chậm dùng màu lỗi, mức Nhanh không",
+    latencyLabel(LATENCY_SLOW).cls.includes("destructive") &&
+      !latencyLabel(0).cls.includes("destructive"),
+  );
+  check("độ trễ âm không làm vỡ (coi như nhanh)", latencyLabel(-5).label === "Nhanh");
+
+  // Giờ Việt Nam = UTC+7: mốc UTC 20:00 là 03:00 NGÀY HÔM SAU ở VN. Nếu mất
+  // phép +7 thì chuỗi sẽ chứa "20:00" chứ không "03:00".
+  const lateUtc = Date.UTC(2026, 9, 3, 20, 0, 0); // VN: 04/10 03:00
+  check(
+    "fmtVietnam cộng đúng 7 giờ (20:00Z → 03:00 hôm sau)",
+    fmtVietnam(lateUtc).includes("03:00") && fmtVietnam(lateUtc).includes("04"),
+  );
+  const midnightUtc = Date.UTC(2026, 9, 3, 17, 30, 0); // VN: 04/10 00:30
+  check(
+    "fmtVietnam xử lý đúng mốc nửa đêm ở VN",
+    fmtVietnam(midnightUtc).includes("00:30") && fmtVietnam(midnightUtc).includes("04"),
+  );
+  check(
+    "fmtVietnam tất định (cùng mốc ra cùng chuỗi)",
+    fmtVietnam(lateUtc) === fmtVietnam(lateUtc),
+  );
+  check(
+    "fmtVietnam không ném với mốc 0",
+    typeof fmtVietnam(0) === "string" && fmtVietnam(0).length > 0,
   );
 }
 
