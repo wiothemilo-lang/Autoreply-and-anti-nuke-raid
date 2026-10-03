@@ -32,6 +32,7 @@ import {
   shouldUsePanelSheet,
 } from "../src/lib/mediaQuery";
 import { simulateAutoReply, type SimInput, type SimRule } from "../src/lib/autoreplySim";
+import { toBranding } from "../src/lib/useBranding";
 import {
   INCIDENT_SLOW,
   LATENCY_FAST,
@@ -853,6 +854,65 @@ console.log("── #13 độ trễ và giờ Việt Nam ──");
     "fmtVietnam không ném với mốc 0",
     typeof fmtVietnam(0) === "string" && fmtVietnam(0).length > 0,
   );
+}
+
+// ── #14 branding (avatar bot + Haimiya) ──
+console.log("── #14 branding ──");
+{
+  check("chưa có dữ liệu (đang tải) → null", toBranding(undefined) === null);
+
+  const full = toBranding({
+    botAvatarUrl: "https://x/bot.png",
+    haimiyaAvatarUrl: "https://x/h.png",
+  });
+  check(
+    "giữ nguyên cả hai avatar khi có đủ",
+    full?.botAvatarUrl === "https://x/bot.png" && full?.haimiyaAvatarUrl === "https://x/h.png",
+    full,
+  );
+  check(
+    "rỗng object vẫn ra Branding đầy đủ (không undefined lọt vào JSX)",
+    full !== null && "botAvatarUrl" in full && "haimiyaAvatarUrl" in full,
+  );
+
+  // Schema khai `v.optional(v.string())` ⇒ `undefined` là giá trị thật.
+  // Nếu lọt xuống JSX thì `src` của <img> thành chuỗi "undefined".
+  const partial = toBranding({ botAvatarUrl: "https://x/bot.png" });
+  check(
+    "thiếu haimiyaAvatarUrl → null (KHÔNG undefined)",
+    partial?.haimiyaAvatarUrl === null,
+    partial,
+  );
+  const onlyH = toBranding({ haimiyaAvatarUrl: "https://x/h.png" });
+  check("thiếu botAvatarUrl → null (KHÔNG undefined)", onlyH?.botAvatarUrl === null, onlyH);
+  check(
+    "cả hai đều undefined → cả hai null",
+    toBranding({})?.botAvatarUrl === null && toBranding({})?.haimiyaAvatarUrl === null,
+  );
+  check(
+    "null sẵn từ query → giữ null",
+    toBranding({ botAvatarUrl: null, haimiyaAvatarUrl: null })?.botAvatarUrl === null,
+  );
+  check(
+    "chuỗi rỗng là giá trị hợp lệ, KHÔNG bị đổi thành null",
+    toBranding({ botAvatarUrl: "" })?.botAvatarUrl === "",
+  );
+  check(
+    "mỗi lần gọi trả về object MỚI (không dùng chung tham chiếu)",
+    toBranding({ botAvatarUrl: "a" }) !== toBranding({ botAvatarUrl: "a" }),
+  );
+
+  // Hook phải bám đúng query và gọi qua hàm thuần — không test được trong
+  // script (useQuery của Convex cần ConvexProvider), nên khoá bằng đọc nguồn.
+  const brandingSrc = readFileSync(
+    new URL("../src/lib/useBranding.ts", import.meta.url).pathname,
+    "utf8",
+  );
+  check(
+    "hook đọc đúng query hidden.getBotBranding",
+    /useQuery\(api\.hidden\.getBotBranding\)/.test(brandingSrc),
+  );
+  check("hook đi qua hàm thuần toBranding", /return toBranding\(useQuery\(/.test(brandingSrc));
 }
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);
