@@ -21,6 +21,8 @@ import { usePublicConfig } from "../../lib/usePublicConfig";
 import { isHeartbeatFresh, timeAgo } from "../../lib/utils";
 import { ANTINUKE_MODULE_META } from "../../lib/constants";
 import { SafetyBar, TopOffenders } from "./HeatBar";
+import ConfigHealthCard from "./ConfigHealthCard";
+import type { HealthTarget } from "../../lib/configHealth";
 import type { AntiNukeEvent, GuildData } from "../../lib/types";
 
 import { dateLocale, translate } from "../../lib/i18n";
@@ -105,7 +107,14 @@ function RecentEvents({ data }: { data: GuildData }) {
   );
 }
 
-export default function OverviewPanel({ data }: { data: GuildData }) {
+export default function OverviewPanel({
+  data,
+  onNavigate,
+}: {
+  data: GuildData;
+  /** GuildPage truyền vào để bấm lỗi cấu hình là mở thẳng panel cần sửa. */
+  onNavigate?: (target: HealthTarget) => void;
+}) {
   const { clientId } = usePublicConfig();
   const enabledModules = data.modules.filter((m) => m.enabled).length;
   const botOnline = data.guild.botInGuild && isHeartbeatFresh(data.guild.lastHeartbeat);
@@ -146,6 +155,9 @@ export default function OverviewPanel({ data }: { data: GuildData }) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Điểm cấu hình đứng ĐẦU: người mới vào server thấy ngay còn thiếu gì. */}
+      <ConfigHealthCard data={data} onNavigate={onNavigate} />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (
           <Card key={s.label} className="card-hover">

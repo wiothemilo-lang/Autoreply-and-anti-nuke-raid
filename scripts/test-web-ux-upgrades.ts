@@ -5,6 +5,7 @@
 // Vì sao test: đây đều là lớp "người dùng hiểu sai" — chạy không lỗi gì nhưng
 // dẫn tới mất cấu hình, tìm không ra panel, hoặc tưởng bot đã chạy cấu hình
 // mới. Biên sai 1 phút / sai thứ tự tìm kiếm là hỏng mục đích.
+import { readFileSync } from "node:fs";
 import {
   confirmLeave,
   hasUnsavedChanges,
@@ -16,6 +17,7 @@ import { syncState, SETTINGS_APPLY_WINDOW_MS, STALE_HEARTBEAT_MS } from "../src/
 import { ensureDictionary, lookupTranslation, translate } from "../src/lib/i18n";
 import { safeRedirectPath } from "../src/lib/discord";
 import { CHUNK_RELOAD_COOLDOWN_MS, installStaleChunkRecovery } from "../src/lib/staleChunk";
+import { evaluateConfigHealth, healthGrade, HEALTH_TARGETS } from "../src/lib/configHealth";
 import { EN } from "../src/lib/i18n.en";
 import { EN_PANELS } from "../src/lib/i18n.en.panels";
 import { EN_LABELS } from "../src/lib/i18n.en.labels";
@@ -346,6 +348,103 @@ console.log("\n── #7 tự tải lại khi chunk bị xoá sau deploy (vite:p
   const evB = b.fire();
   check("sessionStorage bị chặn → không có chống lặp nên KHÔNG tải lại", b.reloads() === 0);
   check("...và không nuốt lỗi gốc", !evB.defaultPrevented);
+}
+
+// ── #5 điểm cấu hình (đợt #4) ──
+console.log("── #8 điểm cấu hình (đợt #4) ──");
+{
+  const full = {
+    botInGuild: true,
+    logChannelId: "1",
+    modLogChannelId: "2",
+    antinukeEnabled: true,
+    automodEnabled: true,
+    joinGateEnabled: true,
+    verifyEnabled: true,
+    backupAutoDays: 7,
+  };
+  const off = { ...full, antinukeEnabled: false, logChannelId: null, modLogChannelId: null };
+
+  check(
+    "bật đủ → 100 điểm, không còn vấn đề",
+    (() => {
+      const r = evaluateConfigHealth(full);
+      return r.score === 100 && r.issues.length === 0;
+    })(),
+  );
+
+  const onlyBackup = evaluateConfigHealth({ ...full, backupAutoDays: 0 });
+  check(
+    "tắt backup → trừ đúng 15 điểm",
+    onlyBackup.score === 85 && onlyBackup.issues[0].points === 15,
+  );
+
+  const r = evaluateConfigHealth(off);
+  check("tắt antinuke + kênh log → trừ 55 điểm", r.score === 45);
+  check("vấn đề nghiêm trọng đứng đầu (30 điểm trước 25)", r.issues[0].key === "noAntiNuke");
+  check(
+    "mọi vấn đề đều có target để mở panel",
+    r.issues.every((i) => Boolean(i.target)),
+  );
+  check(
+    "target chỉ trong danh sách khoá hợp lệ",
+    r.issues.every((i) => HEALTH_TARGETS.includes(i.target)),
+  );
+
+  // Chỉ có modLogChannel cũng đủ — bot ghi log chính và log mod là hai chỗ.
+  check(
+    "chỉ có kênh log mod → coi như đã có log",
+    evaluateConfigHealth({ ...full, logChannelId: null }).score === 100,
+  );
+
+  // Bot chưa ở trong server: cấu hình chưa có ý nghĩa, KHÔNG được chấm rủi ro.
+  const notIn = evaluateConfigHealth({
+    ...full,
+    botInGuild: false,
+    antinukeEnabled: false,
+    logChannelId: null,
+    modLogChannelId: null,
+    backupAutoDays: 0,
+  });
+  check(
+    "bot chưa ở trong server → không chấm điểm rủi ro",
+    notIn.score === 100 && notIn.issues.length === 0,
+  );
+
+  // Tắt HẾT: tổng điểm trừ = 100 ⇒ điểm không âm.
+  const none = evaluateConfigHealth({
+    botInGuild: true,
+    logChannelId: null,
+    modLogChannelId: null,
+    antinukeEnabled: false,
+    automodEnabled: false,
+    joinGateEnabled: false,
+    verifyEnabled: false,
+    backupAutoDays: 0,
+  });
+  check("tắt hết → 0 điểm, KHÔNG âm", none.score === 0);
+  check("tắt hết → 6 vấn đề", none.issues.length === 6);
+
+  check("ngưỡng nhãn: 100 = Tốt", healthGrade(100).tone === "ok" && healthGrade(80).tone === "ok");
+  check(
+    "ngưỡng nhãn: 50 = Cần xem lại",
+    healthGrade(79).tone === "warn" && healthGrade(50).tone === "warn",
+  );
+  check(
+    "ngưỡng nhãn: dưới 50 = Rủi ro cao",
+    healthGrade(49).tone === "bad" && healthGrade(0).tone === "bad",
+  );
+
+  // Khoá `target` phải tồn tại trong NAV_ITEMS của GuildPage — nếu gõ sai,
+  // bấm "Mở panel" sẽ mở panel không có. Kiểm tra trực tiếp trên nguồn.
+  const guildPage = readFileSync(
+    new URL("../src/pages/GuildPage.tsx", import.meta.url).pathname,
+    "utf8",
+  );
+  check(
+    "mọi target của điểm cấu hình đều có panel thật trong NAV_ITEMS",
+    HEALTH_TARGETS.every((t) => new RegExp(`key: "${t}"`).test(guildPage)),
+  );
 }
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);

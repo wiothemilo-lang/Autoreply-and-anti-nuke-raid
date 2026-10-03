@@ -527,7 +527,12 @@ export default function GuildPage() {
                     initial="hidden"
                     animate="show"
                   >
-                    {section === "overview" && <OverviewPanel data={data} />}
+                    {section === "overview" && (
+                      <OverviewPanel
+                        data={data}
+                        onNavigate={(target) => goToSection(target as SectionKey)}
+                      />
+                    )}
                     {section === "automod" && <AutoModPanel data={data} />}
                     {section === "moderation" && <ModerationPanel data={data} />}
                     {section === "joingate" && <JoinGatePanel data={data} />}
