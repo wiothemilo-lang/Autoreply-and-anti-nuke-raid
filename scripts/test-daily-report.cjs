@@ -10,6 +10,7 @@ const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
+const path = require("path");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
   if (request === "discord.js") return DJS_MOCK;
@@ -65,7 +66,7 @@ Module._load = function (request, parent) {
 };
 
 (async () => {
-  const { runDailyReports } = require("../bot/src/handlers/dailyReport");
+  const { runDailyReports, processReportJobs } = require("../bot/src/handlers/dailyReport");
 
   let pass = 0;
   let fail = 0;
@@ -255,6 +256,60 @@ Module._load = function (request, parent) {
     sendLogShouldThrow = true;
     await runDailyReports(client, store, heat);
     check("sendLog lỗi → bắt lỗi, không crash", true);
+  }
+
+  // ── 9. Đợt #4: cờ cron do Convex đặt → tick xử lý + chặn hồi quy kiến trúc ──
+  {
+    clear();
+    const configs = new Map();
+    configs.set("g-cron", { logChannelId: "c", lastReportAt: Date.now() - 25 * 3_600_000 });
+    const store = makeStore(configs);
+    client.guilds.cache.set("g-cron", { id: "g-cron", name: "Cron" });
+    eventsForGuild = [];
+    await processReportJobs(client, store, heat, [{ guildId: "g-cron" }, { guildId: "g-missing" }]);
+    check("cờ cron → gửi báo cáo cho guild đến hạn", sentLogs.length === 1);
+    check(
+      "cờ cron → gửi xong xoá cờ qua botSetReportAt",
+      store.mutations.some(
+        (m) => m.name === "bot_writes:botSetReportAt" && m.args.guildId === "g-cron",
+      ),
+    );
+    check(
+      "cờ cho guild bot đã rời → bỏ qua an toàn (không mutation sai)",
+      store.mutations.every((m) => m.args.guildId === "g-cron"),
+    );
+  }
+  {
+    const ROOT = path.join(__dirname, "..");
+    const cronsSrc = fs.readFileSync(path.join(ROOT, "convex", "crons.ts"), "utf8");
+    check(
+      "convex/crons.ts: lịch báo cáo 30 phút → internal.reports.sweepDueDailyReports",
+      /crons\.interval\(\s*"daily-report-sweep",\s*\{\s*minutes:\s*30\s*\},\s*internal\.reports\.sweepDueDailyReports/.test(
+        cronsSrc,
+      ),
+    );
+    const idxSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "index.js"), "utf8");
+    check(
+      "bot/src/index.js không còn reportInterval (lịch thuộc Convex cron)",
+      !idxSrc.includes("reportInterval"),
+    );
+    const reportsSrc = fs.readFileSync(path.join(ROOT, "convex", "reports.ts"), "utf8");
+    const botDailySrc = fs.readFileSync(
+      path.join(ROOT, "bot", "src", "handlers", "dailyReport.js"),
+      "utf8",
+    );
+    check(
+      "ngưỡng 20h của cron khớp MIN_INTERVAL_MS phía bot (không lệch gây bỏ sót)",
+      reportsSrc.includes("20 * 60 * 60 * 1000") && botDailySrc.includes("20 * 60 * 60 * 1000"),
+    );
+    const settingsSrc = fs.readFileSync(
+      path.join(ROOT, "convex", "bot_writes", "settings.ts"),
+      "utf8",
+    );
+    check(
+      "botSetReportAt xoá cờ reportRequestedAt sau khi gửi (cờ chỉ sống khi chưa gửi)",
+      /lastReportAt: at[\s\S]{0,200}reportRequestedAt: undefined/.test(settingsSrc),
+    );
   }
 
   fs.unlinkSync(DJS_MOCK);

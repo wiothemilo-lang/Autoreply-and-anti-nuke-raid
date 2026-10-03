@@ -7,31 +7,65 @@ const MIN_INTERVAL_MS = 20 * 60 * 60 * 1000; // don't report more than once per 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 const TIER_EMOJI = { warn: "⚠️", timeout: "⏸️", kick: "👢", ban: "🚫" };
 
-async function runDailyReports(client, store, heat) {
+/**
+ * Gửi báo cáo cho MỘT guild nếu đến hạn (đọc cache config như cũ). Tách khỏi
+ * vòng lặp để HAI đường gọi dùng chung logic:
+ *   1. Lượt khởi động 15s sau ready (giữ nguyên hành vi cũ).
+ *   2. Cờ `reportRequestedAt` do cron Convex đặt (đợt #4) — xử lý trong tick.
+ * Trả về true nếu đã gửi thật (đã ghi `botSetReportAt` — nơi xoá cờ cron).
+ */
+async function runDailyReportForGuild(client, store, heat, guildId) {
   const now = Date.now();
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) return false; // bot đã rời server — không còn gì để báo
 
+  const config = await store.getConfig(guildId);
+  if (!config || !config.logChannelId || config.dailyReportEnabled === false) return false;
+
+  const lastAt = config.lastReportAt || now - WINDOW_MS;
+  if (now - lastAt < MIN_INTERVAL_MS) return false; // not due yet
+
+  // Chỉ query sự kiện cho guild ĐẾN HẠN (per-guild, không query global
+  // cho mọi guild mỗi 10 phút — tiết kiệm hàng triệu operations/tháng).
+  const events = await store.client
+    .query("reports:getGuildEvents", {
+      guildId,
+      since: now - 48 * 60 * 60 * 1000,
+      limit: 500,
+    })
+    .catch(() => []);
+  const list = (events || []).filter((e) => e.createdAt >= lastAt);
+  await sendReport(guild, config, list, lastAt, now, heat);
+  await store.client.mutation("bot_writes:botSetReportAt", { guildId, at: now });
+  return true;
+}
+
+async function runDailyReports(client, store, heat) {
   for (const guild of client.guilds.cache.values()) {
     try {
-      const config = await store.getConfig(guild.id);
-      if (!config || !config.logChannelId || config.dailyReportEnabled === false) continue;
-
-      const lastAt = config.lastReportAt || now - WINDOW_MS;
-      if (now - lastAt < MIN_INTERVAL_MS) continue; // not due yet
-
-      // Chỉ query sự kiện cho guild ĐẾN HẠN (per-guild, không query global
-      // cho mọi guild mỗi 10 phút — tiết kiệm hàng triệu operations/tháng).
-      const events = await store.client
-        .query("reports:getGuildEvents", {
-          guildId: guild.id,
-          since: now - 48 * 60 * 60 * 1000,
-          limit: 500,
-        })
-        .catch(() => []);
-      const list = (events || []).filter((e) => e.createdAt >= lastAt);
-      await sendReport(guild, config, list, lastAt, now, heat);
-      await store.client.mutation("bot_writes:botSetReportAt", { guildId: guild.id, at: now });
+      await runDailyReportForGuild(client, store, heat, guild.id);
     } catch (err) {
       console.error(`[report] ${guild.id}:`, err.message);
+    }
+  }
+}
+
+/**
+ * Xử lý cờ báo cáo do cron Convex đặt (`bot_tick.getPendingJobs.reports`).
+ * Lỗi một guild không chặn các guild còn lại; guild bot đã rời thì bỏ qua.
+ * Cờ CHỈ được xoá khi gửi thành công (bên trong `botSetReportAt`) — gửi hỏng
+ * hay đang tắt báo cáo thì cờ còn nguyên để lượt sau thử lại, không im lặng
+ * bỏ mất báo cáo còn nợ.
+ */
+async function processReportJobs(client, store, heat, items) {
+  for (const item of items || []) {
+    const guildId = item?.guildId;
+    if (!guildId) continue;
+    try {
+      const sent = await runDailyReportForGuild(client, store, heat, guildId);
+      if (sent) console.log(`[report] đã gửi theo cờ cron: ${guildId}`);
+    } catch (err) {
+      console.error(`[report] ${guildId}:`, err?.message || err);
     }
   }
 }
@@ -135,4 +169,4 @@ function formatDate(ts) {
   });
 }
 
-module.exports = { runDailyReports };
+module.exports = { runDailyReports, runDailyReportForGuild, processReportJobs };

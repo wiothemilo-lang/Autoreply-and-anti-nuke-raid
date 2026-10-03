@@ -23,13 +23,13 @@
  *  - backupRebuild.js   — dựng lại role/kênh/tin/emoji/sticker/thread/meta/ban/invite
  *  - backupRestore.js   — dry-run + restoreCore + runRestore
  *  - backupImport.js    — import file .msc/.json từ dashboard
- *  - backupJobs.js      — vòng quét/claim/lịch tự động/clone
+ *  - backupJobs.js      — vòng quét/claim/clone (lịch tự động đã sang cron Convex — đợt #4)
  *
  * File này giữ nguyên ĐƯỜNG DẪN require (./handlers/backup) và HÌNH DẠNG export
  * (callable + thuộc tính) để index.js, tick.js, localSnapshot.js và các test mock
  * theo chuỗi request cũ tiếp tục chạy y nguyên.
  */
-const { pollBackups, autoBackupSweep, cloneToServer } = require("../backupJobs");
+const { pollBackups, cloneToServer } = require("../backupJobs");
 const {
   runBackup,
   snapshotWithSettings,
@@ -74,7 +74,6 @@ module.exports.runRestore = runRestore;
 module.exports.planRestoreCore = planRestoreCore;
 module.exports.runRestorePlan = runRestorePlan;
 module.exports.runImportRestore = runImportRestore;
-module.exports.autoBackupSweep = autoBackupSweep;
 // C1 localSnapshot.js tái dùng engine chụp có sẵn — PHẢI export, nếu không
 // snapshotGuildLocal ném "backup.snapshotWithSettings is not a function".
 module.exports.snapshotWithSettings = snapshotWithSettings;

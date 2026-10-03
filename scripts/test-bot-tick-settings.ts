@@ -6,6 +6,7 @@
 //
 // Chạy: bun scripts/test-bot-tick-settings.ts
 import { getPendingJobs } from "../convex/bot_tick";
+import { sweepDueDailyReports } from "../convex/reports";
 import { computeBotKey } from "../convex/botAuth";
 
 const BOT_KEY = "key-thô-32-bytes-của-bot";
@@ -44,6 +45,13 @@ function makeCtx(tables: Record<string, Row[]>) {
       Object.values(tables)
         .flat()
         .find((r) => r._id === id) ?? null,
+    // Cron đợt #4 (sweep báo cáo ngày / auto backup) ghi bằng patch — cần cho test.
+    patch: async (id: string, patch: Row) => {
+      for (const rows of Object.values(tables)) {
+        const row = rows.find((r) => r._id === id);
+        if (row) Object.assign(row, patch);
+      }
+    },
   };
   return { db } as any;
 }
@@ -513,6 +521,129 @@ const status = { _id: "st", kind: "status", botKeySeed: computeBotKey(BOT_KEY), 
       both.backups.filter((b: any) => b.kind === "restore").length === 1 &&
         both.backups.filter((b: any) => b.kind === "plan").length === 1,
     );
+  }
+
+  console.log("\n── Báo cáo ngày: batch trả cờ cron (đợt #4) ──");
+  {
+    const ctx = makeCtx({
+      botStatus: [status],
+      guilds: [
+        {
+          _id: "r1",
+          discordId: "g-report",
+          botInGuild: true,
+          name: "Cờ chờ gửi",
+          reportRequestedAt: NOW - 1_000,
+        },
+        { _id: "r2", discordId: "g-no-report", botInGuild: true, name: "Không cờ" },
+        {
+          _id: "r3",
+          discordId: "g-gone-report",
+          botInGuild: false,
+          name: "Bot đã rời",
+          reportRequestedAt: NOW,
+        },
+      ],
+      reactionRolePanels: [],
+      giveaways: [],
+      guildWebhooks: [],
+    });
+    const jobs = await handler(ctx, { botKey: BOT_KEY });
+    check(
+      "guild có cờ reportRequestedAt → trả trong jobs.reports",
+      jobs.reports.length === 1 && jobs.reports[0].guildId === "g-report",
+      JSON.stringify(jobs.reports),
+    );
+    check(
+      "guild không cờ → không trả job báo cáo",
+      !jobs.reports.some((r: any) => r.guildId === "g-no-report"),
+    );
+    check(
+      "guild bot đã rời (botInGuild=false) → không trả job báo cáo",
+      !jobs.reports.some((r: any) => r.guildId === "g-gone-report"),
+    );
+  }
+
+  console.log("\n── Báo cáo ngày: luật đặt cờ của cron (sweepDueDailyReports) ──");
+  {
+    const sweep = (sweepDueDailyReports as any)._handler as (
+      ctx: any,
+      args: any,
+    ) => Promise<{ flagged: number }>;
+    const NOW2 = Date.now();
+    const HOUR = 60 * 60_000;
+    const tables = {
+      guilds: [
+        {
+          _id: "s1",
+          discordId: "s1",
+          botInGuild: true,
+          name: "Đến hạn",
+          logChannelId: "ch",
+          lastReportAt: NOW2 - 21 * HOUR,
+        },
+        {
+          _id: "s2",
+          discordId: "s2",
+          botInGuild: true,
+          name: "Mới gửi 2h trước",
+          logChannelId: "ch",
+          lastReportAt: NOW2 - 2 * HOUR,
+        },
+        {
+          _id: "s3",
+          discordId: "s3",
+          botInGuild: true,
+          name: "Chưa từng gửi",
+          logChannelId: "ch",
+        },
+        { _id: "s4", discordId: "s4", botInGuild: true, name: "Không kênh log" },
+        {
+          _id: "s5",
+          discordId: "s5",
+          botInGuild: true,
+          name: "Tắt báo cáo",
+          logChannelId: "ch",
+          dailyReportEnabled: false,
+          lastReportAt: NOW2 - 30 * HOUR,
+        },
+        {
+          _id: "s6",
+          discordId: "s6",
+          botInGuild: true,
+          name: "Đã có cờ chờ",
+          logChannelId: "ch",
+          lastReportAt: NOW2 - 30 * HOUR,
+          reportRequestedAt: NOW2 - 5_000,
+        },
+        {
+          _id: "s7",
+          discordId: "s7",
+          botInGuild: false,
+          name: "Bot đã rời",
+          logChannelId: "ch",
+          lastReportAt: NOW2 - 30 * HOUR,
+        },
+      ],
+    } as Record<string, Row[]>;
+    const ctx = makeCtx(tables);
+    const res = await sweep(ctx, {});
+    const by = (id: string) => tables.guilds.find((g) => g._id === id)!;
+    check(
+      "chỉ đặt cờ cho guild đủ điều kiện (s1 quá 20h + s3 chưa gửi)",
+      res.flagged === 2,
+      JSON.stringify(res),
+    );
+    check("s1 → có cờ", typeof by("s1").reportRequestedAt === "number");
+    check("s3 → có cờ", typeof by("s3").reportRequestedAt === "number");
+    check("s2 mới gửi 2h → không cờ", by("s2").reportRequestedAt === undefined);
+    check("s4 thiếu kênh log → không cờ", by("s4").reportRequestedAt === undefined);
+    check("s5 tắt báo cáo → không cờ", by("s5").reportRequestedAt === undefined);
+    check(
+      "s6 đã có cờ → giữ nguyên mốc cũ (không ghi đè liên tục)",
+      by("s6").reportRequestedAt === NOW2 - 5_000,
+    );
+    check("s7 bot đã rời → không cờ", by("s7").reportRequestedAt === undefined);
   }
 
   console.log(`\n${pass}/${pass + fail} ✅`);

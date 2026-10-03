@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { internalMutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
@@ -216,5 +216,50 @@ export const getGuildEvents = query({
       .order("desc")
       .take(Math.min(limit ?? 500, 500));
     return events.map(EVENT_FIELDS);
+  },
+});
+
+/**
+ * PHẢI khớp `MIN_INTERVAL_MS` trong `bot/src/handlers/dailyReport.js` — nếu lệch,
+ * bot sẽ bỏ qua báo cáo do cron đặt cờ (gửi chậm tới khi cache hết hạn) hoặc
+ * cron đặt cờ cho guild mà bot còn thấy "chưa đến hạn".
+ */
+const MIN_REPORT_INTERVAL_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * Cron Convex (đợt #4): thay vòng `reportInterval` 15 phút của bot.
+ *
+ * Đồng hồ "đến hạn báo cáo ngày" thuộc SERVER: mỗi lượt cron quét guild đang có
+ * bot, guild nào đủ điều kiện (có kênh log, không tắt báo cáo, quá 20h từ mốc
+ * gửi gần nhất — hoặc chưa từng gửi) thì đặt cờ `reportRequestedAt`.
+ *
+ * Bot đọc cờ qua batch tick (`bot_tick.getPendingJobs.reports` — đọc TƯƠI,
+ * không đi qua bundle cache) rồi gửi embed và gọi `botSetReportAt` để xoá cờ +
+ * ghi mốc `lastReportAt`. Cờ còn nguyên nghĩa là bot CHƯA gửi: hoặc đang offline
+ * (bật lại là gửi), hoặc cấu hình vừa bị tắt kênh log/báo cáo (bật lại là gửi
+ * báo cáo còn nợ — đúng tinh thần "không im lặng bỏ sót").
+ *
+ * Mỗi guild tối đa MỘT cờ: đã đặt thì bỏ qua để không ghi đè liên tục lên
+ * document (đỡ tốn writes, `lastReportAt` mới là mốc chống gửi trùng).
+ */
+export const sweepDueDailyReports = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const guilds = await ctx.db
+      .query("guilds")
+      .withIndex("by_botInGuild", (q) => q.eq("botInGuild", true))
+      .collect();
+    let flagged = 0;
+    for (const g of guilds) {
+      if (g.reportRequestedAt !== undefined) continue; // cờ đang chờ bot — đừng dồn thêm
+      if (!g.logChannelId) continue;
+      if (g.dailyReportEnabled === false) continue;
+      const lastAt = g.lastReportAt;
+      if (lastAt !== undefined && now - lastAt < MIN_REPORT_INTERVAL_MS) continue;
+      await ctx.db.patch(g._id, { reportRequestedAt: now });
+      flagged++;
+    }
+    return { flagged };
   },
 });

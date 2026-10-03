@@ -13,6 +13,8 @@ import { reassembleBackupJsonForRead } from "./backupChunks";
  *  - backups: yêu cầu backup/restore/import đang chờ + backup tự động đến hạn.
  *  - settingsChanges: guild vừa được dashboard sửa cấu hình (settingsChangedAt mới)
  *    → bot xóa cache getConfig của guild đó để thay đổi áp dụng trong ~1 tick.
+ *  - reports: guild đến hạn báo cáo ngày — cờ `reportRequestedAt` do cron Convex
+ *    `reports:sweepDueDailyReports` đặt (đợt #4, thay vòng reportInterval 15 phút).
  *  - meta: cờ lockdown/heat reset (tham khảo; bot vẫn đọc getConfig có cache).
  * Bot tự lọc guild mình đang ở. Query đọc-only, không có side effect.
  */
@@ -289,12 +291,19 @@ export const getPendingJobs = query({
       }
     }
 
+    // Báo cáo ngày (đợt #4): cờ cron đặt, bot gửi trong tick kế tiếp rồi xoá cờ
+    // bằng botSetReportAt. Cờ còn = bot chưa gửi (offline / tắt tạm) — giữ nguyên.
+    const reports = guilds
+      .filter((g) => g.reportRequestedAt !== undefined)
+      .map((g) => ({ guildId: g.discordId }));
+
     return {
       hidden,
       verifyPanels,
       ticketPanels,
       backups,
       settingsChanges,
+      reports,
       selfDiagnose,
       threatFlags,
       tickets,

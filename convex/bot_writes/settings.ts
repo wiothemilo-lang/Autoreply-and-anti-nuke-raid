@@ -176,7 +176,13 @@ export async function botSetReportAtHandler(
     .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
     .first();
   if (!guild) return { ok: true };
-  await ctx.db.patch(guild._id, { lastReportAt: at, updatedAt: Date.now() });
+  // Xoá luôn cờ do cron đặt (`reportRequestedAt`) — đây là nơi DUY NHẤT biết
+  // báo cáo đã gửi thật; còn cờ thì bot còn thử lại (đợt #4).
+  await ctx.db.patch(guild._id, {
+    lastReportAt: at,
+    reportRequestedAt: undefined,
+    updatedAt: Date.now(),
+  });
   return { ok: true };
 }
 
