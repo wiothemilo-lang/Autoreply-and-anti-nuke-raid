@@ -109,29 +109,70 @@ function topKeys(block) {
   return keys;
 }
 
+/** Vị trí '}' đóng block mở ở `braceStart` (cấu trúc ngoặc còn nguyên sau strip). */
+function blockEnd(src, braceStart) {
+  let depth = 0;
+  for (let i = braceStart; i < src.length; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}") {
+      depth--;
+      if (!depth) return i;
+    }
+  }
+  return src.length;
+}
+
 /** Parse convex/*.ts → Map(fnName → Set(argNames)). */
 function convexFns(file) {
   const src = strip(fs.readFileSync(file, "utf8"));
+  // Đợt #5 tách thân hàm sang module con (vd `convex/guilds/*.ts`): validator nằm
+  // ở file con (`export const xArgs = {…}`), wrapper ở file gốc viết `args: xArgs`
+  // → gom cả file con để vẫn đọc được hợp đồng, không nới lỏng check.
+  const subDir = path.join(path.dirname(file), path.basename(file, ".ts"));
+  const sources = [src];
+  try {
+    for (const e of fs.readdirSync(subDir)) {
+      if (e.endsWith(".ts")) sources.push(strip(fs.readFileSync(path.join(subDir, e), "utf8")));
+    }
+  } catch {
+    // chưa tách file con — bình thường
+  }
+  // Bảng tra `export const xArgs = {…}` để giải `args: xArgs`.
+  const argObjs = new Map();
+  for (const s of sources) {
+    const reC = /export\s+const\s+([A-Za-z0-9_$]+)\s*=\s*\{/g;
+    let mc;
+    while ((mc = reC.exec(s))) {
+      const bs = s.indexOf("{", mc.index);
+      argObjs.set(mc[1], topKeys(s.slice(bs + 1, blockEnd(s, bs))));
+    }
+  }
   const map = new Map();
-  const re = /export\s+const\s+([A-Za-z0-9_$]+)\s*=\s*(query|mutation|action)\s*\(/g;
-  let m;
-  while ((m = re.exec(src))) {
-    const argsIdx = src.indexOf("args:", m.index + m[0].length);
-    if (argsIdx === -1) {
-      map.set(m[1], new Set());
-      continue;
-    }
-    const braceStart = src.indexOf("{", argsIdx);
-    let depth = 0;
-    let i = braceStart;
-    for (; i < src.length; i++) {
-      if (src[i] === "{") depth++;
-      else if (src[i] === "}") {
-        depth--;
-        if (!depth) break;
+  for (const s of sources) {
+    const re = /export\s+const\s+([A-Za-z0-9_$]+)\s*=\s*(query|mutation|action)\s*\(/g;
+    let m;
+    while ((m = re.exec(s))) {
+      const argsIdx = s.indexOf("args:", m.index + m[0].length);
+      if (argsIdx === -1) {
+        map.set(m[1], new Set());
+        continue;
       }
+      const ident = s
+        .slice(argsIdx + "args:".length)
+        .trimStart()
+        .match(/^([A-Za-z0-9_$]+)\s*(?:,|\})/);
+      // `args: {…}` literal HOẶC `args: xArgs` trỏ tới object export; không tra
+      // được thì trả set RỖNG để FAIL to (không im lặng cho qua).
+      let keys;
+      if (ident && argObjs.has(ident[1])) {
+        keys = argObjs.get(ident[1]);
+      } else {
+        const braceStart = s.indexOf("{", argsIdx);
+        keys =
+          braceStart === -1 ? new Set() : topKeys(s.slice(braceStart + 1, blockEnd(s, braceStart)));
+      }
+      map.set(m[1], keys);
     }
-    map.set(m[1], topKeys(src.slice(braceStart + 1, i)));
   }
   return map;
 }

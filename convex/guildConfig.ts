@@ -9,7 +9,8 @@
  *
  * File này chỉ chứa HÀM THUẦN (không đụng db) để test được trực tiếp bằng
  * `scripts/test-guild-config-portability.ts` — cùng kiểu với `guildStats.ts`.
- * Phần gọi db nằm ở `guilds.ts` (`exportGuildConfig` / `importGuildConfig`).
+ * Phần gọi db nằm ở `guilds/configPortability.ts` (`exportGuildConfig` /
+ * `importGuildConfig`) — wrapper giữ ở `guilds.ts` để tên function không đổi.
  *
  * ⚠️ Một giới hạn phải nói rõ khi hiện trên UI: các field chứa **Discord ID**
  * (kênh, vai trò, thành viên) chỉ đúng **trong server gốc**. File này dùng
