@@ -43,17 +43,28 @@ function rebuild(toks: Tok[]): string {
     .join("");
 }
 
-const sample = { username: "user1", server: "Server Thật", count: 128, created: 365, boost: 4 };
+const sample = {
+  username: "user1",
+  server: "Server Thật",
+  count: 128,
+  created: 365,
+  joined: 210,
+  boost: 4,
+};
 
 console.log("\n── fillPreviewSample: placeholder giống hệt bot ──");
 {
-  const out = fillPreviewSample("{user}|{username}|{server}|{count}|{created}|{boost}", sample);
-  const [user, username, server, count, created, boost] = out.split("|");
+  const out = fillPreviewSample(
+    "{user}|{username}|{server}|{count}|{created}|{joined}|{boost}",
+    sample,
+  );
+  const [user, username, server, count, created, joined, boost] = out.split("|");
   check("{user} → mã mention (không phải tên chữ)", /^<@\d{15,21}>$/.test(user));
   check("{username} → tên người dùng", username === "user1");
   check("{server} → tên server thật", server === "Server Thật");
   check("{count} → số thành viên", count === "128");
   check("{created} → tuổi account (ngày)", created === "365");
+  check("{joined} → số ngày đã ở trong server", joined === "210");
   check("{boost} → số boost", boost === "4");
   check(
     "chuỗi rỗng giữ nguyên rỗng (không tự thêm mặc định)",

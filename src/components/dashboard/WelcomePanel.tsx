@@ -72,7 +72,7 @@ const IMAGE_SLOT_FIELD: Record<ImageSlot, string> = {
   goodbyeCardBackground: "goodbyeCardBackground",
 };
 
-const PLACEHOLDER_BADGE = "{user} {username} {server} {count} {created} {boost}";
+const PLACEHOLDER_BADGE = "{user} {username} {server} {count} {created} {joined} {boost}";
 
 /** Biến bot thay khi gửi — hiện dưới dạng chip bấm-là-chèn. */
 const TOKENS: { token: string; hint: string }[] = [
@@ -81,6 +81,7 @@ const TOKENS: { token: string; hint: string }[] = [
   { token: "{server}", hint: "Tên server" },
   { token: "{count}", hint: "Số thành viên hiện tại" },
   { token: "{created}", hint: "Tài khoản đã tạo bao nhiêu ngày" },
+  { token: "{joined}", hint: "Đã ở trong server bao nhiêu ngày" },
   { token: "{boost}", hint: "Số lượt boost của server" },
 ];
 
@@ -891,6 +892,7 @@ function GreetingCard({
                 server: g.name,
                 count: g.memberCount ?? 0,
                 created: 365,
+                joined: 128,
                 boost: 7,
               }}
               channels={channels}

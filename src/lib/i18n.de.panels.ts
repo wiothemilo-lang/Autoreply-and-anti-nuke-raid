@@ -335,6 +335,7 @@ export const DE_PANELS: Record<string, string> = {
   "Tên người dùng (không thông báo)": "Benutzername, ohne zu benachrichtigen",
   "Số thành viên hiện tại": "Aktuelle Mitgliederzahl",
   "Tài khoản đã tạo bao nhiêu ngày": "Wie viele Tage das Konto alt ist",
+  "Đã ở trong server bao nhiêu ngày": "Wie viele Tage sie schon auf dem Server sind",
   "Số lượt boost của server": "Anzahl der Server-Boosts",
 
   /* ==== Landing — đợt viết lại copy (Lô 1). Bản DE của các key còn entry cũ

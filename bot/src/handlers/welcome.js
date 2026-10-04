@@ -43,6 +43,22 @@ function accountAgeDays(member) {
 const MAX_CONTENT = 1500;
 
 /**
+ * Số ngày thành viên ĐÃ Ở trong server.
+ *
+ * Vì sao cần: `{created}` là tuổi tài khoản, nhưng khi tạm biệt, thứ người ta
+ * muốn nhắc là "cảm ơn bạn đã ở lại 2 năm" — không có biến nào để nói. Đây là
+ * lý do phần lớn tin tạm biệt mặc định rất chung chung.
+ *
+ * `guildMemberRemove` đôi khi đưa vào một member partial (joinedTimestamp
+ * mất) → trả 0. Thà 0 còn hơn nói sai, và tin nhắn vẫn gửi được.
+ */
+function memberDays(member) {
+  const ts = member?.joinedTimestamp;
+  if (typeof ts !== "number" || !Number.isFinite(ts)) return 0;
+  return Math.max(0, Math.floor((Date.now() - ts) / 86_400_000));
+}
+
+/**
  * Cắt tới trần ký tự nhưng KHÔNG cắt vào giữa một mã Discord.
  * Nội dung v3 có thể chứa `<:ten:id>`, `<a:ten:id>`, `<@id>`, `<#id>` — cắt ngang
  * sẽ để lại rác như `<:wio:12345` hiện nguyên trong tin nhắn của thành viên.
@@ -64,6 +80,7 @@ function fillTemplate(template, { member, guild }) {
       .replaceAll("{server}", guild.name)
       .replaceAll("{count}", String(guild.memberCount ?? 0))
       .replaceAll("{created}", String(accountAgeDays(member)))
+      .replaceAll("{joined}", String(memberDays(member)))
       .replaceAll("{boost}", String(guild.premiumSubscriptionCount ?? 0)),
   );
 }
@@ -193,6 +210,27 @@ async function buildCard(config, kind, member, guild) {
 }
 
 /**
+ * Báo lỗi cấu hình chào/tạm biệt — NHƯNG có chống spam.
+ *
+ * Vì sao phải có: trước đây kênh bị xoá / bot mất quyền / gửi lỗi đều
+ * `return false` trong im lặng. Chủ server bật welcome, cấu hình xong, không
+ * thấy tin nào hiện ra và cũng không có cách nào biết vì sao — đúng loại lỗi
+ * âm thầm mà phần còn lại của bot cố tránh.
+ *
+ * Dedupe 10 phút/khách: server join đông sẽ không in 200 dòng cùng một lỗi,
+ * nhưng chủ vẫn thấy dòng đầu tiên nói rõ nguyên nhân.
+ */
+const _warnedAt = new Map();
+function reportGreetingProblem(kind, guild, reason) {
+  const key = `${kind}:${guild?.id}:${reason}`;
+  const now = Date.now();
+  if (now - (_warnedAt.get(key) ?? 0) < 10 * 60_000) return false;
+  _warnedAt.set(key, now);
+  console.error(`[${kind}] ${guild?.name ?? guild?.id ?? "?"}: ${reason}`);
+  return true;
+}
+
+/**
  * Gửi welcome/goodbye vào kênh cấu hình. Trả true khi gửi thành công.
  * RAID-SAFE: lockdown đang hoạt động (guild.lockdownUntil > now) → bỏ qua.
  */
@@ -200,16 +238,31 @@ async function sendGreeting(client, config, kind, member, guild) {
   const enabled = kind === "welcome" ? config.welcomeEnabled : config.goodbyeEnabled;
   if (!enabled) return false;
   const channelId = kind === "welcome" ? config.welcomeChannelId : config.goodbyeChannelId;
+  // Chủ chưa chọn kênh thì im lặng là ĐÚNG — đó là lựa chọn của họ, không phải lỗi.
   if (!channelId) return false;
   // Lockdown = đang bị raid → im lặng (config gửi chào sẽ trở thành noise + rò role).
   if ((config.lockdownUntil ?? 0) > Date.now()) return false;
 
   const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel?.isTextBased?.()) return false;
-  // Thiếu quyền gửi → bỏ qua im lặng (không spam log mỗi lượt join).
+  if (!channel?.isTextBased?.()) {
+    reportGreetingProblem(
+      kind,
+      guild,
+      `không gửi được — kênh <#${channelId}> đã bị xoá hoặc bot không còn quyền xem nó. Chọn lại kênh trong dashboard.`,
+    );
+    return false;
+  }
+  // Thiếu quyền gửi → báo RÕ (dedupe 10 phút) thay vì im lặng.
   // Optional chaining đầy đủ: guild.members có thể undefined (guild partial).
   const perms = guild.members?.me?.permissionsIn?.(channel);
-  if (perms && !perms.has(PermissionFlagsBits.SendMessages)) return false;
+  if (perms && !perms.has(PermissionFlagsBits.SendMessages)) {
+    reportGreetingProblem(
+      kind,
+      guild,
+      `thiếu quyền Send Messages trong #${channel.name ?? channelId} — cấp quyền cho bot rồi thử lại.`,
+    );
+    return false;
+  }
 
   // RAID-SAFE + "không được làm chết tính năng": mọi lỗi vẽ thẻ trả null →
   // gửi embed thường, tin nhắn chào vẫn tới kênh.
@@ -219,6 +272,9 @@ async function sendGreeting(client, config, kind, member, guild) {
     .send(payload)
     .then(() => true)
     .catch(() => false);
+  if (!sent) {
+    reportGreetingProblem(kind, guild, `gửi tin thất bại trong #${channel.name ?? channelId}.`);
+  }
   return sent;
 }
 
@@ -296,4 +352,7 @@ module.exports = {
   _safeUrlForTest: safeUrl,
   _buildPayloadForTest: buildPayload,
   _buildCardForTest: buildCard,
+  _memberDaysForTest: memberDays,
+  _reportGreetingProblemForTest: reportGreetingProblem,
+  _resetGreetingProblemCacheForTest: () => _warnedAt.clear(),
 };
