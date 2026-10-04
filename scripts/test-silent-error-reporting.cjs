@@ -458,6 +458,8 @@ function makeGuild({ failChannelSend = false, noChannel = false, full = false } 
   // 🔟+1️⃣1️⃣ runBackup xong → botClearBackup phải nói RÕ kết quả cho dashboard:
   // unchanged=true (bỏ qua vì server không đổi) hay unchanged=false (đã tạo bản mới).
   const utils = require("../bot/src/backupUtils.js");
+  // Phải khớp CHÍNH XÁC phần "ổn định" mà snapshotGuild sinh ra (guild giả của
+  // makeGuild không có banner/roles.everyone → các field đó null).
   const sameChecksum = utils.computeSnapshotChecksum({
     roles: [],
     channels: [],
@@ -473,6 +475,24 @@ function makeGuild({ failChannelSend = false, noChannel = false, full = false } 
       logChannelId: "log-ch-1",
       modLogChannelId: null,
     },
+    guildMeta: {
+      name: "Server Test",
+      description: null,
+      iconUrl: null,
+      bannerUrl: null,
+      splashUrl: null,
+      verificationLevel: null,
+      explicitContentFilter: null,
+      defaultMessageNotifications: null,
+      systemChannelId: null,
+      afkChannelId: null,
+      afkTimeout: null,
+      preferredLocale: null,
+    },
+    everyonePermissions: null,
+    // P2: bản đồ thành viên ↔ vai trò cũng nằm trong phần "ổn định". Guild giả
+    // ở đây không có members.fetch/cache → captureMemberRoles trả mảng rỗng.
+    members: [],
   });
   {
     const store = makeStore({

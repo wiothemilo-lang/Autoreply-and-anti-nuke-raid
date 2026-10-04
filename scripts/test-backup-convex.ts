@@ -193,6 +193,45 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
   );
   check("seed khác → key khác", computeBotKey("abc") !== computeBotKey("xyz"));
 
+  console.log("\n── botStoreBackup: lưu bản đồ vai trò thành viên (P2) ──");
+  {
+    const { ctx, backupRows } = makeCtx({ seed: BOT_KEY });
+    await storeHandler(ctx as any, {
+      guildId: "g1",
+      guildName: "G1",
+      backupJson: "z:map",
+      roleCount: 2,
+      channelCount: 0,
+      memberCount: 3,
+      memberRolesTruncated: true,
+      source: "backup",
+      botKey: BOT_KEY,
+    });
+    const row = backupRows[backupRows.length - 1];
+    check(
+      "botStoreBackup lưu memberCount + cờ bị cắt",
+      row.memberCount === 3 && row.memberRolesTruncated === true,
+      JSON.stringify({ m: row.memberCount, t: row.memberRolesTruncated }),
+    );
+    // memberCount âm / lấy lượt phải ép về 0 — không để số âm lọt vào bảng.
+    await storeHandler(ctx as any, {
+      guildId: "g1",
+      guildName: "G1",
+      backupJson: "z:map2",
+      roleCount: 1,
+      channelCount: 0,
+      memberCount: -5,
+      source: "backup",
+      botKey: BOT_KEY,
+    });
+    const row2 = backupRows[backupRows.length - 1];
+    check(
+      "memberCount âm → ép về 0, cờ bị cắt vắng mặt là undefined",
+      row2.memberCount === 0 && row2.memberRolesTruncated === undefined,
+      JSON.stringify({ m: row2.memberCount, t: row2.memberRolesTruncated }),
+    );
+  }
+
   console.log("\n── botStoreBackup: botKey + dọn tồn dư (giữ 3) ──");
   {
     const { ctx, backupRows, nextId } = makeCtx({ seed: BOT_KEY });
@@ -644,6 +683,8 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
       channelCount: 4,
       pushedToGithub: false,
       backupJson: "z:abc",
+      // Checksum phải được botGetPending chuyển tiếp để bot xác minh toàn vẹn.
+      backupChecksum: "cs-plan-1",
     });
 
     // 1) Không đăng nhập / không quyền → từ chối, KHÔNG đặt cờ.
@@ -685,8 +726,11 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     const pending = (await botGetPendingHandler(ctx as any, { botKey: BOT_KEY })) as any[];
     const planJob = pending.find((p) => p.kind === "plan");
     check(
-      "botGetPending trả job dry-run kèm backupJson",
-      !!planJob && planJob.backupJson === "z:abc" && planJob.backupId === "bk1",
+      "botGetPending trả job dry-run kèm backupJson + backupChecksum (xác minh toàn vẹn)",
+      !!planJob &&
+        planJob.backupJson === "z:abc" &&
+        planJob.backupId === "bk1" &&
+        planJob.backupChecksum === "cs-plan-1",
       JSON.stringify(planJob),
     );
 

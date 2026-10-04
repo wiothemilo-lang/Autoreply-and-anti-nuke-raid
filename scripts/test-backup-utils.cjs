@@ -70,6 +70,14 @@ function check(label, cond) {
     "snapshotChecksum đổi khi nội dung đổi",
     utils.computeSnapshotChecksum(snap1) !== utils.computeSnapshotChecksum(snap3),
   );
+  // P2: bản đồ thành viên ↔ vai trò phải nằm trong phần "ổn định". Nếu thiếu,
+  // đổi vai trò của một thành viên sẽ bị incremental bỏ qua âm thầm và bản gần
+  // nhất giữ nguyên vai trò đã lỗi thời.
+  const snap4 = { ...snap1, members: [{ userId: "u1", roles: ["r1"] }] };
+  check(
+    "snapshotChecksum đổi khi bản đồ vai trò thành viên đổi",
+    utils.computeSnapshotChecksum(snap1) !== utils.computeSnapshotChecksum(snap4),
+  );
 }
 
 // ── 4. Mã hóa / giải mã ──

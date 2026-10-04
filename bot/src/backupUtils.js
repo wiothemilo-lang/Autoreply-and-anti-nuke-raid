@@ -65,6 +65,15 @@ function computeSnapshotChecksum(snapshot) {
     emojis: snapshot.emojis,
     stickers: snapshot.stickers,
     settings: snapshot.settings,
+    // Cấu hình server (tên/icon/banner/mức xác minh/kênh hệ thống…) + quyền
+    // @everyone là phần khôi phục được, nên đổi chúng PHẢI làm checksum lệch
+    // để incremental không bỏ qua nhầm một thay đổi thật.
+    guildMeta: snapshot.guildMeta,
+    everyonePermissions: snapshot.everyonePermissions,
+    // Bản đồ thành viên ↔ vai trò (P2): đổi vai trò của một thành viên là thay
+    // đổi THẬT trong backup → phải làm checksum lệch, nếu không incremental sẽ
+    // bỏ qua và giữ bản cũ với vai trò đã lỗi thời.
+    members: snapshot.members,
   });
   return computeChecksum(stable);
 }
@@ -160,7 +169,12 @@ function filterBackupComponents(backup, filter = {}) {
   result.channels = arr(result.channels);
   result.emojis = arr(result.emojis);
   result.stickers = arr(result.stickers);
+  result.members = arr(result.members);
   if (filter.roles === false) result.roles = [];
+  // Bản đồ thành viên chỉ có nghĩa kèm vai trò: tắt "khôi phục role" thì phải
+  // bỏ luôn bản đồ, nếu không báo cáo vẫn đếm "sẽ gán N vai trò" cho một
+  // lượt khôi phục không hề tạo role nào.
+  if (filter.roles === false) result.members = [];
   if (filter.channels === false) result.channels = [];
   if (filter.emojis === false) result.emojis = [];
   if (filter.stickers === false) result.stickers = [];

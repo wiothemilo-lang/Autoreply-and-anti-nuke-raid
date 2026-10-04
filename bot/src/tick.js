@@ -184,6 +184,8 @@ async function runBackupJobs(client, store, items) {
       } else if (item.kind === "restore") {
         await backupMod.runRestore(client, store, item.guildId, item.backupJson, item.guildName, {
           claimAt,
+          // Kiểm toàn vẹn: botGetPending trả checksum đã lưu của bản backup.
+          expectedChecksum: item.backupChecksum,
         });
       } else if (item.kind === "plan") {
         // Dry-run: chỉ tính kế hoạch khôi phục, KHÔNG đụng server (xem runRestorePlan).
@@ -195,6 +197,7 @@ async function runBackupJobs(client, store, items) {
           item.guildName,
           {
             claimAt,
+            expectedChecksum: item.backupChecksum,
           },
         );
       } else if (item.kind === "import") {

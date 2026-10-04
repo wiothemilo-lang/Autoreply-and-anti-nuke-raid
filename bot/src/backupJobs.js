@@ -64,10 +64,12 @@ async function pollBackups(client, store) {
       } else if (item.kind === "restore") {
         await runRestore(client, store, item.guildId, item.backupJson, item.guildName, {
           claimAt,
+          expectedChecksum: item.backupChecksum,
         });
       } else if (item.kind === "plan") {
         await runRestorePlan(client, store, item.guildId, item.backupJson, item.guildName, {
           claimAt,
+          expectedChecksum: item.backupChecksum,
         });
       } else if (item.kind === "import") {
         const content = await readImportContent(item);

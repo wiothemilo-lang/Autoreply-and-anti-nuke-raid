@@ -8,6 +8,7 @@
  */
 const { normalizeBackupFile } = require("./backupNormalize");
 const { restoreCore } = require("./backupRestore");
+const { computeChecksum } = require("./backupUtils");
 
 /** Tải nội dung file import từ Convex file storage (URL botGetPending trả về). */
 async function readImportContent(item) {
@@ -76,15 +77,20 @@ async function runImportRestore(client, store, guildId, fileContent, fileName, {
   // Lưu bản đã chuẩn hóa (đã làm gọn blob base64) vào guildBackups để xem lại /
   // không mất dữ liệu — không nhét media nặng vào document (giới hạn 1 MB).
   try {
+    // Lưu kèm checksum của bản đã gọn: lần khôi phục sau (từ cloud) sẽ xác minh
+    // được toàn vẹn — file import gốc không có checksum để so.
+    const storedJson = JSON.stringify(slimBackupForStore(backup));
     const stored = await store.client.mutation("bot_writes:botStoreBackup", {
       guildId,
       guildName: backup.guildName,
-      backupJson: JSON.stringify(slimBackupForStore(backup)),
+      backupJson: storedJson,
+      backupChecksum: computeChecksum(storedJson),
       roleCount: backup.roles.length,
       channelCount: backup.channels.length,
       emojiCount: backup.emojis?.length ?? 0,
       stickerCount: backup.stickers?.length ?? 0,
       messageCount: backup.messageCount ?? 0,
+      memberCount: Array.isArray(backup.members) ? backup.members.length : 0,
       source: "import",
       claimAt,
     });

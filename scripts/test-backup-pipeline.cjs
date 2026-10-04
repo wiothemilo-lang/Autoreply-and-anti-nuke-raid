@@ -295,6 +295,14 @@ const check = (label, ok) => {
     bitrate: o.bitrate ?? null,
     userLimit: o.userLimit ?? null,
     parentId: o.parentId ?? null,
+    rateLimitPerUser: o.rateLimitPerUser ?? null,
+    rtcRegion: o.rtcRegion ?? null,
+    videoQualityMode: o.videoQualityMode ?? null,
+    defaultAutoArchiveDuration: o.defaultAutoArchiveDuration ?? null,
+    defaultThreadRateLimitPerUser: o.defaultThreadRateLimitPerUser ?? null,
+    defaultSortOrder: o.defaultSortOrder ?? null,
+    defaultForumLayout: o.defaultForumLayout ?? null,
+    availableTags: o.availableTags ?? [],
     permissionOverwrites: { cache: new Map(o.ows ?? []) },
     messages: {
       fetch: async () => {
@@ -322,8 +330,43 @@ const check = (label, ok) => {
       name: "Server Nguồn",
       available: true,
       iconURL: () => null,
-      members: { me: { permissions: new PermissionsBitField(MY_BITS) } },
+      bannerURL: () => "https://cdn/banner.png",
+      splashURL: () => "https://cdn/splash.png",
+      verificationLevel: 2,
+      explicitContentFilter: 1,
+      defaultMessageNotifications: 1,
+      systemChannelId: "c-text",
+      afkChannelId: "c-voice",
+      afkTimeout: 300,
+      preferredLocale: "vi",
+      members: {
+        me: { permissions: new PermissionsBitField(MY_BITS) },
+        fetch: async () =>
+          new Map([
+            // u1: có @everyone + managed + role thật → chỉ giữ role thật.
+            [
+              "u1",
+              {
+                user: { id: "u1" },
+                roles: {
+                  cache: new Map([
+                    ["r0", {}],
+                    ["r1", {}],
+                    ["r2", {}],
+                  ]),
+                },
+              },
+            ],
+            // u2: chỉ có role thật.
+            ["u2", { user: { id: "u2" }, roles: { cache: new Map([["r3", {}]]) } }],
+            // u3: role KHÔNG có trong danh sách roles → không ghi dòng rỗng.
+            ["u3", { user: { id: "u3" }, roles: { cache: new Map([["rX", {}]]) } }],
+            // u4: không có role nào → bỏ qua hẳn (bản đồ toàn dòng rỗng chỉ phình).
+            ["u4", { user: { id: "u4" }, roles: { cache: new Map() } }],
+          ]),
+      },
       roles: {
+        everyone: mkRole("r0", "@everyone", 0, { permissions: (1n << 10n) | (1n << 13n) }),
         cache: new Map([
           ["r0", mkRole("r0", "@everyone", 0)],
           [
@@ -378,12 +421,19 @@ const check = (label, ok) => {
       },
       channels: {
         cache: new Map([
-          ["c-cat", mkChan("c-cat", "Khoá", CT.GuildCategory, 0)],
+          ["c-cat", mkChan("c-cat", "Khoá", CT.GuildCategory, 0, { defaultSortOrder: 1 })],
           [
             "c-text",
             mkChan("c-text", "general", CT.GuildText, 1, {
               topic: "chủ đề",
               nsfw: true,
+              rateLimitPerUser: 30,
+              defaultAutoArchiveDuration: 1440,
+              defaultThreadRateLimitPerUser: 10,
+              availableTags: [
+                { name: "bug", moderated: false },
+                { name: "", moderated: true },
+              ],
               ows: [
                 [
                   "o1",
@@ -415,6 +465,8 @@ const check = (label, ok) => {
             mkChan("c-voice", "Voice", CT.GuildVoice, 2, {
               bitrate: 64000,
               userLimit: 5,
+              rtcRegion: "us-west",
+              videoQualityMode: 2,
               msgs: [mkMsg("v1", 500)],
             }),
           ],
@@ -502,6 +554,54 @@ const check = (label, ok) => {
       "chụp: settings lấy từ cấu hình server",
       snapshot.settings?.prefix === "?" && snapshot.settings?.logChannelId === "L1",
     );
+    check("chụp: snapshot phiên bản 6 (có bản đồ vai trò thành viên)", snapshot.version === 6);
+    check(
+      "chụp: bản đồ thành viên ↔ vai trò (loại @everyone, managed, role ngoài danh sách)",
+      snapshot.memberCount === 2 &&
+        JSON.stringify(snapshot.members) ===
+          JSON.stringify([
+            { userId: "u1", roles: ["r1"] },
+            { userId: "u2", roles: ["r3"] },
+          ]),
+      JSON.stringify(snapshot.members),
+    );
+    check(
+      "chụp: cờ chưa cắt / đọc được",
+      snapshot.memberRolesTruncated === false && snapshot.memberRolesUnavailable === false,
+    );
+    check(
+      "chụp: quyền @everyone được lưu (che theo quyền bot)",
+      snapshot.everyonePermissions === ((1n << 10n) & MY_BITS).toString(),
+      String(snapshot.everyonePermissions),
+    );
+    check(
+      "chụp: cấu hình server (banner/splash/xác minh/lọc nội dung/kênh hệ thống/AFK/locale)",
+      snapshot.guildMeta?.bannerUrl === "https://cdn/banner.png" &&
+        snapshot.guildMeta?.splashUrl === "https://cdn/splash.png" &&
+        snapshot.guildMeta?.verificationLevel === 2 &&
+        snapshot.guildMeta?.explicitContentFilter === 1 &&
+        snapshot.guildMeta?.defaultMessageNotifications === 1 &&
+        snapshot.guildMeta?.systemChannelId === "c-text" &&
+        snapshot.guildMeta?.afkChannelId === "c-voice" &&
+        snapshot.guildMeta?.afkTimeout === 300 &&
+        snapshot.guildMeta?.preferredLocale === "vi",
+      JSON.stringify(snapshot.guildMeta),
+    );
+    check(
+      "chụp: cấu hình kênh văn bản (slowmode/auto-archive/tag forum, bỏ tag rỗng)",
+      text?.rateLimitPerUser === 30 &&
+        text?.defaultAutoArchiveDuration === 1440 &&
+        text?.defaultThreadRateLimitPerUser === 10 &&
+        text?.availableTags?.length === 1 &&
+        text.availableTags[0].name === "bug",
+      JSON.stringify({ rateLimitPerUser: text?.rateLimitPerUser, tags: text?.availableTags }),
+    );
+    const cat = snapshot.channels.find((c) => c.id === "c-cat");
+    check("chụp: cấu hình danh mục (defaultSortOrder)", cat?.defaultSortOrder === 1);
+    check(
+      "chụp: cấu hình kênh thoại (region/chất lượng video)",
+      voice?.rtcRegion === "us-west" && voice?.videoQualityMode === 2,
+    );
   }
   {
     // Không bật kèm tin → không tốn lượt fetch, JSON nhỏ hơn nhiều.
@@ -535,6 +635,59 @@ const check = (label, ok) => {
     check(
       "chụp: bot không còn trong server → ném lỗi rõ ràng",
       /không còn trong server/i.test(err?.message ?? ""),
+    );
+  }
+  // ══════════ 7b. BẢN ĐỒ THÀNH VIÊN: trần số lượng + thiếu quyền/intent ══════════
+  // Không có test này thì "chụp 50k thành viên" sẽ phình JSON vượt trần 1 MB của
+  // Convex, và thiếu intent Guild Members sẽ làm backup chết im lặng.
+  {
+    const { MAX_MEMBERS_PER_BACKUP, MAX_ROLES_PER_MEMBER } = require("../bot/src/backupCommon");
+    const manyRoles = Array.from({ length: 30 }, (_, i) => [`x${i}`, {}]);
+    // Trần vai trò áp SAU khi lọc theo vai trò khôi phục được, nên fixture phải
+    // khai báo TẤT CẢ 31 vai trò là khôi phục được — nếu không thì bộ lọc cắt
+    // về 2 trước và cap 20 không bao giờ được chạm tới.
+    const restorable = new Set(["r1", ...manyRoles.map(([id]) => id)]);
+    const many = new Map(
+      Array.from({ length: MAX_MEMBERS_PER_BACKUP + 25 }, (_, i) => [
+        `m${i}`,
+        { user: { id: `m${i}` }, roles: { cache: new Map([["r1", {}], ...manyRoles]) } },
+      ]),
+    );
+    const capped = await backup.captureMemberRoles(
+      { name: "G", members: { fetch: async () => many } },
+      restorable,
+    );
+    check(
+      `chụp thành viên: trần ${MAX_MEMBERS_PER_BACKUP} thành viên + cờ bị cắt`,
+      capped.members.length === MAX_MEMBERS_PER_BACKUP && capped.truncated === true,
+      `len=${capped.members.length}`,
+    );
+    check(
+      `chụp thành viên: trần ${MAX_ROLES_PER_MEMBER} vai trò mỗi người`,
+      capped.members[0].roles.length === MAX_ROLES_PER_MEMBER,
+      `roles=${capped.members[0].roles.length}`,
+    );
+
+    const denied = await backup.captureMemberRoles(
+      {
+        name: "G",
+        members: {
+          fetch: async () => {
+            throw new Error("Missing Access");
+          },
+        },
+      },
+      new Set(["r1"]),
+    );
+    check(
+      "chụp thành viên: thiếu quyền/intent → unavailable=true, KHÔNG làm hỏng backup",
+      denied.unavailable === true && denied.members.length === 0,
+    );
+
+    const noRoles = await backup.captureMemberRoles({ name: "G" }, new Set());
+    check(
+      "chụp thành viên: không có role nào để ghi → không gọi mạng",
+      noRoles.members.length === 0,
     );
   }
 
@@ -1697,6 +1850,75 @@ const check = (label, ok) => {
       "dry-run: tắt role → roleCount 0 + nói rõ đang tắt",
       plan.roleCount === 0 && plan.warnings.some((w) => /Đang tắt khôi phục role/.test(w)),
       JSON.stringify(plan),
+    );
+  }
+  {
+    // P2 — kế hoạch phải NÓI TRƯỚC khi bản đồ vai trò sẽ không được áp lại.
+    // Chủ server bấm "Khôi phục" rồi mới thấy vai trò chưa về đúng chỗ là thất vọng.
+    const tg = makeTarget();
+    // Target thiếu quyền: bot không có bit nào → can("ManageRoles") = false.
+    const tgNoPerm = { ...tg, members: { me: { permissions: { bitfield: 0n } } } };
+    const plan = await backup.planRestoreCore(
+      { guilds: { cache: new Map([[TGT, tg]]) } },
+      { client: {}, getConfig: async () => ({}) },
+      TGT,
+      {
+        roles: [{ id: "r1", name: "Mod", permissions: "8", position: 1 }],
+        channels: [],
+        emojis: [],
+        stickers: [],
+        members: [{ userId: "u1", roles: ["r1"] }],
+        memberRolesTruncated: true,
+        memberRolesUnavailable: true,
+        settings: {},
+      },
+    );
+    check(
+      "dry-run: đếm được số thành viên + số lượt gán vai trò",
+      plan.memberCount === 1 && plan.memberRoleAssignments === 1,
+      JSON.stringify({ c: plan.memberCount, a: plan.memberRoleAssignments }),
+    );
+    check(
+      "dry-run: cảnh báo bản đồ bị cắt + không đọc được danh sách thành viên",
+      plan.warnings.some((w) => /bị cắt/.test(w)) &&
+        plan.warnings.some((w) => /KHÔNG có bản đồ vai trò/.test(w)),
+      JSON.stringify(plan.warnings),
+    );
+    const planOff = await backup.planRestoreCore(
+      { guilds: { cache: new Map([[TGT, tg]]) } },
+      { client: {}, getConfig: async () => ({ restoreRolesEnabled: false }) },
+      TGT,
+      {
+        roles: [{ id: "r1", name: "Mod", permissions: "8", position: 1 }],
+        channels: [],
+        emojis: [],
+        stickers: [],
+        members: [{ userId: "u1", roles: ["r1"] }],
+        settings: {},
+      },
+    );
+    check(
+      "dry-run: tắt khôi phục role → không đếm vai trò thành viên (không có role để tra)",
+      planOff.memberCount === 0 && planOff.memberRoleAssignments === 0,
+      JSON.stringify({ c: planOff.memberCount, a: planOff.memberRoleAssignments }),
+    );
+    const planNoPerm = await backup.planRestoreCore(
+      { guilds: { cache: new Map([[TGT, tgNoPerm]]) } },
+      { client: {}, getConfig: async () => ({}) },
+      TGT,
+      {
+        roles: [{ id: "r1", name: "Mod", permissions: "8", position: 1 }],
+        channels: [],
+        emojis: [],
+        stickers: [],
+        members: [{ userId: "u1", roles: ["r1"] }],
+        settings: {},
+      },
+    );
+    check(
+      "dry-run: bot thiếu quyền → nói rõ vai trò sẽ KHÔNG được gán",
+      planNoPerm.warnings.some((w) => /vai trò của \d+ thành viên sẽ KHÔNG gán/.test(w)),
+      JSON.stringify(planNoPerm.warnings),
     );
   }
   {

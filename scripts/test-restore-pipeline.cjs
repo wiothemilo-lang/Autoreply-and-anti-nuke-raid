@@ -116,6 +116,9 @@ function makeStore(flagDb, { logChannelId = "log-ch-1" } = {}) {
 
 function makeClient() {
   const sent = [];
+  const metaCalls = [];
+  const everyoneCalls = [];
+  const channelOpts = [];
   const role = { id: "nr1", name: "Mod", setPosition: async () => {} };
   // Kênh id "log-ch-1" khớp config.logChannelId → sendLog chọn làm đích.
   const channelById = (id) => ({
@@ -131,15 +134,38 @@ function makeClient() {
     id: "999888777666555444",
     name: "Server Phụ",
     available: true,
-    roles: { cache: new Map(), create: async () => role },
+    roles: {
+      cache: new Map(),
+      create: async () => role,
+      everyone: { setPermissions: async (bits) => everyoneCalls.push(bits) },
+    },
     channels: {
       cache: new Map(),
-      create: async () => channelById("nc1"),
+      create: async (opts) => {
+        channelOpts.push(opts);
+        return channelById("nc1");
+      },
       fetch: async (id) => channelById(id),
     },
     members: { fetch: async () => ({ user: { username: "u" } }) },
+    setVerificationLevel: async (v) => metaCalls.push(["verificationLevel", v]),
+    setExplicitContentFilter: async (v) => metaCalls.push(["explicitContentFilter", v]),
+    setDefaultMessageNotifications: async (v) => metaCalls.push(["defaultMessageNotifications", v]),
+    setAFKTimeout: async (v) => metaCalls.push(["afkTimeout", v]),
+    setSystemChannel: async (v) => metaCalls.push(["systemChannel", v]),
+    setAFKChannel: async (v) => metaCalls.push(["afkChannel", v]),
+    setPreferredLocale: async (v) => metaCalls.push(["locale", v]),
+    setBanner: async (v) => metaCalls.push(["banner", v]),
+    setSplash: async (v) => metaCalls.push(["splash", v]),
   };
-  return { client: { guilds: { cache: new Map([["999888777666555444", guild]]) } }, guild, sent };
+  return {
+    client: { guilds: { cache: new Map([["999888777666555444", guild]]) } },
+    guild,
+    sent,
+    metaCalls,
+    everyoneCalls,
+    channelOpts,
+  };
 }
 
 function makeBatchItem(overrides = {}) {
@@ -264,6 +290,369 @@ function makeBatchItem(overrides = {}) {
       (m) => m.name === "bot_writes:botClearBackup" && m.args.kind === "backup",
     );
     check("backup lỗi → KHÔNG xóa cờ như thể đã xong", !cleared);
+  }
+
+  // ---- 7. Cấu hình server/kênh + quyền @everyone được ÁP LẠI khi restore ----
+  {
+    const flagDb = makeFlagDb();
+    const store = makeStore(flagDb);
+    const { client, metaCalls, everyoneCalls, channelOpts } = makeClient();
+    const snapshot7 = {
+      version: 5,
+      guildId: "111122223333444455",
+      guildName: "Server Gốc",
+      createdAt: 0,
+      everyonePermissions: ((1n << 10n) & ((1n << 10n) | (1n << 11n))).toString(),
+      guildMeta: {
+        name: "Server Gốc",
+        bannerUrl: "https://cdn/banner.png",
+        splashUrl: "https://cdn/splash.png",
+        verificationLevel: 2,
+        explicitContentFilter: 1,
+        defaultMessageNotifications: 1,
+        systemChannelId: "c-sys",
+        afkChannelId: "c-voice",
+        afkTimeout: 300,
+        preferredLocale: "vi",
+      },
+      roles: [{ id: "r1", name: "Mod", permissions: "8", position: 1 }],
+      channels: [
+        {
+          id: "c-sys",
+          name: "system",
+          type: 0,
+          overwrites: [],
+          rateLimitPerUser: 45,
+          defaultAutoArchiveDuration: 1440,
+        },
+        {
+          id: "c-voice",
+          name: "Voice",
+          type: 2,
+          overwrites: [],
+          rtcRegion: "us-west",
+          videoQualityMode: 2,
+        },
+      ],
+      emojis: [],
+      stickers: [],
+      messageCount: 0,
+    };
+    const packed7 = utils.compressAndEncryptBackup(snapshot7);
+    await tick.runBackupJobs(client, store, [
+      {
+        kind: "restore",
+        guildId: "999888777666555444",
+        backupId: "bk1",
+        backupJson: packed7.backupJson,
+        backupChecksum: packed7.checksum,
+        guildName: "Server Gốc",
+      },
+    ]);
+    check(
+      "restore: @everyone được áp lại quyền đã chụp",
+      everyoneCalls.length === 1 && everyoneCalls[0] === BigInt(snapshot7.everyonePermissions),
+      JSON.stringify(everyoneCalls.map(String)),
+    );
+    check(
+      "restore: thiết lập server được áp lại (xác minh/lọc nội dung/thông báo/AFK/locale/banner/splash)",
+      metaCalls.some((c) => c[0] === "verificationLevel" && c[1] === 2) &&
+        metaCalls.some((c) => c[0] === "explicitContentFilter" && c[1] === 1) &&
+        metaCalls.some((c) => c[0] === "defaultMessageNotifications" && c[1] === 1) &&
+        metaCalls.some((c) => c[0] === "afkTimeout" && c[1] === 300) &&
+        metaCalls.some((c) => c[0] === "locale" && c[1] === "vi") &&
+        metaCalls.some((c) => c[0] === "banner") &&
+        metaCalls.some((c) => c[0] === "splash"),
+      JSON.stringify(metaCalls),
+    );
+    check(
+      "restore: kênh hệ thống/AFK được map sang id MỚI (không phải id cũ)",
+      metaCalls.some((c) => c[0] === "systemChannel" && c[1] !== "c-sys") &&
+        metaCalls.some((c) => c[0] === "afkChannel" && c[1] !== "c-voice"),
+      JSON.stringify(metaCalls),
+    );
+    check(
+      "restore: cấu hình kênh được truyền khi tạo (slowmode + region/chất lượng video)",
+      channelOpts.some((o) => o.rateLimitPerUser === 45 && o.defaultAutoArchiveDuration === 1440) &&
+        channelOpts.some((o) => o.rtcRegion === "us-west" && o.videoQualityMode === 2),
+      JSON.stringify(channelOpts),
+    );
+  }
+
+  // ---- 8. Checksum LỆCH → DỪNG khôi phục, không tạo cấu trúc từ bản hỏng ----
+  {
+    const flagDb = makeFlagDb();
+    const store = makeStore(flagDb);
+    const { client, channelOpts } = makeClient();
+    const packed = utils.compressAndEncryptBackup({
+      version: 5,
+      guildId: "111122223333444455",
+      guildName: "S",
+      createdAt: 0,
+      roles: [{ id: "r1", name: "Mod", position: 1 }],
+      channels: [{ id: "c1", name: "general", type: 0, overwrites: [] }],
+      emojis: [],
+      stickers: [],
+      messageCount: 0,
+    });
+    await tick.runBackupJobs(client, store, [
+      {
+        kind: "restore",
+        guildId: "999888777666555444",
+        backupId: "bk1",
+        backupJson: packed.backupJson,
+        backupChecksum: "0".repeat(64), // checksum SAI
+        guildName: "S",
+      },
+    ]);
+    const reported = store._mutations.find((m) => m.name === "bot_writes:botReportRestoreError");
+    check(
+      "checksum lệch → báo lỗi + KHÔNG tạo kênh nào",
+      !!reported && /checksum/i.test(reported.args.error) && channelOpts.length === 0,
+      JSON.stringify(reported?.args),
+    );
+    check(
+      "checksum lệch → KHÔNG botClearBackup (không coi là xong)",
+      !store._mutations.some(
+        (m) => m.name === "bot_writes:botClearBackup" && m.args.kind === "restore",
+      ),
+    );
+  }
+
+  // ---- 9. Checksum KHỚP → restore chạy bình thường ----
+  {
+    const flagDb = makeFlagDb();
+    const store = makeStore(flagDb);
+    const { client } = makeClient();
+    const packed = utils.compressAndEncryptBackup({
+      version: 5,
+      guildId: "111122223333444455",
+      guildName: "S",
+      createdAt: 0,
+      roles: [{ id: "r1", name: "Mod", position: 1 }],
+      channels: [{ id: "c1", name: "general", type: 0, overwrites: [] }],
+      emojis: [],
+      stickers: [],
+      messageCount: 0,
+    });
+    await tick.runBackupJobs(client, store, [
+      {
+        kind: "restore",
+        guildId: "999888777666555444",
+        backupId: "bk1",
+        backupJson: packed.backupJson,
+        backupChecksum: packed.checksum,
+        guildName: "S",
+      },
+    ]);
+    check(
+      "checksum khớp → restore thành công (botClearBackup)",
+      store._mutations.some(
+        (m) => m.name === "bot_writes:botClearBackup" && m.args.kind === "restore",
+      ),
+    );
+  }
+
+  // ══════════ VAI TRÒ THÀNH VIÊN — END-TO-END QUA tick ══════════
+  // Unit test ở trên gọi thẳng applyMemberRoles; test này đi trọn đường
+  // job → restoreCore → createRoles → applyMemberRoles để chứng minh bản đồ
+  // dùng id role CŨ và vai trò được gán vào role MỚI đã tạo lại.
+  {
+    const GID = "999888777666555444";
+    const store = makeStore(makeFlagDb({ restoreRequested: true, restoreBackupId: "bk1" }));
+    const assigned = [];
+    const roleCache = new Map();
+    let seq = 0;
+    const e2eGuild = {
+      id: GID,
+      name: "Server Phụ",
+      available: true,
+      roles: {
+        cache: roleCache,
+        everyone: { id: GID, setPermissions: async () => {} },
+        create: async (opts) => {
+          const r = {
+            id: `new-r${++seq}`,
+            name: opts.name,
+            position: 0,
+            managed: false,
+            permissions: { bitfield: BigInt(opts.permissions ?? 0) },
+            setPosition: async () => {},
+            setIcon: async () => {},
+          };
+          roleCache.set(r.id, r);
+          return r;
+        },
+      },
+      channels: { cache: new Map(), create: async () => ({ id: "nc1" }), fetch: async () => null },
+      members: {
+        me: {
+          user: { id: "bot1" },
+          permissions: { bitfield: (1n << 28n) | (1n << 10n), has: (f) => f === "ManageRoles" },
+          roles: { highest: { position: 9 } },
+        },
+        cache: new Map(),
+        fetch: async () => ({}),
+      },
+    };
+    const mkM = (id) => ({
+      user: { id },
+      roles: { cache: new Map(), add: async (list) => assigned.push([id, list.map((r) => r.id)]) },
+    });
+    e2eGuild.members.cache.set("u1", mkM("u1"));
+    const snap = {
+      version: 6,
+      guildId: "111122223333444455",
+      guildName: "Server Gốc",
+      roles: [{ id: "old-mod", name: "Mod", permissions: (1n << 10n).toString(), position: 1 }],
+      channels: [],
+      emojis: [],
+      stickers: [],
+      members: [{ userId: "u1", roles: ["old-mod"] }],
+      memberCount: 1,
+      messageCount: 0,
+    };
+    const packed = utils.compressAndEncryptBackup(snap);
+    await tick.runBackupJobs({ guilds: { cache: new Map([[GID, e2eGuild]]) } }, store, [
+      {
+        kind: "restore",
+        guildId: GID,
+        backupId: "bk1",
+        backupJson: packed.backupJson,
+        backupChecksum: packed.checksum,
+        guildName: "Server Gốc",
+      },
+    ]);
+    check(
+      "vai trò e2e: role được tạo lại (id mới) và bản đồ id cũ được tra sang",
+      roleCache.size === 1 && [...roleCache.values()][0].name === "Mod",
+      JSON.stringify([...roleCache.keys()]),
+    );
+    check(
+      "vai trò e2e: gán vai trò mới tạo cho thành viên đang có",
+      assigned.length === 1 && assigned[0][0] === "u1" && assigned[0][1][0] === "new-r1",
+      JSON.stringify(assigned),
+    );
+    check(
+      "vai trò e2e: job restore vẫn báo xong (không lỗi)",
+      store._mutations.some(
+        (m) => m.name === "bot_writes:botClearBackup" && m.args.kind === "restore",
+      ),
+    );
+  }
+
+  // ══════════ VAI TRÒ THÀNH VIÊN (P2) ══════════
+  // Đây là phần NHẠY CẢM NHẤT của restore: gán sai là leo thang quyền. Bốn
+  // lớp chặn phải được chứng minh bằng test, không chỉ bằng đọc code.
+  {
+    const rebuild = require("../bot/src/backupRebuild.js");
+    const MANAGE_ROLES = 1n << 28n;
+    const ADMIN = 1n << 3n;
+    const VIEW = 1n << 10n;
+    const BAN = 1n << 2n;
+
+    const mkRole = (id, position, o = {}) => ({
+      id,
+      name: id,
+      position,
+      managed: o.managed ?? false,
+      permissions: { bitfield: o.perms ?? 0n },
+    });
+    const mkMember = (id, roles) => ({
+      user: { id },
+      roles: {
+        cache: new Map(roles.map((r) => [r, {}])),
+        add: async (list) => added.push([id, list.map((r) => r.id)]),
+      },
+    });
+    let added = [];
+    const mkGuild = (botBits, botTop) => {
+      const newRoles = new Map([
+        // @everyone CÓ id = guild.id — đây là cách Discord đánh dấu nó.
+        ["g1", mkRole("g1", 0)],
+        ["n-mod", mkRole("n-mod", 1, { perms: VIEW })],
+        ["n-managed", mkRole("n-managed", 1, { managed: true, perms: VIEW })],
+        // Có quyền (Ban Members) mà BOT KHÔNG có → phải bị chặn (lớp chặn 4).
+        ["n-danger", mkRole("n-danger", 1, { perms: BAN })],
+        // Vị trí cao hơn bot → phải bị chặn (lớp chặn 3).
+        ["n-top", mkRole("n-top", botTop + 1, { perms: VIEW })],
+      ]);
+      return {
+        id: "g1",
+        roles: { cache: newRoles, everyone: { id: "g1" } },
+        members: {
+          me: {
+            user: { id: "bot1" },
+            permissions: {
+              bitfield: botBits,
+              has: (f) => (f === "ManageRoles" ? (botBits & MANAGE_ROLES) !== 0n : false),
+            },
+            roles: { highest: { position: botTop } },
+          },
+          cache: new Map(),
+        },
+      };
+    };
+    const roleMap = new Map([
+      ["o-everyone", "g1"],
+      ["o-mod", "n-mod"],
+      ["o-managed", "n-managed"],
+      ["o-danger", "n-danger"],
+      ["o-top", "n-top"],
+    ]);
+
+    added = [];
+    const g = mkGuild(MANAGE_ROLES | ADMIN | VIEW, 5);
+    // `u-gone` CỐ Ý không có trong cache (đã rời server) — đó là nhánh "missing".
+    // `bot1` CÓ trong cache: chỉ nhờ chặn tự-gán mà không nhận vai trò.
+    for (const id of ["u-ok", "u-has-mod", "bot1"]) {
+      g.members.cache.set(id, mkMember(id, id === "u-has-mod" ? ["n-mod"] : []));
+    }
+    const backupMap = {
+      guildId: "g1",
+      members: [
+        { userId: "u-ok", roles: ["o-everyone", "o-mod", "o-managed", "o-danger", "o-top"] },
+        { userId: "u-has-mod", roles: ["o-mod"] },
+        { userId: "u-gone", roles: ["o-mod"] },
+        { userId: "bot1", roles: ["o-mod"] },
+      ],
+    };
+    const stats = await rebuild.applyMemberRoles(g, backupMap, roleMap);
+    check(
+      "vai trò: chỉ gán role AN TOÀN cho thành viên đang có",
+      added.length === 1 &&
+        added[0][0] === "u-ok" &&
+        added[0][1].length === 1 &&
+        added[0][1][0] === "n-mod",
+      JSON.stringify(added),
+    );
+    check(
+      "vai trò: chặn @everyone + managed + vị trí cao hơn bot + quyền vượt quyền bot",
+      !added
+        .flat()
+        .some((x) => typeof x === "string" && ["g1", "n-managed", "n-danger", "n-top"].includes(x)),
+      JSON.stringify(added),
+    );
+    check(
+      "vai trò: không gán lại role đã có, không tự gán cho bot, đếm thành viên đã rời",
+      stats.members === 1 && stats.assigned === 1 && stats.missing === 1,
+      JSON.stringify(stats),
+    );
+
+    // Không có Manage Roles → không gán gì và nói rõ.
+    const gNoPerm = mkGuild(0n, 5);
+    gNoPerm.members.cache.set("u-ok", mkMember("u-ok", []));
+    const before = added.length;
+    const noPerm = await rebuild.applyMemberRoles(gNoPerm, backupMap, roleMap);
+    check(
+      "vai trò: thiếu quyền Manage Roles → gán 0 và báo noPermission",
+      noPerm.noPermission === true && noPerm.assigned === 0 && added.length === before,
+      JSON.stringify(noPerm),
+    );
+
+    // Không có bản đồ → no-op im lặng (bản backup cũ).
+    const empty = await rebuild.applyMemberRoles(g, { guildId: "g1" }, roleMap);
+    check("vai trò: bản backup cũ không có bản đồ → không làm gì", empty.assigned === 0);
   }
 
   console.log(`\nKết quả restore pipeline: ${pass} PASS, ${fail} FAIL`);

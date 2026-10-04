@@ -30,6 +30,59 @@ module.exports = { Colors: new Proxy({}, { get: () => 0x000000 }), EmbedBuilder,
 `,
 );
 
+// ── fetch GIẢ ─────────────────────────────────────────────────────────────
+// Các case `learn` / `learnNow` ở dưới gọi runResearch THẬT → research.js,
+// threatEngine và ai.js đều đi qua globalThis.fetch. Không chặn network thì
+// test gọi Reddit/CISA/URLhaus thật: chậm và tuỳ hạ tầng (mạng yếu là fail
+// ngẫu nhiên), còn từ khoá lấy từ feed thật thì đổi mỗi ngày → assert lung
+// lay. Fixture cố định + bộ đếm lời gọi để chứng minh không lọt mạng.
+const realFetch = globalThis.fetch;
+let fetchCalls = 0;
+// Bật lên để ép nhánh "feed trả rác (không phải JSON)". Trước đợt mock này, nhánh
+// parse lỗi chỉ được phủ TÌNH CỜ vì Reddit trả 403 dạng HTML — tức là đường bảo vệ
+// quan trọng lại phụ thuộc mạng. Giờ ép tường minh.
+let garbledFeed = false;
+const REDDIT_FIXTURE = {
+  data: {
+    children: [
+      {
+        data: {
+          title: "Warning: fake nitro scam hitting servers — v0lt-stealer wave again",
+          selftext: "attackers mass-mention and dm fake captcha links",
+        },
+      },
+    ],
+  },
+};
+// Feed URLhaus là CSV (dòng `#` là comment) — threatEngine.parse cần đúng
+// hình dạng này, nếu trả 503 thì nhánh researchUrlhaus không bao giờ chạy tới.
+const URLHAUS_CSV = [
+  "# firstseen, url, url_status",
+  "2026-10-01 10:00:00, http://malware-c2-9x.top/a.exe, offline",
+  "2026-10-01 11:00:00, http://phishing-login.xyz/b.bin, offline",
+  "",
+].join("\n");
+
+globalThis.fetch = async (url) => {
+  fetchCalls++;
+  const u = String(url);
+  const junk = { ok: true, status: 200, text: async () => "<html>403 Forbidden</html>" };
+  if (u.includes("reddit.com")) {
+    return garbledFeed
+      ? junk
+      : { ok: true, status: 200, text: async () => JSON.stringify(REDDIT_FIXTURE) };
+  }
+  if (u.includes("abuse.ch")) {
+    return { ok: true, status: 200, text: async () => URLHAUS_CSV };
+  }
+  if (u.includes("cisa.gov")) {
+    return garbledFeed ? junk : { ok: false, status: 503, text: async () => "" };
+  }
+  // Mọi provider AI: cố tình trả lỗi để lượt học đi tiếp được nhánh "AI chết"
+  // (aiUsed=false) — đúng hành vi khi provider thật hạ.
+  return { ok: false, status: 503, text: async () => "" };
+};
+
 const { handleResearch } = require("../bot/src/handlers/researchCommands.js");
 const research = require("../bot/src/research.js");
 
@@ -279,9 +332,48 @@ function makeSource({ canManage = true, sub = "status", isSlash = true, args = [
     research.learnNow = realLearnNow;
   }
 
+  // 10. learnNow chạy offline: đủ dữ liệu trong fixture, không lọt mạng.
+  {
+    const callsBefore = fetchCalls;
+    const off = await research.learnNow(store, "wio");
+    console.log("[result]", JSON.stringify(off));
+    check("offline: đã gọi fetch (tức đi qua mock, không lọt mạng)", fetchCalls > callsBefore);
+    check("offline: đọc được nguồn reddit từ fixture", off.sources.includes("reddit-modsupport"));
+    check("offline: đọc được nguồn urlhaus từ fixture", off.sources.includes("urlhaus"));
+    check(
+      "offline: trích được từ khoá + cụm từ từ fixture",
+      // newKeywords/newPhrases là SỐ ĐẾM (xem notifyManualResult). Bằng 0 nghĩa
+      // là researchReddit hoặc extractKeywords đã hỏng âm thầm — đúng lỗi cần chặn.
+      off.newKeywords > 0 && off.newPhrases > 0,
+    );
+  }
+
+  // 11. Feed JSON hỏng → bỏ riêng nguồn lỗi, KHÔNG làm hỏng cả lượt học.
+  {
+    garbledFeed = true;
+    let garbled = null;
+    let threw = null;
+    try {
+      garbled = await research.learnNow(store, "wio");
+    } catch (e) {
+      threw = e;
+    }
+    check("feed JSON hỏng: không ném lỗi ra ngoài", threw === null);
+    check(
+      "feed JSON hỏng: bỏ riêng nguồn reddit/cisa lỗi, giữ nguồn còn tốt",
+      garbled &&
+        !garbled.sources.includes("reddit-modsupport") &&
+        !garbled.sources.includes("cisa-kev") &&
+        garbled.sources.includes("urlhaus"),
+    );
+    garbledFeed = false;
+  }
+
   console.log(`\nKết quả research commands: ${pass} PASS, ${fail} FAIL`);
+  globalThis.fetch = realFetch;
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {
   console.error("CRASH:", e);
+  globalThis.fetch = realFetch;
   process.exit(1);
 });

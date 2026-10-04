@@ -707,6 +707,7 @@ export const botGetPending = query({
       includeMessages?: boolean;
       backupId?: string;
       backupJson?: string;
+      backupChecksum?: string;
       guildName?: string;
       fileName?: string;
       importStorageId?: string;
@@ -742,6 +743,8 @@ export const botGetPending = query({
               guildId: g.discordId,
               backupId: b._id,
               backupJson: json,
+              // Checksum đã lưu (SHA-256 JSON thô) — bot xác minh trước khi khôi phục.
+              backupChecksum: b.backupChecksum ?? undefined,
               guildName: b.guildName,
             });
           }
@@ -764,6 +767,7 @@ export const botGetPending = query({
               guildId: g.discordId,
               backupId: b._id,
               backupJson: json,
+              backupChecksum: b.backupChecksum ?? undefined,
               guildName: b.guildName,
               backupCreatedAt: b.createdAt,
             });
