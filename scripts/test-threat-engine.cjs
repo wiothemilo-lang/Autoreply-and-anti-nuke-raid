@@ -77,6 +77,9 @@ const store = {
     ok ? pass++ : fail++;
   };
 
+  // ---- 0. isUrlhausDomain khi CHƯA nạp feed nào → luôn false ----
+  check("isUrlhausDomain khi chưa có feed → false", engine.isUrlhausDomain("x.com") === false);
+
   // ---- 1. flaggedMessages: ghi + lọc theo cửa sổ + sweep ----
   const now = Date.now();
   check(
@@ -192,6 +195,280 @@ const store = {
   check("research có nguồn urlhaus", srcResearch.includes('"urlhaus"'));
   check("research có digest", srcResearch.includes("buildWeeklyDigest"));
   check("research có AI review", srcResearch.includes("aiReviewKeywords"));
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Phần dưới phủ các nhánh TRƯỚC ĐÂY KHÔNG test nào chạm: setupThreatEngine
+  // (hàm duy nhất 0% functions), các nhánh lỗi feed (ok=false/rỗng/mạng chết),
+  // biên hostsFromFeed (maxDomains/maxLines), ReDoS self-test và catch nuốt lỗi
+  // của runNgramCycle/backfillFromSamples.
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    // ---- 8. setupThreatEngine: hẹn giờ + mọi callback chạy không crash ----
+    const savedST = global.setTimeout;
+    const savedSI = global.setInterval;
+    const timeouts = [];
+    const intervals = [];
+    global.setTimeout = (fn, ms) => {
+      timeouts.push({ fn, ms });
+      return { unref() {} };
+    };
+    global.setInterval = (fn, ms) => {
+      intervals.push({ fn, ms });
+      return { unref() {} };
+    };
+    let setupStats;
+    try {
+      setupStats = engine.setupThreatEngine(store);
+    } finally {
+      global.setTimeout = savedST;
+      global.setInterval = savedSI;
+    }
+    check(
+      "setupThreatEngine trả engineStats",
+      setupStats && typeof setupStats.urlhausDomains === "number",
+    );
+    check(
+      "đặt 4 timeout (urlhaus/openphish/ngram/backfill)",
+      timeouts.length === 4,
+      String(timeouts.length),
+    );
+    check("đặt 4 interval còn lại", intervals.length === 4, String(intervals.length));
+    mutations.length = 0;
+    for (const t of timeouts) await t.fn();
+    for (const i of intervals) {
+      const r = i.fn();
+      if (r && typeof r.then === "function") await r;
+    }
+    check("callback timeout + interval chạy không crash", true);
+
+    // ---- 9. hostsFromFeed: biên maxDomains/maxLines + dòng hỏng ----
+    const feed = [
+      "http://a-ok.example/x",
+      "không phải url",
+      "http://b-ok.example/y",
+      "http://c-ok.example/z",
+    ].join("\n");
+    const all = engine.hostsFromFeed(feed);
+    check(
+      "hostsFromFeed bỏ dòng không phải URL",
+      all.has("a-ok.example") && all.has("c-ok.example") && ![...all].some((h) => h.includes(" ")),
+    );
+    check(
+      "hostsFromFeed tôn trọng maxDomains",
+      engine.hostsFromFeed(feed, { maxDomains: 1 }).size === 1,
+    );
+    const tail = engine.hostsFromFeed(feed, { maxLines: 1 });
+    check("hostsFromFeed chỉ đọc maxLines dòng cuối", tail.size === 1 && tail.has("c-ok.example"));
+    check("hostsFromFeed văn bản rỗng → set rỗng", engine.hostsFromFeed("").size === 0);
+
+    // ---- 10. isUrlhausDomain: host không scheme + chuỗi không phải URL ----
+    check(
+      "isUrlhausDomain: URL không scheme vẫn khớp",
+      engine.isUrlhausDomain("verifypage-completed.info/x") === true,
+    );
+    check(
+      "isUrlhausDomain: host lạ → false",
+      engine.isUrlhausDomain("unknown-host.example") === false,
+    );
+    check("isUrlhausDomain: chuỗi rác → false", engine.isUrlhausDomain(":::") === false);
+
+    // ---- 11. refreshOpenPhish: tải + hợp nhất host; feed lỗi/mạng chết ----
+    {
+      const keepFetch = globalThis.fetch;
+      globalThis.fetch = async (url) => {
+        if (String(url).includes("openphish.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: async () => "http://phish-a.example/login\nhttp://phish-b.example/verify\n",
+          };
+        }
+        return { ok: false, status: 500, text: async () => "" };
+      };
+      const ok = await engine.refreshOpenPhish(store);
+      check(
+        "refreshOpenPhish tải + hợp nhất host vào set",
+        ok === true && engine.isUrlhausDomain("phish-a.example"),
+      );
+      globalThis.fetch = async () => ({ ok: false, status: 503, text: async () => "" });
+      check(
+        "refreshOpenPhish feed lỗi (ok=false) → false",
+        (await engine.refreshOpenPhish(store)) === false,
+      );
+      globalThis.fetch = async () => {
+        throw new Error("mạng chết");
+      };
+      check("refreshOpenPhish fetch ném → false", (await engine.refreshOpenPhish(store)) === false);
+      globalThis.fetch = keepFetch;
+    }
+
+    // ---- 12. refreshUrlhaus: feed lỗi / rỗng / mạng chết ----
+    {
+      const keepFetch = globalThis.fetch;
+      globalThis.fetch = async () => ({ ok: false, status: 503, text: async () => "" });
+      check(
+        "refreshUrlhaus feed lỗi (ok=false) → false",
+        (await engine.refreshUrlhaus(store)) === false,
+      );
+      globalThis.fetch = async () => ({
+        ok: true,
+        status: 200,
+        text: async () => "# chỉ header\n",
+      });
+      check(
+        "refreshUrlhaus không có dòng dữ liệu → false",
+        (await engine.refreshUrlhaus(store)) === false,
+      );
+      globalThis.fetch = async () => {
+        throw new Error("mạng chết");
+      };
+      check("refreshUrlhaus fetch ném → false", (await engine.refreshUrlhaus(store)) === false);
+      globalThis.fetch = keepFetch;
+    }
+
+    // ---- 13. runNgramCycle: mutation ném → nuốt, trả 0 (không làm chết vòng) ----
+    {
+      flagged._resetFlaggedForTest();
+      flagged.noteFlaggedMessage(
+        "fr33 n1tr0 gift redeem now claim your reward here fast",
+        "g1",
+        "spam",
+        now,
+      );
+      flagged.noteFlaggedMessage(
+        "fr33 n1tr0 gift redeem now claim your reward today fast",
+        "g1",
+        "spam",
+        now,
+      );
+      const badStore = {
+        client: {
+          mutation: () => {
+            throw new Error("Convex sập");
+          },
+        },
+      };
+      const r = await engine.runNgramCycle(badStore);
+      check(
+        "runNgramCycle: mutation ném → không crash, trả 0",
+        r.clusters === 0 && r.keywords === 0,
+      );
+    }
+
+    // ---- 14. backfillFromSamples: query ném → nuốt, trả 0 ----
+    {
+      const badStore = {
+        client: {
+          query: () => {
+            throw new Error("Convex chết");
+          },
+        },
+      };
+      const r = await engine.backfillFromSamples(badStore);
+      check("backfillFromSamples: query ném → không crash, trả 0", r.keywords === 0);
+    }
+
+    // ---- 15. selfTestKeywords: path so khớp chậm → cảnh báo ReDoS ----
+    {
+      const filtersPath = require.resolve("../bot/src/handlers/filters.js");
+      const realFilters = require.cache[filtersPath];
+      require.cache[filtersPath] = {
+        id: filtersPath,
+        filename: filtersPath,
+        loaded: true,
+        exports: {
+          findLearnedThreat: (text) => {
+            const s = String(text);
+            // Chỉ chuỗi "độc" mới gây chậm; mẫu flagged thường trả nhanh.
+            if (s.includes("+".repeat(20)) || s.includes("*")) {
+              const end = Date.now() + 300;
+              while (Date.now() < end) {
+                /* busy-wait mô phỏng regex backtracking */
+              }
+            }
+            return null;
+          },
+        },
+      };
+      flagged._resetFlaggedForTest();
+      flagged.noteFlaggedMessage(
+        "fr33 n1tr0 gift redeem now claim your reward here fast",
+        "g1",
+        "spam",
+        now,
+      );
+      const r = engine.selfTestKeywords();
+      check("selfTestKeywords chạy qua mẫu flagged", r.tested >= 1, JSON.stringify(r));
+      check("selfTestKeywords phát hiện ReDoS (failed>0)", r.failed > 0, JSON.stringify(r));
+      check("engineStats.redosSuspect được bật", setupStats.redosSuspect === true);
+      if (realFilters) require.cache[filtersPath] = realFilters;
+      else delete require.cache[filtersPath];
+    }
+
+    // ---- 16. selfTestKeywords: filter ném → đếm failed, không crash ----
+    {
+      const filtersPath = require.resolve("../bot/src/handlers/filters.js");
+      const realFilters = require.cache[filtersPath];
+      require.cache[filtersPath] = {
+        id: filtersPath,
+        filename: filtersPath,
+        loaded: true,
+        exports: {
+          findLearnedThreat: () => {
+            throw new Error("regex hỏng");
+          },
+        },
+      };
+      flagged._resetFlaggedForTest();
+      flagged.noteFlaggedMessage(
+        "fr33 n1tr0 gift redeem now claim your reward here fast",
+        "g1",
+        "spam",
+        now,
+      );
+      const r = engine.selfTestKeywords();
+      check(
+        "selfTestKeywords: filter ném → đếm failed, không crash",
+        r.tested === 0 && r.failed >= 1,
+        JSON.stringify(r),
+      );
+      if (realFilters) require.cache[filtersPath] = realFilters;
+      else delete require.cache[filtersPath];
+    }
+
+    // ---- 17. refreshUrlhaus: filters nạp lỗi → vẫn cập nhật + trả true ----
+    {
+      const filtersPath = require.resolve("../bot/src/handlers/filters.js");
+      const realFilters = require.cache[filtersPath];
+      require.cache[filtersPath] = {
+        id: filtersPath,
+        filename: filtersPath,
+        loaded: true,
+        exports: new Proxy(
+          {},
+          {
+            get() {
+              throw new Error("filters chưa load");
+            },
+          },
+        ),
+      };
+      const keepFetch = globalThis.fetch;
+      globalThis.fetch = async () => ({
+        ok: true,
+        status: 200,
+        text: async () => "2026-09-01 00:00:00 UTC,http://filtcatch.example/x,999\n",
+      });
+      const ok = await engine.refreshUrlhaus(store);
+      check(
+        "refreshUrlhaus: filters lỗi → vẫn cập nhật + trả true",
+        ok === true && engine.isUrlhausDomain("filtcatch.example"),
+      );
+      globalThis.fetch = keepFetch;
+      if (realFilters) require.cache[filtersPath] = realFilters;
+      else delete require.cache[filtersPath];
+    }
+  }
 
   console.log(`\nKết quả threat engine: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
