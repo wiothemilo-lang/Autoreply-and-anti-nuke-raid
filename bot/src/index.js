@@ -66,6 +66,22 @@ const client = new Client({
 const store = new ConvexStore();
 const heat = new HeatTracker(client, store);
 
+// --- Giám sát vòng đời gateway (chặn bot "chết lặng") ---
+// Tiến trình còn sống nhưng gateway rớt thì healthWatch cũ chỉ thấy đĩa/RAM
+// bình thường → báo "ok" trong khi bot không nhận được sự kiện nào. Gắn
+// listener Ở ĐÂY (module scope) để bắt cả lỗi lúc khởi động, trước clientReady.
+// discord.js phát các sự kiện shard* trên Client ngay cả khi chạy đơn shard.
+const healthWatch = require("./handlers/healthWatch");
+const gatewayTracker = healthWatch.createGatewayTracker();
+client.on("shardDisconnect", () => gatewayTracker.onDisconnect());
+client.on("shardReconnecting", () => gatewayTracker.onDisconnect());
+client.on("shardResume", () => gatewayTracker.onReconnect());
+client.on("shardReady", () => gatewayTracker.onReconnect());
+client.on("error", (err) => {
+  gatewayTracker.onError(err);
+  console.error("[gateway]", err?.message || err);
+});
+
 // --- memGuard (Đợt 7): đăng ký sweeper cho các vùng bộ nhớ BỊ LỠ trước đây.
 // Vùng nóng đã có sweeper riêng (state.js 20s, timeoutWatch, altDetection 1h…)
 // — không đăng ký lại. registerSweeper phải chạy trước clientReady để vòng đầu
@@ -143,9 +159,9 @@ client.once("clientReady", async () => {
   // cả buổi mà không ai được báo trước. Bot đo 5 phút/lần, ghi lên dashboard;
   // mức nặng hơn lần trước thì DM chủ bot (chống lặp trong healthWatch).
   try {
-    const healthWatch = require("./handlers/healthWatch");
     healthWatch.startHealthWatch({
       store,
+      gateway: gatewayTracker,
       sendAlert: async (text) => {
         const app = await client.application.fetch();
         const ownerId = app?.owner?.id ?? app?.owner?.ownerId;

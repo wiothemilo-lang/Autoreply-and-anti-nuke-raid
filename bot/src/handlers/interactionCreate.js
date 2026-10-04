@@ -22,6 +22,7 @@ const modCmds = require("./interactionCmdMod");
 const communityCmds = require("./interactionCmdCommunity");
 const backupCmd = require("./interactionCmdBackup");
 const setupCmd = require("./interactionCmdSetup");
+const common = require("./interactionCommon");
 
 module.exports = async function onInteractionCreate(client, interaction, store, heat) {
   // Handle button interactions (verify_confirm + verify_request_captcha)
@@ -63,6 +64,12 @@ module.exports = async function onInteractionCreate(client, interaction, store, 
     interaction.customId.startsWith("ticket_close_reason_submit:")
   ) {
     return ticketFlow.ticketCloseReasonModal(client, store, interaction);
+  }
+
+  // Autocomplete — Discord gửi khi người dùng đang gõ một option có gợi ý.
+  // Phải xử lý TRƯỚC chốt `isChatInputCommand` vì đây là loại tương tác khác.
+  if (interaction.isAutocomplete()) {
+    return common.autocomplete(store, interaction);
   }
 
   if (!interaction.isChatInputCommand()) return;

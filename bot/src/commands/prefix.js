@@ -25,38 +25,10 @@ const { verifyBackup, formatVerifyReport } = require("../backupAudit");
 const { reportInteractive } = require("../handlers/incidentReport");
 const researchHandlers = require("../handlers/researchCommands");
 
-const MODULES = [
-  "massBan",
-  "massKick",
-  "massJoin",
-  "massChannelCreate",
-  "massChannelDelete",
-  "massRoleCreate",
-  "massRoleDelete",
-  "massMessageDelete",
-  "massWebhookCreate",
-  "massThreadCreate",
-  "massThreadDelete",
-  "massChannelRename",
-  "massChannelOverwrite",
-  "massRoleEdit",
-  "adminSelfGrant",
-  "massRoleAssign",
-  "massNickname",
-  "massEmoji",
-  "massBotAdd",
-  "externalAppRaid",
-  "massInviteCreate",
-  "guildTamper",
-  "spam",
-  "massMessage",
-  "blankNoise",
-  "mention",
-  "badword",
-  "attachment",
-  "invite",
-  "malware",
-];
+// Danh sách module antinuke dùng CHUNG với lệnh slash `/antinuke module` và
+// autocomplete (một nguồn duy nhất trong interactionCommon) — trước đây lệnh
+// prefix có 30 module còn slash chỉ 18, lệch nhau gây khó hiểu cho người dùng.
+const { MODULES } = require("../handlers/interactionCommon");
 
 function noPerm(message) {
   return message.reply("❌ Bạn cần quyền **Quản lý server** (Manage Guild) để dùng lệnh này.");

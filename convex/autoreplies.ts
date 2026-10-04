@@ -157,6 +157,17 @@ export const update = mutation({
       patch.cooldownSeconds = Math.max(0, Math.min(86400, args.cooldownSeconds));
     }
     if (args.enabled !== undefined) patch.enabled = args.enabled;
+    // ĐỐI XỨNG VỚI `add`: rule kiểu keyword PHẢI có ít nhất một từ khóa. Trước
+    // đây `update` không kiểm tra → đổi rule mention sang keyword (hoặc xoá sạch
+    // keyword) là tạo rule IM LẶNG: bot không báo lỗi, chỉ đơn giản không bao
+    // giờ trả lời, chủ server tưởng bot hỏng. Kiểm trên giá trị HIỆU LỰC (sau
+    // patch) để bắt cả trường hợp chỉ đổi triggerType mà không gửi keywords.
+    const effectiveTrigger = args.triggerType !== undefined ? args.triggerType : rule.triggerType;
+    const effectiveKeywords =
+      args.keywords !== undefined ? (patch.keywords as string[]) : rule.keywords;
+    if (effectiveTrigger === "keyword" && effectiveKeywords.length === 0) {
+      throw new Error("Cần ít nhất một từ khóa");
+    }
     await ctx.db.patch(rule._id, patch);
     return { ok: true };
   },

@@ -73,7 +73,13 @@ const commands = applyLocalizations([
         description: "Sửa nội dung trả lời / cooldown của rule",
         type: 1,
         options: [
-          { name: "name", description: "Tên rule cần sửa", type: 3, required: true },
+          {
+            name: "name",
+            description: "Tên rule cần sửa",
+            type: 3,
+            required: true,
+            autocomplete: true,
+          },
           {
             name: "response",
             description: "Nội dung trả lời mới ({user} để tag)",
@@ -92,7 +98,15 @@ const commands = applyLocalizations([
         name: "remove",
         description: "Xóa rule auto reply",
         type: 1,
-        options: [{ name: "name", description: "Tên rule", type: 3, required: true }],
+        options: [
+          {
+            name: "name",
+            description: "Tên rule",
+            type: 3,
+            required: true,
+            autocomplete: true,
+          },
+        ],
       },
     ],
   },
@@ -108,7 +122,13 @@ const commands = applyLocalizations([
         description: "Bật/tắt một module cụ thể",
         type: 1,
         options: [
-          { name: "module", description: "Tên module", type: 3, required: true },
+          {
+            name: "module",
+            description: "Tên module",
+            type: 3,
+            required: true,
+            autocomplete: true,
+          },
           { name: "value", description: "on | off", type: 3, required: true },
         ],
       },
@@ -139,7 +159,15 @@ const commands = applyLocalizations([
         name: "remove",
         description: "Xóa từ ngữ xấu",
         type: 1,
-        options: [{ name: "word", description: "Từ ngữ cần bỏ chặn", type: 3, required: true }],
+        options: [
+          {
+            name: "word",
+            description: "Từ ngữ cần bỏ chặn",
+            type: 3,
+            required: true,
+            autocomplete: true,
+          },
+        ],
       },
       {
         name: "list",

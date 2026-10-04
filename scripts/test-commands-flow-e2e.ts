@@ -327,6 +327,8 @@ function makeInteraction(client: any, path: string[], opts: Row = {}) {
     // mock thiếu thì handler gọi tới sẽ ném TypeError.
     isButton: () => false,
     isModalSubmit: () => false,
+    // Dispatcher kiểm tra autocomplete TRƯỚC cả chat input (discord.js luôn có).
+    isAutocomplete: () => false,
     isChatInputCommand: () => true,
     isDMBased: () => false,
     guild: {
