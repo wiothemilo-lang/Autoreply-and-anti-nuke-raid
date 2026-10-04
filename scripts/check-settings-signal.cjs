@@ -57,6 +57,15 @@ const BOT_CONVEX = path.join(ROOT, "bot", "src", "convex.js");
 /** File chứa mutation bot-side (tập được miễn luật A vì luật B phủ). */
 const BOT_WRITES_FILE = "bot_writes.ts";
 
+/**
+ * Chuẩn hoá dấu phân tách về `/` — khoá allowlist và so sánh chuỗi trong cổng
+ * đều viết kiểu POSIX. Trên Windows `path.relative` trả `guilds\config.ts`,
+ * dùng nguyên sẽ không khớp key `guilds/config.ts::botSaveConfig` → báo lỗi giả.
+ */
+function toPosix(p) {
+  return p.split(path.sep).join("/");
+}
+
 /** Ngoại lệ của luật A — mỗi mục BẮT BUỘC kèm lý do kiểm chứng được. */
 const ALLOWLIST = {
   // ── Bot-side nhưng KHÔNG đi qua cache (batch tick đọc tươi) ──
@@ -567,6 +576,10 @@ export async function botNewThingHandler(ctx: any, { guildId }: { guildId: strin
  * Liệt kê .ts dưới convex/ (ĐỆ QUY — từ đợt #5, `convex/guilds/*` là helper ghi
  * cấu hình): bỏ `_generated` + tsconfig, trả path TƯƠNG ĐỐI so với convex/ để
  * khoá allowlist vẫn đọc được (`guilds.ts::x` giữ nguyên, `guilds/y.ts::z` mới).
+ *
+ * LUỬT: luôn chuẩn hoá về dấu `/`. `path.relative` trên Windows trả `a\b.ts`,
+ * còn allowlist + `isBotWritesFile` so sánh với `bot_writes/x.ts` → không
+ * chuẩn hoá thì cổng báo 9 lỗi giả (mọi mutation bot_writes thành vi phạm).
  */
 function listConvexFiles(dir, base = dir) {
   const out = [];
@@ -578,7 +591,7 @@ function listConvexFiles(dir, base = dir) {
       continue;
     }
     if (!e.name.endsWith(".ts") || e.name === "tsconfig.ts") continue;
-    out.push(path.relative(base, p));
+    out.push(toPosix(path.relative(base, p)));
   }
   return out;
 }

@@ -604,7 +604,13 @@ if (process.argv.includes("--self-test")) {
       fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
       fs.copyFileSync(__filename, path.join(dir, "scripts", "check-i18n.cjs"));
       // script require("typescript") — nối tới node_modules gốc thay vì copy 23MB.
-      fs.symlinkSync(path.join(ROOT, "node_modules"), path.join(dir, "node_modules"), "dir");
+      // Windows: junction KHÔNG cần quyền Administrator (symlink "dir" thì cần —
+      // Developer Mode tắt là self-test chết với EPERM trước khi kịp kiểm tra gì).
+      fs.symlinkSync(
+        path.join(ROOT, "node_modules"),
+        path.join(dir, "node_modules"),
+        process.platform === "win32" ? "junction" : "dir",
+      );
       if (real) {
         fs.cpSync(path.join(ROOT, "src"), path.join(dir, "src"), { recursive: true });
         fs.cpSync(path.join(ROOT, "convex"), path.join(dir, "convex"), { recursive: true });

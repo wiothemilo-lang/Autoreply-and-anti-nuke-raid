@@ -310,6 +310,10 @@ export const botReportRestorePlanArgs = {
       emojiCount: v.number(),
       stickerCount: v.number(),
       threadCount: v.optional(v.number()),
+      /** Số thành viên có bản đồ vai trò trong backup (P2). */
+      memberCount: v.optional(v.number()),
+      /** Tổng số lượt gán vai trò dự kiến (P2). */
+      memberRoleAssignments: v.optional(v.number()),
       banCount: v.optional(v.number()),
       settingsCount: v.number(),
       warnings: v.array(v.string()),

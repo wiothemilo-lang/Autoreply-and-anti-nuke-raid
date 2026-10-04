@@ -13,6 +13,19 @@ const MAX_MESSAGES_PER_THREAD = 10;
 const MAX_REPLAY_PER_CHANNEL = 50;
 /** Số thread đang hoạt động tối đa chụp mỗi kênh (tránh phình JSON khi server chat sôi). */
 const MAX_THREADS_PER_CHANNEL = 20;
+/**
+ * Số thành viên TỐI ĐA chụp bản đồ vai trò (P2).
+ *
+ * Vì sao có trần: server 50k thành viên mà bản đồ đầy đủ sẽ phình JSON vượt
+ * trần 1 MB của Convex, và lúc restore phải gọi hàng chục nghìn lần
+ * members.addRoles → chạm rate limit và treo job. 500 là mức đủ phục hồi
+ * phần lớn server cộng đồng vừa/nhỏ mà vẫn nằm gọn trong 1 lần backup.
+ * Vượt trần thì BÁO bằng cờ `memberRolesTruncated` — cắt bớt mà im lặng
+ * khiến chủ server tưởng đã lưu đủ.
+ */
+const MAX_MEMBERS_PER_BACKUP = 500;
+/** Số vai trò tối đa ghi cho MỘT thành viên (thành viên có 50 role là rác). */
+const MAX_ROLES_PER_MEMBER = 20;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -52,6 +65,8 @@ module.exports = {
   MAX_MESSAGES_PER_THREAD,
   MAX_REPLAY_PER_CHANNEL,
   MAX_THREADS_PER_CHANNEL,
+  MAX_MEMBERS_PER_BACKUP,
+  MAX_ROLES_PER_MEMBER,
   sleep,
   safeGuildIconUrl,
   myPermissionBits,

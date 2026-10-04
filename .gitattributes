@@ -1,0 +1,22 @@
+# Ép LF cho mọi file văn bản.
+#
+# Lý do: git trên Windows checkout file text bằng CRLF (core.autocrlf=true là mặc
+# định của Git for Windows). Prettier dùng endOfLine "lf" nên `bun run format:check`
+# cảnh báo hàng loạt file dù nội dung KHÔNG đổi gì — CI Linux xanh còn máy Windows
+# đỏ, và agent sẽ tưởng mình vừa làm hỏng format rồi chạy `format` sửa bậy.
+# `eol=lf` khoá line ending NGAY LÚC CHECKOUT cho mọi nền tảng, không phụ thuộc
+# cấu hình máy. File nhị phân khai báo -text ở dưới để không bao giờ bị convert.
+* text=auto eol=lf
+
+# Font nhúng + icon: nhị phân, tuyệt đối không đổi line ending.
+*.ttf binary
+*.otf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+
+# Lockfile sinh máy — không bao giờ tranh format, không sửa tay.
+bun.lock -diff linguist-generated=true

@@ -9,11 +9,22 @@
  */
 const { Colors, PermissionsBitField } = require("discord.js");
 const { logEmbed } = require("./util");
-const { decompressAndDecryptBackup, filterBackupComponents } = require("./backupUtils");
+const {
+  decompressAndDecryptBackup,
+  filterBackupComponents,
+  computeChecksum,
+} = require("./backupUtils");
 const { countMessages } = require("./backupNormalize");
-const { MAX_REPLAY_PER_CHANNEL, myPermissionBits, sendToLog } = require("./backupCommon");
+const {
+  MAX_MEMBERS_PER_BACKUP,
+  MAX_REPLAY_PER_CHANNEL,
+  myPermissionBits,
+  sendToLog,
+} = require("./backupCommon");
 const {
   applyBans,
+  applyEveryonePermissions,
+  applyMemberRoles,
   applyGuildMeta,
   applyInvites,
   createChannels,
@@ -25,6 +36,23 @@ const {
   sortedChannels,
   sortedRoles,
 } = require("./backupRebuild");
+
+/**
+ * Xác minh tính toàn vẹn của backup TRƯỚC khi khôi phục.
+ *
+ * `expectedChecksum` là SHA-256 của JSON THÔ lúc lưu (bot ghi `backupChecksum`
+ * trong guildBackups). Trước đây bot chỉ bung nén + JSON.parse rồi khôi phục,
+ * KHÔNG so checksum — một bản bị cắt cụt/sửa tay vẫn "khôi phục thành công" và
+ * tạo ra cấu trúc sai (mất role/kênh) mà dashboard báo xanh. Thiếu checksum
+ * (bản cũ, file import) thì bỏ qua kiểm — không nghi oan.
+ */
+function verifyBackupChecksum(jsonString, expectedChecksum) {
+  if (!expectedChecksum || typeof expectedChecksum !== "string") {
+    return { checked: false, ok: true, actual: null, expected: null };
+  }
+  const actual = computeChecksum(jsonString);
+  return { checked: true, ok: actual === expectedChecksum, actual, expected: expectedChecksum };
+}
 
 /**
  * Tính KẾ HOẠCH khôi phục mà KHÔNG đụng server (dry-run).
@@ -59,6 +87,13 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
     ? channels.reduce((n, c) => n + (Array.isArray(c.threads) ? c.threads.length : 0), 0)
     : 0;
   const banCount = restoreExtras ? (backup.bans || []).filter((b) => b?.userId).length : 0;
+  // Bản đồ thành viên ↔ vai trò (P2): chỉ có ý nghĩa khi role được tạo lại.
+  const memberEntries = restoreRoles && Array.isArray(backup.members) ? backup.members : [];
+  const memberCount = memberEntries.filter((m) => m?.userId).length;
+  const memberRoleAssignments = memberEntries.reduce(
+    (n, m) => n + (Array.isArray(m?.roles) ? m.roles.length : 0),
+    0,
+  );
 
   // replayMessages chỉ gửi tối đa MAX_REPLAY_PER_CHANNEL tin/kênh và chỉ kênh
   // có bản ghi mới được gửi → báo đúng số SẼ phục hồi, không phải số có trong
@@ -98,6 +133,23 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
   if (restoreRoles && roles.length > 0 && !can("ManageRoles")) {
     warnings.push(
       `Bot thiếu quyền Manage Roles — ${roles.length} role trong backup sẽ KHÔNG tạo lại được.`,
+    );
+  }
+  // Vai trò thành viên (P2): cùng nhu cầu quyền nhưng là hành động khác —
+  // gán vai trò còn nhạy hơn tạo role, nên phải nói rõ khi bot không làm được.
+  if (memberCount > 0 && !can("ManageRoles")) {
+    warnings.push(
+      `Bot thiếu quyền Manage Roles — ${memberRoleAssignments} vai trò của ${memberCount} thành viên sẽ KHÔNG gán lại được.`,
+    );
+  }
+  if (backup.memberRolesUnavailable === true) {
+    warnings.push(
+      "Bản backup KHÔNG có bản đồ vai trò thành viên — lúc chụp, bot không đọc được danh sách thành viên (thiếu quyền hoặc thiếu intent Guild Members trong Developer Portal).",
+    );
+  }
+  if (backup.memberRolesTruncated === true) {
+    warnings.push(
+      `Bản đồ vai trò bị cắt ở ${MAX_MEMBERS_PER_BACKUP} thành viên — các thành viên còn lại không có vai trò được khôi phục.`,
     );
   }
   if (restoreChannels && channels.length > 0 && !can("ManageChannels")) {
@@ -175,6 +227,8 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
     stickerCount: restoreEmojis ? stickers.length : 0,
     threadCount,
     banCount,
+    memberCount,
+    memberRoleAssignments,
     settingsCount: restoreRoles || restoreChannels ? settingsCount : 0,
     warnings,
     at: Date.now(),
@@ -188,12 +242,18 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
  * nói "sẽ tạo 5 kênh" còn restore thật tạo 7 là bản thuyết phục sai.
  */
 async function runRestorePlan(client, store, guildId, backupJson, backupName, options = {}) {
+  let json = backupJson;
+  try {
+    json = decompressAndDecryptBackup(backupJson);
+  } catch {}
+  const integrity = verifyBackupChecksum(json, options.expectedChecksum);
+  if (integrity.checked && !integrity.ok) {
+    throw new Error(
+      "Backup hỏng — checksum không khớp nội dung (dữ liệu đã bị thay đổi sau khi lưu). Dừng tạo kế hoạch để không báo sai.",
+    );
+  }
   let backup;
   try {
-    let json = backupJson;
-    try {
-      json = decompressAndDecryptBackup(backupJson);
-    } catch {}
     backup = JSON.parse(json);
   } catch {
     throw new Error("Backup bi hong (khong doc duoc JSON)");
@@ -312,8 +372,16 @@ async function restoreCore(
   await ensureClaim();
   // Danh tính server: tên / mô tả / icon.
   const metaApplied = restoreMeta
-    ? await applyGuildMeta(guild, backup.guildMeta || { name: backup.guildName })
+    ? await applyGuildMeta(guild, backup.guildMeta || { name: backup.guildName }, channelMap)
     : { name: false, description: false, icon: false };
+  const everyoneApplied = restoreMeta ? await applyEveryonePermissions(guild, backup) : false;
+  await ensureClaim();
+  // Vai trò thành viên (P2): chỉ chạy khi role THẬT SỰ được tạo lại — roleMap
+  // rỗng thì bản đồ id cũ → id mới không có gì để tra, áp vào là vô nghĩa.
+  const memberRoleStats =
+    restoreRoles && roleMap.size > 0
+      ? await applyMemberRoles(guild, backup, roleMap, ensureClaim)
+      : { members: 0, assigned: 0, skipped: 0, missing: 0, noPermission: false };
   await ensureClaim();
   // Ban list + link mời (chỉ khi chủ server bật "khôi phục ban/link mời").
   const bansApplied = restoreExtras ? await applyBans(guild, backup.bans) : 0;
@@ -422,6 +490,35 @@ async function restoreCore(
       inline: true,
     });
   }
+  if (restoreRoles) {
+    const memberTotal = Array.isArray(backup.members) ? backup.members.length : 0;
+    if (memberRoleStats.assigned > 0) {
+      fields.push({
+        name: "Vai trò thành viên",
+        value: `${memberRoleStats.assigned} vai trò trên ${memberRoleStats.members} thành viên`,
+        inline: true,
+      });
+    } else if (memberRoleStats.noPermission) {
+      fields.push({
+        name: "Vai trò thành viên",
+        value: "⏭️ bỏ qua — bot thiếu quyền Manage Roles",
+        inline: true,
+      });
+    } else if (memberTotal > 0) {
+      // Có bản đồ nhưng không gán được gì: phải nói RÕ lý do, không im lặng —
+      // nếu không chủ server tưởng vai trò đã về đúng chỗ.
+      const why = [];
+      if (memberRoleStats.missing > 0)
+        why.push(`${memberRoleStats.missing} không còn trong server`);
+      if (memberRoleStats.skipped > 0) why.push(`${memberRoleStats.skipped} lỗi khi gán`);
+      if (why.length === 0) why.push("vai trò đã có sẵn hoặc bot không quản lý được role nào");
+      fields.push({
+        name: "Vai trò thành viên",
+        value: `⏭️ chưa gán được (${why.join("; ")})`,
+        inline: true,
+      });
+    }
+  }
   if (restoreExtras) {
     if (bansApplied > 0) {
       fields.push({ name: "Thành viên đã cấm", value: `${bansApplied}`, inline: true });
@@ -435,6 +532,10 @@ async function restoreCore(
       metaApplied.name ? "tên" : null,
       metaApplied.description ? "mô tả" : null,
       metaApplied.icon ? "icon" : null,
+      metaApplied.banner ? "banner" : null,
+      metaApplied.splash ? "splash" : null,
+      metaApplied.settings ? "thiết lập server" : null,
+      everyoneApplied ? "quyền @everyone" : null,
     ].filter(Boolean);
     if (parts.length > 0) {
       fields.push({
@@ -454,7 +555,7 @@ async function restoreCore(
   fields.push({
     name: "Lưu ý",
     value:
-      "Kênh đã được sắp xếp lại đúng thứ tự trong file backup; phần role, kênh, tin nhắn và emoji/sticker đã tắt trong Tùy chỉnh khôi phục sẽ không được tạo/phục hồi. Các role/kênh có sẵn của server này được giữ nguyên. Danh sách ban và link mời chỉ được áp lại khi bật “khôi phục ban/link mời” (link mời cũ đã chết sau khi server bị xoá nên bot tạo link MỚI trỏ đúng kênh). Hãy kiểm tra lại quyền theo ý muốn.",
+      "Kênh đã được sắp xếp lại đúng thứ tự trong file backup; phần role, kênh, tin nhắn và emoji/sticker đã tắt trong Tùy chỉnh khôi phục sẽ không được tạo/phục hồi. Vai trò chỉ được gán cho thành viên đang có trong server, và chỉ gán vai trò mà bot có quyền quản lý. Các role/kênh có sẵn của server này được giữ nguyên. Danh sách ban và link mời chỉ được áp lại khi bật “khôi phục ban/link mời” (link mời cũ đã chết sau khi server bị xoá nên bot tạo link MỚI trỏ đúng kênh). Hãy kiểm tra lại quyền theo ý muốn.",
     inline: false,
   });
 
@@ -467,11 +568,15 @@ async function restoreCore(
   });
   await sendToLog(guild, embed, store);
   console.log(
-    `[backup:restore] ${guildId}: ${roleMap.size} roles, ${channelMap.size} channels, ${threadResult.threadsCreated} threads, ${replayed} messages, ${emojisCreated} emojis, ${stickersCreated} stickers, ${bansApplied} bans, ${invitesCreated} invites (${source}, restoreRoles=${restoreRoles}, restoreChannels=${restoreChannels}, restoreMessages=${restoreMessages}, restoreEmojis=${restoreEmojis}, restoreMeta=${restoreMeta}, restoreExtras=${restoreExtras})`,
+    `[backup:restore] ${guildId}: ${roleMap.size} roles, ${channelMap.size} channels, ${threadResult.threadsCreated} threads, ${replayed} messages, ${emojisCreated} emojis, ${stickersCreated} stickers, ${memberRoleStats.assigned} member-roles/${memberRoleStats.members} members, ${bansApplied} bans, ${invitesCreated} invites (${source}, restoreRoles=${restoreRoles}, restoreChannels=${restoreChannels}, restoreMessages=${restoreMessages}, restoreEmojis=${restoreEmojis}, restoreMeta=${restoreMeta}, restoreExtras=${restoreExtras})`,
   );
   return {
     roleCount: roleMap.size,
     channelCount: channelMap.size,
+    memberRoleCount: memberRoleStats.assigned,
+    memberRoleMemberCount: memberRoleStats.members,
+    memberRoleSkipped: memberRoleStats.skipped,
+    memberRoleMissing: memberRoleStats.missing,
     threadCount: threadResult.threadsCreated,
     threadMessageCount: threadResult.messages,
     messageCount: replayed,
@@ -484,12 +589,20 @@ async function restoreCore(
 }
 
 async function runRestore(client, store, guildId, backupJson, backupName, options = {}) {
+  let json = backupJson;
+  try {
+    json = decompressAndDecryptBackup(backupJson);
+  } catch {}
+  // Xác minh toàn vẹn TRƯỚC khi tạo bất cứ thứ gì: khôi phục từ bản bị sửa/cắt
+  // cụt sẽ tạo cấu trúc sai mà vẫn báo thành công.
+  const integrity = verifyBackupChecksum(json, options.expectedChecksum);
+  if (integrity.checked && !integrity.ok) {
+    throw new Error(
+      "Backup hỏng — checksum không khớp nội dung (dữ liệu đã bị thay đổi sau khi lưu). Dừng khôi phục để không tạo cấu trúc sai; hãy chọn bản backup khác.",
+    );
+  }
   let backup;
   try {
-    let json = backupJson;
-    try {
-      json = decompressAndDecryptBackup(backupJson);
-    } catch {}
     backup = JSON.parse(json);
   } catch {
     throw new Error("Backup bi hong (khong doc duoc JSON)");

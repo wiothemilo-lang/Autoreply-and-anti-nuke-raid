@@ -675,6 +675,17 @@ export default defineSchema({
     stickerCount: v.optional(v.number()),
     /** Số tin nhắn đã backup (0 = không kèm tin). */
     messageCount: v.optional(v.number()),
+    /**
+     * Số dòng bản đồ thành viên ↔ vai trò đã backup (P2). 0 = bản backup cũ,
+     * hoặc lúc chụp bot không đọc được danh sách thành viên — phải phân biệt
+     * hai trường hợp nên thêm `memberRolesTruncated` bên dưới.
+     */
+    memberCount: v.optional(v.number()),
+    /**
+     * true = bản đồ vai trò bị CẮT vì vượt trần số thành viên. Cắt bớt mà
+     * không có cờ này thì chủ server tưởng đã lưu đủ vai trò.
+     */
+    memberRolesTruncated: v.optional(v.boolean()),
     /** Nguồn backup: "backup" (bot tự chụp) | "import" (tải file .msc/.json lên) | "clone" (sao chép từ server khác). */
     source: v.optional(v.string()),
     /** SHA-256 checksum của backup JSON (dùng cho incremental backup + xác minh). */

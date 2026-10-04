@@ -14,6 +14,8 @@ const {
   MAX_MESSAGES_PER_THREAD,
   MAX_REPLAY_PER_CHANNEL,
   MAX_THREADS_PER_CHANNEL,
+  MAX_MEMBERS_PER_BACKUP,
+  MAX_ROLES_PER_MEMBER,
   safeGuildIconUrl,
   sleep,
 } = require("./backupCommon");
@@ -108,9 +110,45 @@ async function createChannels(guild, backup, roleMap, onProgress) {
       permissionOverwrites: overwrites,
     };
     if (ch.parentId && map.has(ch.parentId)) opts.parent = map.get(ch.parentId);
-    if (ch.type === ChannelType.GuildVoice || ch.type === ChannelType.GuildStageVoice) {
+    const isVoiceLike =
+      ch.type === ChannelType.GuildVoice || ch.type === ChannelType.GuildStageVoice;
+    if (isVoiceLike) {
       if (ch.bitrate) opts.bitrate = Math.min(384000, Math.max(8000, ch.bitrate));
       if (ch.userLimit) opts.userLimit = Math.min(99, Math.max(0, ch.userLimit));
+      if (ch.rtcRegion) opts.rtcRegion = ch.rtcRegion;
+      if (Number.isFinite(ch.videoQualityMode)) opts.videoQualityMode = ch.videoQualityMode;
+    }
+    // Kênh văn bản/thông báo/diễn đàn: slowmode + auto-archive + rate-limit thread.
+    // Discord TỪ CHỐI các option này trên kênh thoại nên phải tách theo loại.
+    const isTextLike =
+      ch.type === ChannelType.GuildText ||
+      ch.type === ChannelType.GuildAnnouncement ||
+      ch.type === ChannelType.GuildForum;
+    if (isTextLike) {
+      if (Number.isFinite(ch.rateLimitPerUser)) {
+        opts.rateLimitPerUser = Math.max(0, Math.min(21600, ch.rateLimitPerUser));
+      }
+      if (Number.isFinite(ch.defaultThreadRateLimitPerUser)) {
+        opts.defaultThreadRateLimitPerUser = Math.max(
+          0,
+          Math.min(21600, ch.defaultThreadRateLimitPerUser),
+        );
+      }
+      if (Number.isFinite(ch.defaultAutoArchiveDuration)) {
+        opts.defaultAutoArchiveDuration = ch.defaultAutoArchiveDuration;
+      }
+    }
+    if (ch.type === ChannelType.GuildCategory && Number.isFinite(ch.defaultSortOrder)) {
+      opts.defaultSortOrder = ch.defaultSortOrder;
+    }
+    if (ch.type === ChannelType.GuildForum) {
+      if (Number.isFinite(ch.defaultForumLayout)) opts.defaultForumLayout = ch.defaultForumLayout;
+      if (Array.isArray(ch.availableTags) && ch.availableTags.length > 0) {
+        opts.availableTags = ch.availableTags
+          .slice(0, 20)
+          .map((t) => ({ name: String(t?.name ?? "").slice(0, 20), moderated: !!t?.moderated }))
+          .filter((t) => t.name);
+      }
     }
     return opts;
   };
@@ -405,34 +443,180 @@ async function createThreads(guild, backup, channelMap, onProgress, { restoreMes
  * tiên sau khi mở lại server bị nuke. Best-effort từng bước: thiếu quyền
  * Manage Guild thì bỏ qua chứ không làm hỏng cả lần khôi phục.
  */
-async function applyGuildMeta(guild, meta) {
-  const done = { name: false, description: false, icon: false };
+async function applyGuildMeta(guild, meta, channelMap) {
+  const done = {
+    name: false,
+    description: false,
+    icon: false,
+    banner: false,
+    splash: false,
+    settings: false,
+  };
   if (!meta) return done;
-  if (meta.name) {
+  // Gọi phương thức chỉ khi có giá trị + client hỗ trợ; mỗi field độc lập nên
+  // một field thiếu quyền (banner cần boost, locale cần Community…) không làm
+  // mất các field còn lại.
+  const apply = async (label, method, value) => {
+    if (value === null || value === undefined) return false;
+    if (typeof guild[method] !== "function") return false;
     try {
-      await guild.setName(String(meta.name).slice(0, 100));
-      done.name = true;
+      await guild[method](value);
+      return true;
     } catch (e) {
-      console.error(`[backup:meta:name] ${meta.name}:`, e.message);
+      console.error(`[backup:meta:${label}]:`, e.message);
+      return false;
     }
+  };
+  if (await apply("name", "setName", meta.name ? String(meta.name).slice(0, 100) : null)) {
+    done.name = true;
   }
-  if (meta.description) {
-    try {
-      await guild.setDescription(String(meta.description).slice(0, 300));
-      done.description = true;
-    } catch (e) {
-      console.error(`[backup:meta:description]:`, e.message);
-    }
+  if (await apply("description", "setDescription", meta.description ?? null))
+    done.description = true;
+  if (await apply("icon", "setIcon", meta.iconUrl ?? null)) done.icon = true;
+  if (await apply("banner", "setBanner", meta.bannerUrl ?? null)) done.banner = true;
+  if (await apply("splash", "setSplash", meta.splashUrl ?? null)) done.splash = true;
+
+  // Thiết lập an toàn/thông báo của server. Kênh hệ thống/AFK lưu bằng id CŨ →
+  // phải tra qua channelMap (id đã tạo lại) trước khi gán.
+  let settingsApplied = 0;
+  if (await apply("verifyLevel", "setVerificationLevel", meta.verificationLevel ?? null)) {
+    settingsApplied++;
   }
-  if (meta.iconUrl) {
-    try {
-      await guild.setIcon(String(meta.iconUrl));
-      done.icon = true;
-    } catch (e) {
-      console.error(`[backup:meta:icon]:`, e.message);
-    }
+  if (
+    await apply("contentFilter", "setExplicitContentFilter", meta.explicitContentFilter ?? null)
+  ) {
+    settingsApplied++;
   }
+  if (
+    await apply(
+      "notifications",
+      "setDefaultMessageNotifications",
+      meta.defaultMessageNotifications ?? null,
+    )
+  ) {
+    settingsApplied++;
+  }
+  if (await apply("afkTimeout", "setAFKTimeout", meta.afkTimeout ?? null)) settingsApplied++;
+  const systemChannelId = meta.systemChannelId ? channelMap?.get(meta.systemChannelId) : null;
+  if (systemChannelId && (await apply("systemChannel", "setSystemChannel", systemChannelId))) {
+    settingsApplied++;
+  }
+  const afkChannelId = meta.afkChannelId ? channelMap?.get(meta.afkChannelId) : null;
+  if (afkChannelId && (await apply("afkChannel", "setAFKChannel", afkChannelId))) {
+    settingsApplied++;
+  }
+  if (await apply("locale", "setPreferredLocale", meta.preferredLocale ?? null)) {
+    settingsApplied++;
+  }
+  done.settings = settingsApplied > 0;
   return done;
+}
+
+/**
+ * Áp lại quyền mặc định của server (role @everyone) đã chụp. Đây là "cấu hình
+ * server" thật — không có nó thì sau khôi phục mọi thành viên mất quyền cơ bản.
+ * Trả về true khi ghi thành công.
+ */
+async function applyEveryonePermissions(guild, backup) {
+  const perms = backup?.everyonePermissions;
+  if (typeof perms !== "string" || perms.length === 0) return false;
+  const everyone = guild?.roles?.everyone;
+  if (!everyone || typeof everyone.setPermissions !== "function") return false;
+  try {
+    await everyone.setPermissions(BigInt(perms));
+    return true;
+  } catch (e) {
+    console.error(`[backup:meta:everyone] ${guild?.id ?? "?"}:`, e.message);
+    return false;
+  }
+}
+
+/**
+ * Áp lại VAI TRÒ cho THÀNH VIÊN ĐANG CÓ trong server (P2).
+ *
+ * Khôi phục cấu trúc mà không khôi phục vai trò thì vô dùng: server có đủ
+ * role/kênh nhưng không ai mod, mọi miễn trừ anti-nuke theo role cũng rơi.
+ * Bản đồ `backup.members` lưu vai trò theo id CŨ, nên phải tra qua `roleMap`
+ * (role tạo lại có id MỚI) trước khi gán.
+ *
+ * Bốn lớp chặn, xếp rẻ → đắt:
+ *  1. Role @everyone (id = guild.id) — Discord không cho gán tay, và mạo danh
+ *     nó là đường leo thang quyền kinh điển.
+ *  2. Role `managed` (tích hợp: Nitro/Booster/bot khác) — không gán tay được.
+ *  3. Role có `position` ≥ cao nhất của bot — Discord từ chối, và đây cũng là
+ *     ranh giới "bot không được vươn tay lên trên chính mình".
+ *  4. Role mang bất kỳ quyền nào mà BOT KHÔNG CÓ (`bitfield & ~myBits` ≠ 0).
+ *     Đây là chốt chặn chính: kể cả khi role tạo được (bot đủ quyền để tạo),
+ *     gán nó lên thành viên — đặc biệt lên chính bot — là đường nâng quyền.
+ *
+ * Chỉ gán cho thành viên đang có trong cache; thành viên đã rời thì bỏ qua
+ * (không fetch hàng loạt để tránh chạm rate limit). Trả số liệu để báo cáo.
+ */
+async function applyMemberRoles(guild, backup, roleMap, onProgress) {
+  const stats = { members: 0, assigned: 0, skipped: 0, missing: 0, noPermission: false };
+  const list = Array.isArray(backup?.members) ? backup.members : [];
+  if (list.length === 0 || !roleMap || roleMap.size === 0) return stats;
+
+  const me = guild.members?.me;
+  if (!me || !me.permissions?.has?.("ManageRoles")) {
+    stats.noPermission = true;
+    console.error(
+      `[backup:members] ${guild.id}: bot thiếu quyền Manage Roles — bỏ qua vai trò thành viên`,
+    );
+    return stats;
+  }
+  const myBits = BigInt(me.permissions.bitfield ?? 0n);
+  const myTop = me.roles?.highest?.position ?? Infinity;
+  const everyoneId = guild.roles?.everyone?.id ?? backup.guildId;
+
+  // Lọc trước toàn bộ danh sách role (rẻ) rồi mới lặp thành viên (đắt).
+  const assignable = new Map(); // roleIdCũ -> role mới đã qua 4 lớp chặn
+  for (const [oldId, newId] of roleMap) {
+    if (!newId) continue;
+    const role = guild.roles.cache.get(newId);
+    if (!role) {
+      stats.missing++;
+      continue;
+    }
+    if (role.id === everyoneId || role.managed) continue;
+    if (role.position >= myTop) continue;
+    if ((BigInt(role.permissions?.bitfield ?? 0n) & ~myBits) !== 0n) continue;
+    assignable.set(oldId, role);
+  }
+  if (assignable.size === 0) return stats;
+
+  let processed = 0;
+  for (const entry of list.slice(0, MAX_MEMBERS_PER_BACKUP)) {
+    if (onProgress && processed++ % 10 === 0) await onProgress();
+    const userId = entry?.userId;
+    if (!userId) continue;
+    // Không tự gán vai trò cho chính bot.
+    if (userId === me.user?.id) continue;
+    const member = guild.members.cache.get(userId);
+    if (!member) {
+      stats.missing++;
+      continue;
+    }
+    const wanted = (Array.isArray(entry.roles) ? entry.roles : [])
+      .map((id) => assignable.get(id))
+      .filter(Boolean)
+      .filter((r) => !member.roles?.cache?.has?.(r.id))
+      .slice(0, MAX_ROLES_PER_MEMBER);
+    if (wanted.length === 0) continue;
+    try {
+      if (typeof member.roles?.add !== "function") {
+        stats.skipped++;
+        continue;
+      }
+      await member.roles.add(wanted, "Khôi phục vai trò từ backup");
+      stats.members++;
+      stats.assigned += wanted.length;
+    } catch (e) {
+      stats.skipped++;
+      console.error(`[backup:members] ${userId}:`, e.message);
+    }
+  }
+  return stats;
 }
 
 /** Cấm lại danh tiếp ủy quyền (có bật riêng trong Tùy chỉnh khôi phục). */
@@ -501,6 +685,8 @@ module.exports = {
   replayMessages,
   createThreads,
   applyGuildMeta,
+  applyEveryonePermissions,
+  applyMemberRoles,
   applyBans,
   applyInvites,
 };

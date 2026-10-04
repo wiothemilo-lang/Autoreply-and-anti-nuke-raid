@@ -6,6 +6,7 @@
 // dẫn tới mất cấu hình, tìm không ra panel, hoặc tưởng bot đã chạy cấu hình
 // mới. Biên sai 1 phút / sai thứ tự tìm kiếm là hỏng mục đích.
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   confirmLeave,
   hasUnsavedChanges,
@@ -461,7 +462,7 @@ console.log("── #8 điểm cấu hình (đợt #4) ──");
   // Khoá `target` phải tồn tại trong NAV_ITEMS của GuildPage — nếu gõ sai,
   // bấm "Mở panel" sẽ mở panel không có. Kiểm tra trực tiếp trên nguồn.
   const guildPage = readFileSync(
-    new URL("../src/pages/GuildPage.tsx", import.meta.url).pathname,
+    fileURLToPath(new URL("../src/pages/GuildPage.tsx", import.meta.url)),
     "utf8",
   );
   check(
@@ -562,9 +563,12 @@ console.log("── #9 thống kê sự cố ──");
 // ── #10 hàng đợi việc ở trang Admin (đợt #4) ──
 console.log("── #10 hàng đợi việc (Admin) ──");
 {
-  const statusSrc = readFileSync(new URL("../convex/status.ts", import.meta.url).pathname, "utf8");
+  const statusSrc = readFileSync(
+    fileURLToPath(new URL("../convex/status.ts", import.meta.url)),
+    "utf8",
+  );
   const adminSrc = readFileSync(
-    new URL("../src/pages/Admin.tsx", import.meta.url).pathname,
+    fileURLToPath(new URL("../src/pages/Admin.tsx", import.meta.url)),
     "utf8",
   );
 
@@ -624,11 +628,11 @@ console.log("── #11 sheet panel mobile ──");
   check("KHÔNG mở sheet: màn hình rộng", !shouldUsePanelSheet(false, "antinuke"));
 
   const sheetSrc = readFileSync(
-    new URL("../src/components/MobilePanelSheet.tsx", import.meta.url).pathname,
+    fileURLToPath(new URL("../src/components/MobilePanelSheet.tsx", import.meta.url)),
     "utf8",
   );
   const guildPageSrc = readFileSync(
-    new URL("../src/pages/GuildPage.tsx", import.meta.url).pathname,
+    fileURLToPath(new URL("../src/pages/GuildPage.tsx", import.meta.url)),
     "utf8",
   );
 
@@ -774,10 +778,13 @@ console.log("── #12 mô phỏng auto-reply ──");
   // HỢP ĐỒNG 1:1 với bot: đổi logic bot mà quên sửa bản web thì mô phỏng bịa
   // ra kết quả sai. TS không bắt được, nên khóa bằng đọc nguồn bot.
   const botMsg = readFileSync(
-    new URL("../bot/src/handlers/messageCreate.js", import.meta.url).pathname,
+    fileURLToPath(new URL("../bot/src/handlers/messageCreate.js", import.meta.url)),
     "utf8",
   );
-  const botUtil = readFileSync(new URL("../bot/src/util.js", import.meta.url).pathname, "utf8");
+  const botUtil = readFileSync(
+    fileURLToPath(new URL("../bot/src/util.js", import.meta.url)),
+    "utf8",
+  );
   check(
     "bot vẫn bỏ qua rule tắt + lọc kênh (khớp `enabled === false` vì schema bắt buộc)",
     /if \(!rule\.enabled\) continue;/.test(botMsg) &&
@@ -905,7 +912,7 @@ console.log("── #14 branding ──");
   // Hook phải bám đúng query và gọi qua hàm thuần — không test được trong
   // script (useQuery của Convex cần ConvexProvider), nên khoá bằng đọc nguồn.
   const brandingSrc = readFileSync(
-    new URL("../src/lib/useBranding.ts", import.meta.url).pathname,
+    fileURLToPath(new URL("../src/lib/useBranding.ts", import.meta.url)),
     "utf8",
   );
   check(

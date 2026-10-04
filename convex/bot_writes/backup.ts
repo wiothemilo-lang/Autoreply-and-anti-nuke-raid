@@ -36,6 +36,10 @@ export const botStoreBackupArgs = {
   emojiCount: v.optional(v.number()),
   stickerCount: v.optional(v.number()),
   messageCount: v.optional(v.number()),
+  /** Số dòng bản đồ thành viên ↔ vai trò trong backup (P2). */
+  memberCount: v.optional(v.number()),
+  /** Bản đồ vai trò bị cắt do vượt trần số thành viên (P2). */
+  memberRolesTruncated: v.optional(v.boolean()),
   source: v.optional(v.string()),
   /** SHA-256 checksum (nén + mã hóa) — bot gửi từ backupUtils. */
   backupChecksum: v.optional(v.string()),
@@ -80,6 +84,9 @@ export async function botStoreBackupHandler(ctx: MutationCtx, args: BotStoreBack
       args.stickerCount === undefined ? undefined : Math.max(0, Math.floor(args.stickerCount)),
     messageCount:
       args.messageCount === undefined ? undefined : Math.max(0, Math.floor(args.messageCount)),
+    memberCount:
+      args.memberCount === undefined ? undefined : Math.max(0, Math.floor(args.memberCount)),
+    memberRolesTruncated: args.memberRolesTruncated ?? undefined,
     source: args.source ?? undefined,
     backupChecksum: args.backupChecksum ?? undefined,
     backupCompressed: args.backupCompressed ?? undefined,

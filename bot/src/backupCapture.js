@@ -13,10 +13,27 @@ const { compressAndEncryptBackup, computeSnapshotChecksum } = require("./backupU
 const {
   MAX_MESSAGES_PER_THREAD,
   MAX_THREADS_PER_CHANNEL,
+  MAX_MEMBERS_PER_BACKUP,
+  MAX_ROLES_PER_MEMBER,
   myPermissionBits,
   safeGuildIconUrl,
   sendToLog,
 } = require("./backupCommon");
+
+/**
+ * Gọi một phương thức trả URL của guild (bannerURL/splashURL…) một cách an toàn:
+ * mock hoặc phiên bản client cũ có thể thiếu hàm / ném — đây chỉ là ảnh trang
+ * trí, KHÔNG được làm hỏng cả lần chụp backup.
+ */
+function safeGuildUrl(guild, method, size) {
+  try {
+    const fn = guild?.[method];
+    return typeof fn === "function" ? (fn.call(guild, { size }) ?? null) : null;
+  } catch (e) {
+    console.error(`[backup:${method}] ${guild?.name ?? "?"}:`, e.message);
+    return null;
+  }
+}
 
 const CHANNEL_TYPES = [
   ChannelType.GuildText,
@@ -120,6 +137,58 @@ async function captureBans(guild) {
 }
 
 /**
+ * Chụp bản đồ THÀNH VIÊN ↔ VAI TRÒ (P2).
+ *
+ * Vì sao cần: backup trước đây chỉ lưu role và kênh — khôi phục xong thì mọi
+ * thành viên quay về quyền mặc định, mất hết mod/admin, mất luôn cấu hình
+ * "ai là mod" vốn gắn với id role. Bản đồ này là thứ biến "server trống có
+ * cấu trúc" thành "server có người và đúng vai trò".
+ *
+ * Chỉ giữ vai trò THUỘC `restorableRoleIds` (role thật trong danh sách `roles`):
+ * @everyone và role của tích hợp (managed) không tạo lại được, giữ vào bản đồ
+ * chỉ là rác. Thành viên KHÔNG có role nào trong danh sách thì không ghi — bản đồ
+ * toàn những dòng rỗng chỉ phình dung lượng.
+ *
+ * `guild.members.fetch()` cần intent Guild Members; thiếu quyền/intent thì
+ * hàm ném — bắt và đánh dấu `unavailable` để báo cáo nói rõ "không đọc được"
+ * thay vì kệ, để chủ server tưởng đã lưu đủ vai trò.
+ */
+async function captureMemberRoles(guild, restorableRoleIds) {
+  const out = { members: [], truncated: false, unavailable: false };
+  if (!restorableRoleIds || restorableRoleIds.size === 0) return out;
+  let list;
+  try {
+    if (typeof guild.members?.fetch === "function") {
+      list = await guild.members.fetch();
+    } else if (guild.members?.cache) {
+      list = guild.members.cache;
+    } else {
+      out.unavailable = true;
+      return out;
+    }
+  } catch (e) {
+    console.error(`[backup:members] ${guild?.name ?? "?"}:`, e.message);
+    out.unavailable = true;
+    return out;
+  }
+  // PHẢI lấy .values(): spread Collection/Map ra là CẶP [key, value] chứ không
+  // phải member — lặp như vậy sẽ ra danh sách rỗng mà không báo lỗi gì.
+  const all = [...(list?.values?.() ?? list ?? [])];
+  if (all.length > MAX_MEMBERS_PER_BACKUP) out.truncated = true;
+  for (const m of all) {
+    if (out.members.length >= MAX_MEMBERS_PER_BACKUP) break;
+    const userId = m?.user?.id ?? m?.id;
+    if (!userId) continue;
+    const roleIds = [...(m.roles?.cache?.keys?.() ?? [])]
+      .filter((id) => restorableRoleIds.has(id))
+      .slice(0, MAX_ROLES_PER_MEMBER);
+    if (roleIds.length === 0) continue;
+    out.members.push({ userId, roles: roleIds });
+  }
+  return out;
+}
+
+/**
  * Chụp link mời đang mở (cần quyền Manage Guild). Mã invite cũ KHÔNG dùng lại
  * được sau khi server bị xoá, nên chỉ giữ để dựng lại link mới trỏ đúng kênh.
  */
@@ -192,6 +261,24 @@ async function snapshotGuild(guild, { includeMessages = false } = {}) {
       nsfw: c.nsfw ?? false,
       bitrate: c.bitrate ?? null,
       userLimit: c.userLimit ?? null,
+      // Cấu hình kênh chi tiết (trước đây bị bỏ → khôi phục xong kênh mất
+      // slowmode/region/chất lượng video/auto-archive/tag forum).
+      rateLimitPerUser: typeof c.rateLimitPerUser === "number" ? c.rateLimitPerUser : null,
+      rtcRegion: c.rtcRegion ?? null,
+      videoQualityMode: c.videoQualityMode ?? null,
+      defaultAutoArchiveDuration: c.defaultAutoArchiveDuration ?? null,
+      defaultThreadRateLimitPerUser:
+        typeof c.defaultThreadRateLimitPerUser === "number"
+          ? c.defaultThreadRateLimitPerUser
+          : null,
+      defaultSortOrder: c.defaultSortOrder ?? null,
+      defaultForumLayout: c.defaultForumLayout ?? null,
+      availableTags: Array.isArray(c.availableTags)
+        ? c.availableTags
+            .slice(0, 20)
+            .map((t) => ({ name: String(t?.name ?? "").slice(0, 20), moderated: !!t?.moderated }))
+            .filter((t) => t.name)
+        : [],
       position: c.position ?? 0,
       parentId: c.parentId ?? null,
       overwrites: [...c.permissionOverwrites.cache.values()].map((o) => ({
@@ -233,10 +320,28 @@ async function snapshotGuild(guild, { includeMessages = false } = {}) {
     channels.push(entry);
   }
 
-  // Danh tính server: server bị nuke thường mất cả tên/icon/mô tả — đây là thứ
-  // người dùng nhận ra đầu tiên khi mở lại server.
+  // Quyền mặc định của server (role @everyone). Role @everyone bị loại khỏi danh
+  // sách role (không tạo lại được) NHƯNG quyền của nó là "cấu hình server" thật:
+  // mất nó là mọi thành viên mất quyền cơ bản sau khi khôi phục. Che theo quyền
+  // của bot (myBits) để không bao giờ ghi quyền mà bot không có.
+  let everyonePermissions = null;
+  try {
+    const everyone = guild.roles?.everyone;
+    if (everyone?.permissions?.bitfield !== undefined) {
+      everyonePermissions = (BigInt(everyone.permissions.bitfield) & myBits).toString();
+    }
+  } catch (e) {
+    console.error(`[backup:everyone] ${guild.name}:`, e.message);
+  }
+
+  // Danh tính + cấu hình server: server bị nuke thường mất cả tên/icon/mô tả và
+  // các thiết lập an toàn (mức xác minh, lọc nội dung, kênh hệ thống/AFK…) — đây
+  // là thứ người dùng nhận ra đầu tiên khi mở lại server.
+  // Bản đồ thành viên ↔ vai trò (P2): chỉ giữ vai trò thật trong `roles`.
+  const memberRoles = await captureMemberRoles(guild, new Set(roles.map((r) => r.id)));
+
   return {
-    version: 4,
+    version: 6,
     guildId: guild.id,
     guildName: guild.name,
     createdAt: Date.now(),
@@ -244,11 +349,29 @@ async function snapshotGuild(guild, { includeMessages = false } = {}) {
       name: guild.name ?? null,
       description: guild.description ?? null,
       iconUrl: safeGuildIconUrl(guild, 256),
+      bannerUrl: safeGuildUrl(guild, "bannerURL", 1024),
+      splashUrl: safeGuildUrl(guild, "splashURL", 1024),
+      verificationLevel: guild.verificationLevel ?? null,
+      explicitContentFilter: guild.explicitContentFilter ?? null,
+      defaultMessageNotifications: guild.defaultMessageNotifications ?? null,
+      systemChannelId: guild.systemChannelId ?? null,
+      afkChannelId: guild.afkChannelId ?? null,
+      afkTimeout: guild.afkTimeout ?? null,
+      preferredLocale: guild.preferredLocale ?? null,
     },
+    everyonePermissions,
     roles,
     channels,
     emojis,
     stickers,
+    members: memberRoles.members,
+    // `memberRolesUnavailable` khác `truncated`: unavailable = không ĐỌC được
+    // danh sách thành viên (thiếu intent/quyền), truncated = đọc được nhưng
+    // bị cắt do vượt MAX_MEMBERS_PER_BACKUP. Hai lỗi khác nhau, hai lời báo
+    // khác nhau.
+    memberCount: memberRoles.members.length,
+    memberRolesTruncated: memberRoles.truncated,
+    memberRolesUnavailable: memberRoles.unavailable,
     bans: await captureBans(guild),
     invites: await captureInvites(guild),
     emojiCount: emojis.length,
@@ -398,6 +521,8 @@ async function runBackup(client, store, guildId, opts = {}) {
       emojiCount: snapshot.emojis?.length ?? 0,
       stickerCount: snapshot.stickers?.length ?? 0,
       messageCount: snapshot.messageCount ?? 0,
+      memberCount: snapshot.memberCount ?? 0,
+      memberRolesTruncated: snapshot.memberRolesTruncated || undefined,
       source: "backup",
       backupChecksum: checksum,
       backupSnapshotChecksum: currentChecksum,
@@ -484,6 +609,15 @@ async function runBackup(client, store, guildId, opts = {}) {
   if ((snapshot.messageCount ?? 0) > 0) {
     fields.push({ name: "Tin nhắn", value: `${snapshot.messageCount}`, inline: true });
   }
+  if ((snapshot.memberCount ?? 0) > 0) {
+    fields.push({
+      name: "Thành viên",
+      value:
+        `${snapshot.memberCount}` +
+        (snapshot.memberRolesTruncated ? ` (đã cắt ở ${MAX_MEMBERS_PER_BACKUP})` : ""),
+      inline: true,
+    });
+  }
   fields.push({ name: "GitHub", value: githubLine.slice(0, 200), inline: false });
 
   const embed = logEmbed({
@@ -507,6 +641,7 @@ module.exports = {
   captureThreads,
   captureBans,
   captureInvites,
+  captureMemberRoles,
   pushBackupToGithub,
   describeStoreFailure,
 };
