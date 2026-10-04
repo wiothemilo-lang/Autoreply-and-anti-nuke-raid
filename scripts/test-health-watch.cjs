@@ -77,6 +77,87 @@ check(
 );
 check("ok → warn (từng hồi phục rồi lại xấu) → báo lại", hw.shouldAlert(null, warn, T0) === true);
 
+// ── 3b. Gateway: mất kết nối Discord phải NÂNG mức (bệnh chết lặng) ──
+check(
+  "gateway bình thường + đĩa/RAM thấp → ok",
+  hw.classifyHealth({ diskUsedPct: 10, rssMb: 100, gatewayConnected: true }) === "ok",
+);
+check(
+  "mất kết nối 30s (< 1 phút) → ok (nhiễu mạng ngắn không báo oan)",
+  hw.classifyHealth({
+    diskUsedPct: 10,
+    rssMb: 100,
+    gatewayConnected: false,
+    gatewayDisconnectedMs: 30_000,
+  }) === "ok",
+);
+check(
+  "mất kết nối 60s → warn",
+  hw.classifyHealth({
+    diskUsedPct: 10,
+    rssMb: 100,
+    gatewayConnected: false,
+    gatewayDisconnectedMs: 60_000,
+  }) === "warn",
+);
+check(
+  "mất kết nối 5 phút → critical",
+  hw.classifyHealth({
+    diskUsedPct: 10,
+    rssMb: 100,
+    gatewayConnected: false,
+    gatewayDisconnectedMs: 5 * 60_000,
+  }) === "critical",
+);
+check(
+  "gateway rớt KHÔNG bị coi là ok dù đĩa/RAM thấp",
+  hw.classifyHealth({
+    diskUsedPct: 10,
+    rssMb: 100,
+    gatewayConnected: false,
+    gatewayDisconnectedMs: 10 * 60_000,
+  }) !== "ok",
+);
+
+// ── 3c. createGatewayTracker — đếm + thời lượng (đồng hồ giả) ──
+{
+  let t = 1_000_000;
+  const tracker = hw.createGatewayTracker({ now: () => t });
+  const birth = tracker.snapshot();
+  check(
+    "mới tạo → đang kết nối, 0 lần rớt, thời lượng 0",
+    birth.gatewayConnected === true &&
+      birth.gatewayDisconnects === 0 &&
+      birth.gatewayDisconnectedMs === 0,
+  );
+  tracker.onDisconnect();
+  t += 90_000;
+  const down = tracker.snapshot();
+  check(
+    "sau onDisconnect → false + đếm 1 + 90s",
+    down.gatewayConnected === false &&
+      down.gatewayDisconnects === 1 &&
+      down.gatewayDisconnectedMs === 90_000,
+  );
+  tracker.onDisconnect();
+  check(
+    "onDisconnect trùng (chưa reconnect) vẫn đếm 1",
+    tracker.snapshot().gatewayDisconnects === 1,
+  );
+  t += 10_000;
+  tracker.onReconnect();
+  const up = tracker.snapshot();
+  check(
+    "onReconnect → true + thời lượng về 0",
+    up.gatewayConnected === true && up.gatewayDisconnectedMs === 0,
+  );
+  tracker.onError(new Error("boom"));
+  check(
+    "snapshot đủ 3 trường gateway",
+    "gatewayConnected" in up && "gatewayDisconnectedMs" in up && "gatewayDisconnects" in up,
+  );
+}
+
 // ── 4. Chuỗi nhiều lượt: chỉ DM khi mức NẶNG HƠN, Convex hỏng vẫn chạy ──
 async function runLoop() {
   const written = [];
@@ -144,6 +225,36 @@ async function runLoop() {
   check("Convex hỏng vẫn gọi tiếp (không chết vòng)", calls === 2);
   check("Convex hỏng vẫn DM cảnh báo đúng 1 lần", dms2.length === 1);
   check("DM lỗi không làm hỏng state (vẫn ghi nhớ mức)", st2?.level === "critical");
+
+  // startHealthWatch + gateway: mất kết nối 5 phút phải được GỘP vào số đo,
+  // tính lại mức (critical) và ghi kèm field gateway lên Convex.
+  {
+    let t = 5_000_000;
+    const tracker = hw.createGatewayTracker({ now: () => t });
+    tracker.onDisconnect();
+    t += 5 * 60_000;
+    const gwWritten = [];
+    const stopGw = hw.startHealthWatch({
+      store: { mutation: async (name, args) => gwWritten.push({ name, args }) },
+      gateway: tracker,
+      read: () => ({ diskUsedPct: 10, diskFreeGb: 100, rssMb: 100, uptimeHours: 1 }),
+      intervalMs: 10_000,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    stopGw();
+    check(
+      "gateway rớt 5 phút → mức critical dù đĩa/RAM thấp",
+      gwWritten[0]?.args?.level === "critical",
+      JSON.stringify(gwWritten[0]?.args),
+    );
+    check(
+      "số đo ghi kèm field gateway (connected=false, 300s)",
+      gwWritten[0]?.args?.gatewayConnected === false &&
+        gwWritten[0]?.args?.gatewayDisconnectedMs === 300_000,
+      JSON.stringify(gwWritten[0]?.args),
+    );
+    check("vẫn ghi đúng mutation reportHealth", gwWritten[0]?.name === "status:reportHealth");
+  }
 
   // startHealthWatch tồn tại và trả hàm dừng (gọi 1 lượt rồi dừng, không treo).
   const stop = hw.startHealthWatch({ ...opts, intervalMs: 50 });

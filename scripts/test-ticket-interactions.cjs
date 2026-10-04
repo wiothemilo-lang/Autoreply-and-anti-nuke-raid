@@ -344,6 +344,8 @@ Module._load = function (request, parent) {
       isButton: () => !!opts.isButton,
       isChatInputCommand: () => !!opts.isChatInputCommand,
       isModalSubmit: () => !!opts.isModalSubmit,
+      // Dispatcher kiểm tra autocomplete TRƯỚC chat input (discord.js luôn có).
+      isAutocomplete: () => !!opts.isAutocomplete,
       customId: opts.customId,
       commandName: opts.commandName,
       locale: "vi",

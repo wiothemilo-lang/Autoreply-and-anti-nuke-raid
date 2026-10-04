@@ -152,6 +152,36 @@ check(
   );
 }
 
+// ── Autocomplete: option bật `autocomplete: true` phải hợp lệ với Discord ──
+// Discord CHỈ cho autocomplete trên STRING(3)/INTEGER(4)/NUMBER(10) và CẤM
+// dùng chung với `choices`. Sai shape → PUT 400 → mất TRẦN lệnh câm.
+{
+  const AUTOCOMPLETE_TYPES = new Set([3, 4, 10]);
+  const autoProblems = [];
+  const found = [];
+  const walk = (opt, path) => {
+    if (opt.autocomplete === true) {
+      found.push(path);
+      if (!AUTOCOMPLETE_TYPES.has(opt.type)) {
+        autoProblems.push(`${path}: type ${opt.type} không hỗ trợ autocomplete`);
+      }
+      if (opt.choices) autoProblems.push(`${path}: autocomplete + choices là không hợp lệ`);
+    }
+    for (const child of opt.options || []) walk(child, `${path}/${child.name}`);
+  };
+  for (const c of commands) for (const opt of c.options || []) walk(opt, `/${c.name} ${opt.name}`);
+  check(
+    "mọi option autocomplete đúng shape Discord (type 3/4/10, không choices)",
+    autoProblems.length === 0,
+    autoProblems.join(" | "),
+  );
+  check(
+    "có option autocomplete được bật (gợi ý khi gõ lệnh)",
+    found.length >= 4,
+    `found=${found.length}`,
+  );
+}
+
 // ═══ Tầng 2: registerCommands ═══
 console.log("\n── registerCommands ──");
 

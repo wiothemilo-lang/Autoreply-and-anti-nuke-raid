@@ -867,6 +867,14 @@ export default defineSchema({
         diskFreeGb: v.optional(v.number()),
         rssMb: v.number(),
         uptimeHours: v.number(),
+        /**
+         * Vòng đời gateway Discord (bot → Discord). Tiến trình còn sống nhưng
+         * gateway rớt = bot không nhận sự kiện nào — `false` mới là bất thường,
+         * `undefined` = bot bản cũ chưa báo (đừng coi là mất kết nối).
+         */
+        gatewayConnected: v.optional(v.boolean()),
+        gatewayDisconnectedMs: v.optional(v.number()),
+        gatewayDisconnects: v.optional(v.number()),
         reportedAt: v.number(),
       }),
     ),

@@ -28,6 +28,9 @@ const RSS_CRIT_MB = 1000;
 const DEFAULT_INTERVAL_MS = 5 * 60_000;
 /** Tối đa 1 DM / 6 giờ cho cùng một mức. */
 const ALERT_COOLDOWN_MS = 6 * 60 * 60_000;
+/** Ngưỡng mất kết nối gateway Discord: 1 phút = chú ý, 5 phút = nghiêm trọng. */
+const GATEWAY_WARN_MS = 60_000;
+const GATEWAY_CRIT_MS = 5 * 60_000;
 
 const LEVEL_RANK = { ok: 0, warn: 1, critical: 2 };
 
@@ -35,10 +38,16 @@ const LEVEL_RANK = { ok: 0, warn: 1, critical: 2 };
  * Xếp mức sức khoẻ từ 2 chỉ số. Mức nghiêm trọng nhất thắng.
  * Dùng `>=` (không phải `>`): đĩa tròn 92% là vùng nguy hiểm rồi.
  */
-function classifyHealth({ diskUsedPct, rssMb }) {
+function classifyHealth({ diskUsedPct, rssMb, gatewayConnected, gatewayDisconnectedMs }) {
   const disk = typeof diskUsedPct === "number" ? diskUsedPct : 0;
   const rss = typeof rssMb === "number" ? rssMb : 0;
+  // Mất kết nối gateway là bệnh NẶNG NHẤT: tiến trình còn sống, đĩa/RAM bình
+  // thường, nhưng bot không nhận được tin nhắn/sự kiện nào — đúng kiểu chết lặng.
+  const gwDown = gatewayConnected === false;
+  const gwMs = typeof gatewayDisconnectedMs === "number" ? gatewayDisconnectedMs : 0;
+  if (gwDown && gwMs >= GATEWAY_CRIT_MS) return "critical";
   if (disk >= DISK_CRIT_PCT || rss >= RSS_CRIT_MB) return "critical";
+  if (gwDown && gwMs >= GATEWAY_WARN_MS) return "warn";
   if (disk >= DISK_WARN_PCT || rss >= RSS_WARN_MB) return "warn";
   return "ok";
 }
@@ -105,6 +114,13 @@ function buildAlertText(health) {
   if (health.rssMb >= RSS_WARN_MB) {
     lines.push(`• Bộ nhớ bot **${health.rssMb} MB** (RAM tiến trình)`);
   }
+  if (health.gatewayConnected === false) {
+    const secs = Math.round((health.gatewayDisconnectedMs ?? 0) / 1000);
+    lines.push(
+      `• Mất kết nối Discord **${secs}s** (đã rớt ${health.gatewayDisconnects ?? 0} lần)` +
+        " — bot chưa nhận được sự kiện nào",
+    );
+  }
   lines.push("", "Nếu đĩa sắp đầy, hãy dọn Docker/log cũ hoặc chuyển sang node mới.");
   return lines.join("\n");
 }
@@ -147,10 +163,58 @@ async function checkOnce({
 }
 
 /**
+ * `createGatewayTracker` — theo dõi vòng đời kết nối gateway Discord (trong RAM).
+ *
+ * Vì sao cần: tiến trình bot SỐNG nhưng gateway rớt thì `readHostHealth()` chỉ
+ * thấy đĩa/RAM bình thường → báo "ok" trong khi bot không nhận được tin nhắn
+ * nào. discord.js tự reconnect, nhưng reconnect hỏng kéo dài (token sai, mạng
+ * chết) đúng là kiểu chết LẶNG mà dự án đang chặn.
+ *
+ * Phần này THUẦN: không timer, không I/O — chỉ nhận sự kiện do `index.js` đẩy
+ * sang và trả snapshot. Nhờ vậy test gọi thẳng bằng đồng hồ giả.
+ */
+function createGatewayTracker({ now = () => Date.now() } = {}) {
+  const state = { connected: true, disconnectedAt: null, disconnects: 0, lastError: null };
+  return {
+    /** Gateway rớt (hoặc đang reconnect). Chỉ tính 1 lần cho mỗi đợt mất kết nối. */
+    onDisconnect() {
+      if (!state.connected) return;
+      state.connected = false;
+      state.disconnectedAt = now();
+      state.disconnects += 1;
+    },
+    /** Gateway sống lại (resume/ready) — xoá mốc mất kết nối. */
+    onReconnect() {
+      state.connected = true;
+      state.disconnectedAt = null;
+    },
+    /** Ghi lỗi gateway gần nhất (chỉ để chẩn đoán, không dùng để xếp mức). */
+    onError(err) {
+      state.lastError = String(err?.message || err || "lỗi gateway không rõ").slice(0, 200);
+    },
+    snapshot() {
+      const at = now();
+      const disconnectedMs =
+        !state.connected && state.disconnectedAt != null
+          ? Math.max(0, at - state.disconnectedAt)
+          : 0;
+      return {
+        gatewayConnected: state.connected,
+        gatewayDisconnectedMs: disconnectedMs,
+        gatewayDisconnects: state.disconnects,
+      };
+    },
+  };
+}
+
+/**
  * Vòng canh định kỳ. Gọi 1 lần ở lúc bot `ready`; trả về hàm dừng.
  *
  * @param {object} opts
  * @param {object} opts.store    ConvexStore (dùng `.mutation`)
+ * @param {object} [opts.gateway] tracker từ `createGatewayTracker()` — có thì
+ *   snapshot mất kết nối được GỘP vào số đo và tính lại mức (gateway rớt phải
+ *   nâng mức, nếu không kind chết lặng không bao giờ thành cảnh báo).
  * @param {(text: string) => Promise<void>} [opts.sendAlert] gửi DM cho chủ bot
  * @param {() => number} [opts.now]  đồng hồ (tiêm để test)
  * @param {() => object} [opts.read] bộ đọc số liệu (tiêm để test)
@@ -158,8 +222,19 @@ async function checkOnce({
  */
 function startHealthWatch(opts = {}) {
   let state = null;
+  const { gateway, ...rest } = opts;
+  const baseRead = rest.read ?? readHostHealth;
+  // Có tracker gateway → mỗi lượt đo gộp thêm snapshot và TÍNH LẠI mức trên
+  // tổ hợp mới, thay vì tin `level` mà `readHostHealth` đã chốt (chỉ đĩa/RAM).
+  const read = gateway
+    ? () => {
+        const h = baseRead();
+        const g = gateway.snapshot();
+        return { ...h, ...g, level: classifyHealth({ ...h, ...g }) };
+      }
+    : baseRead;
   const run = async () => {
-    state = await checkOnce({ ...opts, state });
+    state = await checkOnce({ ...rest, read, state });
   };
   void run();
   const timer = setInterval(() => void run(), opts.intervalMs ?? DEFAULT_INTERVAL_MS);
@@ -174,10 +249,13 @@ module.exports = {
   RSS_CRIT_MB,
   DEFAULT_INTERVAL_MS,
   ALERT_COOLDOWN_MS,
+  GATEWAY_WARN_MS,
+  GATEWAY_CRIT_MS,
   classifyHealth,
   readHostHealth,
   shouldAlert,
   buildAlertText,
   checkOnce,
+  createGatewayTracker,
   startHealthWatch,
 };

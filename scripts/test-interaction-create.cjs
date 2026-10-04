@@ -208,6 +208,7 @@ Module._load = function (request, parent) {
 
   const replies = [];
   const shownModals = [];
+  const responses = [];
   function reset() {
     calls.mutations.length = 0;
     calls.queries.length = 0;
@@ -216,6 +217,7 @@ Module._load = function (request, parent) {
     calls.dms.length = 0;
     shownModals.length = 0;
     replies.length = 0;
+    responses.length = 0;
     ctl.perms = { manage: true, admin: false, mod: true };
     ctl.isLocked = false;
     ctl.unlockGuildCalls = 0;
@@ -268,6 +270,9 @@ Module._load = function (request, parent) {
       // discord.js luôn có đủ các predicate này trên Interaction; mock thiếu
       // thì handler gọi tới sẽ ném TypeError và làm cả suite đỏ.
       isModalSubmit: () => !!opts.isModalSubmit,
+      // discord.js luôn có predicate này; thiếu thì handler autocomplete gọi tới
+      // sẽ ném TypeError và làm cả suite đỏ.
+      isAutocomplete: () => !!opts.isAutocomplete,
       customId: opts.customId,
       commandName: opts.commandName,
       replied: false,
@@ -292,6 +297,13 @@ Module._load = function (request, parent) {
         interaction.replied = true;
         return {};
       },
+      // Autocomplete: `respond(choices)` là hàm ở CẤP interaction (không phải
+      // trong options). Đặt nhầm trong options → handler gọi tới ném TypeError.
+      respond: async (choices) => {
+        responses.push(choices);
+        interaction.replied = true;
+        return {};
+      },
       options: {
         getSubcommand: () => opts.subcommand,
         getString: (name, req) => {
@@ -305,6 +317,11 @@ Module._load = function (request, parent) {
         getUser: (name) => opts.users?.[name] ?? null,
         getRole: (name) => opts.roles?.[name] ?? null,
         getChannel: (name) => opts.channels?.[name] ?? null,
+        // Autocomplete: `getFocused(true)` trả { name, value } (discord.js v14).
+        getFocused: (full) =>
+          full
+            ? { name: opts.focusedName, value: opts.focusedValue ?? "" }
+            : (opts.focusedValue ?? ""),
       },
     };
     return interaction;
@@ -903,6 +920,61 @@ Module._load = function (request, parent) {
       "antinuke module hợp lệ → mutation",
       calls.mutations.some((m) => m.name === "bot_writes:botModuleUpdate"),
     );
+
+    // Regression: 12 module từng bị lệnh slash từ chối (danh sách cũ chỉ 18)
+    // trong khi dashboard + `!antinuke module` vẫn bật/tắt được → nay phải khớp.
+    reset();
+    await run({
+      isChatInputCommand: true,
+      commandName: "antinuke",
+      subcommand: "module",
+      strings: { module: "massThreadDelete", value: "on" },
+    });
+    check(
+      "antinuke module massThreadDelete (từng thiếu) → mutation",
+      calls.mutations.some(
+        (m) => m.name === "bot_writes:botModuleUpdate" && m.args.module === "massThreadDelete",
+      ),
+    );
+
+    reset();
+    await run({
+      isChatInputCommand: true,
+      commandName: "antinuke",
+      subcommand: "module",
+      strings: { module: "externalAppRaid", value: "on" },
+    });
+    check(
+      "antinuke module externalAppRaid (từng thiếu) → mutation",
+      calls.mutations.some(
+        (m) => m.name === "bot_writes:botModuleUpdate" && m.args.module === "externalAppRaid",
+      ),
+    );
+
+    // Hợp đồng danh sách module: mọi module `convex/modules.ts` định nghĩa đều
+    // phải bật/tắt được từ Discord (dashboard cũng dùng đúng danh sách đó).
+    {
+      const common = require("../bot/src/handlers/interactionCommon");
+      const src = fs.readFileSync(path.join(__dirname, "..", "convex", "modules.ts"), "utf8");
+      const convexModules = [
+        ...src.slice(0, src.indexOf("MODERATION_MODULE_KEYS")).matchAll(/module:\s*"([^"]+)"/g),
+      ].map((m) => m[1]);
+      const missing = convexModules.filter((m) => !common.MODULES.includes(m));
+      check(
+        `MODULES của bot phủ đủ ${convexModules.length} module trong convex/modules.ts`,
+        convexModules.length > 0 && missing.length === 0,
+        missing,
+      );
+      const prefixSrc = fs.readFileSync(
+        path.join(__dirname, "..", "bot", "src", "commands", "prefix.js"),
+        "utf8",
+      );
+      check(
+        "!antinuke module dùng chung MODULES (không tự khai báo lại)",
+        prefixSrc.includes('require("../handlers/interactionCommon")') &&
+          !/const MODULES = \[/.test(prefixSrc),
+      );
+    }
   }
 
   // ── 10. mod ──
@@ -2549,6 +2621,125 @@ Module._load = function (request, parent) {
       /trả lại quyền/i.test(replies[0]?.content || ""),
       replies[0]?.content,
     );
+  }
+
+  // ── 15. autocomplete (gợi ý khi người dùng gõ) ──
+  {
+    // Tên rule → gợi ý cho /autoreply edit|remove.
+    reset();
+    configs.set("g1", { autoReplies: [{ name: "rule-a" }, { name: "rule-b" }] });
+    await run({
+      isAutocomplete: true,
+      commandName: "autoreply",
+      subcommand: "remove",
+      focusedName: "name",
+      focusedValue: "",
+    });
+    check(
+      "autocomplete /autoreply remove name → gợi ý tên rule",
+      Array.isArray(responses[0]) &&
+        responses[0].some((c) => c.value === "rule-a") &&
+        responses[0].some((c) => c.value === "rule-b"),
+      JSON.stringify(responses[0]),
+    );
+
+    reset();
+    await run({
+      isAutocomplete: true,
+      commandName: "autoreply",
+      subcommand: "remove",
+      focusedName: "name",
+      focusedValue: "b",
+    });
+    check(
+      "autocomplete lọc theo phần đã gõ (b → chỉ rule-b)",
+      responses[0]?.length === 1 && responses[0][0].value === "rule-b",
+      JSON.stringify(responses[0]),
+    );
+
+    // Từ ngữ xấu → gợi ý cho /badword remove.
+    reset();
+    configs.set("g1", { badWords: ["xấu", "tệ"] });
+    await run({
+      isAutocomplete: true,
+      commandName: "badword",
+      subcommand: "remove",
+      focusedName: "word",
+      focusedValue: "",
+    });
+    check(
+      "autocomplete /badword remove word → gợi ý từ ngữ xấu",
+      responses[0]?.some((c) => c.value === "xấu") && responses[0]?.some((c) => c.value === "tệ"),
+      JSON.stringify(responses[0]),
+    );
+
+    // Module antinuke → danh sách tĩnh.
+    reset();
+    configs.set("g1", {});
+    await run({
+      isAutocomplete: true,
+      commandName: "antinuke",
+      subcommand: "module",
+      focusedName: "module",
+      focusedValue: "mass",
+    });
+    check(
+      "autocomplete /antinuke module → gợi ý module khớp 'mass'",
+      responses[0]?.some((c) => c.value === "massBan") &&
+        responses[0]?.every((c) => c.value.toLowerCase().includes("mass")),
+      JSON.stringify(responses[0]),
+    );
+
+    // Lệnh/option không có nguồn gợi ý → trả rỗng, không ném.
+    reset();
+    await run({
+      isAutocomplete: true,
+      commandName: "ping",
+      focusedName: "x",
+      focusedValue: "y",
+    });
+    check(
+      "autocomplete lệnh không hỗ trợ → rỗng",
+      Array.isArray(responses[0]) && responses[0].length === 0,
+    );
+
+    // Không guild → rỗng (không đọc config).
+    reset();
+    await run({
+      isAutocomplete: true,
+      commandName: "autoreply",
+      subcommand: "remove",
+      focusedName: "name",
+      noGuild: true,
+    });
+    check("autocomplete ngoài server → rỗng", responses[0]?.length === 0);
+
+    // Đọc cấu hình lỗi → trả rỗng, KHÔNG để Discord treo.
+    reset();
+    const origGetConfig = store.getConfig;
+    store.getConfig = async () => {
+      throw new Error("Convex down");
+    };
+    await run({
+      isAutocomplete: true,
+      commandName: "badword",
+      subcommand: "remove",
+      focusedName: "word",
+    });
+    store.getConfig = origGetConfig;
+    check("autocomplete đọc cấu hình lỗi → rỗng (không ném)", responses[0]?.length === 0);
+
+    // Chặn trần 25 gợi ý của Discord.
+    reset();
+    configs.set("g1", { badWords: Array.from({ length: 40 }, (_, i) => "w" + i) });
+    await run({
+      isAutocomplete: true,
+      commandName: "badword",
+      subcommand: "remove",
+      focusedName: "word",
+      focusedValue: "w",
+    });
+    check("autocomplete cắt về tối đa 25 gợi ý", responses[0]?.length === 25);
   }
 
   fs.unlinkSync(DJS_MOCK);

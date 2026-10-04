@@ -441,22 +441,64 @@ const CH = "123456789012345678"; // 18 chữ số — hợp lệ
   }
 
   {
-    // BẤT ĐỒNG BỘ ĐÃ BIẾT: `add` chặn rule keyword không có từ khóa, còn
-    // `update` thì không. Đổi một rule mention sang keyword mà quên gõ từ
-    // khóa sẽ tạo ra rule im lặng — bot không báo lỗi, chỉ không trả lời.
-    // Test khoá lại HÀNH VI HIỆN TẠI (kèm chú thích) chứ không khoá ý kiến:
-    // khi nào vá được thì sửa case này thành expectThrow.
+    // Đối xứng với `add`: đổi một rule mention sang keyword mà quên gõ từ khóa,
+    // hoặc xoá sạch keyword của rule keyword, đều tạo rule IM LẶNG (bot không
+    // báo lỗi, chỉ không trả lời). `update` phải chặn như `add`.
     const { ctx, autoReplies } = makeCtx();
     await addH(ctx, { ...BASE, triggerType: "mention", keywords: [] });
+    const before = { ...autoReplies[0] };
+    await expectThrow(
+      "update: đổi sang keyword mà không có từ khóa → chặn (rule im lặng)",
+      () =>
+        updateH(ctx, {
+          token: "tok",
+          id: autoReplies[0]._id,
+          triggerType: "keyword",
+          keywords: [],
+        }),
+      /từ khóa/,
+    );
+    check(
+      "bị chặn thì rule KHÔNG bị sửa (vẫn mention, rỗng keyword)",
+      autoReplies[0].triggerType === before.triggerType &&
+        JSON.stringify(autoReplies[0].keywords) === JSON.stringify(before.keywords),
+      autoReplies[0],
+    );
+  }
+  {
+    // Chỉ gửi triggerType (không gửi keywords): giá trị HIỆU LỰC mới là keyword
+    // + keyword cũ của rule — nếu rule cũ không có từ khóa nào thì vẫn phải chặn.
+    const { ctx, autoReplies } = makeCtx();
+    await addH(ctx, { ...BASE, triggerType: "mention", keywords: [] });
+    await expectThrow(
+      "update: đổi triggerType sang keyword, keywords cũ rỗng → chặn",
+      () => updateH(ctx, { token: "tok", id: autoReplies[0]._id, triggerType: "keyword" }),
+      /từ khóa/,
+    );
+  }
+  {
+    // Xoá sạch keyword của một rule keyword đang chạy → cũng phải chặn.
+    const { ctx, autoReplies } = makeCtx();
+    await addH(ctx, BASE);
+    await expectThrow(
+      "update: xoá hết keyword của rule keyword → chặn",
+      () => updateH(ctx, { token: "tok", id: autoReplies[0]._id, keywords: ["  ", ""] }),
+      /từ khóa/,
+    );
+  }
+  {
+    // Rule mention KHÔNG cần keyword — đổi sang mention với keyword rỗng phải cho qua.
+    const { ctx, autoReplies } = makeCtx();
+    await addH(ctx, BASE);
     const r = await updateH(ctx, {
       token: "tok",
       id: autoReplies[0]._id,
-      triggerType: "keyword",
+      triggerType: "mention",
       keywords: [],
     });
     check(
-      "⚠️ HÀNH VI HIỆN TẠI: update cho phép keyword rỗng (khác add) — rule im lặng",
-      r.ok === true && (autoReplies[0].keywords as string[]).length === 0,
+      "update: đổi sang mention với keyword rỗng → cho qua",
+      r.ok === true && autoReplies[0].triggerType === "mention",
       autoReplies[0],
     );
   }

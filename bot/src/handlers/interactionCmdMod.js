@@ -20,28 +20,9 @@ const {
   unbanMember,
   unwarnMember,
 } = require("./modTools");
-const { needPerm } = require("./interactionCommon");
-
-const MODULES = [
-  "massBan",
-  "massKick",
-  "massJoin",
-  "massChannelCreate",
-  "massChannelDelete",
-  "massRoleCreate",
-  "massRoleDelete",
-  "massMessageDelete",
-  "massWebhookCreate",
-  "massThreadCreate",
-  "spam",
-  "massMessage",
-  "blankNoise",
-  "mention",
-  "badword",
-  "attachment",
-  "invite",
-  "malware",
-];
+// `MODULES` chuyển sang interactionCommon để `/antinuke module` (kiểm hợp lệ)
+// và gợi ý autocomplete dùng CHUNG một danh sách — tránh hai bản lệch nhau.
+const { needPerm, MODULES } = require("./interactionCommon");
 
 /**
  * `/lock` — khoá chat của chủ server (một kênh, tất cả, theo role, tự mở hạn).

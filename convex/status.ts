@@ -256,13 +256,28 @@ export const reportHealth = mutation({
     diskFreeGb: v.optional(v.number()),
     rssMb: v.number(),
     uptimeHours: v.number(),
+    // Vòng đời gateway Discord — undefined = bot bản cũ chưa báo.
+    gatewayConnected: v.optional(v.boolean()),
+    gatewayDisconnectedMs: v.optional(v.number()),
+    gatewayDisconnects: v.optional(v.number()),
     reportedAt: v.number(),
     /** Chìa khóa bot (botAuth) — chỉ bot có OWNER_SEED mới tính được. */
     botKey: v.optional(v.string()),
   },
   handler: async (
     ctx,
-    { botKey, level, diskUsedPct, diskFreeGb, rssMb, uptimeHours, reportedAt },
+    {
+      botKey,
+      level,
+      diskUsedPct,
+      diskFreeGb,
+      rssMb,
+      uptimeHours,
+      gatewayConnected,
+      gatewayDisconnectedMs,
+      gatewayDisconnects,
+      reportedAt,
+    },
   ) => {
     await requireBotKeyStrict(ctx, botKey);
     const health = {
@@ -273,6 +288,9 @@ export const reportHealth = mutation({
       ...(typeof diskFreeGb === "number" ? { diskFreeGb } : {}),
       rssMb,
       uptimeHours,
+      ...(typeof gatewayConnected === "boolean" ? { gatewayConnected } : {}),
+      ...(typeof gatewayDisconnectedMs === "number" ? { gatewayDisconnectedMs } : {}),
+      ...(typeof gatewayDisconnects === "number" ? { gatewayDisconnects } : {}),
       reportedAt: reportedAt || Date.now(),
     };
     const status = await ctx.db
