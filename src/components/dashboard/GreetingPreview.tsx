@@ -26,6 +26,8 @@ export interface GreetingSample {
   count: number;
   /** Tuổi account mẫu (ngày). */
   created: number;
+  /** Số ngày mẫu đã ở trong server — khớp `{joined}` của bot. */
+  joined: number;
   /** Số boost mẫu. */
   boost: number;
 }
@@ -38,6 +40,7 @@ export function fillPreviewSample(template: string, s: GreetingSample): string {
     .replaceAll("{server}", s.server)
     .replaceAll("{count}", String(s.count))
     .replaceAll("{created}", String(s.created))
+    .replaceAll("{joined}", String(s.joined))
     .replaceAll("{boost}", String(s.boost));
 }
 

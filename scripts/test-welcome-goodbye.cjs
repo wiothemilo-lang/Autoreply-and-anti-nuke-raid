@@ -47,8 +47,15 @@ process.on("exit", () => {
   } catch {}
 });
 const welcome = require("../bot/src/handlers/welcome");
-const { handleWelcome, handleGoodbye, WELCOME_DEFAULT, GOODBYE_DEFAULT, _fillTemplateForTest } =
-  welcome;
+const {
+  handleWelcome,
+  handleGoodbye,
+  WELCOME_DEFAULT,
+  GOODBYE_DEFAULT,
+  _fillTemplateForTest,
+  _memberDaysForTest,
+  _resetGreetingProblemCacheForTest,
+} = welcome;
 const lang = require("../bot/src/handlers/lang");
 
 let pass = 0,
@@ -119,6 +126,23 @@ const botMember = { id: "b1", user: { bot: true, username: "botbot" }, guild };
 
   const long = _fillTemplateForTest("x".repeat(2000), { member, guild, isGoodbye: false });
   check("template: cắt tối đa 1500 ký tự", long.length <= 1500);
+
+  // ── {joined}: số ngày đã ở server (biến thiếu cho tin tạm biệt) ──
+  {
+    const joined30 = {
+      ...member,
+      joinedTimestamp: Date.now() - 30 * 86_400_000,
+      user: { ...member.user, createdTimestamp: Date.now() - 400 * 86_400_000 },
+    };
+    const t = _fillTemplateForTest("{user} ở đây {joined} ngày", { member: joined30, guild });
+    check("template: {joined} → số ngày đã ở server", t === "<@u1> ở đây 30 ngày", t);
+    // Member partial (joinedTimestamp mất) → 0 chứ không phải "NaN".
+    check("template: {joined} thiếu dữ liệu → 0", _memberDaysForTest({ id: "x" }) === 0);
+    check(
+      "template: {joined} tương lai (clock lệch) → không âm",
+      _memberDaysForTest({ joinedTimestamp: Date.now() + 86_400_000 }) === 0,
+    );
+  }
 
   // ── welcome cơ bản ──
   sent = [];
@@ -258,6 +282,88 @@ const botMember = { id: "b1", user: { bot: true, username: "botbot" }, guild };
     member,
   );
   check("bot thiếu quyền gửi trong kênh → bỏ qua", sent.length === 0);
+
+  // ── CHẤM DỨT IM LẶNG: lỗi cấu hình phải nói ra lý do ──
+  // Trước đây hai case trên chỉ "bỏ qua" — chủ server bật welcome, cấu hình xong,
+  // không thấy gì hiện ra và không có cách nào biết vì sao. Đây là lỗi âm thầm.
+  {
+    _resetGreetingProblemCacheForTest();
+    const realErr = console.error;
+    const logs = [];
+    console.error = (...a) => logs.push(a.join(" "));
+    try {
+      // (a) kênh bị xoá
+      fetchFail = true;
+      await handleWelcome(
+        makeClient(),
+        makeStore({ welcomeEnabled: true, welcomeChannelId: "cX" }),
+        member,
+      );
+      // (b) thiếu quyền
+      fetchFail = false;
+      noPerms = true;
+      await handleWelcome(
+        makeClient(),
+        makeStore({ welcomeEnabled: true, welcomeChannelId: "c1" }),
+        member,
+      );
+      noPerms = false;
+    } finally {
+      console.error = realErr;
+    }
+    check(
+      "lỗi cấu hình: kênh bị xoá → log nói rõ nguyên nhân + cách sửa",
+      logs.some((l) => l.includes("[welcome]") && /đã bị xoá/.test(l) && /dashboard/.test(l)),
+      JSON.stringify(logs),
+    );
+    check(
+      "lỗi cấu hình: thiếu Send Messages → log nói rõ cần cấp quyền",
+      logs.some((l) => /Send Messages/.test(l)),
+      JSON.stringify(logs),
+    );
+
+    // Dedupe: 20 lượt join liên tiếp cùng một lỗi → chỉ 1 dòng log, không spam.
+    _resetGreetingProblemCacheForTest();
+    const logs2 = [];
+    console.error = (...a) => logs2.push(a.join(" "));
+    try {
+      noPerms = true;
+      for (let i = 0; i < 20; i++) {
+        await handleWelcome(
+          makeClient(),
+          makeStore({ welcomeEnabled: true, welcomeChannelId: "c1" }),
+          member,
+        );
+      }
+      noPerms = false;
+    } finally {
+      console.error = realErr;
+    }
+    check(
+      "lỗi cấu hình: 20 lượt join → chỉ 1 dòng log (chống spam)",
+      logs2.length === 1,
+      `lines=${logs2.length}`,
+    );
+  }
+
+  // ── chưa chọn kênh thì KHÔNG log (đó là lựa chọn của chủ, không phải lỗi) ──
+  {
+    _resetGreetingProblemCacheForTest();
+    const realErr = console.error;
+    const logs = [];
+    console.error = (...a) => logs.push(a.join(" "));
+    try {
+      sent = [];
+      await handleWelcome(makeClient(), makeStore({ welcomeEnabled: true }), member);
+    } finally {
+      console.error = realErr;
+    }
+    check(
+      "chưa chọn kênh → im lặng, KHÔNG log lỗi",
+      sent.length === 0 && logs.length === 0,
+      JSON.stringify(logs),
+    );
+  }
 
   // ══ Welcome/Goodbye v2 (học Carl-bot/Welcomer/ProBot) ══
   noPerms = false; // khôi phục sau case thiếu quyền ở trên

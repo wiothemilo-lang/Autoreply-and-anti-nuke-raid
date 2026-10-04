@@ -1999,5 +1999,39 @@ check(
   /\.dispose\(\)/.test(teardownFn) && /closeAllConnections/.test(teardownFn),
 );
 
+// ── Danh sách placeholder phải KHỚP bot, không được trôi lệch âm thầm ──
+//
+// Lý do: `fillPreviewSample` (preview) và `fillTemplate` (bot) là hai bản sao
+// cùng một danh sách. Lệch một bên thì preview hứa một đằng, bot gửi một nẻo —
+// người dùng tin preview, bấm lưu, rồi ra server thấy chữ `{joined}` hiện
+// nguyên. Đây là lỗi âm thầm đúng kiểu repo này cấm.
+{
+  // Nguồn bot nằm NGOÀI src/ nên phải đọc thẳng — `files` chỉ khoá theo đường dẫn
+  // tương đối tới src/, tra "bot/..." sẽ ra chuỗi rỗng và biến assert thành no-op.
+  const botSrc = fs.readFileSync(
+    path.join(__dirname, "..", "bot", "src", "handlers", "welcome.js"),
+    "utf8",
+  );
+  const panelSrc = files.get("components/dashboard/WelcomePanel.tsx") ?? "";
+  const previewSrc = files.get("components/dashboard/GreetingPreview.tsx") ?? "";
+  const grab = (src, re) => [...new Set(src.match(re) ?? [])].sort();
+  const botTokens = grab(botSrc, /"\{[a-z]+\}"/g);
+  const panelTokens = grab(panelSrc, /"\{[a-z]+\}"/g);
+  const previewTokens = grab(previewSrc, /"\{[a-z]+\}"/g);
+  // So SẴNG BẰNG, không phải ⊆: thiếu một chiều cũng là lỗi.
+  //  - panel có biến bot không thay → preview HỨA SAI, ra server thấy chữ thô.
+  //  - bot có biến panel chưa có → người dùng không chèn được biến đó.
+  check(
+    "placeholder panel khớp CHÍNH XÁC danh sách bot hỗ trợ (chip bấm-chèn không trôi lệch)",
+    JSON.stringify(panelTokens) === JSON.stringify(botTokens),
+    `panel=${JSON.stringify(panelTokens)} bot=${JSON.stringify(botTokens)}`,
+  );
+  check(
+    "placeholder preview khớp CHÍNH XÁC danh sách bot hỗ trợ (preview không hứa sai)",
+    JSON.stringify(previewTokens) === JSON.stringify(botTokens),
+    `preview=${JSON.stringify(previewTokens)} bot=${JSON.stringify(botTokens)}`,
+  );
+}
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);
