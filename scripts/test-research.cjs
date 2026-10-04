@@ -315,6 +315,268 @@ const research = require("../bot/src/research.js");
     else delete require.cache[aiPath];
   }
 
+  // ── Vòng tick của setupResearch + thông báo học thủ công ──
+  // Trước đây setupResearch chỉ được gọi để "không crash": thân tick() và
+  // notifyManualResult() KHÔNG có dòng nào chạy trong test. Học thủ công là
+  // đường người dùng THẬT (nút "Học ngay" trên web + `/research learn`) — hỏng
+  // im lặng nghĩa là chủ bot bấm mà bot không làm gì, không có lỗi nào lộ ra.
+  {
+    // Bắt callback mà setupResearch hẹn giờ (KHÔNG để timer thật chạy).
+    const captureTick = (st, discordClient) => {
+      const savedST = global.setTimeout;
+      const savedSI = global.setInterval;
+      const timeouts = [];
+      global.setTimeout = (fn, ms) => {
+        timeouts.push({ fn, ms });
+        return { unref() {} };
+      };
+      global.setInterval = () => ({ unref() {} });
+      try {
+        research.setupResearch(discordClient, st);
+      } finally {
+        global.setTimeout = savedST;
+        global.setInterval = savedSI;
+      }
+      // tick nằm ở lần hẹn 60s (và 5 phút) — chọn chắc chắn một cái.
+      return (timeouts.find((t) => t.ms === 60_000) || timeouts[0]).fn;
+    };
+    const mkClient = () => ({ guilds: { cache: new Map([["g1", { id: "g1", name: "G1" }]]) } });
+    const baseIntel = {
+      researchEnabled: true,
+      aiWeeklyEnabled: false,
+      nextRunAt: 0,
+      keywords: [],
+      notifyEnabled: false,
+    };
+
+    // (a) cờ học thủ công → claim + chạy NGAY (bỏ qua enabled/nextRunAt).
+    {
+      const calls = [];
+      const st = {
+        client: {
+          query: async (name) =>
+            name === "threatIntel:botGetIntel"
+              ? {
+                  ...baseIntel,
+                  researchEnabled: false,
+                  nextRunAt: Number.MAX_SAFE_INTEGER,
+                  manualLearnPending: true,
+                }
+              : [],
+          mutation: async (name, args) => {
+            calls.push({ name, args });
+            if (name === "threatIntel:botClaimManualLearn") return { requestedBy: "u1" };
+            return null;
+          },
+        },
+        getConfig: async () => ({ logChannelId: "L" }),
+      };
+      const tick = captureTick(st, mkClient());
+      check("setupResearch hẹn callback tick", typeof tick === "function");
+      await tick();
+      check(
+        "cờ học thủ công → claim ngay",
+        calls.some((c) => c.name === "threatIntel:botClaimManualLearn"),
+        JSON.stringify(calls.map((c) => c.name)),
+      );
+      const run = calls.find((c) => c.name === "threatIntel:botSetResearchRun");
+      check(
+        "học thủ công chạy dù research tắt + chưa đến hạn",
+        run?.args?.trigger === "manual" && run?.args?.requestedBy === "u1",
+        JSON.stringify(run?.args),
+      );
+    }
+
+    // (b) cờ đã bị nơi khác lấy (claim null) → rơi xuống nhánh thường; tắt → dừng.
+    {
+      const calls = [];
+      const st = {
+        client: {
+          query: async (name) =>
+            name === "threatIntel:botGetIntel"
+              ? { ...baseIntel, researchEnabled: false, manualLearnPending: true }
+              : [],
+          mutation: async (name, args) => {
+            calls.push({ name, args });
+            return null; // botClaimManualLearn trả null = đã có người lấy cờ
+          },
+        },
+        getConfig: async () => null,
+      };
+      await captureTick(st, mkClient())();
+      check(
+        "claim đã bị lấy + research tắt → KHÔNG chạy research",
+        !calls.some((c) => c.name === "threatIntel:botSetResearchRun"),
+        JSON.stringify(calls.map((c) => c.name)),
+      );
+    }
+
+    // (c) tự động: đến hạn → chạy và báo trigger=auto.
+    {
+      const calls = [];
+      const st = {
+        client: {
+          query: async (name) =>
+            name === "threatIntel:botGetIntel"
+              ? { ...baseIntel, researchEnabled: true, nextRunAt: 0 }
+              : [],
+          mutation: async (name, args) => {
+            calls.push({ name, args });
+            return null;
+          },
+        },
+        getConfig: async () => ({ logChannelId: "L" }),
+      };
+      await captureTick(st, mkClient())();
+      const run = calls.find((c) => c.name === "threatIntel:botSetResearchRun");
+      check("đến hạn → chạy research trigger=auto", run?.args?.trigger === "auto");
+    }
+
+    // (d) chưa đến hạn → không tốn call nghiên cứu nào.
+    {
+      const calls = [];
+      const st = {
+        client: {
+          query: async (name) =>
+            name === "threatIntel:botGetIntel"
+              ? { ...baseIntel, researchEnabled: true, nextRunAt: Date.now() + 3_600_000 }
+              : [],
+          mutation: async (name, args) => {
+            calls.push({ name, args });
+            return null;
+          },
+        },
+        getConfig: async () => ({ logChannelId: "L" }),
+      };
+      await captureTick(st, mkClient())();
+      check(
+        "chưa đến hạn → không chạy research",
+        !calls.some((c) => c.name === "threatIntel:botSetResearchRun"),
+      );
+    }
+
+    // (e) lỗi SAU khi đã xác định ngữ cảnh → báo lên Convex để Admin thấy lý do.
+    {
+      const calls = [];
+      let n = 0;
+      const st = {
+        client: {
+          query: (name) => {
+            if (name !== "threatIntel:botGetIntel") return Promise.resolve([]);
+            n++;
+            // Lượt 1: tick đọc cờ. Lượt 2: runResearch đọc lại → ném để mô phỏng Convex sập.
+            if (n === 2) throw new Error("Convex sập khi chạy research");
+            return Promise.resolve({ ...baseIntel, researchEnabled: true, nextRunAt: 0 });
+          },
+          mutation: async (name, args) => {
+            calls.push({ name, args });
+            return null;
+          },
+        },
+        getConfig: async () => ({ logChannelId: "L" }),
+      };
+      let threw = false;
+      try {
+        await captureTick(st, mkClient())();
+      } catch {
+        threw = true;
+      }
+      const rep = calls.find((c) => c.name === "threatIntel:botReportResearchError");
+      check("lỗi research không ném ra ngoài vòng tick", !threw);
+      check(
+        "lỗi research được báo lên Convex kèm trigger=auto",
+        rep?.args?.trigger === "auto" && String(rep?.args?.error).includes("Convex sập"),
+        JSON.stringify(rep?.args),
+      );
+    }
+
+    // (f) chống chồng lấn: tick đang chạy thì lượt hẹn mới phải bị bỏ qua.
+    {
+      let resolveQ;
+      let qCount = 0;
+      const st = {
+        client: {
+          query: (name) => {
+            if (name !== "threatIntel:botGetIntel") return Promise.resolve(null);
+            qCount++;
+            if (qCount === 1) {
+              return new Promise((r) => {
+                resolveQ = () => r({ ...baseIntel, researchEnabled: false });
+              });
+            }
+            return Promise.resolve({ ...baseIntel, researchEnabled: false });
+          },
+          mutation: async () => null,
+        },
+        getConfig: async () => null,
+      };
+      const tick = captureTick(st, mkClient());
+      const first = tick();
+      check("tick đang chờ query đầu → đã đặt cờ đang chạy", qCount === 1);
+      const second = tick();
+      check("tick chồng lấn bị bỏ qua (không phát query mới)", qCount === 1);
+      resolveQ();
+      await first;
+      await second;
+    }
+
+    // (g) thông báo học thủ công: tối đa 3 server, bỏ guild chưa cấu hình log.
+    {
+      const utilPath = require.resolve("../bot/src/util.js");
+      const realUtil = require.cache[utilPath];
+      const sent = [];
+      require.cache[utilPath] = {
+        id: utilPath,
+        filename: utilPath,
+        loaded: true,
+        exports: {
+          Colors: new Proxy({}, { get: () => 0x000000 }),
+          logEmbed: (o) => o,
+          sendLog: async (guild, cfg, embed) => {
+            sent.push({ guildId: guild.id, embed });
+          },
+        },
+      };
+      // Ghim mốc digest để chỉ có thông báo học thủ công đăng log.
+      globalThis.__protogonLastDigest = Date.now();
+      const guilds = new Map([["g-bad", { id: "g-bad", name: "GBad" }]]);
+      for (let i = 0; i < 4; i++) guilds.set(`g${i}`, { id: `g${i}`, name: `G${i}` });
+      const st = {
+        client: {
+          query: async (name) =>
+            name === "threatIntel:botGetIntel"
+              ? {
+                  ...baseIntel,
+                  researchEnabled: false,
+                  notifyEnabled: true,
+                  manualLearnPending: true,
+                }
+              : [],
+          mutation: async (name) => {
+            if (name === "threatIntel:botClaimManualLearn") return { requestedBy: "u2" };
+            return null;
+          },
+        },
+        getConfig: async (guildId) => (guildId === "g-bad" ? null : { logChannelId: "L" }),
+      };
+      await captureTick(st, { guilds: { cache: guilds } })();
+      // Chỉ xét 3 server đầu; g-bad nằm trong đó nhưng chưa cấu hình log → còn 2.
+      check(
+        "học thủ công xong → đăng thông báo cho server có log",
+        sent.length === 2,
+        String(sent.length),
+      );
+      check(
+        "thông báo nêu người yêu cầu",
+        JSON.stringify(sent[0]?.embed ?? {}).includes("u2"),
+        JSON.stringify(sent[0]?.embed),
+      );
+      check("bỏ qua guild chưa cấu hình log", !sent.some((s) => s.guildId === "g-bad"));
+      if (realUtil) require.cache[utilPath] = realUtil;
+      else delete require.cache[utilPath];
+    }
+  }
+
   globalThis.fetch = realFetch;
   process.exit(fail === 0 ? 0 : 1);
 })().catch((e) => {
