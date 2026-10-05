@@ -1131,7 +1131,13 @@ export const botSyncGuilds = mutation({
                 pricingChecked: v.optional(v.nullable(v.string())),
               }),
             ),
-            reportedAt: v.number(),
+            // `reportedAt` do SERVER tự thêm lúc ghi (dòng dưới: {...aiHealth, reportedAt: now}).
+            // Bot KHÔNG gửi field này — `aiStats()` không có nó. Bắt buộc ở đây
+            // là sai và làm mọi lần gọi botSyncGuilds bị từ chối
+            // ("missing the required field reportedAt", 05/10/2026). Ở
+            // convex/schema.ts (validator của BẢNG) thì bắt buộc là đúng, vì
+            // đó là thứ được lưu xuống.
+            reportedAt: v.optional(v.number()),
           }),
         ),
       }),

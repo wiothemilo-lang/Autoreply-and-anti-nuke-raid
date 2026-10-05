@@ -354,5 +354,90 @@ check(
   );
 }
 
+// ── CHẠY VALIDATOR THẬT với payload bot THẬT (thay vì so tên field) ──
+// Hai bug liên tiếp đều lọt qua gate so-tên-field:
+//   1. `budget` có trong schema.ts nhưng thiếu trong args của mutation →
+//      "extra field budget" (lỗi #1, PR #33 để sót từ 87e62b3).
+//   2. Vá thêm `reportedAt: v.number()` vào args → nhưng BOT KHÔNG gửi field
+//      này (server tự thêm lúc ghi) → "missing the required field reportedAt".
+// Cả hai đều là lỗi "validator vs payload", nên gate phải chạy validator thật.
+// convex/values KHÔNG export hàm validate → ta dựng validator từ source rồi kiểm
+// bằng bộ walker mô phỏng đúng quy tắc của Convex (object: cấm field lạ,
+// bắt buộc field không-optional; array/string/number/boolean theo kind).
+{
+  const { v } = require("convex/values");
+  const src = fs.readFileSync(path.join(convexDir, "guilds.ts"), "utf8");
+  // Tách khối cân bằng ngoặc bắt đầu từ anchor, bỏ comment, bỏ chú thích kiểu TS.
+  const grab = (anchor) => {
+    const i = src.indexOf(anchor);
+    if (i < 0) return null;
+    let d = 0;
+    let out = "";
+    for (let j = src.indexOf("(", i); j < src.length; j++) {
+      out += src[j];
+      if (src[j] === "(") d++;
+      if (src[j] === ")" && --d === 0) break;
+    }
+    return out
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "")
+      .replace(/\sas\s+/g, " ")
+      .replace(/:\s*(string|number|boolean)\s/g, " ");
+  };
+  const build = (anchor) => {
+    const raw = grab(anchor);
+    return raw ? new Function("v", "return v.optional" + raw)(v) : null;
+  };
+
+  // Walker: (validator, value, path) -> danh sách lỗi đọc được.
+  const walk = (val, value, path) => {
+    if (value === undefined) {
+      return val.isOptional === "optional" ? [] : [`${path}: BẮT BUỘC nhưng không được gửi`];
+    }
+    if (val.kind === "object") {
+      const errs = [];
+      for (const k of Object.keys(value)) {
+        if (!val.fields[k]) errs.push(`${path}.${k}: KHÔNG có trong validator`);
+        else errs.push(...walk(val.fields[k], value[k], `${path}.${k}`));
+      }
+      for (const [k, f] of Object.entries(val.fields)) {
+        if (f.isOptional === "required" && !(k in value)) {
+          errs.push(`${path}.${k}: BẮT BUỘC nhưng bot không gửi`);
+        }
+      }
+      return errs;
+    }
+    if (val.kind === "array") {
+      if (!Array.isArray(value)) return [`${path}: phải là array`];
+      return value.flatMap((e, i) => walk(val.element, e, `${path}[${i}]`));
+    }
+    if (val.kind === "string" && typeof value !== "string") return [`${path}: phải là string`];
+    if (val.kind === "float64" && typeof value !== "number") return [`${path}: phải là number`];
+    if (val.kind === "boolean" && typeof value !== "boolean") return [`${path}: phải là boolean`];
+    return [];
+  };
+
+  const aiValidator = build("aiHealth: v.optional(");
+  const aiHealth = require("../bot/src/ai.js").aiStats();
+  const errs = walk(aiValidator, aiHealth, "aiHealth");
+  check(
+    errs.length === 0
+      ? "payload aiStats() thật khớp validator aiHealth của botSyncGuilds"
+      : `aiStats() KHÔNG khớp validator: ${errs.join(" | ")}`,
+    errs.length === 0,
+  );
+
+  // globalStatus: bot gửi 6 field cố định (handlers/guildSync.js)
+  const gsValidator = build("globalStatus: v.optional(");
+  const sent = ["guildCount", "memberCount", "version", "ownerName", "ownerAvatarUrl", "aiHealth"];
+  const bad = sent.filter((k) => !gsValidator || !gsValidator.fields[k]);
+  check(
+    bad.length === 0
+      ? "mọi field globalStatus bot gửi đều có trong validator"
+      : `globalStatus thiếu field trong validator: ${bad.join(", ")}`,
+    bad.length === 0,
+  );
+}
+
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
