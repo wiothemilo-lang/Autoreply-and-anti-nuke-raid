@@ -18,6 +18,7 @@ import {
   splitBackupJson,
 } from "../backupChunks";
 import { requireBotKeyStrict } from "../botAuth";
+import { generateRestoreKey } from "../backupKeys";
 import { claimIsActive, claimMatches } from "./shared";
 
 /** Chặn trên/dưới + làm tròn — người dùng gõ bừa số cũng không làm hỏng dữ liệu. */
@@ -71,6 +72,11 @@ export async function botStoreBackupHandler(ctx: MutationCtx, args: BotStoreBack
   const rawJson = args.backupJson;
   const chunked = rawJson.length > MAX_INLINE_CHARS;
   const chunkCount = chunked ? Math.ceil(rawJson.length / CHUNK_CHARS) : 0;
+  // Mã khôi phục sinh 1 lần lúc lưu: đường cứu hộ khi chủ server đã mất quyền
+  // với server gốc (xem convex/backupKeys.ts). Bản backup CŨ chưa có field này
+  // thì `restoreKey` vắng mặt — người dùng vẫn khôi phục được bằng đường cũ
+  // (còn quyền server gốc), chỉ là không có mã để dán.
+  const restoreKey = generateRestoreKey();
   const backupId = await ctx.db.insert("guildBackups", {
     guildId: args.guildId,
     guildName: args.guildName.slice(0, 120),
@@ -92,6 +98,7 @@ export async function botStoreBackupHandler(ctx: MutationCtx, args: BotStoreBack
     backupCompressed: args.backupCompressed ?? undefined,
     backupEncrypted: args.backupEncrypted ?? undefined,
     backupSnapshotChecksum: args.backupSnapshotChecksum ?? undefined,
+    restoreKey,
     pushedToGithub: false,
     createdAt: now,
   });
@@ -130,7 +137,9 @@ export async function botStoreBackupHandler(ctx: MutationCtx, args: BotStoreBack
     await deleteBackupChunks(ctx, id);
     await ctx.db.delete(id);
   }
-  return { ok: true, backupId };
+  // Trả kèm mã khôi phục để bot có thể in ra log nếu cần — dashboard đọc mã qua
+  // query riêng (`backup:myRestoreKeys`) nên không cần gửi qua bot.
+  return { ok: true, backupId, restoreKey };
 }
 
 /**

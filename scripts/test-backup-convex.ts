@@ -22,9 +22,13 @@ import {
 } from "../convex/bot_writes";
 import {
   listGuild,
+  listMine,
+  lookupBackup,
+  myRestoreKeys,
   botAuditBackups,
   importStatus,
   requestBackup,
+  requestRestore,
   setRetention,
   requestRestorePlan,
   restorePlanStatus,
@@ -33,6 +37,7 @@ import {
 } from "../convex/backup";
 import { computeBotKey } from "../convex/botAuth";
 import { reassembleBackupJsonForRead } from "../convex/backupChunks";
+import { generateRestoreKey, normalizeRestoreKey } from "../convex/backupKeys";
 
 // getBotStatus đọc ctx.db.query("botStatus") — ctx giả chỉ cần bảng botStatus
 // với row { kind: "status", botKeySeed }. Không cần monkey-patch module.
@@ -57,6 +62,10 @@ const reportPlanHandler = (botReportRestorePlan as any)._handler;
 const setRetentionHandler = (botSetBackupRetention as any)._handler;
 const setRetentionBotHandler = (botSetBackupRetention as any)._handler;
 const setRetentionWebHandler = (setRetention as any)._handler;
+const listMineHandler = (listMine as any)._handler;
+const lookupBackupHandler = (lookupBackup as any)._handler;
+const myRestoreKeysHandler = (myRestoreKeys as any)._handler;
+const requestRestoreHandler = (requestRestore as any)._handler;
 
 let pass = 0;
 let fail = 0;
@@ -143,6 +152,14 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
           if (table === "backupChunks") {
             return {
               collect: async () => chunkRows.filter((r) => r.backupId === capture.backupId),
+            };
+          }
+          // Tra cứu mã khôi phục (index by_restoreKey) — O(1), không quét bảng.
+          if ("restoreKey" in capture) {
+            return {
+              first: async () =>
+                backupRows.find((r) => r.restoreKey === capture.restoreKey) ?? null,
+              collect: async () => backupRows.filter((r) => r.restoreKey === capture.restoreKey),
             };
           }
           const rows =
@@ -1063,13 +1080,22 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     );
     const audit = (await auditHandler(ctx as any, { guildId: "g1", botKey: BOT_KEY })) as any[];
     check("chunk: audit cũng thấy payload đầy đủ", audit[0].backupJson === big);
-    // Thiếu chunk → KHÔNG được đẩy job đi (khôi phục từ dữ liệu cụt là thảm họa).
+    // Thiếu chunk → bot KHÔNG BAO GIỜ được giao payload cụt. Job VẪN được gửi
+    // nhưng kèm cờ `unreadable`: bot báo lỗi thật + dọn cờ `restoreRequested`.
+    // Bỏ qua im lặng (cách cũ) làm cờ mắc true mãi mãi ⇒ dashboard quay vòng
+    // chờ vô hạn và mỗi lượt quét lại đọc lại payload.
     chunkRows.pop();
     const pending2 = (await botGetPendingHandler(ctx as any, { botKey: BOT_KEY })) as any[];
+    const badJob = pending2.find((p) => p.kind === "restore");
     check(
-      "chunk: thiếu chunk → KHÔNG gửi job khôi phục (không khôi phục từ dữ liệu cụt)",
-      !pending2.some((p) => p.kind === "restore"),
-      JSON.stringify(pending2.map((p) => p.kind)),
+      "chunk: thiếu chunk → KHÔNG gửi payload cụt cho bot",
+      !!badJob && badJob.backupJson === undefined,
+      JSON.stringify(badJob?.backupJson?.slice(0, 12)),
+    );
+    check(
+      "chunk: thiếu chunk → job đánh dấu unreadable + có lý do để bot báo lỗi",
+      badJob?.unreadable === true && typeof badJob?.unreadableReason === "string",
+      JSON.stringify(badJob?.unreadableReason),
     );
     check(
       "chunk: audit trả null thay vì dữ liệu cụt",
@@ -1281,6 +1307,358 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     check(
       "g6 bot đã rời → không đụng (index by_botInGuild)",
       guildRows.find((g) => g._id === "g6")!.backupRequested === false,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // MÃ KHÔI PHỤC — đường cứu hộ khi đã MẤT quyền server gốc.
+  //
+  // Bug thật: `listMine` + `requestRestore` trước đây bắt người khôi phục phải
+  // còn là người quản lý SERVER GỐC. Đúng lúc cần cứu (server bị nuke mất role /
+  // bị kick / đã xoá rồi dựng server mới) thì bản backup biến mất khỏi danh
+  // sách và khôi phục bị từ chối — backup bị bỏ rơi đúng lúc cần nhất.
+  // ═══════════════════════════════════════════════════════════════════════
+  const OLD = "111111111111111111";
+  const NEW = "222222222222222222";
+  /** Dựng ngữ cảnh: server cũ đã chết (bot rời) + server mới, 1 bản backup. */
+  const makeLostServerCtx = (manageable: string[], withKey = true) => {
+    const h = makeCtx({ seed: BOT_KEY });
+    h.userRows.push({
+      _id: "u1",
+      discordId: "me",
+      username: "me",
+      manageableGuildIds: manageable,
+      lastLoginAt: 0,
+    });
+    h.sessionRows.push({
+      token: "tok1",
+      userId: "u1",
+      createdAt: Date.now(),
+      authVersion: 1,
+    });
+    h.guildRows.push({ _id: "gold", discordId: OLD, botInGuild: false, managers: ["me"] });
+    h.guildRows.push({ _id: "gnew", discordId: NEW, botInGuild: true, managers: ["me"] });
+    const restoreKey = withKey ? generateRestoreKey() : undefined;
+    h.backupRows.push({
+      _id: "b1",
+      guildId: OLD,
+      guildName: "Server Bị Nuke",
+      backupJson: "z:payload",
+      backupChecksum: "cs",
+      roleCount: 5,
+      channelCount: 9,
+      messageCount: 12,
+      pushedToGithub: false,
+      restoreKey,
+      createdAt: 1_700_000_000_000,
+    });
+    return { ...h, restoreKey };
+  };
+
+  console.log("\n── backupKeys: sinh + chuẩn hoá mã khôi phục ──");
+  {
+    const k1 = generateRestoreKey();
+    const k2 = generateRestoreKey();
+    check("mã dài 25 ký tự chia đều 5 nhóm", /^[A-Z2-9]{5}(-[A-Z2-9]{5}){4}$/.test(k1), k1);
+    check("không chứa ký tự dễ nhầm (0/O/1/I/L)", !/[01OIL]/.test(k1), k1);
+    check("hai mã không trùng nhau", k1 !== k2);
+    check(
+      "bỏ gạch nối / khoảng trắng / HOA-thường vẫn ra đúng mã",
+      normalizeRestoreKey(k1.toLowerCase().replace(/-/g, " ")) === k1,
+      k1,
+    );
+    check("mã thiếu ký tự → từ chối", normalizeRestoreKey("ABC") === null);
+    check("mã dài sai → từ chối", normalizeRestoreKey(k1 + "A") === null);
+    // Ký tự bị loại khỏi bảng chữ (O/0/I/1/L) phải bị từ chối chứ KHÔNG được
+    // im lặng map sang một mã khác — đó là lỗi "tra cứu nhầm bản backup".
+    check(
+      "ký tự lạ trong bảng chữ → từ chối (không map nhầm)",
+      normalizeRestoreKey("O".repeat(25)) === null,
+    );
+    check("mã rỗng → từ chối", normalizeRestoreKey("") === null);
+  }
+
+  console.log("\n── lookupBackup: tra cứu theo mã, KHÔNG lộ id server gốc ──");
+  {
+    const { ctx, restoreKey } = makeLostServerCtx([NEW]);
+    const res = await lookupBackupHandler(ctx as any, { token: "tok1", restoreKey });
+    check("mã đúng → trả metadata bản backup", res?.backupId === "b1" && res?.roleCount === 5);
+    // Rò rỉ id server gốc là điều KHÔNG được xảy ra: biết mã không được suy ra
+    // ra server nào đang dùng Protogon.
+    check("KHÔNG trả guildId của server gốc", res !== null && !("guildId" in res));
+    check(
+      "KHÔNG trả backupJson (chỉ bot có botKey mới đọc được)",
+      res !== null && !("backupJson" in res),
+    );
+    // Mã sai / rác → không lộ thêm thông tin gì.
+    const bad = await lookupBackupHandler(ctx as any, {
+      token: "tok1",
+      restoreKey: "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE",
+    });
+    check("mã không khớp → null", bad === null);
+    const junk = await lookupBackupHandler(ctx as any, { token: "tok1", restoreKey: "sai" });
+    check("mã sai định dạng → null (không ném lỗi)", junk === null);
+    // Chưa đăng nhập → không tra cứu được gì.
+    const anon = await lookupBackupHandler(ctx as any, { token: "", restoreKey });
+    check("chưa đăng nhập → null", anon === null);
+  }
+
+  console.log("\n── requestRestore: mất quyền server gốc → dùng mã khôi phục được ──");
+  {
+    // KHÔNG có mã → vẫn phải từ chối như cũ (không nới tuỳ tiện).
+    const noKey = makeLostServerCtx([NEW], false);
+    let err = "";
+    try {
+      await requestRestoreHandler(noKey.ctx as any, {
+        token: "tok1",
+        guildId: NEW,
+        backupId: "b1",
+      });
+    } catch (e: any) {
+      err = e?.message ?? "";
+    }
+    check("mất quyền server gốc + không có mã → từ chối", /quyền với server gốc/.test(err), err);
+    check("lỗi có nói rõ cách gỡ (dán mã khôi phục)", /mã khôi phục/i.test(err), err);
+    check(
+      "bị từ chối thì KHÔNG đặt cờ restoreRequested",
+      noKey.guildRows.find((g) => g.discordId === NEW)!.restoreRequested !== true,
+    );
+
+    // CÓ mã → khôi phục được vào server mới (đúng tình huống nuke).
+    const h = makeLostServerCtx([NEW]);
+    const okRes = await requestRestoreHandler(h.ctx as any, {
+      token: "tok1",
+      guildId: NEW,
+      backupId: "b1",
+      restoreKey: h.restoreKey,
+    });
+    const newGuild = h.guildRows.find((g) => g.discordId === NEW)!;
+    check(
+      "mã đúng → khôi phục vào server MỚI được, đặt cờ restore",
+      okRes?.ok === true && newGuild.restoreRequested === true && newGuild.restoreBackupId === "b1",
+    );
+    // Mã của bản KHÁC → phải từ chối (capability gắn với từng bản backup).
+    const wrong = makeLostServerCtx([NEW]);
+    wrong.backupRows[0].restoreKey = generateRestoreKey();
+    let err2 = "";
+    try {
+      await requestRestoreHandler(wrong.ctx as any, {
+        token: "tok1",
+        guildId: NEW,
+        backupId: "b1",
+        restoreKey: h.restoreKey,
+      });
+    } catch (e: any) {
+      err2 = e?.message ?? "";
+    }
+    check("mã của bản backup khác → từ chối", /quyền với server gốc/.test(err2), err2);
+
+    // Người dùng không quản lý server ĐÍCH thì mã cũng không cứu được.
+    const notMine = makeLostServerCtx([]);
+    let err3 = "";
+    try {
+      await requestRestoreHandler(notMine.ctx as any, {
+        token: "tok1",
+        guildId: NEW,
+        backupId: "b1",
+        restoreKey: notMine.restoreKey,
+      });
+    } catch (e: any) {
+      err3 = e?.message ?? "";
+    }
+    check("không quản lý server ĐÍCH → từ chối dù có mã", /quản lý server/.test(err3), err3);
+  }
+
+  console.log("\n── myRestoreKeys: chủ server cầm được mã để không mất ──");
+  {
+    const h = makeCtx({ seed: BOT_KEY });
+    h.userRows.push({
+      _id: "u1",
+      discordId: "me",
+      username: "me",
+      manageableGuildIds: [NEW],
+      lastLoginAt: 0,
+    });
+    h.sessionRows.push({ token: "tok1", userId: "u1", createdAt: Date.now(), authVersion: 1 });
+    h.guildRows.push({ _id: "gnew", discordId: NEW, botInGuild: true, managers: ["me"] });
+    h.guildRows.push({ _id: "gold", discordId: OLD, botInGuild: false, managers: ["me"] });
+    const key = generateRestoreKey();
+    h.backupRows.push({
+      _id: "bmine",
+      guildId: NEW,
+      guildName: "Server Mới",
+      backupJson: "z:x",
+      roleCount: 1,
+      channelCount: 2,
+      pushedToGithub: false,
+      restoreKey: key,
+      createdAt: 2_000,
+    });
+    // Backup của server KHÔNG còn quản lý phải ẩn khỏi danh sách mã.
+    h.backupRows.push({
+      _id: "bother",
+      guildId: OLD,
+      guildName: "Server Cũ",
+      backupJson: "z:y",
+      roleCount: 3,
+      channelCount: 4,
+      pushedToGithub: false,
+      restoreKey: generateRestoreKey(),
+      createdAt: 1_000,
+    });
+    const keys = await myRestoreKeysHandler(h.ctx as any, { token: "tok1" });
+    check(
+      "chỉ trả mã của server đang quản lý",
+      keys.length === 1 && keys[0].backupId === "bmine",
+      JSON.stringify(keys),
+    );
+    check("mã trả về đúng giá trị lưu", keys[0]?.restoreKey === key);
+    check(
+      "bản backup cũ không có mã → restoreKey = null (không văng undefined)",
+      (
+        await myRestoreKeysHandler(
+          (() => {
+            const c = makeCtx({ seed: BOT_KEY });
+            c.userRows.push({
+              _id: "u",
+              discordId: "me",
+              username: "me",
+              manageableGuildIds: [OLD],
+              lastLoginAt: 0,
+            });
+            c.sessionRows.push({ token: "t", userId: "u", createdAt: Date.now(), authVersion: 1 });
+            c.guildRows.push({ _id: "g", discordId: OLD, botInGuild: true, managers: ["me"] });
+            c.backupRows.push({
+              _id: "b",
+              guildId: OLD,
+              guildName: "G",
+              backupJson: "z:z",
+              roleCount: 0,
+              channelCount: 0,
+              pushedToGithub: false,
+              createdAt: 5,
+            });
+            return c;
+          })().ctx as any,
+          { token: "t" },
+        )
+      )[0].restoreKey === null,
+    );
+  }
+
+  console.log("\n── botStoreBackup: sinh mã khôi phục cho mỗi bản ──");
+  {
+    const { ctx, backupRows } = makeCtx({ seed: BOT_KEY });
+    const r1 = await storeHandler(ctx as any, {
+      guildId: "g1",
+      guildName: "G1",
+      backupJson: "z:a",
+      roleCount: 1,
+      channelCount: 1,
+      botKey: BOT_KEY,
+    });
+    const r2 = await storeHandler(ctx as any, {
+      guildId: "g1",
+      guildName: "G1",
+      backupJson: "z:b",
+      roleCount: 1,
+      channelCount: 1,
+      botKey: BOT_KEY,
+    });
+    check(
+      "mỗi bản backup có mã riêng",
+      !!r1?.restoreKey && !!r2?.restoreKey && r1.restoreKey !== r2.restoreKey,
+    );
+    check(
+      "mã ghi vào bản ghi backup (tra cứu được)",
+      backupRows.every((b) => typeof b.restoreKey === "string" && b.restoreKey.length === 29),
+      JSON.stringify(backupRows.map((b) => b.restoreKey)),
+    );
+    check(
+      "mã trả về khớp mã đã lưu",
+      r1.restoreKey === backupRows.find((b) => b.backupJson === "z:a")?.restoreKey,
+    );
+  }
+
+  console.log("\n── botGetPending: backup hỏng → báo lỗi thật, không treo cờ ──");
+  {
+    // Backup tách chunk nhưng THIẾU chunk → json không gộp được. Trước đây job
+    // bị bỏ qua im lặng ⇒ restoreRequested mắc true mãi mãi, dashboard quay
+    // vòng chờ vô hạn, mỗi lượt quét lại đọc lại payload. Nay vẫn gửi job
+    // với cờ unreadable để bot báo lỗi và DỌN cờ sau đúng một nhịp.
+    const { ctx, guildRows, backupRows } = makeCtx({ seed: BOT_KEY });
+    guildRows.push({
+      _id: "g1",
+      discordId: "g1",
+      botInGuild: true,
+      restoreRequested: true,
+      restoreBackupId: "b1",
+    });
+    backupRows.push({
+      _id: "b1",
+      guildId: "g1",
+      guildName: "G1",
+      backupJson: "chunked:3",
+      backupChunkCount: 3,
+      roleCount: 1,
+      channelCount: 1,
+      pushedToGithub: false,
+      createdAt: 10,
+    });
+    const pending = await botGetPendingHandler(ctx as any, { botKey: BOT_KEY });
+    const job = pending.find((p: any) => p.kind === "restore");
+    check("vẫn gửi job restore (không bỏ qua im lặng)", !!job, JSON.stringify(pending));
+    check("job đánh dấu unreadable", job?.unreadable === true);
+    check("job KHÔNG mang payload rỗng", job?.backupJson === undefined);
+    check(
+      "job có lý do để bot báo lên dashboard",
+      typeof job?.unreadableReason === "string" && job.unreadableReason.length > 10,
+      job?.unreadableReason,
+    );
+
+    // Bản backup đã bị xoá → cũng phải báo, không nuốt im lặng.
+    const gone = makeCtx({ seed: BOT_KEY });
+    gone.guildRows.push({
+      _id: "g1",
+      discordId: "g1",
+      botInGuild: true,
+      restoreRequested: true,
+      restoreBackupId: "bX",
+    });
+    const job2 = (await botGetPendingHandler(gone.ctx as any, { botKey: BOT_KEY })).find(
+      (p: any) => p.kind === "restore",
+    );
+    check(
+      "bản đã bị xoá → job unreadable + nói rõ",
+      job2?.unreadable === true && /không còn tồn tại/.test(job2?.unreadableReason ?? ""),
+      job2?.unreadableReason,
+    );
+
+    // Backup ĐỌC ĐƯỢC thì vẫn phải là job bình thường (không unreadable).
+    const ok = makeCtx({ seed: BOT_KEY });
+    ok.guildRows.push({
+      _id: "g1",
+      discordId: "g1",
+      botInGuild: true,
+      restoreRequested: true,
+      restoreBackupId: "b1",
+    });
+    ok.backupRows.push({
+      _id: "b1",
+      guildId: "g1",
+      guildName: "G1",
+      backupJson: "z:ok",
+      roleCount: 1,
+      channelCount: 1,
+      pushedToGithub: false,
+      createdAt: 10,
+    });
+    const job3 = (await botGetPendingHandler(ok.ctx as any, { botKey: BOT_KEY })).find(
+      (p: any) => p.kind === "restore",
+    );
+    check(
+      "backup đọc được → job bình thường, KHÔNG unreadable",
+      job3?.unreadable === false && job3?.backupJson === "z:ok",
     );
   }
 

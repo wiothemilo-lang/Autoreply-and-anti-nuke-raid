@@ -1477,4 +1477,22 @@ export const DE: Record<string, string> = {
   "Không có việc nào bị kẹt.": "Keine festhängenden Aufträge.",
   "Chỉ tính việc chờ quá 15 phút — tick bot chạy mỗi 3 phút, quá ngưỡng là đứt mắt xích.":
     "Zählt nur Aufträge mit mehr als 15 Minuten Wartezeit — der Bot tickt alle 3 Minuten, darüber ist die Kette gerissen.",
+  // ── Tra cứu backup / mã khôi phục (đường cứu hộ khi mất quyền server gốc) ──
+  "Tra cứu & cứu hộ backup": "Backup-Suche & Rettung",
+  "Xem mã khôi phục của các bản backup bạn đang quản lý":
+    "Wiederherstellungsschlüssel der verwalteten Backups ansehen",
+  "Mã khôi phục của tôi": "Meine Wiederherstellungsschlüssel",
+  "Ẩn mã của tôi": "Schlüssel ausblenden",
+  "Mã khôi phục": "Wiederherstellungsschlüssel",
+  "Tra cứu": "Suchen",
+  tin: "Nachr.",
+  "(bản cũ — chưa có mã)": "(älteres Backup — noch kein Schlüssel)",
+  "Chưa có bản backup nào — bấm “Backup ngay” để có mã khôi phục.":
+    "Noch keine Backups — „Jetzt sichern“ anklicken, um einen Schlüssel zu erhalten.",
+  "Hãy lưu mã lại (kèm ảnh chụp hoặc ghi chú) — mất server là mất luôn đường xem lại mã này.":
+    "Schlüssel gut aufbewahren (Screenshot oder Notiz) — ohne Server gibt es keinen Weg, ihn nochmals zu sehen.",
+  "Đã mất quyền với server gốc (bị nuke mất role, bị kick, hoặc đã xoá server)? Dán mã khôi phục của bản backup vào đây để dựng lại cấu trúc server đó vào server hiện tại.":
+    "Zugriff auf den Ursprungsserver verloren (Rollen durch Nuke entfernt, rausgeworfen oder Server gelöscht)? Hier den Wiederherstellungsschlüssel eines Backups einfügen, um dessen Struktur im aktuellen Server neu aufzubauen.",
+  "Không tìm thấy bản backup nào với mã này — kiểm tra lại mã, hoặc dùng bản backup mới nhất.":
+    "Kein Backup passt zu diesem Schlüssel — bitte prüfen oder das neueste Backup verwenden.",
 };

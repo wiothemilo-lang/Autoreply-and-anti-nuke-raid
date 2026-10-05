@@ -493,6 +493,11 @@ function makeGuild({ failChannelSend = false, noChannel = false, full = false } 
     // P2: bản đồ thành viên ↔ vai trò cũng nằm trong phần "ổn định". Guild giả
     // ở đây không có members.fetch/cache → captureMemberRoles trả mảng rỗng.
     members: [],
+    // Danh sách ban + link mời CŨNG nằm trong phần "ổn định" (xem
+    // computeSnapshotChecksum): cấm người mới không được bị incremental bỏ qua.
+    // Guild giả không có bans/invites.fetch → cả hai hàm bắt lỗi và trả mảng rỗng.
+    bans: [],
+    invites: [],
   });
   {
     const store = makeStore({

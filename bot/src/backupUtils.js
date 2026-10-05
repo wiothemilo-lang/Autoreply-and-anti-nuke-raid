@@ -74,6 +74,13 @@ function computeSnapshotChecksum(snapshot) {
     // đổi THẬT trong backup → phải làm checksum lệch, nếu không incremental sẽ
     // bỏ qua và giữ bản cũ với vai trò đã lỗi thời.
     members: snapshot.members,
+    // Danh sách ban + link mời: restoreCore CÓ khôi phục chúng (khi bật "khôi
+    // phục ban/link mời"), nên chúng là phần khôi phục được → đổi chúng phải
+    // làm checksum lệch. Trước đây bị bỏ sót: cấm người mới (nuke) không tạo
+    // bản mới, bản cũ giữ danh sách ban cũ ⇒ kẻ nuke lọt ngay vào bản "khôi
+    // phục xong" mà chủ server không hề biết.
+    bans: snapshot.bans,
+    invites: snapshot.invites,
   });
   return computeChecksum(stable);
 }

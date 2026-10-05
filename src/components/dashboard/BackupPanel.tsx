@@ -14,6 +14,7 @@ import {
   Loader2,
   MessageSquare,
   RefreshCw,
+  Search,
   ShieldAlert,
   ShieldCheck,
   Smile,
@@ -25,6 +26,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 import type { GuildData, BackupInfo } from "../../lib/types";
 import { MIN_IMPORT_BOT_VERSION } from "../../lib/constants";
@@ -163,13 +165,16 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     | undefined;
 
   // Bấm "Xem kế hoạch" — bot chỉ ĐỌC backup rồi báo sẽ tạo gì, không tạo gì cả.
-  const askPlan = async (b: BackupInfo) => {
+  // `restoreKey` chỉ có khi bản backup được tra cứu bằng MÃ KHÔI PHỤC (người
+  // dùng không còn quyền server gốc) — cần gửi kèm để Convex cho phép.
+  const askPlan = async (b: BackupInfo, restoreKey?: string) => {
     setPlanBusy(b._id);
     try {
       await requestRestorePlan({
         token: TOKEN(),
         guildId: data.guild.discordId,
         backupId: b._id as Id<"guildBackups">,
+        restoreKey,
       });
       toast.info(translate("Đang tính kế hoạch khôi phục…"), {
         description: translate(
@@ -504,7 +509,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     }
   }
 
-  async function restore(backup: BackupInfo) {
+  async function restore(backup: BackupInfo, restoreKey?: string) {
     // Bot OFFLINE → yêu cầu khôi phục sẽ nằm chờ vô hạn — chặn sớm với lý do rõ ràng.
     if (importStatus && importStatus.botOnline === false) {
       toast.error(translate("Bot đang OFFLINE — không thể khôi phục lúc này"), {
@@ -542,6 +547,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
         token: TOKEN(),
         guildId: data.guild.discordId,
         backupId: backup._id,
+        restoreKey,
       });
       setRestoreWatch({ startedAt: Date.now() });
       toast.success(translate("Đã yêu cầu khôi phục — bot thực hiện trong khoảng 1 phút"), {
@@ -1042,6 +1048,9 @@ export default function BackupPanel({ data }: { data: GuildData }) {
         onPlan={askPlan}
       />
 
+      {/* Cứu hộ: mất quyền server gốc vẫn khôi phục được bằng mã khôi phục. */}
+      <BackupLookupCard busy={busy} planBusy={planBusy} onRestore={restore} onPlan={askPlan} />
+
       <RestorePlanCard status={planStatus} />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -1356,6 +1365,209 @@ function BackupListCard({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * TRA CỨU BACKUP + MÃ KHÔI PHỤC — đường cứu hộ khi đã mất server gốc.
+ *
+ * Hai vấn đề thật mà card này gỡ:
+ *  1. Bản backup chỉ hiện được khi bạn CÒN quản lý server gốc. Đúng lúc cần
+ *     cứu — server đã bị nuke mất role / bị kick / đã xoá — bạn mất quyền đó:
+ *     danh sách trống và khôi phục bị từ chối. MÃ KHÔI PHỤC (130 bit ngẫu
+ *     nhiên, sinh cho từng bản backup) gỡ bế tắc đó mà KHÔNG phải lộ id
+ *     server: tra cứu theo index và không trả về `guildId` của server gốc.
+ *  2. Chủ server cần chỗ CẦM MÃ để không mất nó lúc cần — mất server là mất
+ *     luôn quyền, không còn đường nào khác để xem lại mã.
+ *
+ * Convex: cả hai truy vấn đều dùng args kiểu `"skip"` cho tới khi người dùng
+ * chủ động hỏi → dashboard mở ra KHÔNG tốn read nào cho tính năng này.
+ */
+function BackupLookupCard({
+  busy,
+  planBusy,
+  onRestore,
+  onPlan,
+}: {
+  busy: "backup" | string | null;
+  planBusy: string | null;
+  onRestore: (backup: BackupInfo, restoreKey?: string) => void;
+  onPlan: (backup: BackupInfo, restoreKey?: string) => void;
+}) {
+  const [showKeys, setShowKeys] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  /** Mã đã bấm "Tra cứu" — truy vấn chỉ chạy cho mã này (null = chưa tra cứu). */
+  const [submittedKey, setSubmittedKey] = useState<string | null>(null);
+
+  const myKeys = useQuery(api.backup.myRestoreKeys, showKeys ? { token: TOKEN() } : "skip") as {
+    backupId: string;
+    guildName: string;
+    restoreKey: string | null;
+    createdAt: number;
+  }[];
+
+  // Tra cứu là QUERY của Convex (không phải mutation): nên nó reactive + được
+  // cache sẵn, và chỉ chạy khi có mã đã bấm. `undefined` = đang tải.
+  const looked = useQuery(
+    api.backup.lookupBackup,
+    submittedKey ? { token: TOKEN(), restoreKey: submittedKey } : "skip",
+  ) as (BackupInfo & { pushedToGithub: boolean }) | null | undefined;
+  const searching = !!submittedKey && looked === undefined;
+  const found = looked ?? null;
+  const notFound = !!submittedKey && looked === null;
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-primary" />
+            <p className="font-display font-semibold">{translate("Tra cứu & cứu hộ backup")}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowKeys((v) => !v)}
+            title={translate("Xem mã khôi phục của các bản backup bạn đang quản lý")}
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            {showKeys ? translate("Ẩn mã của tôi") : translate("Mã khôi phục của tôi")}
+          </Button>
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          {translate(
+            "Đã mất quyền với server gốc (bị nuke mất role, bị kick, hoặc đã xoá server)? Dán mã khôi phục của bản backup vào đây để dựng lại cấu trúc server đó vào server hiện tại.",
+          )}
+        </p>
+
+        {showKeys && (
+          <div className="rounded-xl border border-border bg-secondary/40 p-3 text-xs">
+            {myKeys === undefined ? (
+              <p className="text-muted-foreground">{translate("Đang tải…")}</p>
+            ) : myKeys.length === 0 ? (
+              <p className="text-muted-foreground">
+                {translate("Chưa có bản backup nào — bấm “Backup ngay” để có mã khôi phục.")}
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {myKeys.map((k) => (
+                  <li key={k.backupId} className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{k.guildName}</span>
+                    <span className="text-muted-foreground">
+                      {new Date(k.createdAt).toLocaleString(dateLocale(), {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    {k.restoreKey ? (
+                      <code className="rounded bg-background px-2 py-0.5 font-mono text-[11px] tracking-wider">
+                        {k.restoreKey}
+                      </code>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {translate("(bản cũ — chưa có mã)")}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-muted-foreground">
+              {translate(
+                "Hãy lưu mã lại (kèm ảnh chụp hoặc ghi chú) — mất server là mất luôn đường xem lại mã này.",
+              )}
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && keyInput.trim()) setSubmittedKey(keyInput.trim());
+            }}
+            placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+            className="max-w-xs font-mono uppercase"
+            aria-label={translate("Mã khôi phục")}
+          />
+          <Button
+            size="sm"
+            disabled={searching || !keyInput.trim()}
+            onClick={() => setSubmittedKey(keyInput.trim())}
+          >
+            {searching ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Search className="h-3.5 w-3.5" />
+            )}
+            {translate("Tra cứu")}
+          </Button>
+        </div>
+
+        {notFound && (
+          <p className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              {translate(
+                "Không tìm thấy bản backup nào với mã này — kiểm tra lại mã, hoặc dùng bản backup mới nhất.",
+              )}
+            </span>
+          </p>
+        )}
+
+        {found && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-secondary/50 px-4 py-3">
+            <div className="min-w-0">
+              <p className="font-medium">{found.guildName}</p>
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                <span>
+                  {new Date(found.createdAt).toLocaleString(dateLocale(), {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Users className="h-3 w-3" /> {found.roleCount} role
+                </span>
+                <span className="flex items-center gap-1">
+                  <FolderTree className="h-3 w-3" /> {found.channelCount} {translate("kênh")}
+                </span>
+                {(found.messageCount ?? 0) > 0 && (
+                  <span className="flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3" /> {found.messageCount} {translate("tin")}
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy !== null || planBusy !== null}
+                onClick={() => onPlan(found, submittedKey ?? undefined)}
+              >
+                <ClipboardList className="h-3.5 w-3.5" /> {translate("Xem kế hoạch")}
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy !== null}
+                onClick={() => onRestore(found, submittedKey ?? undefined)}
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> {translate("Khôi phục vào server này")}
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

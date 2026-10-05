@@ -315,6 +315,8 @@ export const botReportRestorePlanArgs = {
       /** Tổng số lượt gán vai trò dự kiến (P2). */
       memberRoleAssignments: v.optional(v.number()),
       banCount: v.optional(v.number()),
+      /** Số trường thông tin server sẽ áp lại (tên/mô tả/icon/banner/splash). */
+      metaFieldCount: v.optional(v.number()),
       settingsCount: v.number(),
       warnings: v.array(v.string()),
       at: v.number(),

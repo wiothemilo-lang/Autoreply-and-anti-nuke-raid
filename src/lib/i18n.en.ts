@@ -1544,4 +1544,22 @@ export const EN: Record<string, string> = {
   "Không có việc nào bị kẹt.": "No stuck jobs.",
   "Chỉ tính việc chờ quá 15 phút — tick bot chạy mỗi 3 phút, quá ngưỡng là đứt mắt xích.":
     "Only counts jobs waiting more than 15 minutes — the bot ticks every 3 minutes, past that the chain is broken.",
+  // ── Tra cứu backup / mã khôi phục (đường cứu hộ khi mất quyền server gốc) ──
+  "Tra cứu & cứu hộ backup": "Backup lookup & rescue",
+  "Xem mã khôi phục của các bản backup bạn đang quản lý":
+    "View the restore keys of backups you manage",
+  "Mã khôi phục của tôi": "My restore keys",
+  "Ẩn mã của tôi": "Hide my keys",
+  "Mã khôi phục": "Restore key",
+  "Tra cứu": "Look up",
+  tin: "msgs",
+  "(bản cũ — chưa có mã)": "(older backup — no key yet)",
+  "Chưa có bản backup nào — bấm “Backup ngay” để có mã khôi phục.":
+    "No backups yet — click “Back up now” to get a restore key.",
+  "Hãy lưu mã lại (kèm ảnh chụp hoặc ghi chú) — mất server là mất luôn đường xem lại mã này.":
+    "Save the key somewhere safe (screenshot or note) — losing the server means losing your only way to see it again.",
+  "Đã mất quyền với server gốc (bị nuke mất role, bị kick, hoặc đã xoá server)? Dán mã khôi phục của bản backup vào đây để dựng lại cấu trúc server đó vào server hiện tại.":
+    "Lost access to the original server (nuked out of your roles, kicked, or the server was deleted)? Paste a backup's restore key here to rebuild that server's structure in the current one.",
+  "Không tìm thấy bản backup nào với mã này — kiểm tra lại mã, hoặc dùng bản backup mới nhất.":
+    "No backup matches this key — double-check it, or use the most recent backup.",
 };

@@ -17,7 +17,9 @@
  *      route lạ 404 có thương hiệu.
  *
  * KHÔNG cài dependency mới: điều khiển Chromium bằng DevTools Protocol qua
- * WebSocket SẴN CÓ của Node (>=22), phục vụ dist/ bằng http server của Node.
+ * WebSocket, phục vụ dist/ bằng http server của Node. WebSocket lấy theo thứ tự:
+ * global `WebSocket` của Node (>=22) → `ws` (đã nằm sẵn qua convex). Cả hai
+ * cùng bề mặt WHATWG nên phần CDP phía dưới không phải biết đang dùng cái nào.
  * Trình duyệt tìm theo thứ tự: $CHROME_BIN → /usr/bin/chromium* → cache
  * playwright. Thiếu trình duyệt = FAIL có hướng dẫn (không im lặng xanh).
  *
@@ -28,6 +30,32 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { spawn, spawnSync } = require("node:child_process");
+
+/**
+ * WebSocket client cho CDP.
+ *
+ * Global `WebSocket` chỉ có từ Node 22; trên Node 20 (VPS hiện tại) biến này
+ * là `undefined` ⇒ `new WebSocket(url)` ném ReferenceError NGAY ở `Cdp.connect`
+ * và cả suite chết trước khi test được thứ gì — trước đây đây là lý do
+ * `test-browser-contracts` đỏ trên mọi máy chạy Node < 22.
+ *
+ * Vì sao KHÔNG skip: bỏ qua thì hợp đồng bàn phím/skip-link/route của web bị
+ * mất vô hình. Nay lấy `ws` (đã có sẵn trong node_modules qua `convex`, cùng
+ * bề mặt WHATWG: addEventListener open/message/error + event.data + send/close)
+ * ⇒ suite chạy thật trên CẠ Node 20 lẫn Node 22+. Nếu thiếu cả hai thì báo
+ * lỗi tường minh thay vì crash vô hình.
+ */
+function pickWebSocket() {
+  if (typeof WebSocket === "function") return WebSocket;
+  try {
+    return require("ws").WebSocket;
+  } catch {
+    throw new Error(
+      "Cần WebSocket để điều khiển DevTools: Node < 22 thiếu global WebSocket và " +
+        "không tìm thấy gói `ws`. Hãy chạy bằng Node >= 22.",
+    );
+  }
+}
 const { test } = require("node:test");
 
 /**
@@ -220,7 +248,11 @@ class Cdp {
   }
 
   static async connect(url) {
-    const ws = new WebSocket(url);
+    // `new pickWebSocket()(url)` sẽ parse thành `(new pickWebSocket())(url)` —
+    // tức gọi constructor KHÔNG có `new` → "Class constructor ... cannot be
+    // invoked without 'new'". Phải gom tròn ngoặc: `new (pick())(url)`.
+    const WebSocketImpl = pickWebSocket();
+    const ws = new WebSocketImpl(url);
     try {
       // Không có trần thì một WebSocket không mở (cũng không lỗi) treo cả suite.
       await withCeiling(
