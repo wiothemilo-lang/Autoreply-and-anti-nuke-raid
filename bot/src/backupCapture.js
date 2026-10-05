@@ -84,7 +84,13 @@ async function captureThreads(channel, messageLimit, threadCap) {
   try {
     let active = null;
     if (typeof channel.threads?.fetchActive === "function") {
-      active = await channel.threads.fetchActive();
+      // discord.js trả { threads: Collection, members: Collection, hasMore? }
+      // (typings: Promise<FetchedThreads>), KHÔNG phải Collection. Trước đây
+      // code lấy thẳng kết quả → object này không iterable → spread ném, và vì
+      // catch bọc cả vòng lặp nên MẤT SẠCH thread của kênh đó trong mọi bản
+      // backup, chỉ còn dòng lỗi mỗi giây trong log (bug thật 05/10/2026).
+      const res = await channel.threads.fetchActive();
+      active = res?.threads ?? res;
     } else if (channel.threads?.cache) {
       active = channel.threads.cache;
     }

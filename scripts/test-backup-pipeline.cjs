@@ -311,13 +311,16 @@ const check = (label, ok) => {
       },
     },
     // Thread: kênh văn bản dùng fetchActive(), kênh forum dùng cache sẵn có.
+    // fetchActive() thật của discord.js trả { threads, members, hasMore? }
+    // (typings: Promise<FetchedThreads>) — KHÔNG phải Collection thẳng. Mock
+    // cũ trả Map nên code bug vẫn xanh trong test nhưng ném khi chạy thật.
     threads: {
       cache: new Map(o.threads ?? []),
       fetchActive:
         typeof o.fetchActive === "function"
           ? o.fetchActive
           : o.threads
-            ? async () => new Map(o.threads)
+            ? async () => ({ threads: new Map(o.threads), members: new Map() })
             : undefined,
     },
   });
@@ -2440,6 +2443,65 @@ const check = (label, ok) => {
       !err && r.roleCount === 1 && r.banCount === 0 && r.metaApplied.name === false,
       err?.message,
     );
+  }
+
+  // ── Thread capture: shape THẬT của discord.js (bug 05/10/2026) ──
+  // fetchActive() trả { threads, members, hasMore? }. Code cũ lấy thẳng kết
+  // quả rồi spread → object không iterable → ném, và vì catch bọc cả vòng lặp
+  // nên kênh đó MẤT SẠCH thread trong mọi bản backup.
+  {
+    const mkThreadCh = (fetchActive) => ({
+      name: "kênh văn bản",
+      threads: { fetchActive, cache: new Map() },
+    });
+    const cap = require("../bot/src/backupCapture.js").captureThreads;
+
+    // 1. Shape thật: object bọc Collection bên trong.
+    const r1 = await cap(
+      mkThreadCh(async () => ({
+        threads: new Map([
+          ["t1", { id: "t1", name: "thread-một", messageCount: 1 }],
+          ["t2", { id: "t2", name: "thread-hai", messageCount: 2 }],
+        ]),
+        members: new Map(),
+      })),
+      0,
+      10,
+    );
+    check(
+      "fetchActive() trả { threads, members } → lấy đủ thread (không mất)",
+      r1.length === 2 && r1.map((t) => t.name).join(",") === "thread-một,thread-hai",
+      JSON.stringify(r1),
+    );
+
+    // 2. Collection thẳng (một số bản discord.js/mock) → vẫn phải chạy.
+    const r2 = await cap(
+      mkThreadCh(async () => new Map([["t3", { id: "t3", name: "thread-ba", messageCount: 0 }]])),
+      0,
+      10,
+    );
+    check(
+      "fetchActive() trả Collection thẳng → vẫn lấy được",
+      r2.length === 1 && r2[0].name === "thread-ba",
+    );
+
+    // 3. Không có fetchActive → lùi về cache.
+    const r3 = await cap(
+      {
+        name: "forum",
+        threads: { cache: new Map([["t4", { id: "t4", name: "t-ngoi", messageCount: 0 }]]) },
+      },
+      0,
+      10,
+    );
+    check(
+      "không có fetchActive → lùi về threads.cache",
+      r3.length === 1 && r3[0].name === "t-ngoi",
+    );
+
+    // 4. Không có gì → [], KHÔNG ném ra ngoài.
+    const r4 = await cap({ name: "rỗng", threads: {} }, 0, 10);
+    check("không có thread nào → trả [] (không ném)", Array.isArray(r4) && r4.length === 0);
   }
 
   console.log(`\nKết quả backup pipeline: ${pass} PASS, ${fail} FAIL`);
