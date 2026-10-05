@@ -354,89 +354,96 @@ check(
   );
 }
 
-// ── CHẠY VALIDATOR THẬT với payload bot THẬT (thay vì so tên field) ──
-// Hai bug liên tiếp đều lọt qua gate so-tên-field:
-//   1. `budget` có trong schema.ts nhưng thiếu trong args của mutation →
-//      "extra field budget" (lỗi #1, PR #33 để sót từ 87e62b3).
-//   2. Vá thêm `reportedAt: v.number()` vào args → nhưng BOT KHÔNG gửi field
-//      này (server tự thêm lúc ghi) → "missing the required field reportedAt".
-// Cả hai đều là lỗi "validator vs payload", nên gate phải chạy validator thật.
-// convex/values KHÔNG export hàm validate → ta dựng validator từ source rồi kiểm
-// bằng bộ walker mô phỏng đúng quy tắc của Convex (object: cấm field lạ,
-// bắt buộc field không-optional; array/string/number/boolean theo kind).
+// ── Args KHÔNG được đòi field mà bot không gửi ──
+// Bug 05/10/2026 (phát sinh sau ee36db1): args của guilds:botSyncGuilds khai
+// `reportedAt: v.number()` BẮT BUỘC, nhưng `aiStats()` KHÔNG gửi field đó —
+// server tự ghi ở `statusPatch.aiHealth = { ...aiHealth, reportedAt: now }` để
+// bot không thể giả mạo mốc thời gian. Convex validate args TRƯỚC khi chạy
+// handler → ArgumentValidationError, mỗi 180s, cả vòng sync chết.
+//
+// Hai khối test ngay trên vẫn XANH khi bug còn: chúng chỉ so schema↔args với
+// nhau, chưa BAO GIỜ so với payload bot thật. Test này gọi chính aiStats() để
+// bịt đúng lỗ hổng đó — payload bot là mốc, không phải schema.
 {
-  const { v } = require("convex/values");
-  const src = fs.readFileSync(path.join(convexDir, "guilds.ts"), "utf8");
-  // Tách khối cân bằng ngoặc bắt đầu từ anchor, bỏ comment, bỏ chú thích kiểu TS.
-  const grab = (anchor) => {
+  /** Cắt khối cân bằng ngoặc bắt đầu từ `anchor` (dùng cho v.object lồng nhau). */
+  const balanced = (src, anchor) => {
     const i = src.indexOf(anchor);
-    if (i < 0) return null;
+    if (i < 0) return "";
     let d = 0;
     let out = "";
     for (let j = src.indexOf("(", i); j < src.length; j++) {
       out += src[j];
       if (src[j] === "(") d++;
-      if (src[j] === ")" && --d === 0) break;
-    }
-    return out
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "")
-      .replace(/\sas\s+/g, " ")
-      .replace(/:\s*(string|number|boolean)\s/g, " ");
-  };
-  const build = (anchor) => {
-    const raw = grab(anchor);
-    return raw ? new Function("v", "return v.optional" + raw)(v) : null;
-  };
-
-  // Walker: (validator, value, path) -> danh sách lỗi đọc được.
-  const walk = (val, value, path) => {
-    if (value === undefined) {
-      return val.isOptional === "optional" ? [] : [`${path}: BẮT BUỘC nhưng không được gửi`];
-    }
-    if (val.kind === "object") {
-      const errs = [];
-      for (const k of Object.keys(value)) {
-        if (!val.fields[k]) errs.push(`${path}.${k}: KHÔNG có trong validator`);
-        else errs.push(...walk(val.fields[k], value[k], `${path}.${k}`));
+      if (src[j] === ")") {
+        d--;
+        if (d === 0) break;
       }
-      for (const [k, f] of Object.entries(val.fields)) {
-        if (f.isOptional === "required" && !(k in value)) {
-          errs.push(`${path}.${k}: BẮT BUỘC nhưng bot không gửi`);
-        }
-      }
-      return errs;
     }
-    if (val.kind === "array") {
-      if (!Array.isArray(value)) return [`${path}: phải là array`];
-      return value.flatMap((e, i) => walk(val.element, e, `${path}[${i}]`));
-    }
-    if (val.kind === "string" && typeof value !== "string") return [`${path}: phải là string`];
-    if (val.kind === "float64" && typeof value !== "number") return [`${path}: phải là number`];
-    if (val.kind === "boolean" && typeof value !== "boolean") return [`${path}: phải là boolean`];
-    return [];
+    return out;
+  };
+  /**
+   * Key TRỤC TIẾP của một khối + cờ bắt buộc.
+   * Dùng THỤT LỀ của field mốc (`seedKey`) để không lẫn field con: regex so
+   * thụt lề ">= N" sẽ nuốt luôn field lồng sâu hơn và sinh báo động giả.
+   */
+  const directFields = (blk, seedKey) => {
+    const m = blk.match(new RegExp(`^(\\s*)${seedKey}:`, "m"));
+    if (!m) return null;
+    const indent = m[1].length;
+    const re = new RegExp(`^ {${indent}}([a-zA-Z][a-zA-Z0-9]*):\\s*v\\.(optional\\()?`, "gm");
+    const all = [];
+    for (const hit of blk.matchAll(re)) all.push([hit[1], !hit[2]]);
+    return { all, required: all.filter(([, req]) => req).map(([k]) => k) };
   };
 
-  const aiValidator = build("aiHealth: v.optional(");
-  const aiHealth = require("../bot/src/ai.js").aiStats();
-  const errs = walk(aiValidator, aiHealth, "aiHealth");
-  check(
-    errs.length === 0
-      ? "payload aiStats() thật khớp validator aiHealth của botSyncGuilds"
-      : `aiStats() KHÔNG khớp validator: ${errs.join(" | ")}`,
-    errs.length === 0,
-  );
+  const guildsSrc = fs.readFileSync(path.join(convexDir, "guilds.ts"), "utf8");
+  const aiBlk = balanced(guildsSrc, "aiHealth: v.optional(");
+  const aiArgs = directFields(aiBlk, "available");
 
-  // globalStatus: bot gửi 6 field cố định (handlers/guildSync.js)
-  const gsValidator = build("globalStatus: v.optional(");
-  const sent = ["guildCount", "memberCount", "version", "ownerName", "ownerAvatarUrl", "aiHealth"];
-  const bad = sent.filter((k) => !gsValidator || !gsValidator.fields[k]);
-  check(
-    bad.length === 0
-      ? "mọi field globalStatus bot gửi đều có trong validator"
-      : `globalStatus thiếu field trong validator: ${bad.join(", ")}`,
-    bad.length === 0,
-  );
+  // Payload THẬT bot gửi — không hard-code, để test đỏ đúng lúc aiStats() đổi.
+  let sent = null;
+  try {
+    const { aiStats } = require(path.join(root, "bot", "src", "ai.js"));
+    sent = aiStats();
+  } catch (e) {
+    // Không bỏ qua âm thầm: hỏng ở đây nghĩa là mất lớp bảo vệ, phải đỏ.
+    check(`nạp được aiStats() để so payload thật — ${e.message}`, false);
+  }
+
+  if (sent && aiArgs) {
+    const sentTop = Object.keys(sent).filter((k) => sent[k] !== undefined);
+    const requiredNotSent = aiArgs.required.filter((k) => !sentTop.includes(k));
+    check(
+      requiredNotSent.length === 0
+        ? "args botSyncGuilds không đòi field nào aiStats() không gửi"
+        : `args botSyncGuilds đòi BẮT BUỘC nhưng aiStats() không gửi: ${requiredNotSent.join(", ")}`,
+      requiredNotSent.length === 0,
+    );
+
+    // Chiều ngược lại: field bot gửi mà args chưa khai → Convex báo "extra field".
+    const declared = new Set(aiArgs.all.map(([k]) => k));
+    const undeclared = sentTop.filter((k) => !declared.has(k));
+    check(
+      undeclared.length === 0
+        ? "mọi field aiStats() gửi đều được args khai báo"
+        : `aiStats() gửi field chưa có trong args (Convex sẽ báo extra field): ${undeclared.join(", ")}`,
+      undeclared.length === 0,
+    );
+  }
+
+  // budget: field con bắt buộc cũng phải có mặt trong payload bot thật.
+  const budgetBlk = balanced(aiBlk, "budget: v.optional(");
+  const budgetArgs = directFields(budgetBlk, "day");
+  if (sent && sent.budget && budgetArgs) {
+    const sentBudget = Object.keys(sent.budget).filter((k) => sent.budget[k] !== undefined);
+    const missReq = budgetArgs.required.filter((k) => !sentBudget.includes(k));
+    check(
+      missReq.length === 0
+        ? "args aiHealth.budget không đòi field nào budgetSummary() không gửi"
+        : `args aiHealth.budget đòi BẮT BUỘC nhưng budgetSummary() không gửi: ${missReq.join(", ")}`,
+      missReq.length === 0,
+    );
+  }
 }
 
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);

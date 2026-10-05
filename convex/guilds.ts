@@ -1131,12 +1131,23 @@ export const botSyncGuilds = mutation({
                 pricingChecked: v.optional(v.nullable(v.string())),
               }),
             ),
-            // `reportedAt` do SERVER tự thêm lúc ghi (dòng dưới: {...aiHealth, reportedAt: now}).
-            // Bot KHÔNG gửi field này — `aiStats()` không có nó. Bắt buộc ở đây
-            // là sai và làm mọi lần gọi botSyncGuilds bị từ chối
-            // ("missing the required field reportedAt", 05/10/2026). Ở
-            // convex/schema.ts (validator của BẢNG) thì bắt buộc là đúng, vì
-            // đó là thứ được lưu xuống.
+            /**
+             * KHÔNG khai bắt buộc ở đây. `reportedAt` là cột phía SERVER tự ghi
+             * (`statusPatch.aiHealth = { ...aiHealth, reportedAt: now }` ở thân
+             * hàm) để bot không thể giả mạo mốc thời gian — nên `aiStats()`
+             * (bot/src/ai.js) cố tình KHÔNG gửi field này.
+             *
+             * Args ≠ schema: schema.ts khai `reportedAt` bắt buộc là ĐÚNG (server
+             * luôn ghi), nhưng args ở đây phải khớp đúng thứ bot GỬI. Convex
+             * validate args TRƯỚC khi chạy handler, nên một field bắt buộc mà bot
+             * không gửi giết mutation ngay lập tức.
+             *
+             * Sự cố 05/10/2026 (sau ee36db1): bản vá trước chép nguyên khối
+             * aiHealth từ schema.ts sang args, kéo cả `reportedAt: v.number()`
+             * vào → botSyncGuilds trả 500 ArgumentValidationError mỗi 180s,
+             * AI health không bao giờ lên dashboard. Bắt buộc cũng sai theo
+             * hướng ngược lại (bot gửi mà validator đòi thừa): giữ optional.
+             */
             reportedAt: v.optional(v.number()),
           }),
         ),
