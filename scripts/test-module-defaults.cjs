@@ -206,6 +206,29 @@ const check = (label, ok) => {
     `2 nhóm khai báo không trùng module (nuke+auto-mod = ${declaredAll.length}, meta = ${metaKeys.length})`,
     declaredAll.length === declaredSet.size && declaredAll.length === metaKeys.length,
   );
+  // Đối chiếu với danh sách module THẬT của bot (convex/modules.ts): module nào
+  // bot có mà dashboard chưa khai thì module đó KHÔNG có công tắc nào — đúng
+  // lớp lỗi vừa vá (thiếu nhóm hiển thị), chỉ khác tầng. Chốt cả 2 chiều.
+  const cModuleStart = mods.indexOf("export const ANTI_NUKE_MODULES");
+  const cModuleBlock = mods.slice(cModuleStart, mods.indexOf("] as const;", cModuleStart));
+  const convexModuleKeys = [...cModuleBlock.matchAll(/module:\s*"([a-zA-Z]+)"/g)].map((m) => m[1]);
+  const convexSet = new Set(convexModuleKeys);
+  const notOnDashboard = [...convexSet].filter((m) => !declaredSet.has(m)).sort();
+  const notInBot = [...declaredSet].filter((m) => !convexSet.has(m)).sort();
+  check(
+    `mọi module bot có đều có công tắc riêng trên dashboard (${convexModuleKeys.length} module)` +
+      (notOnDashboard.length ? `\n     → thiếu toggle: ${notOnDashboard.join(", ")}` : "") +
+      (notInBot.length ? `\n     → dashboard có mà bot không: ${notInBot.join(", ")}` : ""),
+    convexModuleKeys.length > 0 && notOnDashboard.length === 0 && notInBot.length === 0,
+  );
+  check(
+    "self-test: phát hiện module bot có mà dashboard chưa khai",
+    (() => {
+      const fakeBot = ["massBan", "massKick", "brandNewModule"];
+      const fakeDash = new Set(["massBan", "massKick"]);
+      return fakeBot.filter((m) => !fakeDash.has(m)).join(",") === "brandNewModule";
+    })(),
+  );
   // Self-test: cổng phải THẬT SỰ bắt lỗi thiếu module, không xanh giả.
   check(
     "self-test: findGroupGaps bắt module bị bỏ khỏi nhóm",
