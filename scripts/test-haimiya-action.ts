@@ -255,6 +255,77 @@ const okReply = async () =>
   );
   check("cờ needLogin để web phân biệt", noToken.needLogin === true);
 
+  // Bug thật 05/10/2026: gateway trả 401 vì key sai, code cũ `return` ngay nên
+  // provider dự phòng không bao giờ được thử → Haimiya im bất kể key dự phòng
+  // còn tốt. Test này chặn đúng hành vi đó.
+  console.log("\nG2) Provider đầu lỗi 401 → TỰ LÙI sang provider kế tiếp:");
+  clearAIEnv();
+  (process.env as any).AI_API_KEY = "test-key-sai";
+  (process.env as any).AI_BASE_URL = "https://gw.example.com/v1";
+  (process.env as any).GROQ_API_KEY = "test-groq";
+  let gatewayHits = 0;
+  requests = [];
+  globalThis.fetch = (async (url: any, opts: any = {}) => {
+    const host = new URL(String(url)).host;
+    const body = JSON.parse(opts?.body || "{}");
+    requests.push({ host, model: body.model });
+    if (host === "gw.example.com") {
+      gatewayHits++;
+      return {
+        ok: false,
+        status: 401,
+        json: async () => ({}),
+        text: async () => '{"error":{"message":"Invalid API Key","type":"invalid_request_error"}}',
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: "đã lùi sang provider dự phòng" } }] }),
+    };
+  }) as typeof fetch;
+  const r4 = (await askHandler(ctxMock, {
+    messages: [{ role: "user", content: "ping" }],
+    token: "test-session-token",
+  })) as any;
+  check("gateway trả 401 → vẫn trả lời được qua provider dự phòng", r4.offline === false);
+  check(
+    "reply đến từ provider thứ hai",
+    r4.reply === "đã lùi sang provider dự phòng" && requests[1]?.host === "api.groq.com",
+  );
+  check(
+    "key sai thì KHÔNG thử lại model dự phòng cùng provider (đúng 1 request)",
+    gatewayHits === 1,
+  );
+
+  console.log("\nG3) Mọi provider đều 401 → reason nêu nguyên nhân, không lộ JSON thô:");
+  clearAIEnv();
+  (process.env as any).AI_API_KEY = "test-key-sai";
+  (process.env as any).AI_BASE_URL = "https://gw.example.com/v1";
+  (process.env as any).GROQ_API_KEY = "test-groq-2";
+  requests = [];
+  globalThis.fetch = (async () => ({
+    ok: false,
+    status: 401,
+    json: async () => ({}),
+    text: async () =>
+      '{"error":{"message":"Invalid API Key","type":"invalid_request_error","code":"x"}}',
+  })) as typeof fetch;
+  const r5 = (await askHandler(ctxMock, {
+    messages: [{ role: "user", content: "ping" }],
+    token: "test-session-token",
+  })) as any;
+  check("tất cả provider hỏng → offline: true", r5.offline === true);
+  check("reason nêu rõ lỗi key", (r5.reason ?? "").includes("key"));
+  check(
+    "reason nói đã thử cả chuỗi provider",
+    (r5.reason ?? "").includes("2 provider") && (r5.reason ?? "").includes("401"),
+  );
+  check(
+    "reason KHÔNG nhét JSON thô của gateway vào UI",
+    !(r5.reason ?? "").includes("{") && !(r5.reason ?? "").includes("Invalid API Key"),
+  );
+
   // Rate-limit: bucket in-memory module-level → gọi 20 lần rồi lần 21 phải bị chặn
   clearAIEnv();
   (process.env as any).GROQ_API_KEY = "test-groq";

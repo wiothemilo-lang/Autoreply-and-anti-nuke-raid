@@ -50,12 +50,6 @@ KIẾN THỨC CHUYÊN SÂU VỀ PROTOGON (dùng khi được hỏi về bot):
 /**
  * Chọn provider AI theo thứ tự ưu tiên (tất cả tương thích OpenAI chat completions):
  *   1. Gateway OpenAI-compatible (Groq, kiosapi, ...): AI_BASE_URL + AI_API_KEY + AI_MODEL
- *   2. SambaNova: SAMBANOVA_API_KEY (mặc định Meta-Llama-3.3-70B-Instruct)
- *   3. OpenAI: OPENAI_API_KEY (+ OPENAI_MODEL, mặc định gpt-4o-mini)
- */
-/**
- * Chọn provider AI theo thứ tự ưu tiên (tất cả tương thích OpenAI chat completions):
- *   1. Gateway OpenAI-compatible (Groq, kiosapi, ...): AI_BASE_URL + AI_API_KEY + AI_MODEL
  *   2. Groq free (không cần credit card, 30 RPM, 14.4K RPD): GROQ_API_KEY
  *   3. NVIDIA NIM free (40 RPM / 4M TPM, không cần thẻ): NVIDIA_API_KEY
  *      hoặc key riêng cho DeepSeek: DEEPSEEK_NIM_KEY (deepseek-v4-pro-0813)
@@ -69,65 +63,78 @@ KIẾN THỨC CHUYÊN SÂU VỀ PROTOGON (dùng khi được hỏi về bot):
  * LƯU Ý (15/09/2026): Groq đã NGỪNG phục vụ llama-3.3-70b-versatile từ 08/2026 —
  * mặc định mới là openai/gpt-oss-120b (model thay thế Groq khuyến nghị).
  */
-function aiProvider(): { key: string; baseUrl: string; model: string } | null {
+/** Một provider AI tương thích chuẩn OpenAI chat completions. */
+type AiProvider = { key: string; baseUrl: string; model: string };
+
+function aiProviders(): AiProvider[] {
+  const out: AiProvider[] = [];
   // 1. Gateway tùy chỉnh (Groq/kiosapi qua env) — model gateway tự chọn, mặc định
   // là model dự phòng còn được hỗ trợ (xem FALLBACK_MODEL dưới).
   const groqKey = process.env.AI_API_KEY;
   if (groqKey && process.env.AI_BASE_URL) {
-    return {
+    out.push({
       key: groqKey,
       baseUrl: process.env.AI_BASE_URL,
       model: process.env.AI_MODEL ?? FALLBACK_MODEL,
-    };
+    });
   }
   // 2. Groq free trực tiếp (không qua gateway) — model mặc định là model CỦA GROQ
   // còn phục vụ (llama-3.3-70b-versatile đã bị retire 08/2026 → mọi call lỗi 400
   // và chat web rơi về fallback cục bộ dù key hợp lệ).
   const groqDirectKey = process.env.GROQ_API_KEY;
   if (groqDirectKey) {
-    return {
+    out.push({
       key: groqDirectKey,
       baseUrl: "https://api.groq.com/openai/v1",
       model: process.env.AI_MODEL ?? FALLBACK_MODEL,
-    };
+    });
   }
   // 3. NVIDIA NIM free (https://build.nvidia.com — 40 RPM, 4M TPM)
   const nvidiaKey = process.env.NVIDIA_API_KEY;
   if (nvidiaKey) {
-    return {
+    out.push({
       key: nvidiaKey,
       baseUrl: "https://integrate.api.nvidia.com/v1",
       model: process.env.NVIDIA_MODEL ?? "mistralai/mistral-nemotron",
-    };
+    });
   }
   // 3b. NVIDIA NIM với model DeepSeek V4 Pro (key NIM riêng, mạnh hơn)
   const deepseekNimKey = process.env.DEEPSEEK_NIM_KEY;
   if (deepseekNimKey) {
-    return {
+    out.push({
       key: deepseekNimKey,
       baseUrl: "https://integrate.api.nvidia.com/v1",
       model: process.env.DEEPSEEK_NIM_MODEL ?? "deepseek-ai/deepseek-v4-pro-0813",
-    };
+    });
   }
   // 4. SambaNova free
   const sambanovaKey = process.env.SAMBANOVA_API_KEY;
   if (sambanovaKey) {
-    return {
+    out.push({
       key: sambanovaKey,
       baseUrl: "https://api.sambanova.ai/v1",
       model: "Meta-Llama-3.3-70B-Instruct",
-    };
+    });
   }
   // 5. OpenAI (trả phí)
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
-    return {
+    out.push({
       key: openaiKey,
       baseUrl: "https://api.openai.com/v1",
       model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-    };
+    });
   }
-  return null;
+  return out;
+}
+
+/**
+ * Provider ĐẦU TIÊN trong danh sách — chỉ dùng cho phần báo trạng thái
+ * (model + gatewayHost) và các nhánh "chưa cấu hình". Lời gọi thật dùng
+ * `aiProviders()` để còn đường lùi khi một provider hỏng.
+ */
+function aiProvider(): AiProvider | null {
+  return aiProviders()[0] ?? null;
 }
 
 /**
@@ -154,64 +161,127 @@ async function aiFetch(url: string, init: RequestInit): Promise<Response> {
   return fetch(url, { ...init, signal: AbortSignal.timeout(20_000) });
 }
 
-/**
- * Gọi chat completions qua provider với TỰ VÁ MODEL:
- *  - Thử model cấu hình trước; nếu gateway trả 400/404 (model không khả dụng)
- *    thử lại đúng 1 lần với FALLBACK_MODEL — Haimiya tự phục hồi khi model chết
- *    mà không cần can thiệp tay vào env.
- *  - Mọi thất bại trả `reason` ngắn gọn để web hiển thị cho người dùng
- *    (minh bạch: hết "AI không kết nối được" mơ hồ).
- */
 /** Content part cho vision: text hoặc image_url (chuẩn OpenAI-compatible). */
 type ChatContent =
   | string
   | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 
+/**
+ * Ngân sách thời gian cho cả chuỗi provider × model. 6 provider × 2 model ×
+ * timeout 20s có thể kéo action quá 4 phút — người dùng đã bỏ ô chat. Hết
+ * ngân sách thì dừng và báo lý do cuối thay vì treo.
+ */
+const CHAIN_BUDGET_MS = 45_000;
+
+/**
+ * Diễn giải lỗi HTTP thành câu tiếng Việt CÓ HÀNH ĐỘNG, kèm host để biết
+ * đang hỏng provider nào. Không nhét JSON thô của gateway: web render thẳng
+ * `reason` cho người dùng, mà `{"error":{"message":"Invalid API Key"...}}`
+ * chỉ là rác kỹ thuật — ai cũng bỏ cuộc đọc (bug thật 05/10/2026).
+ */
+function describeHttpFailure(host: string, status: number, model: string, body: string): string {
+  if (status === 401 || status === 403)
+    return `${host} từ chối key (lỗi ${status}) — API key không hợp lệ hoặc đã hết hạn`;
+  if (status === 400 || status === 404)
+    return `${host} không phục vụ model "${model}" (lỗi ${status})`;
+  if (status === 429) return `${host} giới hạn tần suất (lỗi 429)`;
+  const detail = body.slice(0, 100).replace(/\s+/g, " ");
+  return `${host} trả lỗi ${status}${detail ? `: ${detail}` : ""}`;
+}
+
+/** Gộp nhiều lỗi provider thành MỘT câu để web hiển thị. */
+function summarizeFailures(failures: string[], providerCount: number, truncated: boolean): string {
+  const uniq = [...new Set(failures)];
+  if (uniq.length === 0) return "AI gateway không phản hồi";
+  const allAuth = uniq.every((f) => f.includes("từ chối key"));
+  // Mọi key đều bị từ chối → đây là lỗi CẤU HÌNH, nói thẳng ra để người
+  // dùng biết phải sửa env chứ không phải lỗi model/tạm thời.
+  if (allAuth) {
+    const scope = providerCount > 1 ? `Cả ${providerCount} provider AI đều ` : "";
+    return `${scope}từ chối key (401/403) — key AI trên Convex sai hoặc hết hạn, cần cấu hình lại`;
+  }
+  const scope = providerCount > 1 ? `${providerCount} provider AI đều lỗi: ` : "";
+  const more = uniq.length > 2 ? ` (+${uniq.length - 2} lỗi khác)` : "";
+  const tail = truncated ? " — dừng sớm vì hết thời gian chờ" : "";
+  return scope + uniq.slice(0, 2).join("; ") + more + tail;
+}
+
+/** Host của baseUrl — chỉ để hiển thị, không bao giờ lộ key. */
+function providerHost(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return "AI gateway";
+  }
+}
+
+/**
+ * Gọi chat completions với TỰ VÁ MODEL **VÀ TỰ LÙI PROVIDER**:
+ *  - Trong mỗi provider: thử model cấu hình, lỗi 400/404 (model chết) thì thử
+ *    lại đúng 1 lần với FALLBACK_MODEL — Haimiya tự phục hồi khi model bị retire
+ *    mà không cần can thiệp tay vào env.
+ *  - Provider hỏng (401/403 key sai, 429, 5xx, mạng/DNS, timeout) → thử TIẾP
+ *    provider kế tiếp thay vì bỏ cuộc. Bug thật 05/10/2026: trước đây gặp 401
+ *    là `return` ngay, nên gateway hỏng key chặn cả các provider free dự phòng
+ *    và Haimiya im luôn chỉ vì một key sai.
+ *  - Trả `reason` tường minh, đã dịch thành hành động được.
+ */
 async function chatCompletion(
-  p: { key: string; baseUrl: string; model: string },
+  providers: AiProvider[],
   messages: Array<{ role: string; content: ChatContent }>,
   opts: { maxTokens: number; temperature: number },
 ): Promise<{ ok: true; reply: string } | { ok: false; reason: string }> {
-  const candidates = Array.from(new Set([p.model, FALLBACK_MODEL]));
-  let lastReason = "AI gateway không phản hồi";
-  for (const model of candidates) {
-    try {
-      const res = await aiFetch(`${p.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${p.key}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          max_tokens: opts.maxTokens,
-          temperature: opts.temperature,
-        }),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const modelHint =
-          res.status === 400 || res.status === 404 ? ` — model "${model}" không khả dụng` : "";
-        lastReason = `AI gateway trả lỗi ${res.status}${modelHint}${text ? `: ${text.slice(0, 140)}` : ""}`;
-        // Model chết → thử model dự phòng; lỗi khác (429/5xx) thử cũng vô ích.
-        if (res.status === 400 || res.status === 404) continue;
-        return { ok: false, reason: lastReason };
+  const deadline = Date.now() + CHAIN_BUDGET_MS;
+  const failures: string[] = [];
+  let truncated = false;
+  for (const p of providers) {
+    if (Date.now() >= deadline) {
+      truncated = true;
+      break;
+    }
+    const host = providerHost(p.baseUrl);
+    for (const model of Array.from(new Set([p.model, FALLBACK_MODEL]))) {
+      try {
+        const res = await aiFetch(`${p.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${p.key}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            max_tokens: opts.maxTokens,
+            temperature: opts.temperature,
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          failures.push(describeHttpFailure(host, res.status, model, text));
+          // Chỉ 400/404 là lỗi MODEL → thử lại bằng model dự phòng cùng provider.
+          // 401/403 (key), 429, 5xx đổi model cũng vô ích → next provider.
+          if (res.status === 400 || res.status === 404) continue;
+          break;
+        }
+        const data = (await res.json()) as {
+          choices?: { message?: { content?: string } }[];
+        };
+        const reply = data?.choices?.[0]?.message?.content?.trim() ?? "";
+        if (reply) return { ok: true, reply };
+        // Nội dung rỗng: thử provider kế tiếp trước khi báo lỗi.
+        failures.push(`${host} trả về nội dung rỗng`);
+        break;
+      } catch (e) {
+        failures.push(
+          e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
+            ? `${host} quá thời gian phản hồi (timeout 20s)`
+            : `${host} không kết nối được (mạng/DNS)`,
+        );
+        break;
       }
-      const data = (await res.json()) as {
-        choices?: { message?: { content?: string } }[];
-      };
-      const reply = data?.choices?.[0]?.message?.content?.trim() ?? "";
-      if (!reply) return { ok: false, reason: "AI trả về nội dung rỗng" };
-      return { ok: true, reply };
-    } catch (e) {
-      lastReason =
-        e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
-          ? "AI gateway quá thời gian phản hồi (timeout 20s)"
-          : "Không kết nối được tới AI gateway (mạng/DNS)";
     }
   }
-  return { ok: false, reason: lastReason };
+  return { ok: false, reason: summarizeFailures(failures, providers.length, truncated) };
 }
 
 /** Rate-limit trong bộ nhớ cho haimiya.ask: identity → mốc gọi gần đây (60s window). */
@@ -304,8 +374,8 @@ export const ask = action({
     const safeMessages = messages
       .slice(-8)
       .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
-    const p = aiProvider();
-    if (!p)
+    const providers = aiProviders();
+    if (providers.length === 0)
       return {
         reply: "",
         offline: true,
@@ -365,10 +435,14 @@ export const ask = action({
         ? `${systemPrompt}\n\nNGƯỜI DÙNG VỪA GỬI ${validImages.length} ẢNH. Hãy xem kỹ nội dung ảnh và trả lời theo câu hỏi kèm theo. Nếu ảnh chứa thông tin nhạy cảm (mật khẩu, token, thông tin cá nhân), hãy nhắc người dùng che thông tin đó.`
         : systemPrompt;
 
-    const r = await chatCompletion(p, [{ role: "system", content: systemWithVision }, ...history], {
-      maxTokens: 700,
-      temperature: 0.6,
-    });
+    const r = await chatCompletion(
+      providers,
+      [{ role: "system", content: systemWithVision }, ...history],
+      {
+        maxTokens: 700,
+        temperature: 0.6,
+      },
+    );
     if (r.ok) return { reply: r.reply, offline: false };
     return { reply: "", offline: true, reason: r.reason };
   },
@@ -399,8 +473,8 @@ export const classifyViolation = action({
     // CHỈ bot được gọi: phân loại/điều tra xảy ra phía process bot (nguồn dữ liệu
     // tin cậy) — không cho client web tự gọi để đốt lượt AI free tier.
     await requireBotKeyStrict(ctx, args.botKey);
-    const p = aiProvider();
-    if (!p)
+    const providers = aiProviders();
+    if (providers.length === 0)
       return {
         classification: "individual",
         confidence: 0.5,
@@ -420,7 +494,7 @@ Server: ${guildNameSafe ?? "?"} (${args.memberCount ?? "?"} thành viên).
 Thành viên mới gần đây: ${args.recentJoins ?? 0}.
 Mẫu tin nhắn:\n${samples.length ? samples.map((s, i) => `${i + 1}. ${s}`).join("\n") : "(không có)"}`;
     const r = await chatCompletion(
-      p,
+      providers,
       [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -492,8 +566,8 @@ export const analyzeRaid = action({
   },
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
-    const p = aiProvider();
-    if (!p) {
+    const providers = aiProviders();
+    if (providers.length === 0) {
       return {
         coordinated: null,
         confidence: 0,
@@ -511,7 +585,7 @@ Phân tích dữ liệu một vụ tấn công server vừa xảy ra và trả l
 Hồ sơ cụm tài khoản:\n${args.clusterProfile ? String(args.clusterProfile).slice(0, 2000) : "(không có)"}
 Chuỗi hành vi gần đây:\n${args.recentActions ? String(args.recentActions).slice(0, 2000) : "(không có)"}`;
     const r = await chatCompletion(
-      p,
+      providers,
       [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -582,8 +656,8 @@ export const analyzeExternalApp = action({
   },
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
-    const p = aiProvider();
-    if (!p) {
+    const providers = aiProviders();
+    if (providers.length === 0) {
       return { isRaid: null, confidence: 0, reason: "AI chưa cấu hình", offline: true };
     }
     const system = `Bạn là chuyên gia an ninh Discord chuyên điều tra RAID bằng ỨNG DỤNG NGOÀI (external app / integration).
@@ -606,7 +680,7 @@ Chỉ trả lời JSON thuần (không markdown): {"isRaid": true|false|null, "c
     const user = `Vụ: ${args.count} kết nối app ngoài trong ${args.windowSeconds}s (ngưỡng ${args.threshold}). Server: ${args.guildName ? String(args.guildName).slice(0, 120) : "?"} (${args.memberCount ?? "?"} thành viên). Thành viên mới gần đây: ${args.recentJoins ?? 0}.
 Hồ sơ kết nối / tin nhắn app:\n${args.appProfile ? String(args.appProfile).slice(0, 2000) : "(không có)"}`;
     const r = await chatCompletion(
-      p,
+      providers,
       [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -662,6 +736,8 @@ export const aiStatus = action({
         model: null,
         fallbackModel: FALLBACK_MODEL,
         gatewayHost: null,
+        /** 0 provider — endpoint bị chặn rate-limit nên không suy ra được. */
+        providerCount: 0,
         rateLimited: true,
       };
     }
@@ -671,6 +747,12 @@ export const aiStatus = action({
       model: p?.model ?? null,
       /** Model dự phòng sẽ được dùng nếu model cấu hình lỗi 400/404. */
       fallbackModel: FALLBACK_MODEL,
+      /**
+       * Số provider AI đang có key trên deployment. Phân biệt ngay tình huống
+       * "1 provider (key hỏng là chết)" với "nhiều provider (còn đường lùi)" —
+       * không cần đoán từ `model`/`gatewayHost`.
+       */
+      providerCount: aiProviders().length,
       // Chỉ xuất host nguồn (an toàn — không chứa key, giúp biết đang qua gateway nào).
       gatewayHost: p
         ? (() => {

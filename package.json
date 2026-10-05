@@ -19,7 +19,8 @@
     "test:mutation": "node scripts/mutation-test.cjs --full",
     "coverage:floor": "node scripts/check-coverage-floor.cjs",
     "smoke:vps": "node scripts/smoke-vps.cjs",
-    "check:payload": "node scripts/check-bot-payload.cjs --self-test"
+    "check:payload": "node scripts/check-bot-payload.cjs --self-test",
+    "check:ai-status": "node scripts/check-ai-status.cjs --self-test"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
