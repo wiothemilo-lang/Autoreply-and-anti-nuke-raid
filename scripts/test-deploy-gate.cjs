@@ -167,6 +167,85 @@ async function gateAfterRun(command, output) {
     }
   }
 
+  // ── 8. smoke-vps phải THỰC SỰ nạp bot/.env + tìm thấy discord.js ──
+  // Bug thật 05/10/2026 (dựng VPS mới): smoke-vps chỉ `require(...)` loadenv.js
+  // mà không gọi loadEnv() → bot/.env bị bỏ qua im lặng, 2 biến bắt buộc luôn ❌;
+  // và require("discord.js") từ scripts/ không dò tới bot/node_modules → luôn
+  // "Cannot find module". Smoke báo "loadenv.js nạp xong" trong khi chưa nạp gì.
+  {
+    const fs = require("fs");
+    const src = fs.readFileSync(path.join(__dirname, "smoke-vps.cjs"), "utf8");
+    // Bỏ comment dòng trước khi so khớp — nếu không, chính dòng comment giải
+    // thích bug sẽ khớp regex và làm cổng báo xanh giả.
+    const code = src
+      .split("\n")
+      .map((l) => l.replace(/\/\/.*$/, ""))
+      .join("\n");
+
+    check("smoke-vps gọi loadEnv() chứ không chỉ require loadenv.js", /\.loadEnv\(\)/.test(code));
+    check(
+      "smoke-vps KHÔNG còn require loadenv.js kiểu treo bỏ",
+      !/require\([^;]*"loadenv\.js"\)\s*;/.test(code),
+    );
+    check(
+      "smoke-vps resolve discord.js từ gốc bot (createRequire)",
+      /createRequire\(path\.join\(__dirname, "..", "bot", "package\.json"\)\)/.test(code) &&
+        /botRequire\("discord\.js"\)/.test(code),
+    );
+    check(
+      'smoke-vps KHÔNG còn require("discord.js") trần ở scripts/',
+      !/require\("discord\.js"\)/.test(code),
+    );
+    // Chốt nguyên tắc gốc: loadenv.js KHÔNG tự chạy khi require.
+    const le = require(path.join(__dirname, "..", "bot", "src", "loadenv.js"));
+    check(
+      "bot/src/loadenv.js chỉ export loadEnv, không tự nạp khi require",
+      typeof le.loadEnv === "function",
+    );
+  }
+
+  // ── 9. TOÀN BỘ scripts/ + bot/: không file nào require loadenv mà quên gọi ──
+  // Cùng lớp bug như smoke-vps nhưng áp cho MỌI file. `require("loadenv")` trần
+  // là code chạy được nhưng im lặng không nạp .env — dạng lỗi mà review mắt thường
+  // bỏ sót vì "có require vẫn thấy loadenv.js trong file".
+  {
+    const fs = require("fs");
+    const roots = [path.join(__dirname), path.join(__dirname, "..", "bot", "src")];
+    const offenders = [];
+    const walk = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          walk(p);
+          continue;
+        }
+        if (!/\.(c?js)$/.test(e.name)) continue;
+        const code = fs
+          .readFileSync(p, "utf8")
+          .split("\n")
+          .map((l) => l.replace(/\/\/.*$/, ""))
+          .join("\n");
+        // require loadenv mà KHÔNG kèm .loadEnv() ngay sau → treo bỏ.
+        // KHÔNG đặt `"` trước `loadenv`: dạng `require("../bot/src/loadenv.js")`
+        // chỉ có quote ở ĐẦU chuỗi, không có quote ngay trước "loadenv".
+        // Bản cũ có `"` đó → không bao giờ khớp → cổng luôn xanh (vô dụng).
+        if (/require\([^;]*loadenv(?:\.js)?"\)\s*;/.test(code)) {
+          offenders.push(path.relative(path.join(__dirname, ".."), p));
+        }
+      }
+    };
+    for (const r of roots) walk(r);
+    // check() chỉ nhận 2 tham số (tên, ok) → nhét danh sách file vi phạm VÀO
+    // chính tên, nếu không test đỏ mà không ai biết file nào sai.
+    check(
+      offenders.length === 0
+        ? "không script nào require loadenv mà quên gọi loadEnv()"
+        : `require loadenv mà quên loadEnv() ở: ${offenders.join(", ")}`,
+      offenders.length === 0,
+    );
+  }
+
   console.log(`\nKết quả deploy gate: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

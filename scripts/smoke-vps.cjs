@@ -37,8 +37,13 @@ check(`Node.js >= 18 (hiện tại ${process.versions.node})`, major >= 18);
 // ─────────────────────────── 2. Env vars ───────────────────────────
 section("2. Biến môi trường (nạp bot/src/loadenv.js)");
 try {
-  require(path.join(__dirname, "..", "bot", "src", "loadenv.js"));
-  console.log("  ℹ️  loadenv.js nạp xong (đọc .env nếu có)");
+  // PHẢI gọi loadEnv() — chỉ require() thôi KHÔNG nạp gì: loadenv.js chỉ
+  // export hàm (module.exports = { loadEnv }), không tự chạy khi require.
+  // Bot thật gọi ở bot/src/index.js:6 và register-slash.js:1; smoke test
+  // trước đây chỉ require → bot/.env bị bỏ qua và 2 biến bắt buộc luôn ❌
+  // dù VPS đã cấu hình đúng (bug thật 05/10/2026 lúc dựng VPS mới).
+  require(path.join(__dirname, "..", "bot", "src", "loadenv.js")).loadEnv();
+  console.log("  ℹ️  loadenv.js đã nạp bot/.env (nếu có)");
 } catch (e) {
   console.log(`  ⚠️  loadenv.js không nạp được: ${e.message}`);
 }
@@ -131,7 +136,14 @@ check(`${loaded}/${CORE_MODULES.length} module nạp sạch`, loaded === CORE_MO
       check("Discord login", false, "thiếu DISCORD_TOKEN");
     } else {
       try {
-        const { Client, GatewayIntentBits } = require("discord.js");
+        // discord.js nằm ở bot/node_modules (chỉ trong bot/package.json).
+        // require("discord.js") từ scripts/ sẽ dò scripts/node_modules →
+        // root/node_modules — KHÔNG có ở đâu cả → luôn "Cannot find module"
+        // dù bot deps đã cài đủ (bug thật 05/10/2026). createRequire với
+        // đường dẫn trong bot/ ép Node giải resolve theo gốc bot.
+        const { createRequire } = require("module");
+        const botRequire = createRequire(path.join(__dirname, "..", "bot", "package.json"));
+        const { Client, GatewayIntentBits } = botRequire("discord.js");
         const probe = new Client({ intents: [GatewayIntentBits.Guilds] });
         const loginResult = await Promise.race([
           probe

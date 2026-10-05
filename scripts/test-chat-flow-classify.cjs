@@ -61,8 +61,10 @@ if (!LIVE) {
   };
 } else {
   // LIVE: chỉ chạy khi có key — đọc env theo đúng loadenv của bot.
+  // PHẢI gọi loadEnv(): loadenv.js chỉ export hàm, require thôi KHÔNG nạp gì
+  // → nhánh LIVE âm thầm rơi về mock dù bot/.env có key thật (bug 05/10/2026).
   try {
-    require("../bot/src/loadenv.js");
+    require("../bot/src/loadenv.js").loadEnv();
   } catch {}
 }
 

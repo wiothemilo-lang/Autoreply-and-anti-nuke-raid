@@ -8,6 +8,9 @@
 
 - [ ] `cd /protogon && git pull` — code mới nhất
 - [ ] `node scripts/smoke-vps.cjs` — **SMOKE TEST phải PASS 100%** (env, 14 module, Convex, Discord login)
+  - Mục tiêu: **7 PASS, 0 FAIL**
+  - `❌` ở nhánh "Biến môi trường" → bot chưa đọc được `bot/.env`
+  - `❌ Discord login — Cannot find module 'discord.js'` → script chưa resolve được dep của bot, KHÔNG phải thiếu `bun install`
 - [ ] `pm2 restart protogon-bot && pm2 logs protogon-bot --lines 30` — không có error loop
 - [ ] Mở web dashboard → server phụ xuất hiện trong danh sách, bot hiển thị **Online**
 
