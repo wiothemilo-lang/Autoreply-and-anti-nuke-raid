@@ -150,6 +150,13 @@ jobs:
       # phải là MỘT danh sách. Lệch là dashboard báo "đã lưu" còn log không đổi.
       - name: Ngôn ngữ log khớp giữa Convex và bot
         run: node scripts/check-log-lang.cjs --self-test
+      # `haimiya:aiStatus` là endpoint PUBLIC không cần đăng nhập — là nơi DUY
+      # NHẤT còn chẩn đoán được khi AI chết (05/10: key gateway sai làm Haimiya
+      # im, không ai biết còn bao nhiêu key dự phòng). Thêm nhánh return mà quên
+      # `providerCount` là thông tin đó biến mất đúng lúc đang cần nhất. Cổng
+      # quét MỌI nhánh return của action + chặn rò khoá API ra endpoint public.
+      - name: aiStatus giữ thông tin chẩn đoán provider AI
+        run: node scripts/check-ai-status.cjs --self-test
 
   test:
     needs: [lint, security]
