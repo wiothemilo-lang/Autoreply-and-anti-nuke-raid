@@ -1101,6 +1101,35 @@ export const botSyncGuilds = mutation({
               misfires7d: v.number(),
               pending: v.number(),
             }),
+            /**
+             * Tiền + hạn mức ngày (đợt #2). PHẢI khai giống hệt convex/schema.ts
+             * — validator của mutation nghiêm hơn validator của bảng: thừa field
+             * là ArgumentValidationError, thiếu field cũng vậy. Trước đây
+             * schema.ts có `budget` (87e62b3 / PR #33) nhưng bản sao ở đây
+             * bị bỏ sót → botSyncGuilds fail MÃI với
+             * "extra field `budget`" và AI health không lên dashboard
+             * (sự cố 05/10/2026, tra Convex logs theo Request ID).
+             */
+            budget: v.optional(
+              v.object({
+                day: v.string(),
+                spentUsd: v.number(),
+                budgetUsd: v.number(),
+                overBudget: v.boolean(),
+                byProvider: v.array(
+                  v.object({
+                    label: v.string(),
+                    calls: v.number(),
+                    promptTokens: v.number(),
+                    completionTokens: v.number(),
+                    usd: v.number(),
+                  }),
+                ),
+                pricingStaleDays: v.optional(v.number()),
+                pricingChecked: v.optional(v.string()),
+              }),
+            ),
+            reportedAt: v.number(),
           }),
         ),
       }),

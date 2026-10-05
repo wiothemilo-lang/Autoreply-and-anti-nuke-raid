@@ -294,5 +294,65 @@ check(
   check('getBotConfig trả "actionBudgetPerMinute"', returned.has("actionBudgetPerMinute"));
 }
 
+// ── Validator của mutation phải KHÔNG kém validator của bảng ──
+// Bug thật 05/10/2026: `budget` thêm vào aiHealth của convex/schema.ts ở
+// 87e62b3 (PR #33) nhưng bản sao trong args của guilds:botSyncGuilds bị bỏ sót.
+// Convex TỪ CHỐI field lạ trong tham số → botSyncGuilds fail mỗi 180s
+// ("extra field `budget`"), AI health không lên dashboard. Scan bot→convex bên
+// trên không bắt được vì bot gửi cả khối globalStatus, không gọi từng field.
+{
+  const readBlock = (file, anchor) => {
+    const src = fs.readFileSync(path.join(convexDir, file), "utf8");
+    const i = src.indexOf(anchor);
+    if (i < 0) return "";
+    let d = 0;
+    let out = "";
+    for (let j = src.indexOf("v.optional(", i); j < src.length; j++) {
+      out += src[j];
+      if (src[j] === "(") d++;
+      if (src[j] === ")") {
+        d--;
+        if (d === 0) break;
+      }
+    }
+    return out;
+  };
+  // Cấp 1: key trực tiếp của aiHealth.
+  const topKeys = (blk) =>
+    new Set(
+      [...blk.matchAll(/^\s{6,}([a-zA-Z][a-zA-Z0-9]*):\s*v\./gm)]
+        .map((m) => m[1])
+        .filter((k) => k !== "available"),
+    );
+  const fromSchema = topKeys(readBlock("schema.ts", "aiHealth: v.optional("));
+  const fromMutation = topKeys(readBlock("guilds.ts", "aiHealth: v.optional("));
+  const missing = [...fromSchema].filter((k) => !fromMutation.has(k));
+
+  check(
+    missing.length === 0
+      ? "aiHealth của botSyncGuilds có đủ field như schema"
+      : `aiHealth thiếu field so với schema: ${missing.join(", ")}`,
+    missing.length === 0,
+  );
+
+  // Cấp 2: các field con của budget phải khớp y hệt, không chỉ khác tên.
+  const budgetShape = (src) => {
+    const i = src.indexOf("budget: v.optional(");
+    if (i < 0) return null;
+    return new Set(
+      [...src.slice(i, i + 700).matchAll(/([a-zA-Z][a-zA-Z0-9]*):\s*v\./g)].map((m) => m[1]),
+    );
+  };
+  const sBudget = budgetShape(fs.readFileSync(path.join(convexDir, "schema.ts"), "utf8"));
+  const gBudget = budgetShape(fs.readFileSync(path.join(convexDir, "guilds.ts"), "utf8"));
+  const missBudget = sBudget && gBudget ? [...sBudget].filter((k) => !gBudget.has(k)) : ["budget"];
+  check(
+    missBudget.length === 0
+      ? "aiHealth.budget có đủ field con như schema"
+      : `aiHealth.budget thiếu field con: ${missBudget.join(", ")}`,
+    missBudget.length === 0,
+  );
+}
+
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
