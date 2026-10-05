@@ -1006,8 +1006,13 @@ export default defineSchema({
               }),
             ),
             /** Số ngày bảng giá đã cũ; null = chưa có ngày kiểm tra. */
-            pricingStaleDays: v.optional(v.number()),
-            pricingChecked: v.optional(v.string()),
+            // null là TRẠNG THÁI HỢP LỆ (chưa nạp được bảng giá) — bot/src/aiPricing.js
+            // trả null đúng lúc đó. v.optional() chỉ cho `undefined`, KHÔNG cho
+            // `null` → ArgumentValidationError, botSyncGuilds chết mỗi 180s.
+            // Ghi chú ngay trên nói "null = chưa có ngày kiểm tra" nhưng validator
+            // lại cấm null: validator trái với tài liệu của chính nó (05/10/2026).
+            pricingStaleDays: v.optional(v.nullable(v.number())),
+            pricingChecked: v.optional(v.nullable(v.string())),
           }),
         ),
         reportedAt: v.number(),

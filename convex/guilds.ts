@@ -1125,8 +1125,10 @@ export const botSyncGuilds = mutation({
                     usd: v.number(),
                   }),
                 ),
-                pricingStaleDays: v.optional(v.number()),
-                pricingChecked: v.optional(v.string()),
+                // Phải giống hệt convex/schema.ts — null là hợp lệ (chưa nạp được
+                // bảng giá), xem giải thích ở schema.ts.
+                pricingStaleDays: v.optional(v.nullable(v.number())),
+                pricingChecked: v.optional(v.nullable(v.string())),
               }),
             ),
             reportedAt: v.number(),

@@ -156,19 +156,27 @@ async function syncAll(client, store) {
   } catch {
     aiHealth = undefined; // không bao giờ để lỗi AI làm hỏng sync guild
   }
-  await store.client.mutation("guilds:botSyncGuilds", {
-    guilds,
-    trustedFullList,
-    refreshHeartbeat,
-    globalStatus: {
-      guildCount: count,
-      memberCount,
-      version: "v60",
-      ownerName,
-      ownerAvatarUrl,
-      aiHealth,
-    },
-  });
+  // Gắn TÊN mutation vào lỗi: Convex trả "Server Error" kèm Request ID mà
+  // không nêu function nào hỏng, log ở index.js không có cách biết (sự cố
+  // 05/10/2026 phải tra dashboard mới lộ ra guilds:botSyncGuilds).
+  try {
+    await store.client.mutation("guilds:botSyncGuilds", {
+      guilds,
+      trustedFullList,
+      refreshHeartbeat,
+      globalStatus: {
+        guildCount: count,
+        memberCount,
+        version: "v60",
+        ownerName,
+        ownerAvatarUrl,
+        aiHealth,
+      },
+    });
+  } catch (e) {
+    if (e && typeof e === "object" && !e.convexFunction) e.convexFunction = "guilds:botSyncGuilds";
+    throw e;
+  }
   lastSyncOkAt = Date.now();
   return { count, trustedFullList };
 }

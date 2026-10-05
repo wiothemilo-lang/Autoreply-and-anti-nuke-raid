@@ -240,10 +240,12 @@ client.once("clientReady", async () => {
         // thay vì chôn trong message (sự cố 05/10/2026 log này vô dụng).
         const msg = String(e?.message || e || "không rõ");
         const reqId = msg.match(/Request ID:\s*([A-Za-z0-9_-]+)/)?.[1];
-        const fn = e?.data?.functionName || e?.functionName || null;
+        const fn = e?.data?.functionName || e?.functionName || e?.convexFunction || null;
         const real = e?.data?.errorMessage || e?.data?.error || null;
         if (reqId) {
-          console.error(`[sync] lỗi Convex 500${fn ? ` ở ${fn}` : ""} — Request ID: ${reqId}`);
+          console.error(
+            `[sync] lỗi Convex 500${fn ? ` ở ${fn}` : " ở mutation KHÔNG RÕ"} — Request ID: ${reqId}`,
+          );
           console.error(
             "[sync] tra stack thật: Convex Dashboard → Logs → lọc theo Request ID trên",
           );
