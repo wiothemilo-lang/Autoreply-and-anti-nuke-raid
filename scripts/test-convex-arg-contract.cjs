@@ -354,5 +354,97 @@ check(
   );
 }
 
+// ── Args KHÔNG được đòi field mà bot không gửi ──
+// Bug 05/10/2026 (phát sinh sau ee36db1): args của guilds:botSyncGuilds khai
+// `reportedAt: v.number()` BẮT BUỘC, nhưng `aiStats()` KHÔNG gửi field đó —
+// server tự ghi ở `statusPatch.aiHealth = { ...aiHealth, reportedAt: now }` để
+// bot không thể giả mạo mốc thời gian. Convex validate args TRƯỚC khi chạy
+// handler → ArgumentValidationError, mỗi 180s, cả vòng sync chết.
+//
+// Hai khối test ngay trên vẫn XANH khi bug còn: chúng chỉ so schema↔args với
+// nhau, chưa BAO GIỜ so với payload bot thật. Test này gọi chính aiStats() để
+// bịt đúng lỗ hổng đó — payload bot là mốc, không phải schema.
+{
+  /** Cắt khối cân bằng ngoặc bắt đầu từ `anchor` (dùng cho v.object lồng nhau). */
+  const balanced = (src, anchor) => {
+    const i = src.indexOf(anchor);
+    if (i < 0) return "";
+    let d = 0;
+    let out = "";
+    for (let j = src.indexOf("(", i); j < src.length; j++) {
+      out += src[j];
+      if (src[j] === "(") d++;
+      if (src[j] === ")") {
+        d--;
+        if (d === 0) break;
+      }
+    }
+    return out;
+  };
+  /**
+   * Key TRỤC TIẾP của một khối + cờ bắt buộc.
+   * Dùng THỤT LỀ của field mốc (`seedKey`) để không lẫn field con: regex so
+   * thụt lề ">= N" sẽ nuốt luôn field lồng sâu hơn và sinh báo động giả.
+   */
+  const directFields = (blk, seedKey) => {
+    const m = blk.match(new RegExp(`^(\\s*)${seedKey}:`, "m"));
+    if (!m) return null;
+    const indent = m[1].length;
+    const re = new RegExp(`^ {${indent}}([a-zA-Z][a-zA-Z0-9]*):\\s*v\\.(optional\\()?`, "gm");
+    const all = [];
+    for (const hit of blk.matchAll(re)) all.push([hit[1], !hit[2]]);
+    return { all, required: all.filter(([, req]) => req).map(([k]) => k) };
+  };
+
+  const guildsSrc = fs.readFileSync(path.join(convexDir, "guilds.ts"), "utf8");
+  const aiBlk = balanced(guildsSrc, "aiHealth: v.optional(");
+  const aiArgs = directFields(aiBlk, "available");
+
+  // Payload THẬT bot gửi — không hard-code, để test đỏ đúng lúc aiStats() đổi.
+  let sent = null;
+  try {
+    const { aiStats } = require(path.join(root, "bot", "src", "ai.js"));
+    sent = aiStats();
+  } catch (e) {
+    // Không bỏ qua âm thầm: hỏng ở đây nghĩa là mất lớp bảo vệ, phải đỏ.
+    check(`nạp được aiStats() để so payload thật — ${e.message}`, false);
+  }
+
+  if (sent && aiArgs) {
+    const sentTop = Object.keys(sent).filter((k) => sent[k] !== undefined);
+    const requiredNotSent = aiArgs.required.filter((k) => !sentTop.includes(k));
+    check(
+      requiredNotSent.length === 0
+        ? "args botSyncGuilds không đòi field nào aiStats() không gửi"
+        : `args botSyncGuilds đòi BẮT BUỘC nhưng aiStats() không gửi: ${requiredNotSent.join(", ")}`,
+      requiredNotSent.length === 0,
+    );
+
+    // Chiều ngược lại: field bot gửi mà args chưa khai → Convex báo "extra field".
+    const declared = new Set(aiArgs.all.map(([k]) => k));
+    const undeclared = sentTop.filter((k) => !declared.has(k));
+    check(
+      undeclared.length === 0
+        ? "mọi field aiStats() gửi đều được args khai báo"
+        : `aiStats() gửi field chưa có trong args (Convex sẽ báo extra field): ${undeclared.join(", ")}`,
+      undeclared.length === 0,
+    );
+  }
+
+  // budget: field con bắt buộc cũng phải có mặt trong payload bot thật.
+  const budgetBlk = balanced(aiBlk, "budget: v.optional(");
+  const budgetArgs = directFields(budgetBlk, "day");
+  if (sent && sent.budget && budgetArgs) {
+    const sentBudget = Object.keys(sent.budget).filter((k) => sent.budget[k] !== undefined);
+    const missReq = budgetArgs.required.filter((k) => !sentBudget.includes(k));
+    check(
+      missReq.length === 0
+        ? "args aiHealth.budget không đòi field nào budgetSummary() không gửi"
+        : `args aiHealth.budget đòi BẮT BUỘC nhưng budgetSummary() không gửi: ${missReq.join(", ")}`,
+      missReq.length === 0,
+    );
+  }
+}
+
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
