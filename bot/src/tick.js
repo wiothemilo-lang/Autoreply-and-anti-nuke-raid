@@ -102,7 +102,7 @@ function startClaimRenewal(store, guildId, kind, claimAt, everyMs = CLAIM_RENEW_
 
 /**
  * Giành quyền xử lý trên Convex — chỉ ai claim được mới chạy (chống trùng khi
- * chạy 2 bot / 2 lượt quét chồng nhau — giống claim trong handlers/backup.js).
+ * chạy 2 bot / 2 lượt quét chồng nhau).
  */
 async function claimBackup(store, guildId, kind) {
   try {
@@ -144,7 +144,6 @@ async function readImportContent(item) {
   throw new Error("Không lấy được file backup từ đám mây — hãy thử tải lại file");
 }
 
-/** Xử lý các yêu cầu backup/restore/import trong batch (như pollBackups cũ). */
 /**
  * Khoá chat hết hạn → tự mở khoá.
  *
@@ -161,6 +160,15 @@ async function runChannelLocks(client, store) {
   await require("./channelLock").processDueLocks(client, store, due ?? []);
 }
 
+/**
+ * Xử lý các yêu cầu backup/restore/plan/import trong batch.
+ *
+ * Đây là VÒNG QUÉT DUY NHẤT của hệ thống backup (thay `pollBackups` cũ trong
+ * backupJobs.js — bản đó đã bị bỏ vì không ai gọi và chỉ tạo ra bản sao logic
+ * định tuyến job). Mỗi nhánh đều qua `claimBackup` (botClaimBackup) để hai bot
+ * chạy song song không xử lý trùng, và lỗi LUÔN báo ngược lên dashboard bằng
+ * mutation riêng chứ không xoá cờ "xong".
+ */
 async function runBackupJobs(client, store, items) {
   if (!items || items.length === 0) return;
   for (const item of items) {

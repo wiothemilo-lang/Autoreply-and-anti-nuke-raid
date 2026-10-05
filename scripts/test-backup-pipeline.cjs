@@ -46,6 +46,10 @@ module.exports = {
 delete process.env.BACKUP_ENCRYPT_KEY;
 
 const backup = require("../bot/src/handlers/backup.js");
+// Vòng quét job thật sự chạy trên production nằm ở tick.js (index.js chỉ gọi
+// setupTick). `pollBackups` cũ trong backupJobs.js đã bị bỏ: không ai gọi, và
+// bản sao logic định tuyến job đó từng khiến một bản vá lọt ở bot_tick.
+const { runBackupJobs } = require("../bot/src/tick.js");
 const utils = require("../bot/src/backupUtils.js");
 
 let pass = 0;
@@ -222,15 +226,22 @@ const check = (label, ok) => {
       !/botRestoreSettings[\s\S]{0,500}\.catch\(/.test(restoreBlock) &&
       !/botClearBackup[\s\S]{0,300}\.catch\(/.test(restoreBlock),
   );
-  const pollBlock = src.slice(
-    src.indexOf("async function pollBackups"),
-    src.indexOf("async function cloneToServer("),
+  // Vòng quét job THẬT là tick.js:runBackupJobs (pollBackups cũ đã bị bỏ vì
+  // không ai gọi — xem backupJobs.js). Hợp đồng này phải neo vào code đang chạy.
+  const tickSrc = fs.readFileSync(path.join(__dirname, "..", "bot", "src", "tick.js"), "utf8");
+  const pollBlock = tickSrc.slice(
+    tickSrc.indexOf("async function runBackupJobs"),
+    tickSrc.indexOf("async function runTickOnce"),
   );
   check(
     "lỗi backup/restore đi qua mutation báo lỗi, không clear như thành công",
     pollBlock.includes("botReportRestoreError") &&
       pollBlock.includes("botReportBackupError") &&
       !pollBlock.includes('.mutation("bot_writes:botClearBackup"'),
+  );
+  check(
+    "backup hỏng/thiếu chunk → báo lỗi + dọn cờ (không treo vô hạn)",
+    /item\.unreadable/.test(pollBlock) && /unreadableReason/.test(pollBlock),
   );
 
   // ---- 5. pushToGithub gửi bản ĐÃ NÉN (không còn backupJson: json thô) ----
@@ -998,12 +1009,14 @@ const check = (label, ok) => {
     );
   }
 
-  // ══════════ 9. pollBackups: 3 loại việc + báo lỗi đúng mutation ══════════
+  // ══════════ 9. runBackupJobs (tick.js): 4 loại việc + báo lỗi đúng mutation ══════════
+  // Đây là vòng quét DUY NHẤT chạy trên production (index.js → setupTick).
+  // `pollBackups` cũ trong backupJobs.js đã bị bỏ vì không ai gọi.
   {
     const seen = [];
-    const mkStore = (pending, claimOk = true) => ({
+    const mkStore = (claimOk = true) => ({
       client: {
-        query: async (name) => (name === "backup:botGetPending" ? pending : null),
+        query: async () => null,
         mutation: async (name, args) => {
           seen.push({ name, args });
           if (name === "bot_writes:botClaimBackup")
@@ -1015,39 +1028,45 @@ const check = (label, ok) => {
     });
     const emptyClient = { guilds: { cache: new Map() } };
 
-    await backup(emptyClient, mkStore([]));
+    await runBackupJobs(emptyClient, mkStore(), []);
     check("poll: không có việc → không làm gì", seen.length === 0);
 
-    await backup(emptyClient, mkStore(null));
-    check("poll: Convex trả null → không làm gì", seen.length === 0);
+    await runBackupJobs(emptyClient, mkStore(), null);
+    check("poll: batch rỗng/null → không làm gì", seen.length === 0);
 
     // Không giành được claim → bỏ qua, KHÔNG xử lý (tránh 2 bot chạy trùng).
     seen.length = 0;
-    await backup(emptyClient, mkStore([{ guildId: "g1", kind: "backup" }], false));
+    await runBackupJobs(emptyClient, mkStore(false), [{ guildId: "g1", kind: "backup" }]);
     check(
       "poll: không giành được claim → bỏ qua",
       !seen.some((s) => s.name === "bot_writes:botStoreBackup"),
       JSON.stringify(seen.map((s) => s.name)),
     );
 
-    // Query lỗi → không crash, chỉ log.
+    // Mutation lỗi lúc claim → không crash, bỏ qua việc đó.
     seen.length = 0;
-    const badStore = {
+    const claimErrStore = {
       client: {
-        query: async () => {
+        query: async () => null,
+        mutation: async (name) => {
+          seen.push(name);
           throw new Error("Convex chết");
         },
-        mutation: async () => ({ ok: true }),
       },
       getConfig: async () => null,
     };
-    let pollErr = null;
+    let claimErr = null;
     try {
-      await backup(emptyClient, badStore);
+      await runBackupJobs(emptyClient, claimErrStore, [{ guildId: "g1", kind: "backup" }]);
     } catch (e) {
-      pollErr = e;
+      claimErr = e;
     }
-    check("poll: query lỗi → nuốt lỗi, không crash bot", pollErr === null);
+    check("poll: claim lỗi → nuốt lỗi, không crash bot", claimErr === null);
+    check(
+      "claim: mutation lỗi → bỏ qua việc, không xử lý",
+      seen.length === 1 && seen[0] === "bot_writes:botClaimBackup",
+      JSON.stringify(seen),
+    );
 
     // Lỗi khi xử lý → phải đi qua mutation BÁO LỖI, không clear như thành công.
     for (const [kind, reportMutation] of [
@@ -1059,17 +1078,7 @@ const check = (label, ok) => {
       seen.length = 0;
       const failStore = {
         client: {
-          query: async (name) =>
-            name === "backup:botGetPending"
-              ? [
-                  {
-                    guildId: "g1",
-                    kind,
-                    backupJson: "không phải JSON",
-                    fileContent: "không phải JSON",
-                  },
-                ]
-              : null,
+          query: async () => null,
           mutation: async (name) => {
             seen.push({ name });
             if (name === "bot_writes:botClaimBackup") return { ok: true, claimAt: 7 };
@@ -1078,11 +1087,54 @@ const check = (label, ok) => {
         },
         getConfig: async () => null,
       };
-      await backup(emptyClient, failStore);
+      await runBackupJobs(emptyClient, failStore, [
+        {
+          guildId: "g1",
+          kind,
+          backupJson: "không phải JSON",
+          fileContent: "không phải JSON",
+        },
+      ]);
       check(
         `poll: ${kind} lỗi → báo qua ${reportMutation}, KHÔNG clear như thành công`,
         seen.some((s) => s.name === reportMutation) &&
           !seen.some((s) => s.name === "bot_writes:botClearBackup"),
+      );
+    }
+
+    // Backup hỏng/thiếu chunk (botGetPending/bot_tick gắn cờ unreadable) → bot phải
+    // BÁO LỖI + dọn cờ, không treo dashboard quay vòng vô hạn.
+    for (const kind of ["restore", "plan"]) {
+      seen.length = 0;
+      const st = {
+        client: {
+          query: async () => null,
+          mutation: async (name, args) => {
+            seen.push({ name, args });
+            return name === "bot_writes:botClaimBackup" ? { ok: true, claimAt: 7 } : { ok: true };
+          },
+        },
+        getConfig: async () => null,
+      };
+      await runBackupJobs(emptyClient, st, [
+        {
+          guildId: "g1",
+          kind,
+          unreadable: true,
+          unreadableReason: "Bản backup không đọc được (thiếu hoặc hỏng chunk dữ liệu)",
+        },
+      ]);
+      const report =
+        kind === "restore" ? "bot_writes:botReportRestoreError" : "bot_writes:botReportRestorePlan";
+      const rep = seen.find((s) => s.name === report);
+      check(
+        `poll: ${kind} backup hỏng → báo lỗi kèm lý do, KHÔNG dọn cờ như xong`,
+        !!rep && /hỏng chunk/.test(rep.args?.error ?? ""),
+        JSON.stringify(rep?.args?.error),
+      );
+      check(
+        `poll: ${kind} backup hỏng → KHÔNG gọi clear`,
+        !seen.some((s) => s.name === "bot_writes:botClearBackup"),
       );
     }
   }
@@ -1548,7 +1600,7 @@ const check = (label, ok) => {
   }
   {
     // Import file tải từ đám mây (importFileUrl) — đường mà dashboard dùng.
-    // readImportContent CHỈ chạy qua pollBackups, không phải runImportRestore.
+    // readImportContent CHỈ chạy qua vòng quét job, không phải runImportRestore.
     const tg = makeTarget();
     const muts = [];
     const st = {
@@ -1567,7 +1619,9 @@ const check = (label, ok) => {
     const realFetch = globalThis.fetch;
     globalThis.fetch = async () => ({ ok: true, text: async () => JSON.stringify(richBackup) });
     try {
-      await backup({ guilds: { cache: new Map([[TGT, tg]]) } }, st);
+      await runBackupJobs({ guilds: { cache: new Map([[TGT, tg]]) } }, st, [
+        { guildId: TGT, kind: "import", importFileUrl: "https://files.example/b.msc" },
+      ]);
     } finally {
       globalThis.fetch = realFetch;
     }
@@ -1601,7 +1655,9 @@ const check = (label, ok) => {
     const realFetch = globalThis.fetch;
     globalThis.fetch = async () => ({ ok: false, status: 404 });
     try {
-      await backup({ guilds: { cache: new Map([[TGT, makeTarget()]]) } }, st);
+      await runBackupJobs({ guilds: { cache: new Map([[TGT, makeTarget()]]) } }, st, [
+        { guildId: TGT, kind: "import", importFileUrl: "https://files.example/b.msc" },
+      ]);
     } finally {
       globalThis.fetch = realFetch;
     }
@@ -1628,7 +1684,9 @@ const check = (label, ok) => {
       },
       getConfig: async () => null,
     };
-    await backup({ guilds: { cache: new Map([[TGT, makeTarget()]]) } }, st);
+    await runBackupJobs({ guilds: { cache: new Map([[TGT, makeTarget()]]) } }, st, [
+      { guildId: TGT, kind: "import", fileName: "x.msc" },
+    ]);
     const rep = muts.find((m) => m.name === "bot_writes:botReportImportError");
     check(
       "import: không có file nào để đọc → báo lỗi rõ ràng",
@@ -1662,27 +1720,6 @@ const check = (label, ok) => {
         (m) => m.name === "bot_writes:botStoreBackup" && m.args?.guildName === "Server Của Tôi",
       ),
       JSON.stringify(muts[0]?.args?.guildName),
-    );
-  }
-  {
-    // Claim mutation ném lỗi → poll phải bỏ qua, không xử lý.
-    const seen = [];
-    const st = {
-      client: {
-        query: async (n) =>
-          n === "backup:botGetPending" ? [{ guildId: "g1", kind: "backup" }] : null,
-        mutation: async (name) => {
-          seen.push(name);
-          throw new Error("Convex chết");
-        },
-      },
-      getConfig: async () => null,
-    };
-    await backup({ guilds: { cache: new Map() } }, st);
-    check(
-      "claim: mutation lỗi → bỏ qua việc, không xử lý",
-      seen.length === 1 && seen[0] === "bot_writes:botClaimBackup",
-      JSON.stringify(seen),
     );
   }
   {
@@ -2105,7 +2142,7 @@ const check = (label, ok) => {
     check("runRestorePlan: claim hết hạn → ném lỗi", /stale/i.test(err?.message ?? ""));
   }
   {
-    // pollBackups nhận kind "plan" → đi đúng đường dry-run (không lẫn sang restore).
+    // runBackupJobs nhận kind "plan" → đi đúng đường dry-run (không lẫn sang restore).
     const seen = [];
     const tg = makeTarget();
     const store = {
@@ -2129,7 +2166,14 @@ const check = (label, ok) => {
       },
       getConfig: async () => null,
     };
-    await backup({ guilds: { cache: new Map([[TGT, tg]]) } }, store);
+    await runBackupJobs({ guilds: { cache: new Map([[TGT, tg]]) } }, store, [
+      {
+        guildId: TGT,
+        kind: "plan",
+        guildName: "Server Nguồn",
+        backupJson: utils.compressAndEncryptBackup(richBackup).backupJson,
+      },
+    ]);
     check(
       "poll: kind 'plan' → báo kế hoạch, KHÔNG tạo role/kênh",
       seen.some((s) => s.name === "bot_writes:botReportRestorePlan") &&

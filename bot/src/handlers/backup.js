@@ -23,13 +23,15 @@
  *  - backupRebuild.js   — dựng lại role/kênh/tin/emoji/sticker/thread/meta/ban/invite
  *  - backupRestore.js   — dry-run + restoreCore + runRestore
  *  - backupImport.js    — import file .msc/.json từ dashboard
- *  - backupJobs.js      — vòng quét/claim/clone (lịch tự động đã sang cron Convex — đợt #4)
+ *  - backupJobs.js      — clone cấu trúc giữa hai server
  *
- * File này giữ nguyên ĐƯỜNG DẪN require (./handlers/backup) và HÌNH DẠNG export
- * (callable + thuộc tính) để index.js, tick.js, localSnapshot.js và các test mock
- * theo chuỗi request cũ tiếp tục chạy y nguyên.
+ * File này giữ nguyên ĐƯỜNG DẪN require (./handlers/backup) và các THUỘC TÍNH
+ * export để index.js, tick.js, localSnapshot.js và các test mock theo chuỗi
+ * request cũ tiếp tục chạy y nguyên. Trước đây export mặc định là `pollBackups`
+ * (module callable); hàm đó đã bị bỏ vì không ai gọi — vòng quét thật là
+ * `tick.js:runBackupJobs`. Xem chú thích ở backupJobs.js.
  */
-const { pollBackups, cloneToServer } = require("../backupJobs");
+const { cloneToServer } = require("../backupJobs");
 const {
   runBackup,
   snapshotWithSettings,
@@ -67,7 +69,7 @@ const {
 const { MAX_MESSAGES_PER_THREAD, MAX_REPLAY_PER_CHANNEL } = require("../backupCommon");
 const backupUtils = require("../backupUtils");
 
-module.exports = pollBackups;
+module.exports = {};
 module.exports.runBackup = runBackup;
 module.exports.runRestore = runRestore;
 // Dry-run (kế hoạch khôi phục) — tách riêng khỏi runRestore để test khẳng định
