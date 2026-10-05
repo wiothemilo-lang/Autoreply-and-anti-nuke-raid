@@ -140,6 +140,12 @@ jobs:
       # THẬT của bot — hermetic, không cần mạng, chạy được ngay trên VPS.
       - name: Payload bot khớp validator Convex (chạy validator thật, có --self-test)
         run: node scripts/check-bot-payload.cjs --self-test
+      # Gói Convex Free chỉ có 0.5 GB storage; `guildBackups` giữ toàn bộ cấu
+      # trúc server nên `backupKeepCount` là đòn bẩy duy nhất quyết định tháng
+      # có đủ dùng hay không. Trần đó đang bị clamp ở 5 chỗ / 3 file, 2 chỗ
+      # nằm ở dashboard — lệch một bên là ngân sách storage đổi âm thầm.
+      - name: Trần lưu trữ backup giống nhau ở Convex và dashboard
+        run: node scripts/check-retention-clamp.cjs --self-test
 
   test:
     needs: [lint, security]
