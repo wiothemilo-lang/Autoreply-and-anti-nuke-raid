@@ -505,6 +505,8 @@ export const NUKE_GROUPS: { label: string; modules: string[] }[] = [
       "massRoleAssign",
       "massNickname",
       "massBotAdd",
+      "suspiciousBotAlert",
+      "botHitAndRun",
       "externalAppRaid",
     ],
   },

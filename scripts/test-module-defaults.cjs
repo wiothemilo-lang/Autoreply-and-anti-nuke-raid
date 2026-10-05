@@ -112,6 +112,123 @@ const check = (label, ok) => {
       JSON.stringify([...(uiModules ?? [])].sort()),
   );
 
+  // ---- 2c. MỌI MODULE PHẢI CÓ Ô BẬT/TẮT RIÊNG TRÊN DASHBOARD ----
+  // Bug thật: NUKE_MODULES khai 24 module nhưng NUKE_GROUPS chỉ render 22 →
+  // `botHitAndRun` và `suspiciousBotAlert` KHÔNG có ModuleCard, tức không có
+  // công tắc nào để bật/tắt riêng. Marketing hứa "32 module bật/tắt riêng từng
+  // module" mà chỉ 30 cái có toggle. Không ai thấy vì không có cổng nào đối
+  // chiếu danh sách khai báo với danh sách được render theo nhóm.
+  //
+  // Cổng này so 3 tập: khai báo (NUKE/MODERATION_MODULES), nhóm hiển thị
+  // (NUKE/MODERATION_GROUPS), và metadata (ANTINUKE_MODULE_META).
+  const grabList = (src, name, endMarker) => {
+    const start = src.indexOf(name);
+    if (start < 0) return null;
+    const end = src.indexOf(endMarker, start);
+    if (end < 0) return null;
+    return [...src.slice(start, end).matchAll(/"([a-zA-Z]+)"/g)].map((m) => m[1]);
+  };
+  /** Gộp mọi mảng `modules: [...]` trong khối nhóm (NUKE_GROUPS / MODERATION_GROUPS). */
+  const grabGroupModules = (src, name) => {
+    const start = src.indexOf(name);
+    if (start < 0) return null;
+    const end = src.indexOf("];", start);
+    if (end < 0) return null;
+    return [...src.slice(start, end).matchAll(/modules:\s*\[([\s\S]*?)\]/g)].flatMap((m) =>
+      [...m[1].matchAll(/"([a-zA-Z]+)"/g)].map((x) => x[1]),
+    );
+  };
+  /** Trả { missing, unknown, duplicates } giữa danh sách khai báo và danh sách nhóm. */
+  const findGroupGaps = (declared, grouped) => {
+    const declaredSet = new Set(declared);
+    const groupedSet = new Set(grouped);
+    const seen = new Set();
+    const duplicates = [];
+    for (const m of grouped) {
+      if (seen.has(m)) duplicates.push(m);
+      seen.add(m);
+    }
+    return {
+      missing: declared.filter((m) => !groupedSet.has(m)),
+      unknown: [...groupedSet].filter((m) => !declaredSet.has(m)),
+      duplicates,
+    };
+  };
+  const nukeDeclared = grabList(constants, "export const NUKE_MODULES", "] as const;");
+  const modDeclared = grabList(constants, "export const MODERATION_MODULES", "] as const;");
+  const nukeGrouped = grabGroupModules(constants, "export const NUKE_GROUPS");
+  const modGrouped = grabGroupModules(constants, "export const MODERATION_GROUPS");
+  const describeGaps = (g) =>
+    [
+      g.missing.length ? `thiếu: ${g.missing.join(", ")}` : "",
+      g.unknown.length ? `lạ: ${g.unknown.join(", ")}` : "",
+      g.duplicates.length ? `trùng: ${g.duplicates.join(", ")}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+  check(
+    "đọc được NUKE_MODULES + NUKE_GROUPS",
+    Array.isArray(nukeDeclared) && nukeDeclared.length > 0 && Array.isArray(nukeGrouped),
+  );
+  check(
+    "đọc được MODERATION_MODULES + MODERATION_GROUPS",
+    Array.isArray(modDeclared) && modDeclared.length > 0 && Array.isArray(modGrouped),
+  );
+  const nukeGaps = findGroupGaps(nukeDeclared ?? [], nukeGrouped ?? []);
+  check(
+    `mọi module chống nuke đều có nhóm hiển thị (${nukeDeclared?.length ?? 0} module)` +
+      (describeGaps(nukeGaps) ? `\n     → ${describeGaps(nukeGaps)}` : ""),
+    describeGaps(nukeGaps) === "",
+  );
+  const modGaps = findGroupGaps(modDeclared ?? [], modGrouped ?? []);
+  check(
+    `mọi module auto-mod đều có nhóm hiển thị (${modDeclared?.length ?? 0} module)` +
+      (describeGaps(modGaps) ? `\n     → ${describeGaps(modGaps)}` : ""),
+    describeGaps(modGaps) === "",
+  );
+  // Hợp của 2 danh sách khai báo phải phủ ĐÚNG bộ metadata — không thiếu cái
+  // nào (ModuleCard đọc meta.label nên thiếu meta là crash panel) và không lặp
+  // giữa 2 nhóm (cùng module hiện 2 nơi = 2 công tắc ghi đè nhau).
+  const metaStart = constants.indexOf("export const ANTINUKE_MODULE_META");
+  const metaEnd = constants.indexOf("\n};", metaStart);
+  const metaBlock = constants.slice(metaStart, metaEnd);
+  const metaKeys = [...metaBlock.matchAll(/^\s{2}([a-zA-Z]+):\s*\{/gm)].map((m) => m[1]);
+  const declaredAll = [...(nukeDeclared ?? []), ...(modDeclared ?? [])];
+  const metaSet = new Set(metaKeys);
+  const declaredSet = new Set(declaredAll);
+  check(
+    `mọi module khai báo đều có metadata (ModuleCard đọc meta.label) — thừa: ${
+      [...metaSet].filter((m) => !declaredSet.has(m)).join(",") || "không"
+    }` + `, thiếu: ${[...declaredSet].filter((m) => !metaSet.has(m)).join(",") || "không"}`,
+    declaredAll.every((m) => metaSet.has(m)) && metaKeys.every((m) => declaredSet.has(m)),
+  );
+  check(
+    `2 nhóm khai báo không trùng module (nuke+auto-mod = ${declaredAll.length}, meta = ${metaKeys.length})`,
+    declaredAll.length === declaredSet.size && declaredAll.length === metaKeys.length,
+  );
+  // Self-test: cổng phải THẬT SỰ bắt lỗi thiếu module, không xanh giả.
+  check(
+    "self-test: findGroupGaps bắt module bị bỏ khỏi nhóm",
+    findGroupGaps(["a", "b", "c"], ["a", "b"]).missing.join(",") === "c",
+  );
+  check(
+    "self-test: findGroupGaps bắt module lạ + trùng trong nhóm",
+    (() => {
+      const g = findGroupGaps(["a", "b"], ["a", "a", "z"]);
+      return g.unknown.join(",") === "z" && g.duplicates.join(",") === "a";
+    })(),
+  );
+  check(
+    "self-test: hồi quy đúng bug — NUKE_MODULES 24 nhưng nhóm chỉ 22 phải đỏ",
+    (() => {
+      const g = findGroupGaps(
+        nukeDeclared ?? [],
+        (nukeGrouped ?? []).filter((m) => !["botHitAndRun", "suspiciousBotAlert"].includes(m)),
+      );
+      return g.missing.length === 2 && g.missing.includes("botHitAndRun");
+    })(),
+  );
+
   // Bot phải đọc qua helper, không đọc thẳng cờ tổng nữa.
   const shared = fs.readFileSync(
     path.join(__dirname, "..", "bot", "src", "handlers", "antinuke", "shared.js"),
