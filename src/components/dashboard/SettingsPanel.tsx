@@ -51,6 +51,9 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
 
   const [prefix, setPrefix] = useState(data.guild.prefix);
   const [logChannelId, setLogChannelId] = useState(data.guild.logChannelId ?? "none");
+  // Ngôn ngữ NHÃN trong log (nhãn hành động, tên trường) — chọn cho cả kênh
+  // log của server, tách khỏi ngôn ngữ giao diện của từng người dùng.
+  const [logLang, setLogLang] = useState(data.guild.logLang ?? "vi");
   const [modLogChannelId, setModLogChannelId] = useState(data.guild.modLogChannelId ?? "none");
   const [modRoles, setModRoles] = useState<string[]>(data.guild.modRoles);
   const [adminRoles, setAdminRoles] = useState<string[]>(data.guild.adminRoles);
@@ -135,6 +138,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
   const dirty =
     prefix !== data.guild.prefix ||
     logChannelId !== (data.guild.logChannelId ?? "none") ||
+    logLang !== (data.guild.logLang ?? "vi") ||
     modLogChannelId !== (data.guild.modLogChannelId ?? "none") ||
     JSON.stringify(modRoles) !== JSON.stringify(data.guild.modRoles) ||
     JSON.stringify(adminRoles) !== JSON.stringify(data.guild.adminRoles);
@@ -152,6 +156,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
         prefix,
         // "" (chuỗi rỗng) để XÓA kênh đã đặt; undefined = không đổi.
         logChannelId: logChannelId === "none" ? "" : logChannelId,
+        logLang,
         modLogChannelId: modLogChannelId === "none" ? "" : modLogChannelId,
         modRoles,
         adminRoles,
@@ -268,6 +273,25 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                     {translate("1–3 ký tự đặc biệt, dùng cho lệnh text như")}{" "}
                     <code className="font-mono text-primary">{prefix}help</code>
                     {translate(". Slash command hoạt động độc lập.")}{" "}
+                  </p>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label>{translate("Ngôn ngữ cho log")}</Label>
+                  <Select value={logLang} onValueChange={setLogLang}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="vi">{translate("Tiếng Việt")}</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="de">Deutsch</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {translate(
+                      "Chỉ đổi nhãn bot tự sinh trong log (kiểu ban, kick, cảnh cáo). Lý do do mod gõ giữ nguyên.",
+                    )}
                   </p>
                 </div>
 

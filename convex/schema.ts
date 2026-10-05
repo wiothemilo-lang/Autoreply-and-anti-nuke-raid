@@ -43,6 +43,13 @@ export default defineSchema({
     memberCount: v.optional(v.number()),
     prefix: v.string(),
     logChannelId: v.optional(v.string()),
+    /**
+     * Ngôn ngữ cho NHÃN trong log: "vi" | "en" | "de" (thiếu = "vi").
+     * Tách riêng khỏi `userLangs` (ngôn ngữ người dùng) vì đây là lựa chọn của
+     * CHỦ SERVER cho cả kênh log — người dùng tự đổi ngôn ngữ của riêng họ
+     * không nên đổi ngôn ngữ log chung của server.
+     */
+    logLang: v.optional(v.string()),
     /** Kênh log moderation: auto-mod + lệnh mod thủ công (ban/timeout/kick/warn + ngược lại, purge) kiểu Carl-bot. */
     modLogChannelId: v.optional(v.string()),
     /** Số case moderation đã tăng dần của server (hiển thị "case N" trong log kiểu Carl-bot). */

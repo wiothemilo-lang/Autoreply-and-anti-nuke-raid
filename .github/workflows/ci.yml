@@ -146,6 +146,10 @@ jobs:
       # nằm ở dashboard — lệch một bên là ngân sách storage đổi âm thầm.
       - name: Trần lưu trữ backup giống nhau ở Convex và dashboard
         run: node scripts/check-retention-clamp.cjs --self-test
+      # Ngôn ngữ log khai ở Convex (server chấp nhận) và ở bot (bot dịch được)
+      # phải là MỘT danh sách. Lệch là dashboard báo "đã lưu" còn log không đổi.
+      - name: Ngôn ngữ log khớp giữa Convex và bot
+        run: node scripts/check-log-lang.cjs --self-test
 
   test:
     needs: [lint, security]

@@ -494,6 +494,9 @@ export const EN: Record<string, string> = {
   "Chỉ phạt khi có": "Only punish with",
   "Chọn emoji": "Choose emoji",
   "Chọn kênh": "Choose channel",
+  "Ngôn ngữ cho log": "Log language",
+  "Chỉ đổi nhãn bot tự sinh trong log (kiểu ban, kick, cảnh cáo). Lý do do mod gõ giữ nguyên.":
+    "Only changes the labels the bot generates in logs (ban, kick, warn). Reasons typed by moderators stay as written.",
   "Chọn kênh…": "Choose channel…",
   "Chọn loại": "Choose type",
   "Chọn role admin…": "Choose admin role…",

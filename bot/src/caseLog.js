@@ -1,6 +1,7 @@
 const { EmbedBuilder, Colors } = require("discord.js");
 const { sendModLog } = require("./util");
 const { escapeMentions } = require("./ticketCore");
+const { logT, logLabel } = require("./logI18n");
 
 /** Các hành động có mức chi tiết cấu hình được trên web (phần Moderation). */
 const NOTICE_ACTIONS = ["ban", "timeout", "kick", "warn"];
@@ -69,7 +70,10 @@ async function sendCaseLog({
   extraDescription = [],
 }) {
   if (!guild || !guildConfig) return null;
-  const label = CASE_LABEL[action] || action;
+  // Nhãn theo ngôn ngữ CHỦ SERVER đặt (logLang, mặc định vi). CASE_LABEL giữ
+  // lại làm fallback để hành động lạ không bị mất nhãn.
+  const lang = guildConfig.logLang;
+  const label = logLabel(lang, action, CASE_LABEL[action] || action);
 
   // ĐỒNG BỘ VỚI PHẦN MODERATION TRÊN WEB: mức chi tiết theo từng hành động
   // (none/action/reason/full) + kênh gửi (punishNoticeChannelId → mod log → log chung).
@@ -91,23 +95,22 @@ async function sendCaseLog({
     ? executor.username || executor.tag || "mod"
     : botUser
       ? botUser.username
-      : "Bot";
-
+      : logT(lang, "bot");
   const lines = [];
   if (offender && offender.id) {
-    lines.push(`**Offender:** ${offender.username || offender.id} <@${offender.id}>`);
+    lines.push(`${logT(lang, "offender")} ${offender.username || offender.id} <@${offender.id}>`);
   }
   if ((LEVEL_ORDER[level] ?? 3) >= 2) {
-    lines.push(`**Reason:** ${reason || "không có lý do"}`);
+    lines.push(`${logT(lang, "reason")} ${reason || logT(lang, "noReason")}`);
   }
   if ((LEVEL_ORDER[level] ?? 3) >= 3) {
-    lines.push(`**Responsible moderator:** ${responsible}`);
+    lines.push(`${logT(lang, "responsible")} ${responsible}`);
   }
   for (const line of extraDescription) lines.push(String(line));
 
   const embed = new EmbedBuilder()
     .setColor(color ?? CASE_COLOR[action] ?? Colors.Red)
-    .setTitle(`${label}${caseNumber ? ` | case ${caseNumber}` : ""}`)
+    .setTitle(`${label}${caseNumber ? ` | ${logT(lang, "case")} ${caseNumber}` : ""}`)
     .setDescription(lines.join("\n"))
     .setTimestamp();
   embed.setFooter({

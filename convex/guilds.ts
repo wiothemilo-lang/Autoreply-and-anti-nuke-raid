@@ -173,6 +173,7 @@ export const getGuild = query({
         memberCount: guild.memberCount ?? null,
         prefix: guild.prefix,
         logChannelId: guild.logChannelId ?? null,
+        logLang: guild.logLang ?? "vi",
         modLogChannelId: guild.modLogChannelId ?? null,
         punishNoticeChannelId: guild.punishNoticeChannelId ?? null,
         punishNotice: {

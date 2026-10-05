@@ -15,6 +15,12 @@ import { HEAT_DEFAULTS } from "../modules";
 import { GREETING_IMAGE_SLOTS, storageIdFromUrl } from "./greetingImages";
 
 /**
+ * Ngôn ngữ nhãn log bot thật sự có bản dịch. Thêm ngôn ngữ ở đây thì PHẢI thêm
+ * cùng lúc vào `bot/src/logI18n.js` — cổng tĩnh chặn lệch.
+ */
+export const LOG_LANGS = ["vi", "en", "de"] as const;
+
+/**
  * Làm sạch field embed welcome/goodbye v2: màu phải #hex (3/4/6 ký tự), ảnh
  * phải URL http(s) hợp lệ. Giá trị rác từ dashboard bị NUÔT thay vì lưu dơ —
  * bot gửi embed sẽ lỗi nếu màu không parse được.
@@ -33,6 +39,8 @@ export const updateSettingsArgs = {
   logChannelId: v.optional(v.string()),
   modLogChannelId: v.optional(v.string()),
   punishNoticeChannelId: v.optional(v.string()),
+  /** Ngôn ngữ nhãn log: vi | en | de. Giá trị khác bị từ chối (xem handler). */
+  logLang: v.optional(v.string()),
   punishNotice: v.optional(
     v.object({
       ban: v.string(),
@@ -397,6 +405,17 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   if (args.modLogChannelId !== undefined) patch.modLogChannelId = args.modLogChannelId || undefined;
   if (args.punishNoticeChannelId !== undefined) {
     patch.punishNoticeChannelId = args.punishNoticeChannelId || undefined;
+  }
+  if (args.logLang !== undefined) {
+    // Chỉ nhận ngôn ngữ bot thật sự có bản dịch cho NHÃN log. Giá trị rác thì
+    // ném lỗi thay vì nuốt — nếu nuốt, dashboard hiển thị "đã lưu" nhưng log
+    // vẫn tiếng Việt, tức báo sai cho người dùng.
+    // Mở rộng sang string[]: đây là phép thành viên, `args.logLang` kiểu string
+    // nên kiểu literal của `as const` sẽ từ chối hợp lệ.
+    if (!(LOG_LANGS as readonly string[]).includes(args.logLang)) {
+      throw new Error("Ngôn ngữ log không hợp lệ");
+    }
+    patch.logLang = args.logLang;
   }
   if (args.punishNotice !== undefined) {
     const VALID = ["none", "action", "reason", "full"];

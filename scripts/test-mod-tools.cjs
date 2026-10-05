@@ -9,6 +9,7 @@ const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
+const { logT, logLabel } = require("../bot/src/logI18n.js");
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
   if (request === "discord.js") return DJS_MOCK;
@@ -450,6 +451,16 @@ Module._load = function (request, parent) {
       logChannelId: null,
       modLogChannelId: null,
     });
+    // Nhãn mong đợi lấy từ CHÍNH từ điển bot đang dùng. Ghim chuỗi tiếng Anh
+    // vào test từng là cách giữ nguyên lỗi "log trộn hai ngôn ngữ": test fail
+    // mỗi khi dịch nhãn, nên người ta sửa ngược lại từ điển cho hợp test.
+    const L = {
+      offender: logT("vi", "offender"),
+      reason: logT("vi", "reason"),
+      responsible: logT("vi", "responsible"),
+      noReason: logT("vi", "noReason"),
+      case: logT("vi", "case"),
+    };
     const run = async (cfg, opts = {}) => {
       modLogCalls.length = 0;
       const embed = await sendCaseLog({
@@ -478,9 +489,9 @@ Module._load = function (request, parent) {
       const r = await run(base({ ban: "action" }), { caseNumber: 7 });
       check(
         "mức action → chỉ hiện Offender (+ case N trong tiêu đề)",
-        desc(r).includes("Offender") &&
-          !desc(r).includes("Reason") &&
-          r.embed.d.title.includes("case 7"),
+        desc(r).includes(L.offender) &&
+          !desc(r).includes(L.reason) &&
+          r.embed.d.title.includes(`${L.case} 7`),
         JSON.stringify(desc(r)),
       );
     }
@@ -488,9 +499,9 @@ Module._load = function (request, parent) {
       const r = await run(base({ ban: "reason" }));
       check(
         "mức reason → thêm Reason, trống thì ghi 'không có lý do'",
-        desc(r).includes("Reason") &&
-          desc(r).includes("không có lý do") &&
-          !desc(r).includes("Responsible"),
+        desc(r).includes(L.reason) &&
+          desc(r).includes(L.noReason) &&
+          !desc(r).includes(L.responsible),
         JSON.stringify(desc(r)),
       );
     }
@@ -501,7 +512,7 @@ Module._load = function (request, parent) {
       });
       check(
         "mức full + executor → hiện Responsible moderator = tên mod",
-        desc(r).includes("Responsible moderator") && desc(r).includes("mod-name"),
+        desc(r).includes(L.responsible) && desc(r).includes("mod-name"),
         JSON.stringify(desc(r)),
       );
     }
@@ -526,11 +537,59 @@ Module._load = function (request, parent) {
       );
     }
     {
+      // ── Đa ngôn ngữ cho log (logLang) ──
+      const en = await run({ ...base({}), logLang: "en" });
+      check(
+        "logLang=en → nhãn tiêu đề tiếng Anh",
+        en.embed.d.title.includes("Ban") && !en.embed.d.title.includes("Cấm"),
+        JSON.stringify(en.embed.d.title),
+      );
+      check(
+        "logLang=en → nhãn trường tiếng Anh",
+        desc(en).includes("Offender") && desc(en).includes("Responsible moderator"),
+        JSON.stringify(desc(en)),
+      );
+      const de = await run({ ...base({}), logLang: "de" });
+      check(
+        "logLang=de → nhãn tiếng Đức",
+        de.embed.d.title.includes("Bann") &&
+          desc(de).includes("Betroffener") &&
+          desc(de).includes("Verantwortlicher Moderator"),
+        JSON.stringify(desc(de)),
+      );
+      const vi = await run(base({}));
+      check(
+        "mặc định (không logLang) → tiếng Việt",
+        vi.embed.d.title.includes("Cấm") && desc(vi).includes("Thành viên"),
+        JSON.stringify(vi.embed.d.title),
+      );
+      check(
+        "logLang rác → rơi về tiếng Việt, KHÔNG lộ chuỗi rạc",
+        (await run({ ...base({}), logLang: "fr" })).embed.d.title.includes("Cấm"),
+      );
+      check(
+        "lý do do mod gõ KHÔNG bị dịch (giữ nguyên chữ của người dùng)",
+        desc(await run({ ...base({}), logLang: "en" }, { reason: "gây rối server" })).includes(
+          "gây rối server",
+        ),
+      );
+      check(
+        "hành động lạ vẫn có nhãn (fallback không mất nhãn)",
+        (
+          await run({ ...base({}), logLang: "en" }, { action: "weird_action" })
+        ).embed.d.title.includes("weird_action"),
+      );
+      check(
+        "nhãn hành động tra được từ từ điển (logLabel)",
+        logLabel("de", "unban").includes("Bann") && logLabel("vi", "unwarn").includes("Gỡ"),
+      );
+    }
+    {
       // purge/delete không nằm trong bảng cấu hình → luôn hiện đầy đủ.
       const r = await run(base({}), { action: "purge", offender: null });
       check(
         "purge (ngoài bảng cấu hình) → luôn hiện đầy đủ",
-        desc(r).includes("Responsible moderator"),
+        desc(r).includes(L.responsible),
         JSON.stringify(desc(r)),
       );
     }

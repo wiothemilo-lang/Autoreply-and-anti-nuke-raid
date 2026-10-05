@@ -110,6 +110,8 @@ export interface GuildData {
     memberCount: number | null;
     prefix: string;
     logChannelId: string | null;
+    /** Ngôn ngữ nhãn log do chủ server chọn (vi | en | de). */
+    logLang: string | null;
     /** Kênh log moderation — GỘP CHUNG auto-mod + lệnh mod thủ công (kiểu Carl-bot: Offender / Reason / Responsible moderator). */
     modLogChannelId: string | null;
     /** Kênh gửi thông báo sau khi bot trừng phạt thành viên (Moderation). */
