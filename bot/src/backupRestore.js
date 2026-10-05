@@ -77,6 +77,10 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
   const restoreEmojis = cfg?.restoreEmojisEnabled !== false;
   // Phần "ngoài cấu trúc" — phải KHỚP với restoreCore, nếu không kế hoạch nói
   // một đằng, khôi phục thật làm một nẻo (lỗi tinh vi nhất của mọi bản thuyết phục).
+  // restoreMeta (tên/mô tả/icon server) trước đây bị BỎ SÓT khỏi kế hoạch: bot
+  // vẫn đổi tên + icon server nhưng kế hoạch im lặng — mà đó lại là thứ người
+  // dùng nhận ra đầu tiên sau khi mở lại server bị nuke.
+  const restoreMeta = cfg?.restoreMetaEnabled !== false;
   const restoreExtras = cfg?.restoreExtrasEnabled === true;
 
   const roles = sortedRoles(backup).filter((r) => r.name);
@@ -87,6 +91,17 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
     ? channels.reduce((n, c) => n + (Array.isArray(c.threads) ? c.threads.length : 0), 0)
     : 0;
   const banCount = restoreExtras ? (backup.bans || []).filter((b) => b?.userId).length : 0;
+  // Danh tính server trong backup: có tên/mô tả/icon để khôi phục lại không.
+  const meta = backup.guildMeta || {};
+  const metaFields = restoreMeta
+    ? [
+        meta.name ?? backup.guildName ?? null,
+        meta.description ?? null,
+        meta.iconUrl ?? null,
+        meta.bannerUrl ?? null,
+        meta.splashUrl ?? null,
+      ].filter((v) => v !== null && v !== undefined && v !== "").length
+    : 0;
   // Bản đồ thành viên ↔ vai trò (P2): chỉ có ý nghĩa khi role được tạo lại.
   const memberEntries = restoreRoles && Array.isArray(backup.members) ? backup.members : [];
   const memberCount = memberEntries.filter((m) => m?.userId).length;
@@ -188,6 +203,7 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
   if (!restoreChannels) skipped.push("kênh");
   if (!restoreMessages) skipped.push("tin nhắn");
   if (!restoreEmojis) skipped.push("emoji/sticker");
+  if (!restoreMeta) skipped.push("thông tin server");
   if (skipped.length > 0) {
     warnings.push(
       `Đang tắt khôi phục ${skipped.join(", ")} trong Tùy chỉnh khôi phục — phần này sẽ KHÔNG được tạo lại.`,
@@ -204,6 +220,11 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
   if (restoreExtras && banCount > 0) {
     warnings.push(
       `${banCount} thành viên bị ban sẽ được cấm lại — hành động này KHÔNG hoàn tác được.`,
+    );
+  }
+  if (restoreMeta && metaFields > 0) {
+    warnings.push(
+      `Thông tin server sẽ được áp lại (${metaFields} trường: tên, mô tả, icon/banner/splash) — server này sẽ mang tên và ảnh của server trong backup.`,
     );
   }
   if (messages === 0 && countMessages(backup) > 0) {
@@ -227,6 +248,7 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
     stickerCount: restoreEmojis ? stickers.length : 0,
     threadCount,
     banCount,
+    metaFieldCount: restoreMeta ? metaFields : 0,
     memberCount,
     memberRoleAssignments,
     settingsCount: restoreRoles || restoreChannels ? settingsCount : 0,

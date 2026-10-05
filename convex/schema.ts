@@ -711,13 +711,28 @@ export default defineSchema({
     backupChunkCount: v.optional(v.number()),
     /** ID backup trước đó (dùng cho diff). */
     previousBackupId: v.optional(v.string()),
+    /**
+     * Mã khôi phục (capability) của RIÊNG bản backup này — 130 bit ngẫu nhiên,
+     * sinh 1 lần lúc lưu. Đây là đường cứu hộ khi chủ server ĐÃ MẤT quyền với
+     * server gốc (server bị nuke/kick, hoặc xoá server cũ dựng server mới):
+     * chỉ cần dán mã này vào trang "Tra cứu backup" là khôi phục được vào bất kỳ
+     * server nào mình quản lý.
+     *
+     * Vì sao KHÔNG dùng luôn `_id` của Convex làm mã: tra cứu theo id nội bộ
+     * buộc phải phát tán id (ảnh chụp màn hình, log, lỗi) và id đó là thứ ta
+     * không muốn lộ. Mã riêng 130 bit không đoán được, chủ server xoay được
+     * bằng cách xoá bản backup cũ, và tra cứu KHÔNG trả về `guildId` nên biết
+     * mã cũng không lộ id server gốc.
+     */
+    restoreKey: v.optional(v.string()),
     /** URL gist GitHub nếu backup đã được đẩy lên đám mây. */
     githubUrl: v.optional(v.string()),
     pushedToGithub: v.boolean(),
     createdAt: v.number(),
   })
     .index("by_guildId", ["guildId"])
-    .index("by_guildId_createdAt", ["guildId", "createdAt"]),
+    .index("by_guildId_createdAt", ["guildId", "createdAt"])
+    .index("by_restoreKey", ["restoreKey"]),
 
   /**
    * Backup quá trần 1 MB/doc của Convex được tách nhiều document. Payload đã

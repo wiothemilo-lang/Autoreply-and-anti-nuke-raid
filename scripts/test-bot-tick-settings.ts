@@ -378,7 +378,9 @@ const status = { _id: "st", kind: "status", botKeySeed: computeBotKey(BOT_KEY), 
       !!fullJob && fullJob.backupJson === payload,
     );
 
-    // 3) Thiếu chunk → KHÔNG được gửi job (bot sẽ khôi phục từ dữ liệu cụt).
+    // 3) Thiếu chunk → bot KHÔNG BAO GIỜ được giao payload cụt. Job vẫn gửi
+    //    kèm cờ `unreadable` để bot báo lỗi thật và DỌN cờ restoreRequested
+    //    (bỏ qua im lặng làm dashboard quay vòng chờ vô hạn).
     const missing = await handler(
       mkRestoreCtx(
         {
@@ -395,9 +397,16 @@ const status = { _id: "st", kind: "status", botKeySeed: computeBotKey(BOT_KEY), 
       ),
       { botKey: BOT_KEY },
     );
+    const missingJob = missing.backups.find((b: any) => b.kind === "restore");
     check(
-      "thiếu chunk → KHÔNG sinh job restore (dữ liệu cụt còn tệ hơn thất bại)",
-      !missing.backups.some((b: any) => b.kind === "restore"),
+      "thiếu chunk → KHÔNG gửi payload cụt cho bot",
+      !!missingJob && missingJob.backupJson === undefined,
+      JSON.stringify(missingJob?.backupJson?.slice(0, 12)),
+    );
+    check(
+      "thiếu chunk → job unreadable + có lý do (bot báo lỗi rồi dọn cờ)",
+      missingJob?.unreadable === true && typeof missingJob?.unreadableReason === "string",
+      JSON.stringify(missingJob?.unreadableReason),
     );
   }
 
@@ -468,9 +477,11 @@ const status = { _id: "st", kind: "status", botKeySeed: computeBotKey(BOT_KEY), 
       mkPlanCtx({ restorePlanRequested: true, restorePlanBackupId: "b-khong-con" }, row()),
       { botKey: BOT_KEY },
     );
+    const goneJob = gone.backups.find((b: any) => b.kind === "plan");
     check(
-      "backup đã bị xoá → không sinh job (không ném)",
-      !gone.backups.some((b: any) => b.kind === "plan"),
+      "backup đã bị xoá → job unreadable + nói rõ (bot báo lỗi rồi dọn cờ plan)",
+      goneJob?.unreadable === true && /không còn tồn tại/.test(goneJob?.unreadableReason ?? ""),
+      JSON.stringify(goneJob?.unreadableReason),
     );
 
     // Backup tách chunk phải được GHÉP LẠI như restore (nếu không bot tính kế hoạch từ chuỗi rác).
@@ -498,9 +509,16 @@ const status = { _id: "st", kind: "status", botKeySeed: computeBotKey(BOT_KEY), 
       ),
       { botKey: BOT_KEY },
     );
+    const brokenPlanJob = brokenChunks.backups.find((b: any) => b.kind === "plan");
     check(
-      "thiếu chunk → KHÔNG sinh job plan (kế hoạch từ dữ liệu cụt còn tệ hơn không có)",
-      !brokenChunks.backups.some((b: any) => b.kind === "plan"),
+      "thiếu chunk → KHÔNG giao payload cụt cho bot",
+      !!brokenPlanJob && brokenPlanJob.backupJson === undefined,
+      JSON.stringify(brokenPlanJob?.backupJson?.slice(0, 12)),
+    );
+    check(
+      "thiếu chunk → job plan unreadable (nút xem kế hoạch báo lỗi thay vì quay vòng)",
+      brokenPlanJob?.unreadable === true && typeof brokenPlanJob?.unreadableReason === "string",
+      JSON.stringify(brokenPlanJob?.unreadableReason),
     );
 
     // Yêu cầu restore thật VÀ plan cùng lúc → cả hai job, không cái nào nuốt cái nào.

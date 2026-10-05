@@ -78,6 +78,35 @@ function check(label, cond) {
     "snapshotChecksum đổi khi bản đồ vai trò thành viên đổi",
     utils.computeSnapshotChecksum(snap1) !== utils.computeSnapshotChecksum(snap4),
   );
+  // Danh sách ban + link mời: restoreCore CÓ khôi phục chúng (khi bật “khôi phục
+  // ban/link mời”) nên chúng là phần khôi phục được. Trước đây bị bỏ sót khỏi
+  // phần “ổn định” ⇒ cấm người mới (kẻ nuke) KHÔNG sinh bản backup mới, bản gần
+  // nhất giữ danh sách ban cũ ⇒ khôi phục xong thì kẻ nuke vẫn ở trong server mà
+  // chủ server không hề được báo.
+  const base = { ...snap1, bans: [], invites: [] };
+  const banThem = { ...base, bans: [{ userId: "u9", username: "nuke" }] };
+  check(
+    "snapshotChecksum đổi khi CẤM thêm người (không bỏ sót danh sách ban)",
+    utils.computeSnapshotChecksum(base) !== utils.computeSnapshotChecksum(banThem),
+  );
+  const inviteThem = {
+    ...base,
+    invites: [{ code: "abc", channelName: "general", maxAge: 0, maxUses: 0, temporary: false }],
+  };
+  check(
+    "snapshotChecksum đổi khi thêm link mời (không bỏ sót link mời)",
+    utils.computeSnapshotChecksum(base) !== utils.computeSnapshotChecksum(inviteThem),
+  );
+  check(
+    "snapshotChecksum ổN khi danh sách ban/link mời KHÔNG đổi (vẫn bỏ bản trùng)",
+    utils.computeSnapshotChecksum(base) === utils.computeSnapshotChecksum({ ...base }),
+  );
+  // Bản backup cŨ không có 2 field này vẫn phải băm được (undefined → bỏ trong
+  // JSON.stringify), không ném lỗi làm hỏng luồng incremental.
+  check(
+    "snapshot: bản CŨ không có bans/invites vẫn băm được",
+    typeof utils.computeSnapshotChecksum(snap1) === "string",
+  );
 }
 
 // ── 4. Mã hóa / giải mã ──

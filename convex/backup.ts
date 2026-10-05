@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getUserByToken, canManageGuild, guildAccessibleBy } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { reassembleBackupJsonForRead } from "./backupChunks";
+import { findBackupByRestoreKey, normalizeRestoreKey } from "./backupKeys";
 import { claimIsActive } from "./bot_writes/shared";
 
 /**
@@ -25,7 +26,6 @@ import { claimIsActive } from "./bot_writes/shared";
  * (document chỉ chứa tối đa 1 MB).
  */
 const MAX_IMPORT_FILE_BYTES = 8_000_000;
-const BACKUP_CLAIM_TTL_MS = 600_000;
 /**
  * Trần số bản backup ĐỌC RA cho mỗi server (danh sách chat/dashboard/audit).
  * PHẢI bằng trần của quy tắc giữ bản (`backupKeepCount`: 2-50 ở botStoreBackup
@@ -33,13 +33,12 @@ const BACKUP_CLAIM_TTL_MS = 600_000;
  */
 export const MAX_BACKUPS_PER_GUILD = 50;
 
-function isClaimActive(claimedAt: number | undefined, leaseUntil?: number): boolean {
-  if (claimedAt === undefined) return false;
-  return leaseUntil !== undefined
-    ? leaseUntil > Date.now()
-    : Date.now() - claimedAt < BACKUP_CLAIM_TTL_MS;
-}
-
+/**
+ * Còn claim backup HOẶC restore nào đang sống không (chặn 2 việc chồng nhau).
+ * Dùng CHUNG `claimIsActive` của bot_writes/shared — trước đây backup.ts tự
+ * viết lại một bản kèm hằng BACKUP_CLAIM_TTL_MS riêng, hai nơi có thể trôi
+ * lệch nhau (một nơi đổi TTL là nơi kia tính sai).
+ */
 function isAnyClaimActive(guild: {
   backupClaimedAt?: number;
   backupLeaseUntil?: number;
@@ -47,8 +46,8 @@ function isAnyClaimActive(guild: {
   restoreLeaseUntil?: number;
 }): boolean {
   return (
-    isClaimActive(guild.backupClaimedAt, guild.backupLeaseUntil) ||
-    isClaimActive(guild.restoreClaimedAt, guild.restoreLeaseUntil)
+    claimIsActive(guild.backupClaimedAt, guild.backupLeaseUntil) ||
+    claimIsActive(guild.restoreClaimedAt, guild.restoreLeaseUntil)
   );
 }
 
@@ -211,14 +210,131 @@ export const requestBackup = mutation({
   },
 });
 
+/**
+ * Danh sách MÃ KHÔI PHỤC của các bản backup thuộc server người dùng quản lý.
+ *
+ * Tách riêng `listMine` (danh sách nặng, không cần mã) vì mã khôi phục là
+ * capability — chỉ nên lấy ra khi chủ server CHỦ ĐỘNG bấm, không nhúng vào
+ * payload của danh sách chạy mỗi lần dashboard mở.
+ *
+ * Trả kèm `backupId` để web dựng nút "Khôi phục" cho đúng bản đó.
+ */
+export const myRestoreKeys = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const user = await getUserByToken(ctx, token);
+    if (!user) return [];
+    const mine = new Set(user.manageableGuildIds ?? []);
+    const all = await ctx.db.query("guilds").collect();
+    const out: {
+      backupId: string;
+      guildId: string;
+      guildName: string;
+      restoreKey: string | null;
+      createdAt: number;
+    }[] = [];
+    for (const g of all) {
+      if (!mine.has(g.discordId)) continue;
+      const backups = await ctx.db
+        .query("guildBackups")
+        .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", g.discordId))
+        .order("desc")
+        .take(MAX_BACKUPS_PER_GUILD);
+      for (const b of backups) {
+        out.push({
+          backupId: b._id,
+          guildId: b.guildId,
+          guildName: b.guildName,
+          restoreKey: b.restoreKey ?? null,
+          createdAt: b.createdAt,
+        });
+      }
+    }
+    return out.sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_BACKUPS_PER_GUILD);
+  },
+});
+
+/**
+ * Tra cứu một bản backup bằng MÃ KHÔI PHỤC — trang "Tra cứu backup".
+ *
+ * Trả về metadata để người dùng biết mình đang khôi phục CÁI GÌ (tên server,
+ * role/kênh/tin/emoji, thời điểm) trước khi bấm xác nhận.
+ *
+ * CỐ Ý KHÔNG trả về `guildId` và KHÔNG trả `backupJson`:
+ *  - id server gốc là thứ không nên phát tán (lộ ra là lộ ra server nào đang
+ *    dùng Protogon) — biết mã khôi phục không được suy ra id server;
+ *  - nội dung backup chỉ bot có botKey mới đọc được (`botAuditBackups`), người
+ *    dùng chỉ thấy số liệu đếm.
+ *
+ * Chỉ cần đăng nhập + quản lý ít nhất một server; mã 130 bit là chìa khoá.
+ */
+export const lookupBackup = query({
+  args: { token: v.string(), restoreKey: v.string() },
+  handler: async (ctx, { token, restoreKey }) => {
+    const user = await getUserByToken(ctx, token);
+    if (!user) return null;
+    if ((user.manageableGuildIds ?? []).length === 0) return null;
+    const backup = await findBackupByRestoreKey(ctx, restoreKey);
+    if (!backup) return null;
+    return {
+      backupId: backup._id,
+      guildName: backup.guildName,
+      createdAt: backup.createdAt,
+      roleCount: backup.roleCount,
+      channelCount: backup.channelCount,
+      emojiCount: backup.emojiCount ?? 0,
+      stickerCount: backup.stickerCount ?? 0,
+      messageCount: backup.messageCount ?? 0,
+      source: backup.source ?? "backup",
+      pushedToGithub: backup.pushedToGithub,
+      githubUrl: backup.githubUrl ?? null,
+    };
+  },
+});
+
+/**
+ * Có được khôi phục bản backup này không?
+ *
+ * ĐƯỜNG 1 (cũ): người khôi phục còn là người quản lý SERVER GỐC.
+ * ĐƯỜNG 2 (mới, cứu hộ): người khôi phục dán đúng MÃ KHÔI PHỤC của bản backup.
+ *
+ * Vì sao cần đường 2: trước đây chỉ có đường 1, nên đúng lúc cần cứu — bạn đã
+ * mất server gốc (bị nuke mất role, bị kick, hoặc xoá server chết dựng server
+ * mới) — bản backup biến mất khỏi danh sách và bị từ chối với lý do "Bạn không
+ * có quyền với server gốc". Mã khôi phục gỡ bế tắc mà VẪN không lộ id server
+ * (xem convex/backupKeys.ts). Người dùng vẫn phải quản lý server ĐÍCH.
+ */
+async function canRestoreBackup(
+  ctx: any,
+  user: { discordId: string; manageableGuildIds?: string[] } | null,
+  backup: { guildId: string; restoreKey?: string },
+  restoreKey: string | undefined,
+): Promise<boolean> {
+  const source = await ctx.db
+    .query("guilds")
+    .withIndex("by_discordId", (q: any) => q.eq("discordId", backup.guildId))
+    .first();
+  if (source && canManageGuild(user, source)) return true;
+  if (!restoreKey) return false;
+  // So trên bản ghi ĐÃ LƯU, không tra index lần hai: `restoreKey` trong backup
+  // là dạng chuẩn do generateRestoreKey() sinh, còn người dùng dán có thể
+  // thiếu gạch nối → normalize trước rồi mới so.
+  return normalizeRestoreKey(restoreKey) === backup.restoreKey;
+}
+
 /** Dashboard yêu cầu bot khôi phục một backup vào server hiện tại. */
 export const requestRestore = mutation({
   args: {
     token: v.string(),
     guildId: v.string(),
     backupId: v.id("guildBackups"),
+    /**
+     * Mã khôi phục của bản backup — BẮT BUỘC khi người dùng không còn quản lý
+     * server gốc (xem canRestoreBackup). Tuỳ chọn: còn quyền server gốc thì bỏ.
+     */
+    restoreKey: v.optional(v.string()),
   },
-  handler: async (ctx, { token, guildId, backupId }) => {
+  handler: async (ctx, { token, guildId, backupId, restoreKey }) => {
     const user = await getUserByToken(ctx, token);
     const guild = await ctx.db
       .query("guilds")
@@ -234,14 +350,15 @@ export const requestRestore = mutation({
       );
     }
     const backup = await ctx.db.get(backupId);
-    if (!backup) throw new Error("Backup không tồn tại hoặc đã bị xóa");
-    // Người khôi phục phải cũng là người quản lý server gốc đã tạo backup.
-    const source = await ctx.db
-      .query("guilds")
-      .withIndex("by_discordId", (q) => q.eq("discordId", backup.guildId))
-      .first();
-    if (!source || !canManageGuild(user, source)) {
-      throw new Error("Bạn không có quyền với server gốc của backup này");
+    if (!backup) throw new Error("Backup không tồn tại hoặc đã bị xoá");
+    // Còn quản lý server gốc, hoặc dán đúng mã khôi phục → được khôi phục vào
+    // server đích (chủ server vẫn phải quản lý server đích — kiểm tra trên).
+    if (!(await canRestoreBackup(ctx, user, backup, restoreKey))) {
+      throw new Error(
+        "Bạn không có quyền với server gốc của backup này. Hãy dán mã khôi phục " +
+          "(mã khôi phục của bản backup) ở mục “Tra cứu backup”, hoặc đăng nhập lại " +
+          "bằng tài khoản vẫn quản lý server gốc.",
+      );
     }
     await ctx.db.patch(guild._id, {
       restoreRequested: true,
@@ -268,8 +385,10 @@ export const requestRestorePlan = mutation({
     token: v.string(),
     guildId: v.string(),
     backupId: v.id("guildBackups"),
+    /** Mã khôi phục — xem canRestoreBackup (bắt buộc nếu mất quyền server gốc). */
+    restoreKey: v.optional(v.string()),
   },
-  handler: async (ctx, { token, guildId, backupId }) => {
+  handler: async (ctx, { token, guildId, backupId, restoreKey }) => {
     const user = await getUserByToken(ctx, token);
     const guild = await ctx.db
       .query("guilds")
@@ -285,13 +404,16 @@ export const requestRestorePlan = mutation({
       );
     }
     const backup = await ctx.db.get(backupId);
-    if (!backup) throw new Error("Backup không tồn tại hoặc đã bị xóa");
-    const source = await ctx.db
-      .query("guilds")
-      .withIndex("by_discordId", (q) => q.eq("discordId", backup.guildId))
-      .first();
-    if (!source || !canManageGuild(user, source)) {
-      throw new Error("Bạn không có quyền với server gốc của backup này");
+    if (!backup) throw new Error("Backup không tồn tại hoặc đã bị xoá");
+    // Dry-run phải dùng CHUNG luật quyền với restore thật, nếu không bản kế
+    // hoạch xem được thì khôi phục thật lại không (lỗi tinh vi nhất: bản thuyết
+    // phục sai, người dùng bấm xong mới biết không dùng được).
+    if (!(await canRestoreBackup(ctx, user, backup, restoreKey))) {
+      throw new Error(
+        "Bạn không có quyền với server gốc của backup này. Hãy dán mã khôi phục " +
+          "(mã khôi phục của bản backup) ở mục “Tra cứu backup”, hoặc đăng nhập lại " +
+          "bằng tài khoản vẫn quản lý server gốc.",
+      );
     }
     await ctx.db.patch(guild._id, {
       restorePlanRequested: true,
@@ -386,7 +508,7 @@ export const requestImportRestore = mutation({
         throw new Error("Không có quyền quản lý server này");
       }
       if (!guild.botInGuild) throw new Error("Bot chưa có trong server này");
-      if (isClaimActive(guild.restoreClaimedAt, guild.restoreLeaseUntil)) {
+      if (claimIsActive(guild.restoreClaimedAt, guild.restoreLeaseUntil)) {
         throw new Error("Bot đang xử lý yêu cầu khôi phục trước; hãy đợi hoàn tất rồi thử lại");
       }
       const meta = await ctx.storage.getMetadata(storageId);
@@ -713,6 +835,10 @@ export const botGetPending = query({
       importStorageId?: string;
       importFileUrl?: string;
       backupCreatedAt?: number;
+      /** true = không gộp được payload (hỏng/thiếu chunk hoặc bản đã bị xoá). */
+      unreadable?: boolean;
+      /** Lý do cụ thể để bot báo lên dashboard. */
+      unreadableReason?: string;
     }[] = [];
     const all = await ctx.db.query("guilds").collect();
     for (const g of all) {
@@ -727,28 +853,31 @@ export const botGetPending = query({
       }
       if (g.restoreRequested && g.restoreBackupId) {
         const b = await ctx.db.get(g.restoreBackupId);
-        if (b) {
-          const json = await reassembleBackupJsonForRead(
-            ctx,
-            b._id,
-            b.backupJson,
-            b.backupChunkCount,
-          );
-          // Backup hỏng/thiếu chunk → KHÔNG gửi việc cho bot, nếu không bot sẽ
-          // "khôi phục thành công" từ dữ liệu cụt. Bỏ qua job: requestRestore
-          // vẫn treo và người dùng thấy cờ treo thay vì bị dữ liệu mất.
-          if (json !== null) {
-            out.push({
-              kind: "restore",
-              guildId: g.discordId,
-              backupId: b._id,
-              backupJson: json,
-              // Checksum đã lưu (SHA-256 JSON thô) — bot xác minh trước khi khôi phục.
-              backupChecksum: b.backupChecksum ?? undefined,
-              guildName: b.guildName,
-            });
-          }
-        }
+        // Backup hỏng/thiếu chunk → KHÔNG gửi việc cho bot, nếu không bot sẽ
+        // "khôi phục thành công" từ dữ liệu cụt.
+        //
+        // Nhưng KHÔNG được bỏ qua im lặng: cờ `restoreRequested` sẽ mắc true mãi
+        // mãi ⇒ dashboard quay vòng chờ vô hạn, người dùng không biết vì sao, và
+        // mỗi lượt quét lại đọc/gộp payload (có thể vài MB). Thay vào đó vẫn
+        // gửi job với cờ `unreadable` — bot claim rồi báo `botReportRestoreError`
+        // → cờ được dọn và dashboard hiện LÝ DO thật, vòng lặp kết thúc sau
+        // đúng một nhịp.
+        const json = b
+          ? await reassembleBackupJsonForRead(ctx, b._id, b.backupJson, b.backupChunkCount)
+          : null;
+        out.push({
+          kind: "restore",
+          guildId: g.discordId,
+          backupId: b?._id ?? g.restoreBackupId,
+          backupJson: json ?? undefined,
+          // Checksum đã lưu (SHA-256 JSON thô) — bot xác minh trước khi khôi phục.
+          backupChecksum: b?.backupChecksum ?? undefined,
+          guildName: b?.guildName ?? "backup",
+          unreadable: json === null,
+          unreadableReason: b
+            ? "Bản backup không đọc được (thiếu hoặc hỏng chunk dữ liệu) — hãy thử bản backup khác, hoặc tải file .json từ Gist rồi khôi phục bằng chức năng “Tải file backup”."
+            : "Bản backup không còn tồn tại (đã bị xoá theo quy tắc giữ bản) — hãy chọn bản backup khác.",
+        });
       }
       // Dry-run: gửi kèm createdAt để dashboard đúng lúc bản backup này mới
       // được chọn (tránh hiện kế hoạch cũ của bản khác khi danh sách đổi).

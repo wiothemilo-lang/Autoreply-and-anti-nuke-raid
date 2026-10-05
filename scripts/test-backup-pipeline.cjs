@@ -1940,6 +1940,53 @@ const check = (label, ok) => {
     );
   }
   {
+    // Thông tin server (tên/mô tả/icon) PHẢI xuất hiện trong kế hoạch: restoreCore
+    // áp lại chúng (mặc định BẬT) mà trước đây planRestoreCore im lặng — kế hoạch
+    // nói một đằng, làm một nẻo. Tên/icon là thứ người dùng nhận ra đầu tiên
+    // sau khi mở lại server bị nuke.
+    const metaBackup = {
+      roles: [],
+      channels: [],
+      emojis: [],
+      stickers: [],
+      settings: {},
+      guildName: "Tên Server Cũ",
+      guildMeta: {
+        name: "Tên Server Cũ",
+        description: "Mô tả",
+        iconUrl: "https://cdn.discordapp.com/icons/1/a.png",
+      },
+    };
+    const planMetaOn = await backup.planRestoreCore(
+      { guilds: { cache: new Map([[TGT, makeTarget()]]) } },
+      { client: {}, getConfig: async () => ({}) }, // restoreMeta mặc định bật
+      TGT,
+      metaBackup,
+    );
+    check(
+      "dry-run: ĐẾM số trường thông tin server sẽ áp lại (tên/mô tả/icon)",
+      planMetaOn.metaFieldCount === 3,
+      JSON.stringify({ n: planMetaOn.metaFieldCount }),
+    );
+    check(
+      "dry-run: nói rõ thông tin server sẽ được áp lại",
+      planMetaOn.warnings.some((w) => /Thông tin server sẽ được áp lại/.test(w)),
+      JSON.stringify(planMetaOn.warnings),
+    );
+    const planMetaOff = await backup.planRestoreCore(
+      { guilds: { cache: new Map([[TGT, makeTarget()]]) } },
+      { client: {}, getConfig: async () => ({ restoreMetaEnabled: false }) },
+      TGT,
+      metaBackup,
+    );
+    check(
+      "dry-run: TẮT khôi phục thông tin server → không đếm + nói rõ đang tắt",
+      planMetaOff.metaFieldCount === 0 &&
+        planMetaOff.warnings.some((w) => /tắt khôi phục .*thông tin server/.test(w)),
+      JSON.stringify({ n: planMetaOff.metaFieldCount, w: planMetaOff.warnings }),
+    );
+  }
+  {
     // runRestorePlan: nén → bung → tính → BÁO LẠI Convex (kèm claimAt).
     const tg = makeTarget();
     const muts = [];

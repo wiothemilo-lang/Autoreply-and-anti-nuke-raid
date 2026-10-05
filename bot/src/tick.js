@@ -182,6 +182,10 @@ async function runBackupJobs(client, store, items) {
           claimAt,
         });
       } else if (item.kind === "restore") {
+        // Backup hỏng / thiếu chunk / đã bị xoá → ném để nhánh catch báo lỗi
+        // và DỌN cờ `restoreRequested`. Trước đây job này bị botGetPending bỏ
+        // qua im lặng ⇒ cờ mắc mãi mãi, dashboard quay vòng chờ vô hạn (bug thật).
+        if (item.unreadable) throw new Error(item.unreadableReason || "Bản backup không đọc được");
         await backupMod.runRestore(client, store, item.guildId, item.backupJson, item.guildName, {
           claimAt,
           // Kiểm toàn vẹn: botGetPending trả checksum đã lưu của bản backup.
@@ -189,6 +193,9 @@ async function runBackupJobs(client, store, items) {
         });
       } else if (item.kind === "plan") {
         // Dry-run: chỉ tính kế hoạch khôi phục, KHÔNG đụng server (xem runRestorePlan).
+        // Backup hỏng/thiếu chunk → ném để nhánh catch báo lỗi và dọn cờ
+        // `restorePlanRequested` (nếu không nút "Xem kế hoạch" quay mãi).
+        if (item.unreadable) throw new Error(item.unreadableReason || "Bản backup không đọc được");
         await backupMod.runRestorePlan(
           client,
           store,

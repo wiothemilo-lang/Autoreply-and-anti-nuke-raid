@@ -62,11 +62,17 @@ async function pollBackups(client, store) {
           claimAt,
         });
       } else if (item.kind === "restore") {
+        // Backup hỏng / thiếu chunk / đã bị xoá → ném để nhánh catch báo lỗi
+        // và DỌN cờ `restoreRequested` (giống tick.js) thay vì để treo vĩnh viễn.
+        if (item.unreadable) throw new Error(item.unreadableReason || "Bản backup không đọc được");
         await runRestore(client, store, item.guildId, item.backupJson, item.guildName, {
           claimAt,
           expectedChecksum: item.backupChecksum,
         });
       } else if (item.kind === "plan") {
+        // Backup hỏng/thiếu chunk → ném để nhánh catch báo lỗi và dọn cờ
+        // `restorePlanRequested` (giống tick.js) thay vì để treo vĩnh viễn.
+        if (item.unreadable) throw new Error(item.unreadableReason || "Bản backup không đọc được");
         await runRestorePlan(client, store, item.guildId, item.backupJson, item.guildName, {
           claimAt,
           expectedChecksum: item.backupChecksum,

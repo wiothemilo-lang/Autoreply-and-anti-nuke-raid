@@ -63,6 +63,18 @@ export const getPendingJobs = query({
       includeMessages?: boolean;
       backupId?: string;
       backupJson?: string;
+      /**
+       * Checksum SHA-256 đã lưu của bản backup — bot xác minh toàn vẹn TRƯỚC khi
+       * tạo bất cứ thứ gì. Field này từng KHÔNG có trong kiểu ở đây ⇒ đường
+       * thật (batch tick) im lặng bỏ qua bước xác minh, chỉ đường quét cũ
+       * (`backup:botGetPending`) có gửi. Bản bị sửa/cắt cụt vẫn "khôi phục
+       * thành công" và tạo ra cấu trúc sai.
+       */
+      backupChecksum?: string;
+      /** true = không gộp được payload (hỏng/thiếu chunk hoặc bản đã bị xoá). */
+      unreadable?: boolean;
+      /** Lý do cụ thể để bot báo lên dashboard thay vì im lặng. */
+      unreadableReason?: string;
       guildName?: string;
       fileName?: string;
       importStorageId?: string;
@@ -83,56 +95,60 @@ export const getPendingJobs = query({
       }
       if (g.restoreRequested && g.restoreBackupId) {
         const b = await ctx.db.get(g.restoreBackupId);
-        if (b) {
-          // Bản backup >700KB được tách thành nhiều document `backupChunks`,
-          // còn `backupJson` trên bản cha chỉ là ký hiệu "chunked:N". Gửi thẳng
-          // ký hiệu đó cho bot ⇒ bot khôi phục từ chuỗi rác rồi báo "thành công"
-          // trong khi không server nào được khôi phục. Đường cũ
-          // (`backup:botGetPending`) đã làm đúng: ghép lại, và hỏng/thiếu chunk
-          // thì KHÔNG sinh job để người dùng thấy cờ treo thay vì mất dữ liệu.
-          const backupJson = await reassembleBackupJsonForRead(
-            ctx,
-            b._id,
-            b.backupJson,
-            b.backupChunkCount,
-          );
-          if (backupJson !== null) {
-            backups.push({
-              kind: "restore",
-              guildId: g.discordId,
-              backupId: b._id,
-              backupJson,
-              guildName: b.guildName,
-            });
-          }
-        }
+        // Bản backup >700KB được tách thành nhiều document `backupChunks`,
+        // còn `backupJson` trên bản cha chỉ là ký hiệu "chunked:N". Gửi thẳng
+        // ký hiệu đó cho bot ⇒ bot khôi phục từ chuỗi rác rồi báo "thành công"
+        // trong khi không server nào được khôi phục.
+        //
+        // Hỏng/thiếu chunk (hoặc bản đã bị xoá): KHÔNG giao payload cụt, nhưng
+        // CŨNG KHÔNG bỏ qua im lặng — bỏ qua làm cờ `restoreRequested` mắc
+        // true mãi mãi ⇒ dashboard quay vòng chờ vô hạn và mỗi lượt quét lại
+        // đọc/gộp lại payload. Gửi job kèm cờ `unreadable` để bot báo lỗi thật
+        // lên dashboard rồi DỌN cờ — vòng lặp kết thúc sau đúng một nhịp.
+        const backupJson = b
+          ? await reassembleBackupJsonForRead(ctx, b._id, b.backupJson, b.backupChunkCount)
+          : null;
+        backups.push({
+          kind: "restore",
+          guildId: g.discordId,
+          backupId: b?._id ?? g.restoreBackupId,
+          backupJson: backupJson ?? undefined,
+          // Checksum đã lưu — bot xác minh toàn vẹn TRƯỚC khi tạo bất cứ thứ
+          // gì. Thiếu field này thì bước xác minh bị bỏ qua âm thầm trên toàn
+          // bộ đường thật (chỉ đường cũ `backup:botGetPending` có gửi).
+          backupChecksum: b?.backupChecksum ?? undefined,
+          guildName: b?.guildName ?? "backup",
+          unreadable: backupJson === null,
+          unreadableReason: b
+            ? "Bản backup không đọc được (thiếu hoặc hỏng chunk dữ liệu) — hãy thử bản backup khác, hoặc tải file .json từ Gist rồi khôi phục bằng chức năng “Tải file backup”."
+            : "Bản backup không còn tồn tại (đã bị xoá theo quy tắc giữ bản) — hãy chọn bản backup khác.",
+        });
       }
       // Dry-run khôi phục ("xem kế hoạch trước khi bấm"): dashboard đặt
       // `restorePlanRequested` + `restorePlanBackupId`. Đường quét cũ
       // (`backup:botGetPending`) có sinh job này nhưng vòng quét cũ không còn được
       // lên lịch — batch tick thiếu nhánh → nút xem kế hoạch quay mãi không có
-      // kết quả. Cùng quy tắc ghép chunk với restore; thiếu/hỏng chunk thì KHÔNG
-      // sinh job để người dùng thấy cờ treo thay vì nhận kế hoạch sai.
+      // kết quả. Cùng quy tắc ghép chunk + checksum với restore; hỏng/thiếu
+      // chunk thì gửi job `unreadable` để bot báo lỗi và DỌN cờ (bỏ qua im
+      // lặng làm nút "Xem kế hoạch" quay vòng vô hạn).
       if (g.restorePlanRequested && g.restorePlanBackupId) {
         const b = await ctx.db.get(g.restorePlanBackupId);
-        if (b) {
-          const backupJson = await reassembleBackupJsonForRead(
-            ctx,
-            b._id,
-            b.backupJson,
-            b.backupChunkCount,
-          );
-          if (backupJson !== null) {
-            backups.push({
-              kind: "plan",
-              guildId: g.discordId,
-              backupId: b._id,
-              backupJson,
-              guildName: b.guildName,
-              backupCreatedAt: b.createdAt,
-            });
-          }
-        }
+        const backupJson = b
+          ? await reassembleBackupJsonForRead(ctx, b._id, b.backupJson, b.backupChunkCount)
+          : null;
+        backups.push({
+          kind: "plan",
+          guildId: g.discordId,
+          backupId: b?._id ?? g.restorePlanBackupId,
+          backupJson: backupJson ?? undefined,
+          backupChecksum: b?.backupChecksum ?? undefined,
+          guildName: b?.guildName ?? "backup",
+          backupCreatedAt: b?.createdAt,
+          unreadable: backupJson === null,
+          unreadableReason: b
+            ? "Bản backup không đọc được (thiếu hoặc hỏng chunk dữ liệu) — không thể tính kế hoạch khôi phục."
+            : "Bản backup không còn tồn tại (đã bị xoá theo quy tắc giữ bản) — hãy chọn bản backup khác.",
+        });
       }
       if (g.importRestoreRequested && g.importStorageId) {
         const importFileUrl = await ctx.storage.getUrl(g.importStorageId).catch(() => null);
