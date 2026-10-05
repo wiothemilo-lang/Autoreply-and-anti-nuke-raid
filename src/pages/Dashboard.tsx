@@ -24,6 +24,7 @@ import { Badge } from "../components/ui/badge";
 import { Card, CardContent } from "../components/ui/card";
 import {
   SILENT_ATTEMPT_KEY,
+  SILENT_FAILED_KEY,
   SILENT_STATE_KEY,
   SILENT_VERIFIER_KEY,
   buildBotInviteUrl,
@@ -100,6 +101,10 @@ export default function Dashboard() {
    */
   async function startSilentRefresh(force: boolean) {
     if (!clientId || !token) return;
+    // Đã thử và thất bại → thôi tự đẩy sang Discord. Chỉ nút "Tải lại" của
+    // người dùng mới mở lại; nếu không thì mỗi lần mở dashboard (sau 10 phút)
+    // lại bị nhảy sang Discord rồi quay về — người dùng thấy như lặp đăng nhập.
+    if (!force && sessionStorage.getItem(SILENT_FAILED_KEY) === "1") return;
     const lastAttempt = Number(sessionStorage.getItem(SILENT_ATTEMPT_KEY) ?? 0);
     if (!force && Date.now() - lastAttempt < 10 * 60_000) return;
     sessionStorage.setItem(SILENT_ATTEMPT_KEY, String(Date.now()));
@@ -113,10 +118,15 @@ export default function Dashboard() {
   }
 
   // Khi mở dashboard: tự làm mới một lần để server mới mời bot hiện ra ngay.
+  // CHỈ khi phiên còn hợp lệ: `me === null` nghĩa là RequireAuth đang chuyển
+  // sang /auth — nếu vẫn nhảy sang Discord thì hai lần điều hướng tranh nhau và
+  // người dùng bị đẩy tới Discord một cách vô nghĩa, không làm được gì.
   useEffect(() => {
+    if (!me) return;
     void startSilentRefresh(false);
-    // Lưu ý: chỉ chạy 1 lần khi mở dashboard — startSilentRefresh đọc state hiện tại.
-  }, [clientId, token]);
+    // startSilentRefresh đọc state hiện tại; `me` vào deps để không chạy lúc
+    // phiên còn chưa xác định.
+  }, [me, clientId, token]);
 
   // Xử lý kết quả quay về sau luồng làm mới im lặng.
   useEffect(() => {
@@ -124,8 +134,13 @@ export default function Dashboard() {
     const silent = params.get("silent");
     if (silent) {
       if (silent === "ok") {
+        sessionStorage.removeItem(SILENT_FAILED_KEY);
         toast.success(translate("Đã làm mới danh sách server"));
       } else {
+        // Khoá lượt tự động cho tới khi người dùng bấm "Tải lại" — xem
+        // SILENT_FAILED_KEY. Không làm thì cứ mở dashboard là lại bị đẩy sang
+        // Discord, thất bại, quay lại: cảm giác "lặp đăng nhập".
+        sessionStorage.setItem(SILENT_FAILED_KEY, "1");
         toast.error(
           translate("Không thể làm mới tự động — hãy thử nút Tải lại hoặc Đăng nhập lại."),
         );
@@ -147,11 +162,15 @@ export default function Dashboard() {
     await logout({ token });
     clearSessionToken();
     clearLegacyDiscordAccess();
+    // Đăng xuất rồi đăng nhập lại thì không được mang theo cờ "làm mới đã hỏng".
+    sessionStorage.removeItem(SILENT_FAILED_KEY);
     navigate("/");
   }
 
   async function handleRefresh() {
     setRefreshing(true);
+    // Người dùng chủ động thử lại → mở lại lượt tự động (xem SILENT_FAILED_KEY).
+    sessionStorage.removeItem(SILENT_FAILED_KEY);
     try {
       await startSilentRefresh(true);
     } catch (error) {

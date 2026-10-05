@@ -170,5 +170,52 @@ check(
   !/navigate\(returnTo\.startsWith/.test(callbackTsx),
 );
 
+// ─── 7. Làm mới im lặng KHÔNG được lặp vô hạn (sự cố "lặp đăng nhập") ─────────
+// Dashboard tự nhảy sang Discord (prompt=none) mỗi lần mở trang, khoá lặp bằng
+// SILENT_ATTEMPT_KEY 10 phút. Nếu Discord từ chối prompt=none thì cứ mở dashboard
+// sau 10 phút lại bị đẩy sang Discord → thất bại → quay lại: người dùng thấy
+// đúng cảm giác "lặp đăng nhập". Ba lá chắn: khoá lượt tự động khi thất bại, chỉ
+// nút "Tải lại" mở lại, và không nhảy khi phiên đã hỏng (me === null).
+const dashboardTsx = fs.readFileSync(path.join(ROOT, "src/pages/Dashboard.tsx"), "utf8");
+
+check(
+  "cờ SILENT_FAILED_KEY được khai báo",
+  /export const SILENT_FAILED_KEY\s*=\s*"wio_silent_failed"/.test(discordTs),
+);
+check(
+  "lượt TỰ ĐỘNG bị khoá khi đã thất bại (guard trong startSilentRefresh)",
+  /if \(!force && sessionStorage\.getItem\(SILENT_FAILED_KEY\) === "1"\) return;/.test(
+    dashboardTsx,
+  ),
+);
+check(
+  "nhánh lỗi (else sau silent=ok) đặt cờ thất bại",
+  /if \(silent === "ok"\)[\s\S]{0,400}?\}\s*else\s*\{[\s\S]{0,400}sessionStorage\.setItem\(SILENT_FAILED_KEY, "1"\)/.test(
+    dashboardTsx,
+  ),
+);
+check(
+  "nhánh silent=ok XOÁ cờ thất bại",
+  /silent === "ok"[\s\S]{0,200}sessionStorage\.removeItem\(SILENT_FAILED_KEY\)/.test(dashboardTsx),
+);
+check(
+  "nút Tải lại (force) mở lại lượt tự động",
+  /async function handleRefresh\(\)[\s\S]{0,300}sessionStorage\.removeItem\(SILENT_FAILED_KEY\)/.test(
+    dashboardTsx,
+  ),
+);
+check(
+  "KHÔNG nhảy sang Discord khi phiên đã hỏng (me null)",
+  /useEffect\(\(\) => \{\s*\n\s*if \(!me\) return;[\s\S]{0,200}startSilentRefresh\(false\)/.test(
+    dashboardTsx,
+  ),
+);
+check(
+  "đăng xuất xoá cờ thất bại (đăng nhập lại không mang theo lỗi cũ)",
+  /async function handleLogout\(\)[\s\S]{0,400}sessionStorage\.removeItem\(SILENT_FAILED_KEY\)/.test(
+    dashboardTsx,
+  ),
+);
+
 console.log(`\nKết quả OAuth client-id guard: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

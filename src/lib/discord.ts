@@ -7,6 +7,13 @@ export const REMEMBER_LOGIN_KEY = "wio_remember_login";
 export const SILENT_VERIFIER_KEY = "wio_silent_verifier";
 export const SILENT_STATE_KEY = "wio_silent_state";
 export const SILENT_ATTEMPT_KEY = "wio_silent_last_attempt";
+/**
+ * Cờ "làm mới im lặng đã thất bại": đặt khi Discord từ chối prompt=none. Từ
+ * lúc này lượt TỰ ĐỘNG bị khoá cho tới khi người dùng bấm nút làm mới — nếu
+ * không, mỗi lần mở dashboard sau 10 phút lại bị đẩy sang Discord, thất bại
+ * rồi quay lại: đúng cảm giác "lặp đăng nhập".
+ */
+export const SILENT_FAILED_KEY = "wio_silent_failed";
 
 /** Chỉ lưu đăng nhập tối đa 7 ngày khi bật "Lưu đăng nhập". */
 export const SESSION_EXPIRY_DAYS = 7;
