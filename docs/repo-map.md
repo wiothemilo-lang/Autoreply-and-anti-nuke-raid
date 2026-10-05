@@ -91,7 +91,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `ai.js`                                                                                                      | Client AI trực tiếp từ VPS (Kira gateway + fallback Groq/NVIDIA)                                                                                                                    |
 | `util.js`                                                                                                    | Tiện ích dùng chung: quyền, định dạng, helper                                                                                                                                       |
 | `logDedupe.js`                                                                                               | Chống gửi trùng log (cùng embed + cùng kênh trong 3s)                                                                                                                               |
-| `logI18n.js`                                                                                                | Từ điển nhãn log đa ngôn ngữ (vi/en/de) theo `logLang` của server                                                                                                                  |
+| `logI18n.js`                                                                                                 | Từ điển nhãn log đa ngôn ngữ (vi/en/de) theo `logLang` của server                                                                                                                   |
 
 ## convex/ — backend
 
