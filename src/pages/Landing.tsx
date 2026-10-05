@@ -42,34 +42,12 @@ export default function Landing() {
       <main id="main" tabIndex={-1}>
         {/* ============ HERO ============ */}
         <section className="relative overflow-hidden pb-16 pt-28 md:pb-20 md:pt-32">
-          {/* Ảnh thương hiệu lớn: bức tranh cá voi bứt sóng (đã bỏ dải chữ, sinh
-              từ assets/brand/whale-source.png bằng scripts/build-logo-assets.cjs).
-              Nét trắng nên phải nằm trên khối tối ở MỌI chủ đề; chữ "Protogon."
-              dưới ảnh đúng bố cục lockup của tranh gốc. */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="container mb-12 md:mb-16"
-          >
-            <div className="mx-auto w-full max-w-2xl overflow-hidden rounded-3xl bg-neutral-950 shadow-sm ring-1 ring-white/10">
-              <img
-                src="/brand-whale.png"
-                alt="Protogon"
-                width={1024}
-                height={652}
-                decoding="async"
-                // Ảnh này là phần tử LCP của trang — ưu tiên tải NGAY, đừng
-                // xếp sau các chunk JS như ảnh bình thường.
-                fetchPriority="high"
-                draggable={false}
-                className="w-full"
-              />
-              <p className="pb-6 text-center font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                Protogon<span className="text-primary">.</span>
-              </p>
-            </div>
-          </motion.div>
+          {/* Bố cục hero: hai cột ngay từ đầu. Trước đây ảnh thương hiệu là một
+              khối full-width max-w-2xl (~500px cao) đứng một mình giữa trang,
+              đẩy tiêu đề + nút bấm xuống dưới màn hình đầu và để lại một khoảng
+              trống toàn diện — nhìn như "logo to đùng rồi bỏ trống". Nay ảnh
+              thu nhỏ và ghép vào CỘT PHẢI cùng mockup chat, nên hero gọn đúng một
+              màn hình và hai cột cân nhau. */}
           <div className="container relative grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
             <div>
               <motion.div
@@ -154,8 +132,37 @@ export default function Landing() {
                 ))}
               </motion.div>
             </div>
-            <div className="hidden lg:block">
-              <HeroChatCard />
+            <div className="flex flex-col items-center gap-6 lg:items-stretch">
+              {/* Ảnh thương hiệu: bức tranh cá voi bứt sóng (đã bỏ dải chữ, sinh
+                  từ assets/brand/whale-source.png bằng
+                  scripts/build-logo-assets.cjs). Nét trắng nên phải nằm trên khối
+                  tối ở MỌI chủ đề; chữ "Protogon." dưới ảnh đúng bố cục lockup
+                  của tranh gốc. */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7 }}
+                className="w-full max-w-xs overflow-hidden rounded-2xl bg-neutral-950 shadow-sm ring-1 ring-white/10 sm:max-w-sm"
+              >
+                <img
+                  src="/brand-whale.png"
+                  alt="Protogon"
+                  width={1024}
+                  height={652}
+                  decoding="async"
+                  // Ảnh này là phần tử LCP của trang — ưu tiên tải NGAY, đừng
+                  // xếp sau các chunk JS như ảnh bình thường.
+                  fetchPriority="high"
+                  draggable={false}
+                  className="w-full"
+                />
+                <p className="pb-4 text-center font-display text-xl font-bold tracking-tight text-white">
+                  Protogon<span className="text-primary">.</span>
+                </p>
+              </motion.div>
+              <div className="hidden w-full lg:block">
+                <HeroChatCard />
+              </div>
             </div>
           </div>
         </section>
