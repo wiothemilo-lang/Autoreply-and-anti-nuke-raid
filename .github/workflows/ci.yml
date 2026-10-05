@@ -133,6 +133,13 @@ jobs:
       # xoá) nên timer chỉ giảm được sau khi review.
       - name: Allowlist setInterval (timer mới phải qua review, không tự dựng)
         run: node scripts/check-timer-allowlist.cjs --self-test
+      # Convex chặn args TRƯỚC khi chạy handler và kiểm tra MẠNH hơn so tên
+      # field (thừa/thiếu/SAI KIỂU trong object lồng đều giết mutation). 05/10
+      # botSyncGuilds chết liên tục vì args đòi `reportedAt` mà aiStats() không
+      # gửi. Cổng này dựng validator THẬT từ convex/*.ts rồi chạy lên payload
+      # THẬT của bot — hermetic, không cần mạng, chạy được ngay trên VPS.
+      - name: Payload bot khớp validator Convex (chạy validator thật, có --self-test)
+        run: node scripts/check-bot-payload.cjs --self-test
 
   test:
     needs: [lint, security]

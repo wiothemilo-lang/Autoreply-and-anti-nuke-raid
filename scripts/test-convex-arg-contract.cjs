@@ -446,5 +446,15 @@ check(
   }
 }
 
+// ── Chạy VALIDATOR THẬT với PAYLOAD THẬT (đệ quy, có kiểu) ──────────────────
+// Các khối trên chỉ so TÊN field ở cấp ngoài. Convex thì kiểm tra MẠNH hơn:
+// thừa field / thiếu field bắt buộc / SAI KIỂU trong object lồng và phần tử
+// mảng đều giết mutation. Cổng dùng chung nằm ở scripts/check-bot-payload.cjs
+// để không viết trùng bộ dựng validator + walker.
+{
+  const { runChecks } = require("./check-bot-payload.cjs");
+  for (const r of runChecks()) check(r.name, r.ok, r.detail);
+}
+
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);

@@ -18,7 +18,8 @@
     "test:bot": "for s in scripts/test-*.cjs; do node \"$s\" || exit 1; done",
     "test:mutation": "node scripts/mutation-test.cjs --full",
     "coverage:floor": "node scripts/check-coverage-floor.cjs",
-    "smoke:vps": "node scripts/smoke-vps.cjs"
+    "smoke:vps": "node scripts/smoke-vps.cjs",
+    "check:payload": "node scripts/check-bot-payload.cjs --self-test"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
