@@ -2,6 +2,9 @@
 
 > Viết cho người mới — đi từng bước, giải thích thuật ngữ ngay tại chỗ.
 > Thời gian: ~20 phút. Yêu cầu: VPS đã chạy bot Protogon (xem `bot/VPS-DEPLOY.md`).
+>
+> 🔐 Siết an ninh VPS + giả lập tấn công + trỏ Freebuff CLI đúng tệp:
+> xem [`docs/vps-security-hardening.md`](./vps-security-hardening.md).
 
 ---
 
