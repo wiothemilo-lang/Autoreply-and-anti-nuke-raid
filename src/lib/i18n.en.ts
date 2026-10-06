@@ -1467,8 +1467,6 @@ export const EN: Record<string, string> = {
   "Chọn mức tùy khả năng": "Pick whatever feels comfortable",
   "Đây chỉ là gợi ý. Mọi mức đều được chào đón, kể cả một lời cảm ơn.":
     "These are suggestions only. Every amount is welcome, including a simple thank-you.",
-  "Chưa có cổng thanh toán trực tuyến — hãy nhắn cho mình để được hướng dẫn nhanh nhất.":
-    "There is no online checkout yet — message me and I'll sort you out.",
   "Quyền góp giúp được gì": "What your support pays for",
   "Nói thẳng: quyền góp KHÔNG tạo ra tính năng độc quyền và không xoá được quảng cáo. Nó giữ cho bot có máy chủ và có người trực sửa lỗi.":
     "Straight talk: support does not unlock exclusive features and does not remove ads. It keeps the server running and someone on hand to fix bugs.",
@@ -1480,15 +1478,7 @@ export const EN: Record<string, string> = {
   "Trả phí để bot có thêm sức làm việc": "Pay to give the bot more room to work",
   "Gói Miễn phí luôn ở đó và không bao giờ bị cắt bớt. Premium chỉ mở thêm tiện ích cho server cần nhiều hơn — và là cách duy nhất để duy trì bot trong dài hạn.":
     "The free plan stays and is never trimmed down. Premium only adds extras for servers that need more — and it is the only way to keep the bot running long term.",
-  "Chưa mở bán — cổng thanh toán đang hoàn thiện":
-    "Not on sale yet — the payment rail is still being finished",
   "Được nhiều người chọn": "Most popular",
-  "Sắp mở bán": "Coming soon",
-  "Giá chưa chốt và sẽ không bao giờ cao hơn mức này cho người đã đăng ký sớm. Huỷ bất kỳ lúc nào.":
-    "Prices are not final and will never be higher than this for people who signed up early. Cancel any time.",
-  "Muốn biết khi nào mở bán?": "Want to know when it opens?",
-  "Nhắn một câu trong Discord là được. Mình sẽ báo trước ít nhất một tuần trước khi mở, và cho bạn giữ nguyên mức giá này nếu bạn đã đăng ký.":
-    "Just send a message on Discord. I will announce it at least a week before launch, and you keep this price if you sign up.",
   "Đăng ký qua Discord": "Sign up via Discord",
   // ── Điểm cấu hình (panel Tổng quan, đợt #4) ──
   "Điểm cấu hình": "Configuration score",
@@ -1574,4 +1564,46 @@ export const EN: Record<string, string> = {
     "Lost access to the original server (nuked out of your roles, kicked, or the server was deleted)? Paste a backup's restore key here to rebuild that server's structure in the current one.",
   "Không tìm thấy bản backup nào với mã này — kiểm tra lại mã, hoặc dùng bản backup mới nhất.":
     "No backup matches this key — double-check it, or use the most recent backup.",
+  /* ==== Thanh toán ZaloPay (06/10/2026) ==== /donate + /premium + banner PaymentReturn. */
+  "Đang mở ZaloPay…": "Opening ZaloPay…",
+  "Ủng hộ {so}": "Donate {so}",
+  "Ủng hộ số tiền này": "Donate this amount",
+  "Số tiền khác (VND)": "Other amount (VND)",
+  "Không tạo được đơn thanh toán — thử lại sau ít phút.":
+    "Couldn't create the payment order — try again in a few minutes.",
+  "Số tiền phải từ 10.000đ đến 100.000.000đ.": "Amount must be between 10,000₫ and 100,000,000₫.",
+  "Thanh toán một lần qua ZaloPay — không lưu thông tin thẻ, không tự động trừ tiền.":
+    "One-time payment via ZaloPay — no card details stored, no automatic charges.",
+  "Miễn phí vĩnh viễn": "Free forever",
+  "Bạn đang có gói cao hơn": "You already have a higher plan",
+  "Gia hạn thêm 30 ngày": "Extend by 30 days",
+  "Mua bằng ZaloPay": "Buy with ZaloPay",
+  "Gói {goi} đang hoạt động — dùng tới {ngay}": "Plan {goi} active until {ngay}",
+  "Gói {goi} đã hết hạn {ngay}": "Plan {goi} expired on {ngay}",
+  "Thanh toán một lần qua ZaloPay — không tự động gia hạn":
+    "One-time payment via ZaloPay — no auto-renewal",
+  "Một lần thanh toán cho 30 ngày Premium — không tự động trừ tiền, hết hạn thì mua lại nếu muốn.":
+    "One payment covers 30 days of Premium — no automatic charges; buy again after expiry if you want.",
+  "Cần giúp trước khi mua?": "Need help before buying?",
+  "Nhắn một câu trong Discord — mình trả lời trong 24 giờ, kể cả khi bạn chỉ muốn hỏi Premium làm gì.":
+    "Send a message on Discord — I reply within 24 hours, even if you just want to ask what Premium does.",
+  "Đang xác nhận thanh toán…": "Confirming payment…",
+  "Mã đơn": "Order ID",
+  "Thanh toán thành công — cảm ơn bạn!": "Payment successful — thank you!",
+  "Đã thanh toán {so}đ qua ZaloPay — gói {goi} đã kích hoạt.":
+    "Paid {so}₫ via ZaloPay — the {goi} plan is now active.",
+  "Đã thanh toán {so}đ qua ZaloPay. Cảm ơn bạn đã giữ Protogon mở cửa miễn phí.":
+    "Paid {so}₫ via ZaloPay. Thank you for keeping Protogon free.",
+  "Hoàn tất": "Done",
+  "Chưa nhận được xác nhận": "No confirmation yet",
+  "ZaloPay chưa báo giao dịch thành công. Nếu bạn ĐÃ thanh toán, quay lại trang này sau vài phút — tiền không bị mất.":
+    "ZaloPay hasn't reported a successful transaction yet. If you DID pay, come back to this page in a few minutes — your money is safe.",
+  "Thanh toán thất bại": "Payment failed",
+  "Giao dịch bị huỷ hoặc không thành công — chưa có khoản tiền nào bị trừ.":
+    "The transaction was cancelled or failed — no money was charged.",
+  "Đăng nhập lại để kiểm tra đơn": "Sign in again to check this order",
+  "Phiên đăng nhập cần thiết để xem trạng thái đơn thanh toán này.":
+    "You need to be signed in to see the status of this payment.",
+  "Không kiểm tra được trạng thái": "Can't check the status",
+  "Lỗi kết nối — thử lại sau ít phút.": "Connection error — try again in a few minutes.",
 };

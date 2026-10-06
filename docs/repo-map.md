@@ -124,7 +124,8 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `backupKeys.ts`                                                   | Sinh/chuẩn hoá **mã khôi phục** (130 bit, capability) + tra cứu O(1) theo index `by_restoreKey` — đường cứu hộ khi mất quyền server gốc                                                      |
 | `rateGuard.ts`                                                    | Giới hạn tần suất gọi API từ bot                                                                                                                                                             |
 | `public.ts`, `hidden.ts`                                          | API công khai landing + endpoint ẩn                                                                                                                                                          |
-| `http.ts`                                                         | httpRouter `/geo_lang`: dò quốc gia theo IP cho web tự chọn ngôn ngữ                                                                                                                         |
+| `http.ts`                                                         | httpRouter `/geo_lang`: dò quốc gia theo IP cho web tự chọn ngôn ngữ · `/zalopay/callback` (IPN ZaloPay, verify MAC key2 qua action)                                                         |
+| `payments.ts`, `paymentsAction.ts`                                | Thanh toán ZaloPay (donate + Premium 30 ngày): bảng giá/chốt tiền SERVER-SIDE, MAC HMAC key1/key2, entitlement lười không cron — xem `docs/zalopay-integration.md`                           |
 | `geoGuard.ts`                                                     | Chặn đốt usage cho `/geo_lang`: chỉ IP công cộng + trần mỗi IP/toàn cục                                                                                                                      |
 | `selfDiagnose.ts`                                                 | Tự chẩn đoán bot báo về dashboard                                                                                                                                                            |
 | `sha256.ts`                                                       | Hash dùng chung (botKey, session)                                                                                                                                                            |
@@ -133,7 +134,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 
 ## Vòng lặp làm việc
 
-- Kiểm chứng: `bun run test` (85 CJS suites, chạy song song — gồm `test-browser-contracts` chạy Chromium headless THẬT qua DevTools Protocol) · `bun run test:ts` (21 TS suites) · `bun tsc -b --noEmit` ·
+- Kiểm chứng: `bun run test` (87 CJS suites, chạy song song — gồm `test-browser-contracts` chạy Chromium headless THẬT qua DevTools Protocol) · `bun run test:ts` (23 TS suites) · `bun tsc -b --noEmit` ·
   `bun run lint` · `bun run format:check` — chi tiết gộp 1 lệnh xem skill
   `verification-loop`.
 - Route/SEO/hosting: `src/lib/routes.json` là NGUỒN DUY NHẤT — thêm trang công khai PHẢI khai báo ở đó; `scripts/test-web-contracts.cjs` + `scripts/test-route-manifest.ts` suy kỳ vọng cho vercel.json / nginx / sitemap / robots.txt TỪ bảng. Alias (`/status` → `/monitor`) chỉ redirect 301, không tự khai canonical.

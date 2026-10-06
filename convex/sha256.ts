@@ -15,8 +15,9 @@ function rotr(x: number, n: number): number {
   return (x >>> n) | (x << (32 - n));
 }
 
-export function sha256Hex(input: string): string {
-  const bytes = new TextEncoder().encode(input);
+/** Băm SHA-256 trên mảng byte thô → digest 32 byte (lõi dùng chung cho HMAC). */
+export function sha256Bytes(input: Uint8Array): Uint8Array {
+  const bytes = input;
   const bitLen = bytes.length * 8;
   const paddedLen = (((bytes.length + 8) >> 6) + 1) << 6;
   const msg = new Uint8Array(paddedLen);
@@ -76,8 +77,55 @@ export function sha256Hex(input: string): string {
     h6 = (h6 + g) >>> 0;
     h7 = (h7 + hh) >>> 0;
   }
-  const hex = (v: number) => v.toString(16).padStart(8, "0");
-  return hex(h0) + hex(h1) + hex(h2) + hex(h3) + hex(h4) + hex(h5) + hex(h6) + hex(h7);
+  const out = new Uint8Array(32);
+  const odv = new DataView(out.buffer);
+  odv.setUint32(0, h0);
+  odv.setUint32(4, h1);
+  odv.setUint32(8, h2);
+  odv.setUint32(12, h3);
+  odv.setUint32(16, h4);
+  odv.setUint32(20, h5);
+  odv.setUint32(24, h6);
+  odv.setUint32(28, h7);
+  return out;
+}
+
+/** Đổi mảng byte sang chuỗi hex thường. */
+export function bytesToHex(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += bytes[i].toString(16).padStart(2, "0");
+  return s;
+}
+
+export function sha256Hex(input: string): string {
+  return bytesToHex(sha256Bytes(new TextEncoder().encode(input)));
+}
+
+/**
+ * HMAC-SHA256 (RFC 2104) → hex — dùng để ký/kiểm MAC theo yêu cầu của ZaloPay
+ * (create, query, callback đều là HmacSHA256 mặc định). Thuần TS vì Convex
+ * mặc định runtime không có node:crypto (xem botAuth.ts về lý do tương tự).
+ */
+export function hmacSha256Hex(key: string, message: string): string {
+  const raw = new TextEncoder().encode(key);
+  // Không gán lại biến (k = sha256Bytes(...)) — TS5.7 gán Uint8Array bị variance.
+  const k = raw.length > 64 ? sha256Bytes(raw) : raw;
+  const ipad = new Uint8Array(64);
+  const opad = new Uint8Array(64);
+  for (let i = 0; i < 64; i++) {
+    const byte = i < k.length ? k[i] : 0;
+    ipad[i] = byte ^ 0x36;
+    opad[i] = byte ^ 0x5c;
+  }
+  const msg = new TextEncoder().encode(message);
+  const inner = new Uint8Array(64 + msg.length);
+  inner.set(ipad);
+  inner.set(msg, 64);
+  const innerDigest = sha256Bytes(inner);
+  const outer = new Uint8Array(64 + 32);
+  outer.set(opad);
+  outer.set(innerDigest, 64);
+  return bytesToHex(sha256Bytes(outer));
 }
 
 /** Băm mật khẩu kèm salt là guildId — DI SẢN: bản cũ lưu theo từng server nên

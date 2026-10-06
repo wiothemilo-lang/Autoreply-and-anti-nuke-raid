@@ -1408,4 +1408,67 @@ export default defineSchema({
   })
     .index("by_guildId", ["guildId"])
     .index("by_guildId_key", ["guildId", "key"]),
+
+  /**
+   * Đơn thanh toán ZaloPay — ủng hộ dev (/donate) + gói Premium (/premium).
+   * Một dòng = một đơn tạo tại ZaloPay. Trạng thái CHỈ đổi ở server:
+   * pending → paid (callback MAC key2 hoặc query status xác thực), failed
+   * (API create lỗi), expired (quá hạn thanh toán mà chưa nộp tiền).
+   * amount do SERVER chốt theo plan — không bao giờ nhận số tiền từ client.
+   */
+  payments: defineTable({
+    /** Người mua — đơn cần đăng nhập (chống spam tạo đơn rác tại ZaloPay). */
+    userId: v.id("users"),
+    /** Snapshot Discord ID — giữ khi user xoá tài khoản web, phục vụ đối soát. */
+    discordId: v.string(),
+    /** "donate" = ủng hộ; "premium" = mua gói tháng. */
+    kind: v.union(v.literal("donate"), v.literal("premium")),
+    /**
+     * Mã gói/mức: "supporter" | "pioneer" (premium); "50000" | "100000" |
+     * "300000" | "custom" (donate).
+     */
+    plan: v.string(),
+    /** Số tiền VND (nguyên, không dấu phẩy). */
+    amount: v.number(),
+    /** Mã đơn ZaloPay — tiền tố yyMMdd theo giờ VN (GMT+7), duy nhất. */
+    appTransId: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("paid"),
+      v.literal("failed"),
+      v.literal("expired"),
+    ),
+    createdAt: v.number(),
+    paidAt: v.optional(v.number()),
+    /** Giao dịch ZaloPay khi thành công (đối soát với portal). */
+    zpTransId: v.optional(v.string()),
+    /** Lỗi API lần gần nhất — hiển thị debug, KHÔNG chứa key. */
+    error: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_appTransId", ["appTransId"])
+    .index("by_userId_createdAt", ["userId", "createdAt"])
+    .index("by_status_createdAt", ["status", "createdAt"]),
+
+  /**
+   * Quyền lợi Premium theo người dùng — suy ra từ payments đã paid.
+   * 1 người 1 dòng (upsert khi mua/gia hạn). Hạn dùng LƯỜI: quá expiresAt
+   * là hết hạn ngay khi đọc — không có cron dọn (cron Convex trong repo này
+   * chỉ được đụng cờ trên guilds, xem scripts/check-cron-boundary.cjs).
+   */
+  entitlements: defineTable({
+    userId: v.id("users"),
+    discordId: v.string(),
+    /** "supporter" | "pioneer" — gói cao nhất đang sở hữu. */
+    plan: v.string(),
+    startsAt: v.number(),
+    /** Mốc hết hạn (mua lần sau gia hạn cộng thêm từ max(now, expiresAt cũ)). */
+    expiresAt: v.number(),
+    /** Đơn paid cuối cùng cập nhật dòng này — đối soát tiền về. */
+    lastPaymentId: v.id("payments"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_discordId", ["discordId"]),
 });

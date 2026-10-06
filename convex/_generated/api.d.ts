@@ -48,6 +48,8 @@ import type * as hidden from "../hidden.js";
 import type * as http from "../http.js";
 import type * as incidents from "../incidents.js";
 import type * as modules from "../modules.js";
+import type * as payments from "../payments.js";
+import type * as paymentsAction from "../paymentsAction.js";
 import type * as presets from "../presets.js";
 import type * as public_ from "../public.js";
 import type * as rateGuard from "../rateGuard.js";
@@ -111,6 +113,8 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   incidents: typeof incidents;
   modules: typeof modules;
+  payments: typeof payments;
+  paymentsAction: typeof paymentsAction;
   presets: typeof presets;
   public: typeof public_;
   rateGuard: typeof rateGuard;

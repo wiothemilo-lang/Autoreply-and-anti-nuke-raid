@@ -1392,8 +1392,6 @@ export const DE: Record<string, string> = {
   "Chọn mức tùy khả năng": "Wähle, was dir entspricht",
   "Đây chỉ là gợi ý. Mọi mức đều được chào đón, kể cả một lời cảm ơn.":
     "Das sind nur Vorschläge. Jeder Betrag ist willkommen, auch ein einfaches Danke.",
-  "Chưa có cổng thanh toán trực tuyến — hãy nhắn cho mình để được hướng dẫn nhanh nhất.":
-    "Es gibt noch keine Online-Zahlung — schreib mir, ich kümmere mich darum.",
   "Quyền góp giúp được gì": "Was deine Unterstützung bewirkt",
   "Nói thẳng: quyền góp KHÔNG tạo ra tính năng độc quyền và không xoá được quảng cáo. Nó giữ cho bot có máy chủ và có người trực sửa lỗi.":
     "Ganz direkt: Unterstützung schaltet keine Exklusivfunktionen frei und entfernt keine Werbung. Sie hält den Server am Laufen und jemanden da, der Fehler behebt.",
@@ -1406,15 +1404,7 @@ export const DE: Record<string, string> = {
   "Trả phí để bot có thêm sức làm việc": "Bezahlen, damit der Bot mehr Luft bekommt",
   "Gói Miễn phí luôn ở đó và không bao giờ bị cắt bớt. Premium chỉ mở thêm tiện ích cho server cần nhiều hơn — và là cách duy nhất để duy trì bot trong dài hạn.":
     "Der kostenlose Tarif bleibt und wird nie beschnitten. Premium ergänzt nur Extras für Server mit mehr Bedarf — und ist der einzige Weg, den Bot dauerhaft zu betreiben.",
-  "Chưa mở bán — cổng thanh toán đang hoàn thiện":
-    "Noch nicht im Verkauf — die Zahlungsstrecke wird fertiggestellt",
   "Được nhiều người chọn": "Am beliebtesten",
-  "Sắp mở bán": "Demnächst",
-  "Giá chưa chốt và sẽ không bao giờ cao hơn mức này cho người đã đăng ký sớm. Huỷ bất kỳ lúc nào.":
-    "Die Preise stehen nicht fest und werden für frühe Anmeldungen nie höher. Jederzeit kündbar.",
-  "Muốn biết khi nào mở bán?": "Du willst wissen, wann es startet?",
-  "Nhắn một câu trong Discord là được. Mình sẽ báo trước ít nhất một tuần trước khi mở, và cho bạn giữ nguyên mức giá này nếu bạn đã đăng ký.":
-    "Schreib einfach eine Nachricht auf Discord. Ich kündige es mindestens eine Woche vorher an, und du behältst diesen Preis.",
   "Đăng ký qua Discord": "Über Discord anmelden",
   // ── Konfigurations-Score (Übersicht, Runde #4) ──
   "Điểm cấu hình": "Konfigurations-Score",
@@ -1502,4 +1492,48 @@ export const DE: Record<string, string> = {
     "Zugriff auf den Ursprungsserver verloren (Rollen durch Nuke entfernt, rausgeworfen oder Server gelöscht)? Hier den Wiederherstellungsschlüssel eines Backups einfügen, um dessen Struktur im aktuellen Server neu aufzubauen.",
   "Không tìm thấy bản backup nào với mã này — kiểm tra lại mã, hoặc dùng bản backup mới nhất.":
     "Kein Backup passt zu diesem Schlüssel — bitte prüfen oder das neueste Backup verwenden.",
+  /* ==== Thanh toán ZaloPay (06/10/2026) ==== Xem i18n.en.ts. */
+  "Đang mở ZaloPay…": "ZaloPay wird geöffnet…",
+  "Ủng hộ {so}": "{so} spenden",
+  "Ủng hộ số tiền này": "Diesen Betrag spenden",
+  "Số tiền khác (VND)": "Anderer Betrag (VND)",
+  "Không tạo được đơn thanh toán — thử lại sau ít phút.":
+    "Zahlungsauftrag konnte nicht erstellt werden – bitte in wenigen Minuten erneut versuchen.",
+  "Số tiền phải từ 10.000đ đến 100.000.000đ.":
+    "Der Betrag muss zwischen 10.000 ₫ und 100.000.000 ₫ liegen.",
+  "Thanh toán một lần qua ZaloPay — không lưu thông tin thẻ, không tự động trừ tiền.":
+    "Einmalige Zahlung über ZaloPay – keine Kartendaten gespeichert, keine automatischen Abbuchungen.",
+  "Miễn phí vĩnh viễn": "Kostenlos auf unbegrenzte Zeit",
+  "Bạn đang có gói cao hơn": "Du hast bereits einen höheren Tarif",
+  "Gia hạn thêm 30 ngày": "Um 30 Tage verlängern",
+  "Mua bằng ZaloPay": "Mit ZaloPay kaufen",
+  "Gói {goi} đang hoạt động — dùng tới {ngay}": "Tarif {goi} aktiv bis {ngay}",
+  "Gói {goi} đã hết hạn {ngay}": "Tarif {goi} am {ngay} abgelaufen",
+  "Thanh toán một lần qua ZaloPay — không tự động gia hạn":
+    "Einmalige Zahlung über ZaloPay – keine automatische Verlängerung",
+  "Một lần thanh toán cho 30 ngày Premium — không tự động trừ tiền, hết hạn thì mua lại nếu muốn.":
+    "Eine Zahlung deckt 30 Tage Premium – keine automatischen Abbuchungen; bei Bedarf nach Ablauf erneut kaufen.",
+  "Cần giúp trước khi mua?": "Brauchst du Hilfe vor dem Kauf?",
+  "Nhắn một câu trong Discord — mình trả lời trong 24 giờ, kể cả khi bạn chỉ muốn hỏi Premium làm gì.":
+    "Schreib kurz auf Discord – ich antworte innerhalb von 24 Stunden, auch wenn du nur fragen willst, was Premium bringt.",
+  "Đang xác nhận thanh toán…": "Zahlung wird bestätigt…",
+  "Mã đơn": "Bestellnummer",
+  "Thanh toán thành công — cảm ơn bạn!": "Zahlung erfolgreich – danke!",
+  "Đã thanh toán {so}đ qua ZaloPay — gói {goi} đã kích hoạt.":
+    "{so} ₫ über ZaloPay bezahlt – der Tarif {goi} ist jetzt aktiv.",
+  "Đã thanh toán {so}đ qua ZaloPay. Cảm ơn bạn đã giữ Protogon mở cửa miễn phí.":
+    "{so} ₫ über ZaloPay bezahlt. Danke, dass Protogon kostenlos bleibt.",
+  "Hoàn tất": "Fertig",
+  "Chưa nhận được xác nhận": "Noch keine Bestätigung",
+  "ZaloPay chưa báo giao dịch thành công. Nếu bạn ĐÃ thanh toán, quay lại trang này sau vài phút — tiền không bị mất.":
+    "ZaloPay hat die Transaktion noch nicht bestätigt. Wenn du bereits bezahlt hast, kehre in wenigen Minuten zurück – dein Geld ist sicher.",
+  "Thanh toán thất bại": "Zahlung fehlgeschlagen",
+  "Giao dịch bị huỷ hoặc không thành công — chưa có khoản tiền nào bị trừ.":
+    "Die Transaktion wurde abgebrochen oder ist fehlgeschlagen – es wurde nichts abgebucht.",
+  "Đăng nhập lại để kiểm tra đơn": "Erneut anmelden, um diese Bestellung zu prüfen",
+  "Phiên đăng nhập cần thiết để xem trạng thái đơn thanh toán này.":
+    "Für den Status dieser Zahlung musst du angemeldet sein.",
+  "Không kiểm tra được trạng thái": "Status kann nicht abgefragt werden",
+  "Lỗi kết nối — thử lại sau ít phút.":
+    "Verbindungsfehler – bitte in wenigen Minuten erneut versuchen.",
 };

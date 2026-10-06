@@ -1,29 +1,44 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowUp, Coffee, Facebook, Heart, MessageCircle, Sparkles, Star } from "lucide-react";
+import { useAction } from "convex/react";
+import {
+  ArrowUp,
+  Coffee,
+  Facebook,
+  Heart,
+  Loader2,
+  MessageCircle,
+  Sparkles,
+  Star,
+} from "lucide-react";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import PaymentReturn from "../components/PaymentReturn";
 import Footer from "../components/landing/Footer";
 import LangSwitch from "../components/LangSwitch";
 import SkipLink from "../components/SkipLink";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { translate } from "../lib/i18n";
+import { getSessionToken } from "../lib/discord";
+import { api } from "../../convex/_generated/api";
 
 /**
  * Trang /donate — ủng hộ nhà phát triển.
  *
  * Vì sao cần: Protogon do một người làm, miễn phí cho mọi server. Người dùng
  * muốn giúp thì cần một chỗ rõ ràng; không có nó thì chỉ có người đã biết mới
- * ủng hộ. Trang này CỐ TÌNH không gắn nút thanh toán: chưa có cổng tiền thật,
- * nên mọi mức quyên góp đi qua kênh liên hệ — không bịa ra giỏ hàng giả.
+ * ủng hộ. Nút thanh toán ZaloPay chạy THẬT (tạo đơn + ký MAC ở Convex —
+ * convex/payments.ts): trang chỉ nhận paymentUrl rồi redirect, giá do server
+ * chốt theo plan, không bao giờ nhận số tiền từ client.
  */
 
 /** Mức quyền góp gợi ý. Số tiền do người dùng chọn, không gắn gói dịch vụ. */
 const TIERS = [
-  { amount: "50.000đ", blurb: "Một ly cà phê cho ngày thức khuya" },
-  { amount: "100.000đ", blurb: "Một giờ server không phải lo lỗi cấu hình" },
-  { amount: "300.000đ", blurb: "Một đêm deploy mà không sập giữa chừng" },
+  { plan: "50000", amount: "50.000đ", blurb: "Một ly cà phê cho ngày thức khuya" },
+  { plan: "100000", amount: "100.000đ", blurb: "Một giờ server không phải lo lỗi cấu hình" },
+  { plan: "300000", amount: "300.000đ", blurb: "Một đêm deploy mà không sập giữa chừng" },
 ];
 
 const PERKS = [
@@ -35,6 +50,41 @@ const PERKS = [
 
 export default function DonatePage() {
   const { discordInvite, facebookUrl } = usePublicConfig();
+  const navigate = useNavigate();
+  const token = getSessionToken();
+  const startPayment = useAction(api.paymentsAction.startPayment);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [customAmount, setCustomAmount] = useState("");
+
+  /** Tạo đơn ZaloPay rồi redirect — chưa đăng nhập thì đưa qua /auth rồi quay lại đây. */
+  const go = async (plan: string, custom?: number) => {
+    if (!token) {
+      navigate(`/auth?returnTo=${encodeURIComponent("/donate")}`);
+      return;
+    }
+    setBusy(plan);
+    setPayError(null);
+    try {
+      const r = await startPayment({ token, kind: "donate", plan, customAmount: custom });
+      window.location.assign(r.paymentUrl);
+    } catch (e) {
+      // Lỗi backend đã viết sẵn tiếng Việt (thiếu key, spam đơn…) — bóc prefix Convex nếu có.
+      const msg = e instanceof Error ? e.message.replace(/^Uncaught \w+:\s*/, "").trim() : "";
+      setPayError(msg || translate("Không tạo được đơn thanh toán — thử lại sau ít phút."));
+      setBusy(null);
+    }
+  };
+
+  /** Số tiền khác: dọn ký tự không phải chữ số rồi kiểm hạn mức (server kiểm lại lần cuối). */
+  const goCustom = () => {
+    const n = Number(customAmount.replace(/[^\d]/g, ""));
+    if (!Number.isInteger(n) || n < 10_000 || n > 100_000_000) {
+      setPayError(translate("Số tiền phải từ 10.000đ đến 100.000.000đ."));
+      return;
+    }
+    void go("custom", n);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -53,6 +103,17 @@ export default function DonatePage() {
       </div>
 
       <main id="main" tabIndex={-1} className="mx-auto max-w-5xl px-6 pb-16 pt-12">
+        {/* Kết quả thanh toán ?order= — hiện khi quay lại từ ZaloPay. */}
+        <PaymentReturn token={token} />
+        {payError && (
+          <div
+            role="alert"
+            className="mt-6 rounded-2xl border border-border bg-card p-4 text-center text-sm text-foreground"
+          >
+            {payError}
+          </div>
+        )}
+
         {/* Hero */}
         <header className="text-center">
           <Badge variant="secondary" className="mb-5 gap-1.5">
@@ -106,12 +167,51 @@ export default function DonatePage() {
                   {tier.amount}
                 </p>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{tier.blurb}</p>
+                <Button
+                  className="mt-4 w-full"
+                  disabled={busy !== null}
+                  onClick={() => void go(tier.plan)}
+                >
+                  {busy === tier.plan ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {translate("Đang mở ZaloPay…")}
+                    </>
+                  ) : (
+                    translate("Ủng hộ {so}", { so: tier.amount })
+                  )}
+                </Button>
               </motion.div>
             ))}
           </div>
+          {/* Số tiền khác — plan "custom": server tự chốt hạn mức, không nhận số tiền từ client. */}
+          <div className="mx-auto mt-8 flex max-w-md items-center gap-2">
+            <label className="sr-only" htmlFor="donate-custom">
+              {translate("Số tiền khác (VND)")}
+            </label>
+            <input
+              id="donate-custom"
+              type="number"
+              inputMode="numeric"
+              min={10000}
+              max={100000000}
+              step={1000}
+              value={customAmount}
+              onChange={(e) => setCustomAmount(e.target.value)}
+              placeholder={translate("Số tiền khác (VND)")}
+              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <Button variant="outline" disabled={busy !== null || !customAmount} onClick={goCustom}>
+              {busy === "custom" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                translate("Ủng hộ số tiền này")
+              )}
+            </Button>
+          </div>
           <p className="mt-6 text-center text-xs text-muted-foreground">
             {translate(
-              "Chưa có cổng thanh toán trực tuyến — hãy nhắn cho mình để được hướng dẫn nhanh nhất.",
+              "Thanh toán một lần qua ZaloPay — không lưu thông tin thẻ, không tự động trừ tiền.",
             )}
           </p>
         </section>

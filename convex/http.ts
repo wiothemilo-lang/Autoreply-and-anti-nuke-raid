@@ -9,6 +9,7 @@
 
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { allowGeoRequest, isPublicIp, parseClientIp } from "./geoGuard";
 
 /**
@@ -75,8 +76,43 @@ const geoLang = httpAction(async (_ctx, request) => {
   }
 });
 
+/**
+ * IPN thanh toán ZaloPay (POST từ server ZaloPay — không cần CORS).
+ * Vai trò của httpAction này CHỈ là bắc cầu: parse body rồi giao cho
+ * `paymentsAction.handleCallback` (action "use node" — nơi duy nhất đọc được
+ * ZALOPAY_KEY2 để verify MAC). Trả đúng thể thức ZaloPay mong muốn:
+ * {return_code: 1|2} — 2 nghĩa là "không hợp lệ, gửi lại".
+ */
+const zalopayCallback = httpAction(async (ctx, request) => {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204 });
+  const json = (body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    });
+  let data = "";
+  let mac = "";
+  let type = 1;
+  try {
+    const body = (await request.json()) as { data?: unknown; mac?: unknown; type?: unknown };
+    data = typeof body.data === "string" ? body.data : "";
+    mac = typeof body.mac === "string" ? body.mac : "";
+    type = typeof body.type === "number" ? body.type : 1;
+  } catch {
+    return json({ return_code: 2, return_message: "bad request" });
+  }
+  try {
+    const out = await ctx.runAction(internal.paymentsAction.handleCallback, { data, mac, type });
+    return json({ return_code: out.returnCode, return_message: out.message });
+  } catch {
+    // Lỗi server → trả 2 để ZaloPay retry (tiền thật không được nuốt im lặng).
+    return json({ return_code: 2, return_message: "server error" });
+  }
+});
+
 const http = httpRouter();
 http.route({ path: "/geo_lang", method: "GET", handler: geoLang });
 http.route({ path: "/geo_lang", method: "OPTIONS", handler: geoLang });
+http.route({ path: "/zalopay/callback", method: "POST", handler: zalopayCallback });
 
 export default http;

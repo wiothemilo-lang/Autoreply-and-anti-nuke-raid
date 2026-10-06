@@ -1,23 +1,28 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowUp, Check, Clock, Crown, Heart, Minus, Sparkles } from "lucide-react";
+import { useAction, useQuery } from "convex/react";
+import { ArrowUp, Check, Crown, Heart, Loader2, Minus, ShieldCheck, Sparkles } from "lucide-react";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import PaymentReturn from "../components/PaymentReturn";
 import Footer from "../components/landing/Footer";
 import LangSwitch from "../components/LangSwitch";
 import SkipLink from "../components/SkipLink";
 import { usePublicConfig } from "../lib/usePublicConfig";
-import { translate } from "../lib/i18n";
+import { dateLocale, translate } from "../lib/i18n";
+import { getSessionToken } from "../lib/discord";
+import { api } from "../../convex/_generated/api";
 
 /**
- * Trang /premium — nền tảng cho gói trả phí sắp tới.
+ * Trang /premium — gói Premium30 ngày thanh toán qua ZaloPay.
  *
- * Vì sao CHƯA có nút mua: chưa có cổng thanh toán chạy thật. Dựng nút "Mua"
- * bấm vào không làm gì là loại slop nặng nhất — nó hứa hẹn rồi nuốt tiền người
- * dùng. Nên trang này ở trạng thái "sắp mở": nói rõ CHƯA bán, vẫn trình bày
- * gói và giá để người dùng biết sẽ mua cái gì, và để sẵn đường cắm cổng thanh
- * toán (Stripe) sau này mà không phải thiết kế lại từ đầu.
+ * Nút Mua gọi paymentsAction.startPayment (server chốt giá theo plan, ký MAC,
+ * tạo đơn) rồi redirect sang ZaloPay; quay về ?order= trang này thì
+ * PaymentReturn query lại trạng thái từ server (không tin tham số URL).
+ * Không tự động gia hạn (không có recurring) — ghi rõ trên trang để không
+ * hứa hẹn thứ không làm được. Chưa đăng nhập → đưa qua /auth rồi quay lại.
  */
 
 interface Plan {
@@ -78,8 +83,52 @@ const PLANS: Plan[] = [
   },
 ];
 
+/** Thứ hạng gói — mua gói thấp hơn khi gói cao đang hoạt động bị chặn. */
+const PREMIUM_PLAN_RANK: Record<string, number> = { supporter: 1, pioneer: 2 };
+
 export default function PremiumPage() {
   const { discordInvite, facebookUrl } = usePublicConfig();
+  const navigate = useNavigate();
+  const token = getSessionToken();
+  const startPayment = useAction(api.paymentsAction.startPayment);
+  const premiumStatus = useQuery(api.payments.premiumStatus, token ? { token } : "skip");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
+
+  const planName = (id: string) => PLANS.find((p) => p.id === id)?.name ?? id;
+  const formatDate = (ms: number) => new Date(ms).toLocaleDateString(dateLocale());
+  const active = premiumStatus?.active ? premiumStatus : null;
+
+  /** Trạng thái nút theo quyền hiện có: chặn mua gói thấp hơn khi gói cao đang chạy. */
+  const buyState = (planId: string): { disabled: boolean; label: string } => {
+    if (planId === "free") return { disabled: true, label: translate("Miễn phí vĩnh viễn") };
+    const rank = PREMIUM_PLAN_RANK[planId] ?? 0;
+    if (active && (PREMIUM_PLAN_RANK[active.plan] ?? 0) > rank) {
+      return { disabled: true, label: translate("Bạn đang có gói cao hơn") };
+    }
+    if (active && active.plan === planId) {
+      return { disabled: false, label: translate("Gia hạn thêm 30 ngày") };
+    }
+    return { disabled: false, label: translate("Mua bằng ZaloPay") };
+  };
+
+  /** Tạo đơn ZaloPay rồi redirect — chưa đăng nhập thì đưa qua /auth rồi quay lại đây. */
+  const go = async (planId: string) => {
+    if (!token) {
+      navigate(`/auth?returnTo=${encodeURIComponent("/premium")}`);
+      return;
+    }
+    setBusy(planId);
+    setPayError(null);
+    try {
+      const r = await startPayment({ token, kind: "premium", plan: planId });
+      window.location.assign(r.paymentUrl);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.replace(/^Uncaught \w+:\s*/, "").trim() : "";
+      setPayError(msg || translate("Không tạo được đơn thanh toán — thử lại sau ít phút."));
+      setBusy(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,6 +147,17 @@ export default function PremiumPage() {
       </div>
 
       <main id="main" tabIndex={-1} className="mx-auto max-w-5xl px-6 pb-16 pt-12">
+        {/* Kết quả thanh toán ?order= + lỗi tạo đơn. */}
+        <PaymentReturn token={token} />
+        {payError && (
+          <div
+            role="alert"
+            className="mt-6 rounded-2xl border border-border bg-card p-4 text-center text-sm text-foreground"
+          >
+            {payError}
+          </div>
+        )}
+
         {/* Hero */}
         <header className="text-center">
           <Badge variant="secondary" className="mb-5 gap-1.5">
@@ -113,11 +173,26 @@ export default function PremiumPage() {
             )}
           </p>
 
-          {/* Trạng thái trung thực: chưa mở bán. */}
-          <div className="mx-auto mt-7 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-4 py-2 text-xs font-medium text-muted-foreground">
-            <Clock className="h-3.5 w-3.5 shrink-0" />
-            {translate("Chưa mở bán — cổng thanh toán đang hoàn thiện")}
-          </div>
+          {/* Trạng thái gói: đã đăng nhập thì hiện hạn dùng thật; ngược lại nói thật về cách trả. */}
+          {token && premiumStatus ? (
+            <div className="mx-auto mt-7 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-4 py-2 text-xs font-medium text-muted-foreground">
+              <Crown className="h-3.5 w-3.5 shrink-0" />
+              {premiumStatus.active
+                ? translate("Gói {goi} đang hoạt động — dùng tới {ngay}", {
+                    goi: planName(premiumStatus.plan),
+                    ngay: formatDate(premiumStatus.expiresAt),
+                  })
+                : translate("Gói {goi} đã hết hạn {ngay}", {
+                    goi: planName(premiumStatus.plan),
+                    ngay: formatDate(premiumStatus.expiresAt),
+                  })}
+            </div>
+          ) : (
+            <div className="mx-auto mt-7 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-4 py-2 text-xs font-medium text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              {translate("Thanh toán một lần qua ZaloPay — không tự động gia hạn")}
+            </div>
+          )}
         </header>
 
         {/* 3 gói */}
@@ -174,14 +249,20 @@ export default function PremiumPage() {
                   ))}
                 </ul>
 
-                {/* Chưa mở bán → KHÔNG dựng nút "Mua" giả. Chỉ mời đăng ký
-                    quan tâm qua Discord để biết khi nào mở. */}
                 <Button
                   className="mt-6 w-full"
                   variant={plan.featured ? "default" : "outline"}
-                  disabled
+                  disabled={buyState(plan.id).disabled || busy !== null}
+                  onClick={() => void go(plan.id)}
                 >
-                  {translate("Sắp mở bán")}
+                  {busy === plan.id ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {translate("Đang mở ZaloPay…")}
+                    </>
+                  ) : (
+                    buyState(plan.id).label
+                  )}
                 </Button>
               </motion.div>
             ))}
@@ -189,7 +270,7 @@ export default function PremiumPage() {
 
           <p className="mt-5 text-center text-xs text-muted-foreground">
             {translate(
-              "Giá chưa chốt và sẽ không bao giờ cao hơn mức này cho người đã đăng ký sớm. Huỷ bất kỳ lúc nào.",
+              "Một lần thanh toán cho 30 ngày Premium — không tự động trừ tiền, hết hạn thì mua lại nếu muốn.",
             )}
           </p>
         </section>
@@ -197,11 +278,11 @@ export default function PremiumPage() {
         {/* Đăng ký quan tâm */}
         <section className="mt-14 rounded-2xl border border-border bg-secondary/40 p-8 text-center">
           <h2 className="font-display text-xl font-bold text-foreground">
-            {translate("Muốn biết khi nào mở bán?")}
+            {translate("Cần giúp trước khi mua?")}
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
             {translate(
-              "Nhắn một câu trong Discord là được. Mình sẽ báo trước ít nhất một tuần trước khi mở, và cho bạn giữ nguyên mức giá này nếu bạn đã đăng ký.",
+              "Nhắn một câu trong Discord — mình trả lời trong 24 giờ, kể cả khi bạn chỉ muốn hỏi Premium làm gì.",
             )}
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
