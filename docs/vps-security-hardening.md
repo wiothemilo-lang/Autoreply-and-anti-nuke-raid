@@ -116,6 +116,12 @@ chứng → báo cáo), danh sách lệnh kiểm chứng bắt buộc, và **3 v
 🟢/🟡/🔴. Chạy ở thư mục khác (`/root`, `/tmp`) là agent **không** thấy hợp đồng →
 hành xử tự do, dễ chạm vào vùng cấm.
 
+**Kể cả khi chỉ sửa mỗi `bot/`** — vẫn mở Freebuff CLI ở **gốc repo** rồi yêu cầu
+đích danh tệp trong `bot/`. `bot/` **không phải git repo riêng**: mọi lệnh
+`git add/commit/push` chỉ đúng khi chạy từ gốc (chạy trong `bot/` chỉ thấy phạm vi
+`bot/`). Nếu bạn lỡ mở trong `bot/`, agent sẽ đọc `bot/AGENTS.md` và tự được trỏ về
+`../AGENTS.md` — nhưng gốc repo vẫn là chỗ đúng.
+
 Kiểm tra nhanh sau khi mở: hỏi
 
 ```

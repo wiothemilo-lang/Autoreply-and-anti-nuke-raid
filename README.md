@@ -150,12 +150,19 @@ Cài môi trường + agent bảo trì bot ngay trên server (chạy bằng user
 
 ```bash
 sh ./scripts/setup-vps-agent.sh   # cài Bun + OpenCode + cấu hình an toàn
-cd bot && opencode               # mở TUI; lần đầu: /auth login + dán API key
+opencode                          # mở TUI Ở GỐC REPO (KHÔNG cd vào bot/ — xem lưu ý dưới)
 ```
+
+> ⚠️ **Mở agent ở GỐC repo, KHÔNG `cd bot && opencode`.** `bot/` không phải git repo
+> riêng và không có `AGENTS.md`/`.opencode/` của riêng nó: mở trong đó agent mất hợp
+> đồng 5 pha lẫn các lệnh `/verify` `/fix` `/ship`, còn `git`/`bun run test` chỉ nhìn
+> thấy phạm vi `bot/` (dễ commit thiếu file phía `convex/`). Muốn nhờ agent sửa bot thì
+> mở ở gốc rồi yêu cầu đích danh — ví dụ _“sửa `bot/src/handlers/…`”_. Nếu bạn vẫn mở
+> trong `bot/`, agent sẽ tự đọc `bot/AGENTS.md` để được trỏ về hợp đồng đầy đủ.
 
 Bộ cấu hình an toàn đi kèm repo:
 
-- **`opencode.json`** — permission: chặn đọc `.env`/`.bot-key`/key files, **cấm agent tự commit/push/reset** (chỉ sửa code + in diff chờ bạn review), cấm lệnh phá hoại (`rm -rf`, `sudo`, `dd`…), cho sẵn các lệnh test/lint/typecheck của repo.
+- **`opencode.json`** — permission: chặn đọc `.env`/`.bot-key`/key files, **cho phép agent `git add`/`commit`/`push`** (chỉ sau khi kiểm chứng xanh — xem `AGENTS.md`), **cấm `git reset`/`clean`/`rebase`** (không sửa lịch sử), cấm lệnh phá hoại (`rm -rf`, `sudo`, `dd`…), cho sẵn các lệnh test/lint/typecheck của repo.
 - **`AGENTS.md`** — quy tắc ứng xử: chạy `bun run test` + typecheck sau mỗi thay đổi, không bỏ qua `requireBotKeyStrict`, không sửa `convex/_generated/`, kèm test chặn tái diễn khi vá bug.
 
 > 🔐 **Siết an ninh VPS + giả lập tấn công + trỏ Freebuff CLI đúng tệp**: xem [`docs/vps-security-hardening.md`](docs/vps-security-hardening.md) — bảng bề mặt tấn công, công cụ mô phỏng `bun scripts/simulate-attack.ts`, và playbook debug VPS + bot.
