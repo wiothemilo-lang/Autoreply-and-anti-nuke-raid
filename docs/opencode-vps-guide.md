@@ -16,9 +16,14 @@ giới hạn an toàn do repo quy định (xem `AGENTS.md` + `opencode.json`).
 
 ### 1.1. SSH vào VPS và chạy script cài sẵn của repo
 
+> 📁 **Đường dẫn repo trên VPS không cố định** (`/opt/protogon` theo
+> `bot/VPS-DEPLOY.md`, hoặc thư mục bạn tự clone). Cách tìm nhanh:
+> [`docs/vps-security-hardening.md`](./vps-security-hardening.md) **§0 — Tìm thư mục
+> repo trên VPS**. Đoán đường dẫn là gặp `cd: No such file or directory`.
+
 ```bash
 ssh root@IP-VPS-CỦA-BẠN
-cd /root/Autoreply-and-anti-nuke-raid   # hoặc thư mục repo bạn đã clone
+cd "$REPO_DIR"                           # GỐC repo — đổi thành đường dẫn thật (§0)
 git pull                                 # lấy AGENTS.md + opencode.json mới nhất
 sh ./scripts/setup-vps-agent.sh
 ```
@@ -35,7 +40,7 @@ nhận `AGENTS.md` đã nằm ở root repo.
 ### 1.2. Mở OpenCode lần đầu
 
 ```bash
-cd /root/Autoreply-and-anti-nuke-raid
+cd "$REPO_DIR"     # GỐC repo (§0) — KHÔNG đoán đường dẫn
 opencode
 ```
 
@@ -430,7 +435,7 @@ Cách chạy bền nhất — **systemd** (tự bật sau reboot, tự chạy l�
 không phụ thuộc tmux). Cài 3 lệnh, lần đầu thôi:
 
 ```bash
-cp /root/Autoreply-and-anti-nuke-raid/scripts/kiira-retry-proxy.service /etc/systemd/system/
+cp "$REPO_DIR/scripts/kiira-retry-proxy.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now kiira-retry-proxy
 curl http://127.0.0.1:8787/__health   # {"ok":true,...} là đang chạy
@@ -669,7 +674,7 @@ phải restart vì Convex).
 | Triệu chứng                                                            | Nguyên nhân                                                                                                                                     | Cách xử lý                                                                                                                                           |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `freebuff` không hiện link đăng nhập                                   | CLI đợi xác thực ở chế độ khác                                                                                                                  | Chạy `freebuff login` (hoặc `freebuff --help` xem lệnh auth) rồi thử lại                                                                             |
-| `/verify` `/fix` `/ship` biến mất khỏi menu                            | OpenCode đang chạy **ngoài thư mục repo** (nhìn `/~` góc màn hình) — các lệnh nằm trong `.opencode/commands/` của repo, chỉ nạp khi mở đúng chỗ | `cd /root/Autoreply-and-anti-nuke-raid && opencode` — hoặc tạo lệnh tắt `alias oc='cd /root/Autoreply-and-anti-nuke-raid && opencode'`               |
+| `/verify` `/fix` `/ship` biến mất khỏi menu                            | OpenCode đang chạy **ngoài thư mục repo** (nhìn `/~` góc màn hình) — các lệnh nằm trong `.opencode/commands/` của repo, chỉ nạp khi mở đúng chỗ | `cd "$REPO_DIR" && opencode` — hoặc tạo lệnh tắt `alias oc='cd "$REPO_DIR" && opencode'`                                                             |
 | `git commit` bị chặn dù đã bật push tự do                              | Phiên OpenCode đang chạy **nạp permission CŨ lúc khởi động** — sửa config giữa phiên không có hiệu lực với phiên hiện tại                       | Thoát OpenCode → mở lại **trong thư mục repo** (config mới của repo được nạp) — agent tự commit/push được ngay                                       |
 | OpenCode không thấy model Kiira                                        | Sai baseURL, ID model sai, hoặc model chưa khai trong `models`                                                                                  | Kiểm tra `opencode.json` — OpenCode chỉ hiện model đã khai báo; lấy đúng ID từ `curl https://kiraai.vn/api/v1/models`                                |
 | `git commit` bị từ chối trong OpenCode                                 | File `~/.config/opencode/opencode.json` cũ chưa có rule `git add/commit: allow`                                                                 | Merge lại từ `opencode.json` trong repo                                                                                                              |

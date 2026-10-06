@@ -5,9 +5,16 @@
 # và TỰ CHẠY LẠI khi process chết (Restart=always) — đúng nghĩa "đừng ngắt quãng".
 #
 # Cài trên VPS (chạy 3 lệnh, lần đầu thôi):
-#   cp /root/Autoreply-and-anti-nuke-raid/scripts/kiira-retry-proxy.service /etc/systemd/system/
+#   cp "$REPO_DIR/scripts/kiira-retry-proxy.service" /etc/systemd/system/
 #   systemctl daemon-reload
 #   systemctl enable --now kiira-retry-proxy
+#
+# ⚠️ TRƯỚC KHI CÀI — sửa lại dòng ExecStart bên dưới cho KHỚP VPS của bạn:
+#   1) đường dẫn `bun`  → lấy bằng `which bun` (mặc định /root/.bun/bin/bun)
+#   2) đường dẫn repo   → ĐƯỜNG DẪN REPO KHÔNG CỐ ĐỊNH (bản cài theo
+#      bot/VPS-DEPLOY.md nằm ở /opt/protogon; bản clone tay ở chỗ khác).
+#      Cách tìm: docs/vps-security-hardening.md §0.
+#   Unit này KHÔNG tự tìm repo — để sai đường dẫn là service chết ngay khi start.
 #
 # Kiểm tra:  systemctl status kiira-retry-proxy
 # Xem log:   journalctl -u kiira-retry-proxy -f
@@ -23,6 +30,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=/root/.bun/bin/bun /root/Autoreply-and-anti-nuke-raid/scripts/kiira-retry-proxy.mjs
+#                ↑ sửa 2 đường dẫn này theo VPS thật (xem ghi chú đầu tệp)
 Restart=always
 RestartSec=3
 # Tự dừng và chạy lại nếu proxy treo không phản hồi.

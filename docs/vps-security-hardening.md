@@ -10,6 +10,40 @@
 
 ---
 
+## 0. Tìm thư mục repo trên VPS — đừng đoán đường dẫn
+
+Các tài liệu (kể cả bản cũ của chính tệp này) hay ghi
+`/root/Autoreply-and-anti-nuke-raid`, nhưng **đường dẫn thật tuỳ VPS**: bản cài theo
+[`bot/VPS-DEPLOY.md`](../bot/VPS-DEPLOY.md) nằm ở `/opt/protogon`, bản clone tay có
+thể ở `/root/<tên-bạn-đặt>`, `/srv/...`… Đoán sai đường dẫn là gặp ngay
+`bash: cd: /root/...: No such file or directory`. **Tìm repo trước, rồi mới làm gì.**
+
+```bash
+# Cách 1 (nhanh nhất) — pm2 nhớ thư mục làm việc của tiến trình bot
+pm2 describe protogon-bot | grep -iE "script path|exec cwd"
+```
+
+```bash
+# Cách 2 — quét dấu vân tay: `opencode.json` CHỈ tồn tại ở GỐC repo
+find /opt /root /srv /home -maxdepth 4 -name opencode.json \
+  -not -path '*/node_modules/*' 2>/dev/null
+```
+
+Dòng kết quả có dạng `.../<thư-mục-repo>/opencode.json` → **thư mục repo** là phần
+đứng trước `/opencode.json`. Đặt biến để dùng cho cả phiên (thay bằng đường dẫn thật
+vừa tìm được):
+
+```bash
+REPO_DIR=/opt/protogon     # ← ĐỔI thành kết quả vừa tìm được
+cd "$REPO_DIR" && pwd && ls AGENTS.md opencode.json
+```
+
+`pwd` in ra gốc repo và `ls` phải thấy **cả hai** `AGENTS.md` + `opencode.json` —
+đó chính là định nghĩa "đang đứng ở gốc repo" mà mọi lệnh ở các mục sau giả định.
+Nếu `ls` báo thiếu file → bạn đang ở sai thư mục, quay lại cách 1/2.
+
+---
+
 ## 1. Bề mặt tấn công & chốt phòng thủ đã có sẵn
 
 Không cần đoán "hệ thống có chống được DDoS không" — mỗi lớp phòng thủ dưới đây
@@ -106,9 +140,13 @@ vượt trần — đó là **bằng chứng phòng thủ đang bật**, không 
 
 ```bash
 npm i -g freebuff          # cài CLI (npm có sẵn trên VPS)
-cd /root/Autoreply-and-anti-nuke-raid   # PHẢI đứng ở GỐC repo
+cd "$REPO_DIR"             # PHẢI đứng ở GỐC repo — xem §0 nếu chưa biết đường dẫn thật
 freebuff                   # lần đầu in link đăng nhập → mở trên máy có trình duyệt
 ```
+
+> Đường dẫn repo **không cố định** (`/opt/protogon` theo `bot/VPS-DEPLOY.md`, hoặc
+> chỗ bạn tự clone). Nếu `cd` báo `No such file or directory` → bạn đang dùng đường
+> dẫn đoán, chạy lại §0 để tìm đúng rồi mới mở CLI.
 
 **Vì sao phải đứng ở gốc repo:** Freebuff CLI (và OpenCode) đọc `AGENTS.md` ở thư
 mục hiện tại — đó là **hợp đồng 5 pha** (hiểu → lập kế hoạch → thực hiện → kiểm
@@ -203,7 +241,7 @@ docker ps && docker logs --tail 50 <id> # container nào đang chạy / log
 df -h                                   # còn chỗ đĩa không (đầy = bot chết)
 free -m                                 # RAM còn bao nhiêu
 ps aux --sort=-%mem | head              # tiến trình ngốn RAM nhất
-du -sh /root/Autoreply-and-anti-nuke-raid # repo chiếm bao nhiêu
+du -sh "$REPO_DIR"                        # repo chiếm bao nhiêu ($REPO_DIR từ §0)
 uptime                                  # load average
 ```
 

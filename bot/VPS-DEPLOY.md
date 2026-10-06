@@ -7,6 +7,11 @@
 > 🔁 **Đang chuyển sang VPS node khác (không phải cài lần đầu)?** Xem runbook
 > chuyên biệt: [`docs/migrate-node.md`](../docs/migrate-node.md) — giữ session
 > Discord, checklist cutover + rollback.
+>
+> 📁 **Đường dẫn repo trên VPS không cố định.** Tài liệu này dùng `/opt/protogon`
+> (kiểu upload zip), nhưng nếu bạn `git clone` repo thì nó nằm ở chỗ bạn clone
+> (`/root/<tên>`, `/srv/...`…). Đừng đoán — tìm bằng
+> [`docs/vps-security-hardening.md`](../docs/vps-security-hardening.md) **§0**.
 
 ## Yêu cầu
 
