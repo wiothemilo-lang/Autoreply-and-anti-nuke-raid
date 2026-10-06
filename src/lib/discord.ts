@@ -3,17 +3,15 @@ export const OAUTH_VERIFIER_KEY = "wio_oauth_verifier";
 export const OAUTH_STATE_KEY = "wio_oauth_state";
 export const REMEMBER_LOGIN_KEY = "wio_remember_login";
 
-/** Luồng làm mới im lặng: prompt=none, dùng chung redirect /discord/callback. */
+/**
+ * Luồng làm mới im lặng: prompt=none, dùng chung redirect /discord/callback.
+ * PKCE verifier + state phải ở sessionStorage (khớp đúng tab vừa chuyển trang).
+ * Khoá chống lặp (`thử gần nhất` / `đã hỏng`) nằm ở `silentRefresh.ts` và dùng
+ * localStorage — phạm vi trình duyệt, vì sessionStorage là riêng từng tab nên
+ * tab mới luôn bị đẩy sang Discord lại từ đầu (bug thật 06/10/2026).
+ */
 export const SILENT_VERIFIER_KEY = "wio_silent_verifier";
 export const SILENT_STATE_KEY = "wio_silent_state";
-export const SILENT_ATTEMPT_KEY = "wio_silent_last_attempt";
-/**
- * Cờ "làm mới im lặng đã thất bại": đặt khi Discord từ chối prompt=none. Từ
- * lúc này lượt TỰ ĐỘNG bị khoá cho tới khi người dùng bấm nút làm mới — nếu
- * không, mỗi lần mở dashboard sau 10 phút lại bị đẩy sang Discord, thất bại
- * rồi quay lại: đúng cảm giác "lặp đăng nhập".
- */
-export const SILENT_FAILED_KEY = "wio_silent_failed";
 
 /** Chỉ lưu đăng nhập tối đa 7 ngày khi bật "Lưu đăng nhập". */
 export const SESSION_EXPIRY_DAYS = 7;

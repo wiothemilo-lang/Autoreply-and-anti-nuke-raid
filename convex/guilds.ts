@@ -204,6 +204,8 @@ export const getGuild = query({
         restoreMetaEnabled: guild.restoreMetaEnabled ?? true,
         // Mặc định TẮT: cấm người + mở link mời là hành động không hoàn tác được.
         restoreExtrasEnabled: guild.restoreExtrasEnabled ?? false,
+        // Mặc định TẮT: xoá kênh sẵn có cũng không hoàn tác được.
+        restoreClearChannelsEnabled: guild.restoreClearChannelsEnabled ?? false,
         raidHuntEnabled: guild.raidHuntEnabled ?? true,
         raidHuntBanSuspects: guild.raidHuntBanSuspects ?? true,
         rollbackEnabled: guild.rollbackEnabled ?? true,
@@ -552,6 +554,16 @@ export const getBotConfig = query({
       restoreChannelsEnabled: guild.restoreChannelsEnabled ?? true,
       restoreMessagesEnabled: guild.restoreMessagesEnabled ?? true,
       restoreEmojisEnabled: guild.restoreEmojisEnabled ?? true,
+      // BUG THẬT: hai cờ này bot ĐỌC (backupRestore.js: cfg?.restoreMetaEnabled
+      // !== false, cfg?.restoreExtrasEnabled === true) nhưng getBotConfig KHÔNG
+      // trả ⇒ bot luôn dùng mặc định. Hệ quả người dùng thấy: tắt "khôi phục
+      // tên/mô tả/icon" mà bot vẫn đổi tên + icon server; bật "khôi phục ban +
+      // link mời" mà bot không cấm ai (và bật xong vẫn KHÔNG có tác dụng cho
+      // tới khi query này trả đúng field).
+      restoreMetaEnabled: guild.restoreMetaEnabled ?? true,
+      restoreExtrasEnabled: guild.restoreExtrasEnabled ?? false,
+      // Cờ mới: xoá kênh sẵn có trước khi khôi phục (mặc định TẮT).
+      restoreClearChannelsEnabled: guild.restoreClearChannelsEnabled ?? false,
       lastReportAt: guild.lastReportAt ?? null,
       raidHuntEnabled: guild.raidHuntEnabled ?? true,
       raidHuntBanSuspects: guild.raidHuntBanSuspects ?? true,

@@ -6,6 +6,13 @@
 // Vite chỉ expose biến có tiền tố VITE_* vào bundle. Shim này chuyển đổi trước
 // khi chạy vite build, để usePublicConfig có BAKED_CLIENT_ID dự phòng.
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import fs from "node:fs";
+import path from "node:path";
+
+// Một nguồn duy nhất cho CSP/header bảo mật (CommonJS — dùng chung với bộ test).
+const require = createRequire(import.meta.url);
+const { injectSecurityMeta, securityHeadersFile } = require("./security-headers.cjs");
 
 // Chỉ nướng giá trị Client ID HỢP LỆ (Discord Application ID là snowflake: chỉ
 // gồm chữ số, 15-21 ký tự). Bug thật 18/09: env chứa blob mã hóa dán nhầm
@@ -106,4 +113,25 @@ if (res.error) {
   console.error(`[build] Không chạy được vite: ${res.error.message}`);
   process.exit(res.status ?? 1);
 }
+
+// ── Header bảo mật cho hosting TĨNH (sau khi build thành công) ──
+// Vercel/nginx đã có CSP ở cấu hình riêng; đường deploy tĩnh không cấu hình
+// được header HTTP nên CSP phải đi kèm artifact: meta trong index.html +
+// `_headers`. Best-effort có log — thiếu bước này là mất một lớp bảo vệ chứ
+// không phải build hỏng, nên không được che mất lỗi build thật ở trên.
+if ((res.status ?? 0) === 0) {
+  try {
+    const indexPath = path.join("dist", "index.html");
+    const html = fs.readFileSync(indexPath, "utf8");
+    const patched = injectSecurityMeta(html);
+    if (patched !== html) fs.writeFileSync(indexPath, patched);
+    fs.writeFileSync(path.join("dist", "_headers"), securityHeadersFile());
+    console.log(
+      "[build] Đã áp header bảo mật cho bản tĩnh: meta CSP trong index.html + dist/_headers",
+    );
+  } catch (error) {
+    console.error(`[build] Không áp được header bảo mật cho bản tĩnh: ${error.message}`);
+  }
+}
+
 process.exit(res.status ?? 1);

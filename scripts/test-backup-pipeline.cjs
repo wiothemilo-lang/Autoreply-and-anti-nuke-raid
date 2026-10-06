@@ -2024,6 +2024,180 @@ const check = (label, ok) => {
     );
   }
   {
+    // ══════════ XOÁ KÊNH SẴN CÓ trước khi khôi phục (06/10/2026) ══════════
+    // Tuỳ chọn PHÁ HUỶ: xoá kênh là xoá luôn tin nhắn trong đó. Ba điều phải
+    // đúng — sai một điều là chủ server mất dữ liệu ngoài ý muốn:
+    //   1. KHÔNG có quyền Manage Channels → không xoá gì (xoá xong không dựng lại được);
+    //   2. chỉ xoá kênh discord.js coi là `deletable` (bỏ kênh trên role bot,
+    //      kênh quy tắc/thông báo) và KHÔNG xoá thread riêng;
+    //   3. xoá TRƯỚC khi tạo kênh mới, và chỉ khi CÓ khôi phục kênh.
+    const order = [];
+    const mkCh = (id, name, o = {}) => ({
+      id,
+      name,
+      type: o.type ?? 0,
+      deletable: o.deletable ?? true,
+      isThread: () => !!o.thread,
+      delete: async () => {
+        if (o.fail) throw new Error("Missing Permissions");
+        order.push(`delete:${name}`);
+      },
+    });
+    const guildWith = (list, perms = true) => ({
+      id: TGT,
+      members: { me: { permissions: { has: (flag) => perms && flag === "ManageChannels" } } },
+      channels: { cache: new Map(list) },
+    });
+
+    const r1 = await backup.clearExistingChannels(
+      guildWith([
+        ["a1", mkCh("a1", "chung")],
+        ["a2", mkCh("a2", "danh-muc", { type: CT.GuildCategory })],
+        ["a3", mkCh("a3", "tren-role-bot", { deletable: false })],
+        ["a4", mkCh("a4", "thread", { thread: true })],
+      ]),
+    );
+    check(
+      "xoá-kênh: xoá kênh con TRƯỚC danh mục; bỏ kênh không xoá được + thread",
+      r1.deleted === 2 && r1.kept === 1 && order.join(",") === "delete:chung,delete:danh-muc",
+      JSON.stringify({ r1, order }),
+    );
+
+    // Thiếu quyền Manage Channels: KHÔNG được chạm vào kênh nào. Đây là lớp an
+    // toàn quan trọng nhất — xoá xong mà không tạo lại được là server trắng kênh.
+    order.length = 0;
+    const r2 = await backup.clearExistingChannels(
+      guildWith([["b1", mkCh("b1", "giu-nguyen")]], false),
+    );
+    check(
+      "xoá-kênh: thiếu quyền Manage Channels → KHÔNG xoá gì",
+      r2.deleted === 0 && r2.skippedReason === "no_permission" && order.length === 0,
+      JSON.stringify({ r2, order }),
+    );
+
+    // Lỗi từng kênh (rate limit / thiếu quyền riêng kênh đó) → bỏ qua kênh đó,
+    // các kênh còn lại vẫn xoá, KHÔNG ném ra làm hỏng cả lượt khôi phục.
+    order.length = 0;
+    const r3 = await backup.clearExistingChannels(
+      guildWith([
+        ["c1", mkCh("c1", "loi", { fail: true })],
+        ["c2", mkCh("c2", "xoa-duoc")],
+      ]),
+    );
+    check(
+      "xoá-kênh: 1 kênh lỗi → vẫn xoá kênh còn lại và báo số giữ lại",
+      r3.deleted === 1 && r3.kept === 1 && order.join(",") === "delete:xoa-duoc",
+      JSON.stringify({ r3, order }),
+    );
+
+    // ── Tích hợp với runRestore: thứ tự xoá → tạo, và chỉ chạy khi được bật ──
+    const mkTrashTarget = async () => {
+      const tg = makeTarget();
+      // makeTarget chỉ mô phỏng `permissions.bitfield`; lớP an toàn "thiếu quyền
+      // thì không xoá" đọc qua `permissions.has("ManageChannels")` (đúng API
+      // discord.js thật) nên ở đây phải mô phỏng thêm `has`.
+      const bits = tg.members.me.permissions.bitfield;
+      tg.members.me.permissions = { bitfield: bits, has: () => true };
+      const events = [];
+      await tg.channels.create({ name: "rác-1", type: 0 });
+      await tg.channels.create({ name: "rác-2", type: CT.GuildCategory });
+      for (const c of tg.channels.cache.values()) {
+        c.deletable = true;
+        c.delete = async () => {
+          events.push(`delete:${c.name}`);
+          tg.channels.cache.delete(c.id);
+        };
+      }
+      const origCreate = tg.channels.create;
+      tg.channels.create = async (o) => {
+        events.push(`create:${o.name}`);
+        return origCreate(o);
+      };
+      return { tg, events };
+    };
+    const runOn = async (cfg) => {
+      const { tg, events } = await mkTrashTarget();
+      const r = await backup.runRestore(
+        { guilds: { cache: new Map([[TGT, tg]]) } },
+        { client: { mutation: async () => ({ ok: true }) }, getConfig: async () => cfg },
+        TGT,
+        JSON.stringify(richBackup),
+      );
+      return { tg, events, r };
+    };
+
+    const on = await runOn({ restoreClearChannelsEnabled: true });
+    check(
+      "phục hồi + BẬT xoá kênh: xoá kênh rác TRƯỚC khi tạo kênh theo backup",
+      on.events[0] === "delete:rác-1" &&
+        on.events[1] === "delete:rác-2" &&
+        on.events[2] === "create:general" &&
+        on.r.channelCount === 1,
+      JSON.stringify(on.events),
+    );
+    check(
+      "phục hồi + BẬT xoá kênh: kênh cũ đã biến mất khỏi server (cache 1 = kênh mới)",
+      on.tg.channels.cache.size === 1,
+      String(on.tg.channels.cache.size),
+    );
+
+    const off = await runOn(null);
+    check(
+      "phục hồi mặc định (không bật): KHÔNG xoá kênh nào",
+      !off.events.some((e) => e.startsWith("delete:")),
+      JSON.stringify(off.events),
+    );
+    check(
+      "phục hồi mặc định: kênh rác cũ vẫn còn (2 rác + 1 mới)",
+      off.tg.channels.cache.size === 3,
+      String(off.tg.channels.cache.size),
+    );
+
+    // Bật xoá kênh nhưng TẮT "khôi phục kênh": phải KHÔNG xoá — xoá mà không
+    // dựng lại là tự biến server thành trắng kênh.
+    const noChan = await runOn({
+      restoreClearChannelsEnabled: true,
+      restoreChannelsEnabled: false,
+    });
+    check(
+      "bật xoá kênh nhưng TẮT khôi phục kênh → KHÔNG xoá gì",
+      !noChan.events.some((e) => e.startsWith("delete:")) && noChan.tg.channels.cache.size === 2,
+      JSON.stringify({ events: noChan.events, size: noChan.tg.channels.cache.size }),
+    );
+
+    // ── Kế hoạch (dry-run) phải nói TRƯỚC số kênh sẽ bị xoá ──
+    const planTg = makeTarget();
+    await planTg.channels.create({ name: "rác", type: 0 });
+    const planClear = await backup.planRestoreCore(
+      { guilds: { cache: new Map([[TGT, planTg]]) } },
+      { client: {}, getConfig: async () => ({ restoreClearChannelsEnabled: true }) },
+      TGT,
+      richBackup,
+    );
+    check(
+      "kế hoạch + bật xoá kênh: nói TRƯỚC số kênh sẽ bị XOÁ (không hoàn tác được)",
+      planClear.warnings.some((w) => /xoá kênh sẵn có.*KHÔNG hoàn tác được/.test(w)),
+      JSON.stringify(planClear.warnings),
+    );
+    const planNoChan = await backup.planRestoreCore(
+      { guilds: { cache: new Map([[TGT, planTg]]) } },
+      {
+        client: {},
+        getConfig: async () => ({
+          restoreClearChannelsEnabled: true,
+          restoreChannelsEnabled: false,
+        }),
+      },
+      TGT,
+      richBackup,
+    );
+    check(
+      "kế hoạch + tắt khôi phục kênh: cảnh báo sẽ KHÔNG xoá gì",
+      planNoChan.warnings.some((w) => /sẽ không xoá gì/.test(w)),
+      JSON.stringify(planNoChan.warnings),
+    );
+  }
+  {
     // runRestorePlan: nén → bung → tính → BÁO LẠI Convex (kèm claimAt).
     const tg = makeTarget();
     const muts = [];

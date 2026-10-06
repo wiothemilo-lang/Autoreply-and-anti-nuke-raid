@@ -34,7 +34,9 @@ import {
   restorePlanStatus,
   botGetPending,
   sweepDueAutoBackups,
+  setRestoreOptions,
 } from "../convex/backup";
+import { getBotConfig } from "../convex/guilds";
 import { computeBotKey } from "../convex/botAuth";
 import { reassembleBackupJsonForRead } from "../convex/backupChunks";
 import { generateRestoreKey, normalizeRestoreKey } from "../convex/backupKeys";
@@ -66,6 +68,8 @@ const listMineHandler = (listMine as any)._handler;
 const lookupBackupHandler = (lookupBackup as any)._handler;
 const myRestoreKeysHandler = (myRestoreKeys as any)._handler;
 const requestRestoreHandler = (requestRestore as any)._handler;
+const setRestoreOptionsHandler = (setRestoreOptions as any)._handler;
+const getBotConfigHandler = (getBotConfig as any)._handler;
 
 let pass = 0;
 let fail = 0;
@@ -1721,6 +1725,110 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     check(
       "backup đọc được → job bình thường, KHÔNG unreadable",
       job3?.unreadable === false && job3?.backupJson === "z:ok",
+    );
+  }
+
+  console.log("\n── getBotConfig: cờ tùy chỉnh khôi phục phải TỚI ĐƯỢC bot ──");
+  // BUG THẬT 06/10/2026: bot đọc `cfg.restoreMetaEnabled` / `cfg.restoreExtrasEnabled`
+  // (backupRestore.js) nhưng getBotConfig KHÔNG trả hai field đó ⇒ bot luôn dùng
+  // mặc định: tắt "khôi phục tên/mô tả/icon" vẫn đổi tên server, bật "khôi phục ban
+  // + link mời" mà không cấm ai. Test này chặn tái diễn: mọi cờ trong Tùy chỉnh
+  // khôi phục (kể cả cờ mới "xoá kênh sẵn có") phải có mặt trong bundle config.
+  {
+    const { ctx, guildRows } = makeCtx({ seed: BOT_KEY });
+    guildRows.push({
+      _id: "gldcfg",
+      discordId: "g1",
+      name: "G1",
+      prefix: "?",
+      managers: [],
+      adminRoles: [],
+      modRoles: [],
+      antinukeEnabled: true,
+      botInGuild: true,
+    });
+    const cfg = await getBotConfigHandler(ctx as any, { botKey: BOT_KEY, guildId: "g1" });
+    check(
+      "getBotConfig trả restoreMetaEnabled (mặc định BẬT)",
+      cfg?.restoreMetaEnabled === true,
+      JSON.stringify(cfg?.restoreMetaEnabled),
+    );
+    check(
+      "getBotConfig trả restoreExtrasEnabled (mặc định TẮT)",
+      cfg?.restoreExtrasEnabled === false,
+      JSON.stringify(cfg?.restoreExtrasEnabled),
+    );
+    check(
+      "getBotConfig trả restoreClearChannelsEnabled (mặc định TẮT)",
+      cfg?.restoreClearChannelsEnabled === false,
+      JSON.stringify(cfg?.restoreClearChannelsEnabled),
+    );
+    // Giá trị đã bật trên dashboard phải đi nguyên vẹn tới bot (không bị ép mặc định).
+    guildRows[0].restoreMetaEnabled = false;
+    guildRows[0].restoreExtrasEnabled = true;
+    guildRows[0].restoreClearChannelsEnabled = true;
+    const cfg2 = await getBotConfigHandler(ctx as any, { botKey: BOT_KEY, guildId: "g1" });
+    check(
+      "getBotConfig giữ nguyên cờ người dùng đã bật/tắt",
+      cfg2?.restoreMetaEnabled === false &&
+        cfg2?.restoreExtrasEnabled === true &&
+        cfg2?.restoreClearChannelsEnabled === true,
+      JSON.stringify([
+        cfg2?.restoreMetaEnabled,
+        cfg2?.restoreExtrasEnabled,
+        cfg2?.restoreClearChannelsEnabled,
+      ]),
+    );
+  }
+
+  console.log("\n── setRestoreOptions: ghi cờ xoá kênh + tín hiệu settingsChangedAt ──");
+  {
+    const { ctx, guildRows, userRows, sessionRows } = makeCtx({ seed: BOT_KEY });
+    guildRows.push({
+      _id: "gldopt",
+      discordId: "g1",
+      name: "G1",
+      prefix: "?",
+      managers: [],
+      adminRoles: [],
+      modRoles: [],
+      antinukeEnabled: true,
+      botInGuild: true,
+    });
+    userRows.push({ _id: "u1", discordId: "u1", manageableGuildIds: ["g1"] });
+    sessionRows.push({
+      _id: "s1",
+      token: "tok",
+      userId: "u1",
+      createdAt: Date.now(),
+      authVersion: 1,
+    });
+    const res = await setRestoreOptionsHandler(ctx as any, {
+      token: "tok",
+      guildId: "g1",
+      restoreClearChannels: true,
+    });
+    check(
+      "setRestoreOptions ghi restoreClearChannelsEnabled",
+      guildRows[0].restoreClearChannelsEnabled === true && res?.restoreClearChannels === true,
+      JSON.stringify({
+        row: guildRows[0].restoreClearChannelsEnabled,
+        res: res?.restoreClearChannels,
+      }),
+    );
+    check(
+      "setRestoreOptions đặt settingsChangedAt (thay đổi tới bot ngay, không chờ 30 phút)",
+      typeof guildRows[0].settingsChangedAt === "number",
+      JSON.stringify(guildRows[0].settingsChangedAt),
+    );
+    const off = await setRestoreOptionsHandler(ctx as any, {
+      token: "tok",
+      guildId: "g1",
+      restoreClearChannels: false,
+    });
+    check(
+      "setRestoreOptions tắt lại được (không kẹt ở true)",
+      guildRows[0].restoreClearChannelsEnabled === false && off?.restoreClearChannels === false,
     );
   }
 

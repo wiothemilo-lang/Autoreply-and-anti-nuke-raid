@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Smile,
   Sticker,
+  Trash2,
   Users,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -107,6 +108,11 @@ export default function BackupPanel({ data }: { data: GuildData }) {
   const [restoreMeta, setRestoreMeta] = useState(data.guild.restoreMetaEnabled ?? true);
   // Mặc định TẮT: cấm người + mở link mời không hoàn tác được.
   const [restoreExtras, setRestoreExtras] = useState(data.guild.restoreExtrasEnabled ?? false);
+  // Mặc định TẮT: xoá kênh sẵn có của server đích là hành động KHÔNG hoàn tác
+  // được (tin nhắn trong kênh mất theo) — chỉ chạy khi chủ server chủ động bật.
+  const [restoreClearChannels, setRestoreClearChannels] = useState(
+    data.guild.restoreClearChannelsEnabled ?? false,
+  );
   const [restoreChannels, setRestoreChannels] = useState(data.guild.restoreChannelsEnabled ?? true);
   const [restoreMessages, setRestoreMessages] = useState(data.guild.restoreMessagesEnabled ?? true);
   const [restoreOptBusy, setRestoreOptBusy] = useState(false);
@@ -522,6 +528,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
         restoreEmojis,
         restoreMeta,
         restoreExtras,
+        restoreClearChannels,
       });
       const { applied, skipped } = splitRestoreParts({
         roles: restoreRoles,
@@ -610,6 +617,9 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     // Câu xác nhận gồm nhiều đoạn: dịch RIÊNG TỪNG ĐOẠN rồi nối bằng xuống dòng
     // — không nhét "\n" vào trong key từ điển (key chứa escape \n rất dễ lọt
     // lưới check-i18n và khó đọc trong file dịch).
+    // Câu "Các role/kênh đang có của server này được giữ nguyên" ở đoạn dưới
+    // SAI khi bật "xoá kênh sẵn có" → phải nói rõ ngoại lệ ngay trước khi người
+    // dùng bấm OK, đây là hành động phá hủy không hoàn tác được.
     const confirmText = [
       translate('Khôi phục backup của "{p0}" vào server hiện tại?', {
         p0: backup.guildName,
@@ -617,6 +627,13 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       translate(
         "Bot dựng lại cấu trúc theo backup (kênh đúng thứ tự, kèm role và emoji/sticker nếu backup có) rồi phục hồi tin nhắn cùng media (ảnh/video…), theo đúng Tùy chỉnh khôi phục bên dưới. Các role/kênh đang có của server này được giữ nguyên.",
       ),
+      ...(restoreClearChannels && restoreChannels
+        ? [
+            translate(
+              "NGOẠI LỆ: “xoá kênh sẵn có” đang BẬT nên các KÊNH đang có của server này sẽ bị XOÁ trước khi dựng lại — không hoàn tác được (tin nhắn trong kênh mất theo). Role thì vẫn giữ nguyên.",
+            ),
+          ]
+        : []),
       translate("Tùy chỉnh đang áp dụng: {p0}.", { p0: [...applied, ...skipped].join(", ") }),
     ].join("\n\n");
     if (!window.confirm(confirmText)) {
@@ -1098,7 +1115,24 @@ export default function BackupPanel({ data }: { data: GuildData }) {
               </span>
               <Switch checked={restoreExtras} onCheckedChange={setRestoreExtras} />
             </label>
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-danger/25 bg-danger/5 px-3 py-2.5">
+              <span className="flex items-center gap-2 text-sm">
+                <Trash2 className="h-4 w-4 text-danger" />
+                <span>
+                  {translate("Xoá kênh sẵn có của server trước khi dựng lại")}{" "}
+                  <span className="text-xs text-danger">({translate("không hoàn tác được")})</span>
+                </span>
+              </span>
+              <Switch checked={restoreClearChannels} onCheckedChange={setRestoreClearChannels} />
+            </label>
           </div>
+          {restoreClearChannels ? (
+            <p className="rounded-xl border border-danger/25 bg-danger/5 px-3 py-2 text-xs text-danger">
+              {translate(
+                "Chỉ bật khi khôi phục vào server đã có sẵn kênh rác cần dọn: bot sẽ XOÁ các kênh xoá được của server này TRƯỚC khi dựng lại kênh theo backup (tin nhắn trong kênh mất theo). Kênh bot không xoá được — kênh nằm trên role của bot, kênh quy tắc/thông báo cập nhật — vẫn được giữ nguyên.",
+              )}{" "}
+            </p>
+          ) : null}
           <div className="flex items-center gap-3">
             <Button size="sm" onClick={saveRestoreOptions} disabled={restoreOptBusy}>
               {restoreOptBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -1109,7 +1143,8 @@ export default function BackupPanel({ data }: { data: GuildData }) {
             (data.guild.restoreChannelsEnabled ?? true) !== restoreChannels ||
             (data.guild.restoreMessagesEnabled ?? true) !== restoreMessages ||
             (data.guild.restoreMetaEnabled ?? true) !== restoreMeta ||
-            (data.guild.restoreExtrasEnabled ?? false) !== restoreExtras ? (
+            (data.guild.restoreExtrasEnabled ?? false) !== restoreExtras ||
+            (data.guild.restoreClearChannelsEnabled ?? false) !== restoreClearChannels ? (
               <span className="text-xs text-muted-foreground">
                 {translate("Có thay đổi chưa lưu — bấm Lưu để áp dụng.")}{" "}
               </span>

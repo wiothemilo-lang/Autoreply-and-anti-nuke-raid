@@ -384,6 +384,13 @@ export const DE: Record<string, string> = {
   "Khôi phục tên / mô tả / icon server": "Servername / Beschreibung / Icon wiederherstellen",
   "Khôi phục danh sách ban + link mời": "Ban-Liste + Einladungslinks wiederherstellen",
   "không hoàn tác được": "nicht rückgängig machbar",
+  /* ==== Vorhandene Kanäle beim Wiederherstellen löschen (06/10/2026) ==== */
+  "Xoá kênh sẵn có của server trước khi dựng lại":
+    "Vorhandene Kanäle des Servers vor dem Neuaufbau löschen",
+  "NGOẠI LỆ: “xoá kênh sẵn có” đang BẬT nên các KÊNH đang có của server này sẽ bị XOÁ trước khi dựng lại — không hoàn tác được (tin nhắn trong kênh mất theo). Role thì vẫn giữ nguyên.":
+    "AUSNAHME: “vorhandene Kanäle löschen” ist AN — die vorhandenen KANÄLE dieses Servers werden vor dem Neuaufbau GELÖSCHT, das ist nicht rückgängig machbar (Nachrichten in diesen Kanälen gehen verloren). Rollen bleiben erhalten.",
+  "Chỉ bật khi khôi phục vào server đã có sẵn kênh rác cần dọn: bot sẽ XOÁ các kênh xoá được của server này TRƯỚC khi dựng lại kênh theo backup (tin nhắn trong kênh mất theo). Kênh bot không xoá được — kênh nằm trên role của bot, kênh quy tắc/thông báo cập nhật — vẫn được giữ nguyên.":
+    "Nur aktivieren, wenn in einen Server wiederhergestellt wird, der noch alte Kanäle zum Aufräumen hat: der Bot LÖSCHT die löschbaren Kanäle dieses Servers VOR dem Neuaufbau der Kanäle aus dem Backup (Nachrichten darin gehen verloren). Kanäle, die der Bot nicht löschen kann — über der Bot-Rolle oder Regel-/Update-Kanäle — bleiben erhalten.",
   /* ==== Quy tắc giữ bản (29/09/2026) ==== */
   Giữ: "Behalte",
   "bản gần nhất": "neueste Backups",
@@ -599,8 +606,8 @@ export const DE: Record<string, string> = {
   "Không lưu đăng nhập": "Anmeldung nicht merken",
   "Không phát hiện lỗi nào — bot hoạt động bình thường ✅":
     "Keine Fehler gefunden — der Bot läuft normal ✅",
-  "Không thể làm mới tự động — hãy thử nút Tải lại hoặc Đăng nhập lại.":
-    "Automatische Aktualisierung nicht möglich — nutze Neu laden oder melde dich neu an.",
+  "Không làm mới được danh sách server (Discord từ chối làm mới im lặng). Bạn vẫn dùng bình thường — chỉ bấm “Tải lại” khi cần.":
+    "Serverliste konnte nicht aktualisiert werden (Discord hat die stille Aktualisierung abgelehnt). Alles funktioniert weiterhin — drücke bei Bedarf “Neu laden”.",
   "Không thể truy cập server này": "Dieser Server ist nicht zugänglich",
   "Không thể truy cập server này — bạn không có quyền quản lý.":
     "Dieser Server ist nicht zugänglich — dir fehlt die Verwaltungsberechtigung.",

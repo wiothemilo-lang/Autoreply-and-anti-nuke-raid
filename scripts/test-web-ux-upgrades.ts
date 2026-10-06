@@ -36,6 +36,16 @@ import { simulateAutoReply, type SimInput, type SimRule } from "../src/lib/autor
 import { toBranding } from "../src/lib/useBranding";
 import { judgeJobWatch, type JobWatch } from "../src/lib/backupWatch";
 import {
+  SILENT_ATTEMPT_KEY,
+  SILENT_COOLDOWN_MS,
+  SILENT_FAILED_KEY,
+  clearSilentFailed,
+  judgeSilentRefresh,
+  markSilentAttempt,
+  markSilentFailed,
+  readSilentLock,
+} from "../src/lib/silentRefresh";
+import {
   INCIDENT_SLOW,
   LATENCY_FAST,
   LATENCY_SLOW,
@@ -1028,6 +1038,98 @@ console.log("── #15 theo dõi kết quả backup/khôi phục (chống báo 
   check(
     "lượt import khai báo KHÔNG có mốc xong (hasFinishMarker: false)",
     /hasFinishMarker: false/.test(panelSrc),
+  );
+}
+
+console.log("── #16 khoá chống lặp làm mới im lặng (sự cố 'lặp đăng nhập') ──");
+{
+  // Vì sao test: mỗi lượt "làm mới im lặng" là một lần CHUYỂN TRANG THẬT sang
+  // Discord rồi quay về. Sai một nhánh ở đây là người dùng bị đá khỏi dashboard
+  // (hoặc bị bắt đăng nhập lại) giữa lúc làm việc. Khoá phải nằm ở phạm vi
+  // TRÌNH DUYỆT (localStorage), không phải từng tab (sessionStorage).
+  const clean = { failed: false, lastAttempt: 0 };
+  check("lần đầu (chưa từng thử) → cho phép", judgeSilentRefresh(clean, T) === null);
+  check(
+    "vừa thử 5 phút trước → CHẶN vì còn trong cooldown 10 phút",
+    judgeSilentRefresh({ failed: false, lastAttempt: T - 5 * 60_000 }, T) === "cooldown",
+  );
+  check(
+    "thử đúng mốc 10 phút trước → cho phép (biên cooldown)",
+    judgeSilentRefresh({ failed: false, lastAttempt: T - SILENT_COOLDOWN_MS }, T) === null,
+  );
+  check(
+    "lượt trước HỎNG → khoá vĩnh viễn dù đã quá 10 phút",
+    judgeSilentRefresh({ failed: true, lastAttempt: T - 24 * 3600_000 }, T) === "locked",
+  );
+  check(
+    "hỏng thì cũng không xét cooldown (không tự mở lại sau 10 phút)",
+    judgeSilentRefresh({ failed: true, lastAttempt: T - 1_000 }, T) === "locked",
+  );
+  check(
+    "người dùng bấm 'Tải lại' (force) → bỏ qua CẢ khoá hỏng lẫn cooldown",
+    judgeSilentRefresh({ failed: true, lastAttempt: T - 1_000 }, T, { force: true }) === null,
+  );
+  check(
+    "không có phiên (thiếu token/clientId) → KHÔNG nhảy sang Discord, kể cả khi force",
+    judgeSilentRefresh(clean, T, { hasSession: false }) === "no_session" &&
+      judgeSilentRefresh(clean, T, { hasSession: false, force: true }) === "no_session",
+  );
+
+  // Khoá là chuỗi có tiền tố wio_ (đồng bộ với phần còn lại của phiên web) và
+  // phải KHÁC nhau — trùng khoá thì "đã hỏng" bị hiểu thành "mốc thời gian".
+  check(
+    "khoá lưu trữ dùng đúng tên và không trùng nhau",
+    SILENT_FAILED_KEY === "wio_silent_failed" &&
+      SILENT_ATTEMPT_KEY === "wio_silent_last_attempt" &&
+      SILENT_FAILED_KEY !== SILENT_ATTEMPT_KEY,
+  );
+
+  // Hành vi khi MÔI TRƯỜNG KHÔNG CÓ localStorage (SSR/Node/chế độ riêng tư chặn):
+  // tuyệt đối không được ném — ném ở đây là trắng trang dashboard.
+  let storageOk = true;
+  try {
+    const lock = readSilentLock();
+    storageOk = typeof lock.failed === "boolean" && typeof lock.lastAttempt === "number";
+    markSilentAttempt(T);
+    markSilentFailed();
+    clearSilentFailed();
+  } catch {
+    storageOk = false;
+  }
+  check("mọi hàm storage chạy được cả khi localStorage không tồn tại (không ném)", storageOk);
+
+  // Vòng ghi → đọc: chỉ kiểm khi môi trường THẬT SỰ có localStorage (bun/Node
+  // thuần không có), nhưng khi có thì hợp đồng phải đúng.
+  if (typeof localStorage !== "undefined") {
+    clearSilentFailed();
+    markSilentFailed();
+    const afterFail = readSilentLock();
+    markSilentAttempt(T);
+    const afterAttempt = readSilentLock();
+    clearSilentFailed();
+    check(
+      "markSilentFailed đọc lại được (khoá nằm ở phạm vi trình duyệt)",
+      afterFail.failed === true,
+    );
+    check("markSilentAttempt đọc lại được", afterAttempt.lastAttempt === T);
+    check("clearSilentFailed xoá được cờ hỏng", readSilentLock().failed === false);
+  }
+
+  // Neo nguồn: Dashboard phải hỏi hàm thuần này chứ không tự so sessionStorage —
+  // khoá theo tab chính là gốc rễ sự cố 06/10/2026.
+  const dashboardSrc = readFileSync(
+    fileURLToPath(new URL("../src/pages/Dashboard.tsx", import.meta.url)),
+    "utf8",
+  );
+  check(
+    "Dashboard dùng judgeSilentRefresh",
+    /judgeSilentRefresh\(readSilentLock\(\)/.test(dashboardSrc),
+  );
+  check(
+    "Dashboard không tự đọc/ghi khoá bằng sessionStorage nữa",
+    !/sessionStorage\.(getItem|setItem|removeItem)\(\s*SILENT_(FAILED|ATTEMPT)_KEY/.test(
+      dashboardSrc,
+    ),
   );
 }
 

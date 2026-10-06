@@ -157,6 +157,14 @@ export default defineSchema({
      * chủ server bật mới chạy.
      */
     restoreExtrasEnabled: v.optional(v.boolean()),
+    /**
+     * Khôi phục: XOÁ các kênh đang có của server đích TRƯỚC khi dựng lại kênh
+     * theo backup. Mặc định TẮT vì đây là hành động KHÔNG hoàn tác được, và
+     * server phụ thường còn kênh mặc định (general, voice) mà chủ server muốn
+     * giữ. Bật khi khôi phục vào server đã có rác cần dọn để bản khôi phục
+     * trùng khớp với server gốc.
+     */
+    restoreClearChannelsEnabled: v.optional(v.boolean()),
     /** Tự động backup: số ngày giữa 2 lần (2-30, 0 = tắt). */
     backupAutoDays: v.optional(v.number()),
     /**

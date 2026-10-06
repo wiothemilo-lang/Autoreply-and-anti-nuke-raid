@@ -2033,5 +2033,113 @@ check(
   );
 }
 
+// ─── 13. CSP / header bảo mật: MỘT nguồn duy nhất + có hiệu lực cả bản tĩnh ───
+// Vì sao test: header bảo mật từng chỉ có ở vercel.json + Dockerfile.web, còn
+// đường phát production thật (hosting tĩnh) KHÔNG cấu hình được header HTTP →
+// bản deploy chạy với CSP rỗng. Ba lớp bị kiểm ở đây:
+//   a. `scripts/security-headers.cjs` là nguồn duy nhất; CSP ở vercel.json và
+//      Dockerfile.web phải khớp CHÍNH XÁC nó (đổi một nơi mà quên nơi khác =
+//      CI đỏ, không thể âm thầm nới lỏng CSP ở nơi duy nhất ai đó nhớ).
+//   b. `injectSecurityMeta` (dùng ở `scripts/build.mjs`) phải chèn được meta CSP
+//      vào index.html THẬT: idempotent, nằm trong <head>, TRƯỚC mọi <script>.
+//   c. CSP không được nới: không `unsafe-inline`/`unsafe-eval`/`*` cho script,
+//      `connect-src` phải phủ Convex (https + wss) và Discord OAuth.
+{
+  const sec = require(path.join(ROOT, "scripts", "security-headers.cjs"));
+  const buildShim = fs.readFileSync(path.join(ROOT, "scripts", "build.mjs"), "utf8");
+  const dockerText = fs.readFileSync(path.join(ROOT, "Dockerfile.web"), "utf8");
+
+  const vercelCsp =
+    (vercelJson.headers ?? [])
+      .find((group) => (group.headers ?? []).some((h) => h.key === "Content-Security-Policy"))
+      ?.headers.find((h) => h.key === "Content-Security-Policy")?.value ?? "";
+  const nginxCsp =
+    (dockerText.match(/add_header Content-Security-Policy \\"([^"]+)\\"/) || [])[1] ?? "";
+
+  check(
+    "CSP ở vercel.json khớp CHÍNH XÁC nguồn duy nhất (scripts/security-headers.cjs)",
+    vercelCsp.trim() === sec.CSP.trim(),
+    `vercel=${vercelCsp.slice(0, 60)}… nguồn=${sec.CSP.slice(0, 60)}…`,
+  );
+  check(
+    "CSP ở Dockerfile.web (nginx) khớp CHÍNH XÁC nguồn duy nhất",
+    nginxCsp.trim() === sec.CSP.trim(),
+    `nginx=${nginxCsp.slice(0, 60)}… nguồn=${sec.CSP.slice(0, 60)}…`,
+  );
+
+  // (c) CSP không được nới — kiểm trên chính nguồn duy nhất.
+  const scriptSrc = sec.CSP_DIRECTIVES.find(([d]) => d === "script-src")?.[1] ?? [];
+  const connectSrc = sec.CSP_DIRECTIVES.find(([d]) => d === "connect-src")?.[1] ?? [];
+  const imgSrc = sec.CSP_DIRECTIVES.find(([d]) => d === "img-src")?.[1] ?? [];
+  check(
+    "script-src chỉ 'self' (không unsafe-inline/unsafe-eval/wildcard)",
+    scriptSrc.length === 1 && scriptSrc[0] === "'self'",
+    JSON.stringify(scriptSrc),
+  );
+  check(
+    "connect-src phủ Convex (https + wss) và Discord OAuth",
+    [
+      "https://*.convex.cloud",
+      "https://*.convex.site",
+      "wss://*.convex.cloud",
+      "wss://*.convex.site",
+      "https://discord.com",
+    ].every((origin) => connectSrc.includes(origin)),
+    JSON.stringify(connectSrc),
+  );
+  check("img-src cho phép ảnh Discord CDN qua https:", imgSrc.includes("https:"));
+  check(
+    "object-src 'none' + base-uri 'self' (chặn plugin & base-tag injection)",
+    sec.CSP.includes("object-src 'none'") && sec.CSP.includes("base-uri 'self'"),
+  );
+  check(
+    "CSP meta BỎ frame-ancestors (meta không hỗ trợ directive này)",
+    !sec.CSP_META.includes("frame-ancestors") && sec.CSP.includes("frame-ancestors 'none'"),
+  );
+
+  // (b) Chèn meta vào index.html THẬT — đúng đường build production đi qua.
+  const indexHtml = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+  const injected = sec.injectSecurityMeta(indexHtml);
+  const again = sec.injectSecurityMeta(injected);
+  check("chèn meta CSP: idempotent (chạy 2 lần cho cùng kết quả)", injected === again);
+  check("chèn meta CSP: có thẻ meta trong <head>", injected.includes(sec.cspMetaTag()));
+  const headEnd = injected.toLowerCase().indexOf("</head>");
+  const firstScript = injected.search(/<script/i);
+  check(
+    "chèn meta CSP: nằm trong <head> và TRƯỚC mọi <script>",
+    injected.indexOf(sec.cspMetaTag()) < headEnd &&
+      (firstScript === -1 || injected.indexOf(sec.cspMetaTag()) < firstScript),
+  );
+  check(
+    "chèn meta CSP: html không có <head> → trả nguyên bản (không phá file)",
+    sec.injectSecurityMeta("<div>x</div>") === "<div>x</div>",
+  );
+
+  // (a-bis) build.mjs phải THẬT SỰ gọi hai bước trên, nếu không artifact vẫn
+  // không có header dù hàm đúng.
+  check(
+    "build.mjs gọi injectSecurityMeta + ghi dist/_headers",
+    /injectSecurityMeta\(html\)/.test(buildShim) &&
+      /writeFileSync\(path\.join\("dist", "_headers"\)/.test(buildShim),
+  );
+  const headersFile = sec.securityHeadersFile();
+  check(
+    "dist/_headers chứa đủ header bảo mật (CSP + nosniff + frame + referrer + HSTS)",
+    sec.SECURITY_HEADERS.every(([name]) => headersFile.includes(`${name}:`)) &&
+      /^\/\*\n/.test(headersFile),
+  );
+  check(
+    "_headers + vercel.json + nginx dùng CÙNG danh sách giá trị header",
+    sec.SECURITY_HEADERS.every(([name, value]) =>
+      name === "Content-Security-Policy"
+        ? true
+        : dockerText.includes(value) &&
+          (vercelJson.headers ?? []).some((g) =>
+            (g.headers ?? []).some((h) => h.key === name && h.value === value),
+          ),
+    ),
+  );
+}
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

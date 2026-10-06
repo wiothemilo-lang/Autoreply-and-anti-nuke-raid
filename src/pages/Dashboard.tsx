@@ -23,8 +23,6 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent } from "../components/ui/card";
 import {
-  SILENT_ATTEMPT_KEY,
-  SILENT_FAILED_KEY,
   SILENT_STATE_KEY,
   SILENT_VERIFIER_KEY,
   buildBotInviteUrl,
@@ -38,6 +36,13 @@ import {
   getSessionToken,
   randomState,
 } from "../lib/discord";
+import {
+  clearSilentFailed,
+  judgeSilentRefresh,
+  markSilentAttempt,
+  markSilentFailed,
+  readSilentLock,
+} from "../lib/silentRefresh";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import type { MeData } from "../lib/types";
 import { toast } from "sonner";
@@ -100,14 +105,16 @@ export default function Dashboard() {
    * code + PKCE verifier và tự cập nhật quyền server; browser không giữ access token.
    */
   async function startSilentRefresh(force: boolean) {
-    if (!clientId || !token) return;
-    // Đã thử và thất bại → thôi tự đẩy sang Discord. Chỉ nút "Tải lại" của
-    // người dùng mới mở lại; nếu không thì mỗi lần mở dashboard (sau 10 phút)
-    // lại bị nhảy sang Discord rồi quay về — người dùng thấy như lặp đăng nhập.
-    if (!force && sessionStorage.getItem(SILENT_FAILED_KEY) === "1") return;
-    const lastAttempt = Number(sessionStorage.getItem(SILENT_ATTEMPT_KEY) ?? 0);
-    if (!force && Date.now() - lastAttempt < 10 * 60_000) return;
-    sessionStorage.setItem(SILENT_ATTEMPT_KEY, String(Date.now()));
+    // Khoá chống lặp nằm ở localStorage (phạm vi TRÌNH DUYỆT, không phải từng
+    // tab) — xem src/lib/silentRefresh.ts. Dùng sessionStorage như trước thì
+    // mỗi tab mới lại bị đẩy sang Discord một lần: đúng cảm giác "lặp đăng nhập".
+    const now = Date.now();
+    const blocked = judgeSilentRefresh(readSilentLock(), now, {
+      force,
+      hasSession: Boolean(clientId && token),
+    });
+    if (blocked) return;
+    markSilentAttempt(now);
     const verifier = generateVerifier();
     const challenge = await generateChallenge(verifier);
     const silentState = randomState();
@@ -134,15 +141,17 @@ export default function Dashboard() {
     const silent = params.get("silent");
     if (silent) {
       if (silent === "ok") {
-        sessionStorage.removeItem(SILENT_FAILED_KEY);
+        clearSilentFailed();
         toast.success(translate("Đã làm mới danh sách server"));
       } else {
         // Khoá lượt tự động cho tới khi người dùng bấm "Tải lại" — xem
-        // SILENT_FAILED_KEY. Không làm thì cứ mở dashboard là lại bị đẩy sang
+        // markSilentFailed(). Không làm thì cứ mở dashboard là lại bị đẩy sang
         // Discord, thất bại, quay lại: cảm giác "lặp đăng nhập".
-        sessionStorage.setItem(SILENT_FAILED_KEY, "1");
+        markSilentFailed();
         toast.error(
-          translate("Không thể làm mới tự động — hãy thử nút Tải lại hoặc Đăng nhập lại."),
+          translate(
+            "Không làm mới được danh sách server (Discord từ chối làm mới im lặng). Bạn vẫn dùng bình thường — chỉ bấm “Tải lại” khi cần.",
+          ),
         );
       }
       window.history.replaceState({}, "", window.location.pathname);
@@ -163,14 +172,14 @@ export default function Dashboard() {
     clearSessionToken();
     clearLegacyDiscordAccess();
     // Đăng xuất rồi đăng nhập lại thì không được mang theo cờ "làm mới đã hỏng".
-    sessionStorage.removeItem(SILENT_FAILED_KEY);
+    clearSilentFailed();
     navigate("/");
   }
 
   async function handleRefresh() {
     setRefreshing(true);
-    // Người dùng chủ động thử lại → mở lại lượt tự động (xem SILENT_FAILED_KEY).
-    sessionStorage.removeItem(SILENT_FAILED_KEY);
+    // Người dùng chủ động thử lại → mở lại lượt tự động (xem markSilentFailed).
+    clearSilentFailed();
     try {
       await startSilentRefresh(true);
     } catch (error) {

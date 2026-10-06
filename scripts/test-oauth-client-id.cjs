@@ -171,38 +171,67 @@ check(
 );
 
 // ─── 7. Làm mới im lặng KHÔNG được lặp vô hạn (sự cố "lặp đăng nhập") ─────────
-// Dashboard tự nhảy sang Discord (prompt=none) mỗi lần mở trang, khoá lặp bằng
-// SILENT_ATTEMPT_KEY 10 phút. Nếu Discord từ chối prompt=none thì cứ mở dashboard
-// sau 10 phút lại bị đẩy sang Discord → thất bại → quay lại: người dùng thấy
-// đúng cảm giác "lặp đăng nhập". Ba lá chắn: khoá lượt tự động khi thất bại, chỉ
-// nút "Tải lại" mở lại, và không nhảy khi phiên đã hỏng (me === null).
+// Dashboard tự nhảy sang Discord (prompt=none) để làm mới danh sách server, khoá
+// lặp nằm ở `src/lib/silentRefresh.ts`. Nếu Discord từ chối prompt=none thì cứ mở
+// dashboard lại bị đẩy sang Discord → thất bại → quay lại: đúng cảm giác "lặp
+// đăng nhập". Ba lá chắn: khoá lượt tự động khi thất bại, chỉ nút "Tải lại" mở
+// lại, và không nhảy khi phiên đã hỏng (me === null).
+//
+// Sự cố 06/10/2026 (bản trước): khoá nằm ở SESSIONSTORAGE — riêng từng tab — nên
+// mỗi tab mới lại bị đẩy sang Discord một lần nữa. Bản này bắt buộc khoá nằm ở
+// localStorage (phạm vi trình duyệt) và Dashboard KHÔNG được tự đọc/ghi
+// sessionStorage cho hai khoá đó nữa.
 const dashboardTsx = fs.readFileSync(path.join(ROOT, "src/pages/Dashboard.tsx"), "utf8");
+const silentRefreshTs = fs.readFileSync(path.join(ROOT, "src/lib/silentRefresh.ts"), "utf8");
 
 check(
-  "cờ SILENT_FAILED_KEY được khai báo",
-  /export const SILENT_FAILED_KEY\s*=\s*"wio_silent_failed"/.test(discordTs),
+  "cờ SILENT_FAILED_KEY khai báo trong silentRefresh.ts",
+  /export const SILENT_FAILED_KEY\s*=\s*"wio_silent_failed"/.test(silentRefreshTs),
 );
 check(
-  "lượt TỰ ĐỘNG bị khoá khi đã thất bại (guard trong startSilentRefresh)",
-  /if \(!force && sessionStorage\.getItem\(SILENT_FAILED_KEY\) === "1"\) return;/.test(
+  "mốc SILENT_ATTEMPT_KEY khai báo trong silentRefresh.ts",
+  /export const SILENT_ATTEMPT_KEY\s*=\s*"wio_silent_last_attempt"/.test(silentRefreshTs),
+);
+check(
+  "khoá lưu ở localStorage (phạm vi TRÌNH DUYỆT, không phải từng tab)",
+  /localStorage\.setItem\(key, value\)/.test(silentRefreshTs) &&
+    /localStorage\.removeItem\(key\)/.test(silentRefreshTs) &&
+    /localStorage\.getItem\(key\)/.test(silentRefreshTs),
+);
+// Ba hàm chạm storage (readRaw/writeRaw/removeRaw) đều phải có nhánh catch: chế
+// độ riêng tư / cookie bị chặn làm localStorage NÉM lỗi, không bắt là trắng trang.
+// (Hành vi thật — gọi hàm khi KHÔNG có localStorage — được chứng minh ở
+// scripts/test-web-ux-upgrades.ts, mục "#16 khoá chống lặp làm mới im lặng".)
+check(
+  "3 hàm storage đều bọc try/catch (chế độ riêng tư ném lỗi → trắng trang)",
+  (silentRefreshTs.match(/function (readRaw|writeRaw|removeRaw)/g) || []).length === 3 &&
+    (silentRefreshTs.match(/\} catch \{/g) || []).length >= 6,
+);
+check(
+  "startSilentRefresh quyết định qua judgeSilentRefresh (hasSession = có token + clientId)",
+  /judgeSilentRefresh\(readSilentLock\(\), now, \{[\s\S]{0,200}?hasSession: Boolean\(clientId && token\)/.test(
     dashboardTsx,
   ),
 );
 check(
-  "nhánh lỗi (else sau silent=ok) đặt cờ thất bại",
-  /if \(silent === "ok"\)[\s\S]{0,400}?\}\s*else\s*\{[\s\S]{0,400}sessionStorage\.setItem\(SILENT_FAILED_KEY, "1"\)/.test(
+  "Dashboard KHÔNG còn tự đọc/ghi 2 khoá đó bằng sessionStorage",
+  !/sessionStorage\.(getItem|setItem|removeItem)\(\s*SILENT_(FAILED|ATTEMPT)_KEY/.test(
+    dashboardTsx,
+  ),
+);
+check(
+  "nhánh lỗi (else sau silent=ok) khoá lượt tự động qua markSilentFailed()",
+  /if \(silent === "ok"\)[\s\S]{0,400}?\}\s*else\s*\{[\s\S]{0,400}markSilentFailed\(\)/.test(
     dashboardTsx,
   ),
 );
 check(
   "nhánh silent=ok XOÁ cờ thất bại",
-  /silent === "ok"[\s\S]{0,200}sessionStorage\.removeItem\(SILENT_FAILED_KEY\)/.test(dashboardTsx),
+  /silent === "ok"[\s\S]{0,200}clearSilentFailed\(\)/.test(dashboardTsx),
 );
 check(
   "nút Tải lại (force) mở lại lượt tự động",
-  /async function handleRefresh\(\)[\s\S]{0,300}sessionStorage\.removeItem\(SILENT_FAILED_KEY\)/.test(
-    dashboardTsx,
-  ),
+  /async function handleRefresh\(\)[\s\S]{0,300}clearSilentFailed\(\)/.test(dashboardTsx),
 );
 check(
   "KHÔNG nhảy sang Discord khi phiên đã hỏng (me null)",
@@ -212,9 +241,11 @@ check(
 );
 check(
   "đăng xuất xoá cờ thất bại (đăng nhập lại không mang theo lỗi cũ)",
-  /async function handleLogout\(\)[\s\S]{0,400}sessionStorage\.removeItem\(SILENT_FAILED_KEY\)/.test(
-    dashboardTsx,
-  ),
+  /async function handleLogout\(\)[\s\S]{0,400}clearSilentFailed\(\)/.test(dashboardTsx),
+);
+check(
+  "discord.ts KHÔNG còn giữ 2 khoá chống lặp (một nguồn duy nhất)",
+  !/export const SILENT_(FAILED|ATTEMPT)_KEY/.test(discordTs),
 );
 
 console.log(`\nKết quả OAuth client-id guard: ${pass} PASS, ${fail} FAIL`);

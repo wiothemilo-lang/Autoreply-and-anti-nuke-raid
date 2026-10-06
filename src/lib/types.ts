@@ -213,6 +213,8 @@ export interface GuildData {
     restoreMetaEnabled?: boolean;
     /** Khôi phục danh sách ban + link mời khi restore (mặc định TẮT — không hoàn tác được). */
     restoreExtrasEnabled?: boolean;
+    /** Xoá kênh đang có của server đích trước khi khôi phục kênh (mặc định TẮT — không hoàn tác được). */
+    restoreClearChannelsEnabled?: boolean;
     /** Khôi phục kênh khi restore backup. */
     restoreChannelsEnabled?: boolean;
     /** Khôi phục tin nhắn khi restore backup. */

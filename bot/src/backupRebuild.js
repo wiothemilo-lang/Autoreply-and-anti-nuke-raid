@@ -85,6 +85,59 @@ async function createRoles(guild, backup, onProgress) {
   return map;
 }
 
+/**
+ * XOÁ các kênh ĐANG CÓ của server đích trước khi dựng lại kênh theo backup.
+ *
+ * Vì sao cần: khôi phục vào server đã có sẵn kênh rác (server phụ, server dựng
+ * lại sau nuke còn sót kênh mặc định) thì bản khôi phục KHÔNG trùng với server
+ * gốc — mọi kênh trùng tên bị Discord đổi thành `ten-2`, rác cũ nằm lẫn giữa
+ * cấu trúc mới. Chủ server muốn "dựng lại y như bản gốc" phải xoá tay trước.
+ *
+ * Vì sao TẮT mặc định (cờ `restoreClearChannelsEnabled`): đây là hành động
+ * KHÔNG HOÀN TÁC được — xoá kênh là xoá luôn tin nhắn trong đó, và server phụ
+ * thường có kênh mặc định chủ server muốn giữ.
+ *
+ * Ba lớp an toàn:
+ *  1. Bot PHẢI có quyền ManageChannels — không có quyền TẠO kênh thì tuyệt đối
+ *     không được xoá (xoá xong là server trắng trơn, không dựng lại được).
+ *  2. Chỉ xoá kênh mà discord.js coi là `deletable` — đã tính sẵn quyền của bot
+ *     VÀ vị trí role (kênh nằm trên role bot thì không xoá được), đồng thời tự
+ *     loại kênh quy tắc/ thông báo cập nhật của server.
+ *  3. Best-effort từng kênh: lỗi một kênh chỉ bỏ qua kênh đó và ĐẾM LẠI, không
+ *     ném ra làm hỏng cả lượt khôi phục (kênh không xoá được vẫn nằm nguyên).
+ *
+ * Thread không xoá riêng: xoá kênh cha là chúng đi theo, và xoá từng thread
+ * chỉ tốn rate limit vô ích.
+ */
+async function clearExistingChannels(guild, onProgress) {
+  const me = guild.members?.me ?? null;
+  if (!me || !me.permissions?.has?.("ManageChannels")) {
+    return { deleted: 0, kept: guild.channels?.cache?.size ?? 0, skippedReason: "no_permission" };
+  }
+  const all = [...(guild.channels?.cache?.values?.() ?? [])].filter((c) => !c.isThread?.());
+  // Xoá kênh CHA trước kênh danh mục: kênh con của danh mục bị xoá sẽ mất
+  // parentId tạm thời, nếu chưa xoá thì chúng nhảy ra ngoài danh mục một lúc.
+  const doomed = all
+    .filter((c) => c.deletable !== false)
+    .sort(
+      (a, b) =>
+        (a.type === ChannelType.GuildCategory ? 1 : 0) -
+        (b.type === ChannelType.GuildCategory ? 1 : 0),
+    );
+  let deleted = 0;
+  let processed = 0;
+  for (const c of doomed) {
+    if (onProgress && processed++ % 5 === 0) await onProgress();
+    try {
+      await c.delete("Protogon: xoá kênh sẵn có trước khi khôi phục backup");
+      deleted++;
+    } catch (e) {
+      console.error(`[backup:clear-channels] ${c.name}:`, e.message);
+    }
+  }
+  return { deleted, kept: all.length - deleted, skippedReason: null };
+}
+
 /** Tạo lại kênh từ backup theo đúng thứ tự + vị trí; trả về Map oldId -> newId. */
 async function createChannels(guild, backup, roleMap, onProgress) {
   const map = new Map();
@@ -676,6 +729,7 @@ module.exports = {
   sortedRoles,
   sortedChannels,
   createRoles,
+  clearExistingChannels,
   createChannels,
   sanitizeEmojiName,
   recreateEmojis,

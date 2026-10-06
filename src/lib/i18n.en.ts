@@ -406,6 +406,14 @@ export const EN: Record<string, string> = {
   "Khôi phục tên / mô tả / icon server": "Restore server name / description / icon",
   "Khôi phục danh sách ban + link mời": "Restore ban list + invite links",
   "không hoàn tác được": "cannot be undone",
+  /* ==== Xoá kênh sẵn có khi khôi phục (06/10/2026) ==== khôi phục vào server
+     đã có rác cần dọn; mặc định TẮT vì không hoàn tác được. */
+  "Xoá kênh sẵn có của server trước khi dựng lại":
+    "Delete the server's existing channels before rebuilding",
+  "NGOẠI LỆ: “xoá kênh sẵn có” đang BẬT nên các KÊNH đang có của server này sẽ bị XOÁ trước khi dựng lại — không hoàn tác được (tin nhắn trong kênh mất theo). Role thì vẫn giữ nguyên.":
+    "EXCEPTION: “delete existing channels” is ON, so the existing CHANNELS of this server will be DELETED before rebuilding — this cannot be undone (messages in those channels are lost). Roles are still kept.",
+  "Chỉ bật khi khôi phục vào server đã có sẵn kênh rác cần dọn: bot sẽ XOÁ các kênh xoá được của server này TRƯỚC khi dựng lại kênh theo backup (tin nhắn trong kênh mất theo). Kênh bot không xoá được — kênh nằm trên role của bot, kênh quy tắc/thông báo cập nhật — vẫn được giữ nguyên.":
+    "Only enable this when restoring into a server that already has junk channels to clean up: the bot will DELETE the deletable channels of this server BEFORE rebuilding the channels from the backup (messages in them are lost). Channels the bot cannot delete — channels above the bot's role, or the rules/updates channels — are kept.",
   /* ==== Quy tắc giữ bản (29/09/2026) ==== thay cho slice(3) hard-code. */
   Giữ: "Keep",
   "bản gần nhất": "most recent backups",
@@ -616,8 +624,12 @@ export const EN: Record<string, string> = {
   "Không lưu đăng nhập": "Don't remember sign-in",
   "Không phát hiện lỗi nào — bot hoạt động bình thường ✅":
     "No errors found — the bot is running normally ✅",
-  "Không thể làm mới tự động — hãy thử nút Tải lại hoặc Đăng nhập lại.":
-    "Couldn't refresh automatically — try Reload or sign in again.",
+  // Sự cố "lặp đăng nhập" 06/10/2026: câu cũ ("hãy thử nút Tải lại hoặc Đăng nhập
+  // lại") khiến người dùng tưởng phiên đã hỏng phải đăng nhập lại — trong khi
+  // danh sách server hiện tại vẫn dùng bình thường, chỉ là lượt làm mới im lặng
+  // bị Discord từ chối. Nói rõ "không sao" thay vì đòi đăng nhập.
+  "Không làm mới được danh sách server (Discord từ chối làm mới im lặng). Bạn vẫn dùng bình thường — chỉ bấm “Tải lại” khi cần.":
+    "Couldn't refresh the server list (Discord declined the silent refresh). Everything still works — just hit “Reload” when you need it.",
   "Không thể truy cập server này": "Cannot access this server",
   "Không thể truy cập server này — bạn không có quyền quản lý.":
     "Cannot access this server — you lack manage permissions.",

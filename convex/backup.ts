@@ -640,6 +640,12 @@ export const setRestoreOptions = mutation({
     restoreEmojis: v.optional(v.boolean()),
     restoreMeta: v.optional(v.boolean()),
     restoreExtras: v.optional(v.boolean()),
+    /**
+     * XOÁ các kênh đang có của server đích trước khi dựng lại kênh theo backup.
+     * Tuỳ chọn PHÁ HUỶ (không hoàn tác được) nên mặc định TẮT — chỉ chạy khi
+     * người dùng chủ động bật.
+     */
+    restoreClearChannels: v.optional(v.boolean()),
   },
   handler: async (
     ctx,
@@ -652,6 +658,7 @@ export const setRestoreOptions = mutation({
       restoreEmojis,
       restoreMeta,
       restoreExtras,
+      restoreClearChannels,
     },
   ) => {
     const user = await getUserByToken(ctx, token);
@@ -672,6 +679,8 @@ export const setRestoreOptions = mutation({
     if (typeof restoreEmojis === "boolean") patch.restoreEmojisEnabled = restoreEmojis;
     if (typeof restoreMeta === "boolean") patch.restoreMetaEnabled = restoreMeta;
     if (typeof restoreExtras === "boolean") patch.restoreExtrasEnabled = restoreExtras;
+    if (typeof restoreClearChannels === "boolean")
+      patch.restoreClearChannelsEnabled = restoreClearChannels;
     await ctx.db.patch(guild._id, patch);
     return {
       ok: true,
@@ -681,6 +690,7 @@ export const setRestoreOptions = mutation({
       restoreEmojis: guild.restoreEmojisEnabled ?? true,
       restoreMeta: guild.restoreMetaEnabled ?? true,
       restoreExtras: guild.restoreExtrasEnabled ?? false,
+      restoreClearChannels: guild.restoreClearChannelsEnabled ?? false,
     };
   },
 });

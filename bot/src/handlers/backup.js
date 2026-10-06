@@ -59,6 +59,7 @@ const {
   applyInvites,
   replayIntoChannel,
   sanitizeEmojiName,
+  clearExistingChannels,
 } = require("../backupRebuild");
 const {
   resolveAttachment,
@@ -86,6 +87,10 @@ module.exports.sortedChannels = sortedChannels;
 // NukeRollback (S3) tái dùng 2 engine tạo lại role/kênh — không nhân bản logic.
 module.exports.createRoles = createRoles;
 module.exports.createChannels = createChannels;
+// Tuỳ chọn PHÁ HUỶ "xoá kênh sẵn có" — export để test khẳng định được đúng 3
+// lớp an toàn (thiếu quyền thì không xoá, chỉ xoá kênh `deletable`, xoá TRƯỚC
+// khi tạo kênh mới) thay vì chỉ kiểm qua bản phục hồi trọn gói.
+module.exports.clearExistingChannels = clearExistingChannels;
 module.exports.countMessages = countMessages;
 // Nhánh mở rộng phạm vi chụp (ban list, link mời, thread, danh tính server) —
 // export để test khẳng định được từng phần thay vì chỉ kiểm qua bản backup.

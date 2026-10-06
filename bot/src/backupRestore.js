@@ -27,6 +27,7 @@ const {
   applyMemberRoles,
   applyGuildMeta,
   applyInvites,
+  clearExistingChannels,
   createChannels,
   createRoles,
   createThreads,
@@ -82,6 +83,10 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
   // dùng nhận ra đầu tiên sau khi mở lại server bị nuke.
   const restoreMeta = cfg?.restoreMetaEnabled !== false;
   const restoreExtras = cfg?.restoreExtrasEnabled === true;
+  // Cờ mới: XOÁ kênh đang có của server đích trước khi dựng lại kênh theo
+  // backup. Mặc định TẮT (không hoàn tác được) — kế hoạch phải nói TRƯỚC số
+  // kênh sẽ mất, nếu không chủ server bấm "khôi phục" rồi mới biết.
+  const restoreClearChannels = cfg?.restoreClearChannelsEnabled === true;
 
   const roles = sortedRoles(backup).filter((r) => r.name);
   const channels = sortedChannels(backup).filter((c) => c.name);
@@ -155,6 +160,25 @@ async function planRestoreCore(client, store, guildId, backup, { backupName } = 
   if (memberCount > 0 && !can("ManageRoles")) {
     warnings.push(
       `Bot thiếu quyền Manage Roles — ${memberRoleAssignments} vai trò của ${memberCount} thành viên sẽ KHÔNG gán lại được.`,
+    );
+  }
+  if (restoreClearChannels && restoreChannels) {
+    const existingChannels = [...(guild.channels?.cache?.values?.() ?? [])].filter(
+      (c) => !c.isThread?.(),
+    );
+    const deletable = existingChannels.filter((c) => c.deletable !== false).length;
+    warnings.push(
+      `Đã bật “xoá kênh sẵn có”: ${deletable}/${existingChannels.length} kênh đang có của server này sẽ bị XOÁ trước khi dựng lại — hành động này KHÔNG hoàn tác được (tin nhắn trong kênh mất theo).`,
+    );
+    if (deletable < existingChannels.length) {
+      warnings.push(
+        `${existingChannels.length - deletable} kênh bot KHÔNG xoá được (thiếu quyền, kênh nằm trên role của bot, hoặc là kênh quy tắc/thông báo) — chúng sẽ được giữ nguyên.`,
+      );
+    }
+  }
+  if (restoreClearChannels && !restoreChannels) {
+    warnings.push(
+      "Bạn bật “xoá kênh sẵn có” nhưng lại TẮT “khôi phục kênh” — bot sẽ không xoá gì (xoá mà không dựng lại thì server trắng kênh).",
     );
   }
   if (backup.memberRolesUnavailable === true) {
@@ -349,6 +373,9 @@ async function restoreCore(
   // chủ server bật mới chạy).
   const restoreMeta = cfg?.restoreMetaEnabled !== false;
   const restoreExtras = cfg?.restoreExtrasEnabled === true;
+  // Xoá kênh sẵn có trước khi dựng lại (mặc định TẮT). Chỉ chạy khi CÓ khôi
+  // phục kênh — xoá mà không dựng lại là tự biến server thành trắng kênh.
+  const restoreClearChannels = cfg?.restoreClearChannelsEnabled === true && restoreChannels;
   const claimKind = source === "import" ? "import" : "restore";
   const ensureClaim = async () => {
     if (claimAt === undefined) return;
@@ -373,6 +400,13 @@ async function restoreCore(
     );
   }
   const roleMap = restoreRoles ? await createRoles(guild, backup, ensureClaim) : new Map();
+  await ensureClaim();
+  // Xoá kênh cũ TRƯỚC khi tạo kênh mới: tạo trước rồi xoá sẽ đẩy mọi kênh vừa
+  // dựng vào đúng tên cũ (Discord tự thêm hậu tố khi trùng), xoá sau thì phải
+  // suy lại id và có nguy cơ xoá nhầm kênh vừa tạo.
+  const clearedChannels = restoreClearChannels
+    ? await clearExistingChannels(guild, ensureClaim)
+    : null;
   await ensureClaim();
   const channelMap = restoreChannels
     ? await createChannels(guild, backup, roleMap, ensureClaim)
@@ -487,6 +521,20 @@ async function restoreCore(
     fields.push({ name: "Kênh đã tạo", value: `${channelMap.size}`, inline: true });
   } else {
     fields.push({ name: "Kênh", value: "⏭️ bỏ qua (đã tắt)", inline: true });
+  }
+  // Báo cáo phải nói rõ ĐÃ XOÁ BAO NHIÊU và CÒN SÓT BAO NHIÊU — người dùng bật
+  // tuỳ chọn phá huỷ nên cần biết kết quả thật, không phải "đã xoá kênh" chung chung.
+  if (clearedChannels) {
+    const keptNote =
+      clearedChannels.kept > 0 ? `, giữ lại ${clearedChannels.kept} (không xoá được)` : "";
+    fields.push({
+      name: "Kênh sẵn có đã xoá",
+      value:
+        clearedChannels.skippedReason === "no_permission"
+          ? "⏭️ bỏ qua — bot thiếu quyền Manage Channels"
+          : `${clearedChannels.deleted}${keptNote}`,
+      inline: true,
+    });
   }
   if (restoreEmojis) {
     if (emojisCreated > 0) {
