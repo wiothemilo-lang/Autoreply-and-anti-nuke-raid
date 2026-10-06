@@ -1382,7 +1382,15 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
   {
     const { ctx, restoreKey } = makeLostServerCtx([NEW]);
     const res = await lookupBackupHandler(ctx as any, { token: "tok1", restoreKey });
-    check("mã đúng → trả metadata bản backup", res?.backupId === "b1" && res?.roleCount === 5);
+    // `_id` (KHÔNG phải tên `backupId`): panel gửi thẳng kết quả tra cứu vào
+    // `requestRestore`/`requestRestorePlan` — cả hai đọc `backup._id`. Lệch tên
+    // là gửi `undefined` và Convex từ chối ngay ở validator: TOÀN BỘ đường cứu
+    // hộ (mất quyền server gốc) hỏng dù mã đúng.
+    check(
+      "mã đúng → trả metadata + `_id` để gọi được requestRestore/Plan",
+      res?._id === "b1" && res?.roleCount === 5,
+      JSON.stringify(res),
+    );
     // Rò rỉ id server gốc là điều KHÔNG được xảy ra: biết mã không được suy ra
     // ra server nào đang dùng Protogon.
     check("KHÔNG trả guildId của server gốc", res !== null && !("guildId" in res));
@@ -1632,6 +1640,60 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
       "bản đã bị xoá → job unreadable + nói rõ",
       job2?.unreadable === true && /không còn tồn tại/.test(job2?.unreadableReason ?? ""),
       job2?.unreadableReason,
+    );
+
+    // Dry-run (`kind: "plan"`) phải đi CÙNG luật. Trước đây nhánh plan ở đây BỎ
+    // QUA im lặng khi payload không gộp được ⇒ cờ `restorePlanRequested` mắc
+    // true mãi mãi, nút "Xem kế hoạch" quay vòng vô hạn. Đây là đường DỰ PHÒNG
+    // của tick (khi batch `bot_tick:getPendingJobs` lỗi) nên phải khớp bot_tick.
+    const planBroken = makeCtx({ seed: BOT_KEY });
+    planBroken.guildRows.push({
+      _id: "g1",
+      discordId: "g1",
+      botInGuild: true,
+      restorePlanRequested: true,
+      restorePlanBackupId: "b1",
+    });
+    planBroken.backupRows.push({
+      _id: "b1",
+      guildId: "g1",
+      guildName: "G1",
+      backupJson: "chunked:3",
+      backupChunkCount: 3,
+      roleCount: 1,
+      channelCount: 1,
+      pushedToGithub: false,
+      createdAt: 10,
+    });
+    const planJob = (await botGetPendingHandler(planBroken.ctx as any, { botKey: BOT_KEY })).find(
+      (p: any) => p.kind === "plan",
+    );
+    check("plan hỏng/thiếu chunk → VẪN gửi job (không bỏ qua im lặng)", !!planJob);
+    check(
+      "plan hỏng/thiếu chunk → job unreadable + lý do để bot báo lỗi và dọn cờ",
+      planJob?.unreadable === true &&
+        typeof planJob.unreadableReason === "string" &&
+        planJob.unreadableReason.length > 10,
+      planJob?.unreadableReason,
+    );
+    check("plan hỏng → KHÔNG mang payload rỗng", planJob?.backupJson === undefined);
+
+    const planGone = makeCtx({ seed: BOT_KEY });
+    planGone.guildRows.push({
+      _id: "g1",
+      discordId: "g1",
+      botInGuild: true,
+      restorePlanRequested: true,
+      restorePlanBackupId: "bX",
+    });
+    const planGoneJob = (await botGetPendingHandler(planGone.ctx as any, { botKey: BOT_KEY })).find(
+      (p: any) => p.kind === "plan",
+    );
+    check(
+      "plan: bản đã bị xoá → job unreadable + nói rõ",
+      planGoneJob?.unreadable === true &&
+        /không còn tồn tại/.test(planGoneJob?.unreadableReason ?? ""),
+      planGoneJob?.unreadableReason,
     );
 
     // Backup ĐỌC ĐƯỢC thì vẫn phải là job bình thường (không unreadable).

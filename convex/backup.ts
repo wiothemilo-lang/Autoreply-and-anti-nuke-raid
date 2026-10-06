@@ -266,6 +266,13 @@ export const myRestoreKeys = query({
  *  - nội dung backup chỉ bot có botKey mới đọc được (`botAuditBackups`), người
  *    dùng chỉ thấy số liệu đếm.
  *
+ * PHẢI trả `_id` (id NỘI BỘ của chính bản backup, KHÔNG phải id server gốc):
+ * `requestRestore`/`requestRestorePlan` bắt buộc nhận `backupId` để biết khôi
+ * phục bản nào. Trước đây hàm này trả tên `backupId` còn panel gửi lại
+ * `backup._id` ⇒ gửi `undefined` ⇒ Convex từ chối ngay ở validator, tức TOÀN BỘ
+ * đường cứu hộ (mất quyền server gốc) hỏng dù mã đúng. Biết `_id` không mở thêm
+ * quyền gì: hai mutation kia vẫn kiểm tra quyền server ĐÍCH + mã/nguồn gốc.
+ *
  * Chỉ cần đăng nhập + quản lý ít nhất một server; mã 130 bit là chìa khoá.
  */
 export const lookupBackup = query({
@@ -277,7 +284,10 @@ export const lookupBackup = query({
     const backup = await findBackupByRestoreKey(ctx, restoreKey);
     if (!backup) return null;
     return {
-      backupId: backup._id,
+      // `_id` (không phải `backupId`): panel dùng chung 2 hàm restore/askPlan với
+      // danh sách backup thường — cả hai đọc `backup._id`. Lệch tên ⇒ gửi
+      // undefined và Convex từ chối (xem chú thích đầu hàm).
+      _id: backup._id,
       guildName: backup.guildName,
       createdAt: backup.createdAt,
       roleCount: backup.roleCount,
@@ -881,27 +891,31 @@ export const botGetPending = query({
       }
       // Dry-run: gửi kèm createdAt để dashboard đúng lúc bản backup này mới
       // được chọn (tránh hiện kế hoạch cũ của bản khác khi danh sách đổi).
+      //
+      // Hỏng/thiếu chunk (hoặc bản đã bị xoá): KHÔNG bỏ qua im lặng — bỏ qua làm
+      // cờ `restorePlanRequested` mắc true mãi mãi ⇒ nút "Xem kế hoạch" quay
+      // vòng vô hạn và mỗi lượt quét lại đọc/gộp payload. Gửi job kèm cờ
+      // `unreadable` + lý do để bot dọn cờ và báo lỗi thật lên dashboard (đúng
+      // như nhánh restore ở trên và `bot_tick:getPendingJobs` — ba nơi phải
+      // cùng luật, nếu không đường dự phòng vẫn treo).
       if (g.restorePlanRequested && g.restorePlanBackupId) {
         const b = await ctx.db.get(g.restorePlanBackupId);
-        if (b) {
-          const json = await reassembleBackupJsonForRead(
-            ctx,
-            b._id,
-            b.backupJson,
-            b.backupChunkCount,
-          );
-          if (json !== null) {
-            out.push({
-              kind: "plan",
-              guildId: g.discordId,
-              backupId: b._id,
-              backupJson: json,
-              backupChecksum: b.backupChecksum ?? undefined,
-              guildName: b.guildName,
-              backupCreatedAt: b.createdAt,
-            });
-          }
-        }
+        const json = b
+          ? await reassembleBackupJsonForRead(ctx, b._id, b.backupJson, b.backupChunkCount)
+          : null;
+        out.push({
+          kind: "plan",
+          guildId: g.discordId,
+          backupId: b?._id ?? g.restorePlanBackupId,
+          backupJson: json ?? undefined,
+          backupChecksum: b?.backupChecksum ?? undefined,
+          guildName: b?.guildName ?? "backup",
+          backupCreatedAt: b?.createdAt,
+          unreadable: json === null,
+          unreadableReason: b
+            ? "Bản backup không đọc được (thiếu hoặc hỏng chunk dữ liệu) — không thể tính kế hoạch khôi phục."
+            : "Bản backup không còn tồn tại (đã bị xoá theo quy tắc giữ bản) — hãy chọn bản backup khác.",
+        });
       }
       if (g.importRestoreRequested && g.importStorageId) {
         const importFileUrl = await ctx.storage.getUrl(g.importStorageId).catch(() => null);

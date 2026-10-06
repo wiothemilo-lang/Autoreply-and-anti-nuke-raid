@@ -31,6 +31,7 @@ import { Switch } from "../ui/switch";
 import type { GuildData, BackupInfo } from "../../lib/types";
 import { MIN_IMPORT_BOT_VERSION } from "../../lib/constants";
 import { getSessionToken } from "../../lib/discord";
+import { judgeJobWatch, type JobWatch } from "../../lib/backupWatch";
 
 import { dateLocale, translate } from "../../lib/i18n";
 const TOKEN = () => getSessionToken();
@@ -41,6 +42,19 @@ function parseBotVersion(v: string | null): number {
   const m = String(v).match(/^v?(\d+)/i);
   return m ? parseInt(m[1], 10) : 0;
 }
+
+/**
+ * Hình dạng TỐI THIỂU mà 2 handler `restore`/`askPlan` cần để gọi Convex:
+ * `_id` của bản backup + tên server (hiện trong câu xác nhận).
+ *
+ * Vì sao không dùng thẳng `BackupInfo`: đường cứu hộ (`backup:lookupBackup`)
+ * CỐ Ý không trả `guildId` của server gốc (không phát tán server nào đang dùng
+ * bot) nên kết quả tra cứu KHÔNG phải một `BackupInfo` đầy đủ. Trước đây chỗ đó
+ * `as BackupInfo` — ép kiểu nói dối đã che mất lỗi thật: Convex trả tên field
+ * `backupId` còn handler đọc `backup._id` ⇒ gửi `undefined` ⇒ nút khôi phục
+ * bằng mã khôi phục luôn hỏng. Kiểu này khiến tsc bắt được lệch tên field.
+ */
+type RescuableBackup = { _id: Id<"guildBackups">; guildName: string };
 
 /**
  * Chia các phần khôi phục thành "sẽ làm" / "bỏ qua". MỖI MỤC được dịch trọn
@@ -97,7 +111,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
   const [restoreMessages, setRestoreMessages] = useState(data.guild.restoreMessagesEnabled ?? true);
   const [restoreOptBusy, setRestoreOptBusy] = useState(false);
   /** Theo dõi trạng thái xử lý file import: null = không chờ, active = đang chờ bot. */
-  const [importWatch, setImportWatch] = useState<null | { startedAt: number }>(null);
+  const [importWatch, setImportWatch] = useState<JobWatch | null>(null);
   const requestBackup = useMutation(api.backup.requestBackup);
   const requestRestore = useMutation(api.backup.requestRestore);
   const generateUploadUrl = useMutation(api.backup.generateImportUploadUrl);
@@ -135,7 +149,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     | undefined;
   // Theo dõi yêu cầu khôi phục (nút "Khôi phục vào server này") — bot xử lý xong
   // hoặc lỗi sẽ hiển thị ngay thay vì người dùng chờ không biết kết quả.
-  const [restoreWatch, setRestoreWatch] = useState<null | { startedAt: number }>(null);
+  const [restoreWatch, setRestoreWatch] = useState<JobWatch | null>(null);
   /** Dry-run: bản backup đang xem kế hoạch (để chờ đúng kết quả của lượt bấm). */
   const [planBusy, setPlanBusy] = useState<string | null>(null);
   const requestRestorePlan = useMutation(api.backup.requestRestorePlan);
@@ -167,7 +181,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
   // Bấm "Xem kế hoạch" — bot chỉ ĐỌC backup rồi báo sẽ tạo gì, không tạo gì cả.
   // `restoreKey` chỉ có khi bản backup được tra cứu bằng MÃ KHÔI PHỤC (người
   // dùng không còn quyền server gốc) — cần gửi kèm để Convex cho phép.
-  const askPlan = async (b: BackupInfo, restoreKey?: string) => {
+  const askPlan = async (b: RescuableBackup, restoreKey?: string) => {
     setPlanBusy(b._id);
     try {
       await requestRestorePlan({
@@ -192,38 +206,59 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     }
   };
   // Theo dõi yêu cầu backup (nút "Backup ngay") — bot báo lỗi sẽ toast ngay.
-  const [backupWatch, setBackupWatch] = useState<null | { startedAt: number }>(null);
+  const [backupWatch, setBackupWatch] = useState<JobWatch | null>(null);
 
   const refresh = () => setRefreshAt((n) => n + 1);
 
   // Bot báo lỗi xử lý file import → hiện ngay lý do; xử lý xong → báo kết quả.
+  //
+  // KHÔNG đọc thẳng `importStatus`: sau khi bấm, nó còn là bản CŨ của lượt trước
+  // trong một nhịp ⇒ `requested === false` cũ đọc thành "đã xong" ngay khi vừa
+  // bấm, và lượt theo dõi bị khoá nên lỗi thật không bao giờ hiện. Xem
+  // src/lib/backupWatch.ts (judgeJobWatch) — luật + test khoá biên thời gian.
   useEffect(() => {
     if (!importWatch || importStatus === undefined || importStatus === null) return;
-    if (importStatus.error) {
-      toast.error(translate("Khôi phục từ file thất bại: {p0}", { p0: importStatus.error }), {
-        description: translate("Hãy kiểm tra lại file backup hoặc tải lại file khác."),
-      });
-      setImportWatch(null);
-    } else if (!importStatus.requested) {
-      // Bot bản mới (v47+) xác nhận kết quả chính xác; bản cũ xóa cờ im lặng → chỉ nhắc kiểm tra.
-      const fresh = parseBotVersion(importStatus.botVersion) >= MIN_IMPORT_BOT_VERSION;
-      if (fresh) {
-        toast.success(translate("Bot đã khôi phục xong backup từ file"), {
-          description: translate(
-            "Role, kênh, tin nhắn + media và emoji/sticker đã được tạo lại trên server.",
-          ),
-        });
-      } else {
-        toast.info(translate("Yêu cầu đã được xử lý xong"), {
-          description: translate(
-            "Bot đang chạy bản cũ ({p0}) nên không xác nhận được kết quả — hãy kiểm tra server trực tiếp và cập nhật bot lên bản mới nhất (v{p1}+) để nhận báo cáo chính xác.",
-            { p0: importStatus.botVersion || translate("không rõ"), p1: MIN_IMPORT_BOT_VERSION },
-          ),
-        });
-      }
-      setImportWatch(null);
-      window.setTimeout(refresh, 2500);
+    const verdict = judgeJobWatch(
+      importWatch,
+      {
+        requested: importStatus.requested,
+        error: importStatus.error,
+        errorAt: importStatus.errorAt,
+      },
+      { hasFinishMarker: false },
+    );
+    if (verdict.outcome === "waiting") {
+      if (verdict.watch !== importWatch) setImportWatch(verdict.watch);
+      return;
     }
+    if (verdict.outcome === "error") {
+      toast.error(
+        translate("Khôi phục từ file thất bại: {p0}", {
+          p0: importStatus.error ?? translate("Lỗi không xác định"),
+        }),
+        { description: translate("Hãy kiểm tra lại file backup hoặc tải lại file khác.") },
+      );
+      setImportWatch(null);
+      return;
+    }
+    // Bot bản mới (v47+) xác nhận kết quả chính xác; bản cũ xóa cờ im lặng → chỉ nhắc kiểm tra.
+    const fresh = parseBotVersion(importStatus.botVersion) >= MIN_IMPORT_BOT_VERSION;
+    if (fresh) {
+      toast.success(translate("Bot đã khôi phục xong backup từ file"), {
+        description: translate(
+          "Role, kênh, tin nhắn + media và emoji/sticker đã được tạo lại trên server.",
+        ),
+      });
+    } else {
+      toast.info(translate("Yêu cầu đã được xử lý xong"), {
+        description: translate(
+          "Bot đang chạy bản cũ ({p0}) nên không xác nhận được kết quả — hãy kiểm tra server trực tiếp và cập nhật bot lên bản mới nhất (v{p1}+) để nhận báo cáo chính xác.",
+          { p0: importStatus.botVersion || translate("không rõ"), p1: MIN_IMPORT_BOT_VERSION },
+        ),
+      });
+    }
+    setImportWatch(null);
+    window.setTimeout(refresh, 2500);
   }, [importWatch, importStatus]);
 
   // Chờ quá 3 phút mà bot chưa xử lý → nhắc kiểm tra bot (không treo vô thời hạn).
@@ -231,6 +266,12 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     if (!importWatch) return;
     const timer = window.setTimeout(() => {
       if (Date.now() - importWatch.startedAt > 180_000) {
+        // Việc đã xong trong lúc chưa kịp quan sát cờ yêu cầu bật (bot nhanh hơn
+        // nhịp cập nhật) → dọn lượt theo dõi, KHÔNG cảnh báo oan "bot chưa xử lý".
+        if (importStatus && importStatus.requested === false && !importStatus.error) {
+          setImportWatch(null);
+          return;
+        }
         const hint =
           importStatus?.botOnline === false
             ? translate(
@@ -254,34 +295,57 @@ export default function BackupPanel({ data }: { data: GuildData }) {
   // Quá 3 phút chưa xong → cảnh báo chẩn đoán (bot offline / bản cũ) thay vì treo.
   useEffect(() => {
     if (!restoreWatch || importStatus === undefined || importStatus === null) return;
-    if (importStatus.restoreError) {
-      toast.error(translate("Khôi phục thất bại: {p0}", { p0: importStatus.restoreError }), {
-        description: translate(
-          "Bot đã dừng giữa chừng. Kiểm tra bot còn trong server và đủ quyền Administrator rồi thử khôi phục lại.",
-        ),
-        duration: 12000,
-      });
+    // `hasFinishMarker: true` — mốc `restoreFinishedAt` do server ghi khi bot báo
+    // khôi phục xong. Trước đây nhánh này chỉ hỏi `!restoreRequested`: trạng thái
+    // cũ (còn của lượt trước) nói false ⇒ vừa bấm đã toast "Bot đã khôi phục xong"
+    // trong khi bot chưa làm gì, và lượt theo dõi bị khoá nên lỗi thật không hiện.
+    const verdict = judgeJobWatch(
+      restoreWatch,
+      {
+        requested: importStatus.restoreRequested,
+        error: importStatus.restoreError,
+        errorAt: importStatus.restoreErrorAt,
+        finishedAt: importStatus.restoreFinishedAt,
+      },
+      { hasFinishMarker: true },
+    );
+    if (verdict.outcome === "waiting") {
+      if (verdict.watch !== restoreWatch) setRestoreWatch(verdict.watch);
+      return;
+    }
+    if (verdict.outcome === "error") {
+      toast.error(
+        translate("Khôi phục thất bại: {p0}", {
+          p0: importStatus.restoreError ?? translate("Lỗi không xác định"),
+        }),
+        {
+          description: translate(
+            "Bot đã dừng giữa chừng. Kiểm tra bot còn trong server và đủ quyền Administrator rồi thử khôi phục lại.",
+          ),
+          duration: 12000,
+        },
+      );
       setRestoreWatch(null);
       refresh();
-    } else if (!importStatus.restoreRequested) {
-      const fresh = parseBotVersion(importStatus.botVersion) >= MIN_IMPORT_BOT_VERSION;
-      if (fresh) {
-        toast.success(translate("Bot đã khôi phục xong"), {
-          description: translate(
-            "Role, kênh, tin nhắn và emoji/sticker đã được tạo lại theo backup. Kiểm tra embed xác nhận trong kênh log.",
-          ),
-        });
-      } else {
-        toast.info(translate("Yêu cầu khôi phục đã được xử lý"), {
-          description: translate(
-            "Bot đang chạy bản cũ ({p0}) — hãy kiểm tra server trực tiếp và cập nhật bot lên bản mới nhất (v{p1}+).",
-            { p0: importStatus.botVersion || translate("không rõ"), p1: MIN_IMPORT_BOT_VERSION },
-          ),
-        });
-      }
-      setRestoreWatch(null);
-      window.setTimeout(refresh, 2500);
+      return;
     }
+    const fresh = parseBotVersion(importStatus.botVersion) >= MIN_IMPORT_BOT_VERSION;
+    if (fresh) {
+      toast.success(translate("Bot đã khôi phục xong"), {
+        description: translate(
+          "Role, kênh, tin nhắn và emoji/sticker đã được tạo lại theo backup. Kiểm tra embed xác nhận trong kênh log.",
+        ),
+      });
+    } else {
+      toast.info(translate("Yêu cầu khôi phục đã được xử lý"), {
+        description: translate(
+          "Bot đang chạy bản cũ ({p0}) — hãy kiểm tra server trực tiếp và cập nhật bot lên bản mới nhất (v{p1}+).",
+          { p0: importStatus.botVersion || translate("không rõ"), p1: MIN_IMPORT_BOT_VERSION },
+        ),
+      });
+    }
+    setRestoreWatch(null);
+    window.setTimeout(refresh, 2500);
   }, [restoreWatch, importStatus]);
 
   // Kết quả của lượt "Backup ngay": lỗi → báo lý do; xong → báo ĐÃ TẠO BẢN MỚI
@@ -289,35 +353,52 @@ export default function BackupPanel({ data }: { data: GuildData }) {
   // nên người dùng bấm xong không thấy bản backup cũng không thấy thông báo nào.
   useEffect(() => {
     if (!backupWatch || importStatus === undefined || importStatus === null) return;
-    if (importStatus.backupError) {
-      toast.error(translate("Backup thất bại: {p0}", { p0: importStatus.backupError }), {
-        description: translate(
-          "Bot không lưu được bản backup. Đọc lý do ở khung đỏ phía trên, khắc phục rồi bấm Backup ngay lại.",
-        ),
-        duration: 12000,
-      });
+    // Lỗi + mốc "xong" đều phải của CHÍNH lượt này (mới hơn lúc bấm): trạng thái
+    // tới chậm một nhịp còn giữ lỗi/kết quả của lượt trước ⇒ báo oan, và nếu tiêu
+    // huỷ lượt theo dõi luôn thì kết quả thật không bao giờ hiện.
+    const verdict = judgeJobWatch(
+      backupWatch,
+      {
+        requested: importStatus.backupRequested,
+        error: importStatus.backupError,
+        errorAt: importStatus.backupErrorAt,
+        finishedAt: importStatus.backupFinishedAt,
+      },
+      { hasFinishMarker: true },
+    );
+    if (verdict.outcome === "waiting") {
+      if (verdict.watch !== backupWatch) setBackupWatch(verdict.watch);
+      return;
+    }
+    if (verdict.outcome === "error") {
+      toast.error(
+        translate("Backup thất bại: {p0}", {
+          p0: importStatus.backupError ?? translate("Lỗi không xác định"),
+        }),
+        {
+          description: translate(
+            "Bot không lưu được bản backup. Đọc lý do ở khung đỏ phía trên, khắc phục rồi bấm Backup ngay lại.",
+          ),
+          duration: 12000,
+        },
+      );
       setBackupWatch(null);
       refresh();
       return;
     }
-    // Cờ còn treo = bot chưa tới lượt xử lý → tiếp tục chờ (banner "Đang tạo backup").
-    if (importStatus.backupRequested) return;
-    // So mốc thời gian để không nhầm với kết quả của lượt bấm trước đó.
-    if ((importStatus.backupFinishedAt ?? 0) > backupWatch.startedAt) {
-      if (importStatus.backupUnchanged) {
-        toast.info(translate("Server không có thay đổi kể từ bản backup gần nhất"), {
-          description: translate(
-            'Bot không tạo bản trùng lặp. Bật "Kèm tin nhắn" hoặc chỉnh cấu trúc server rồi bấm Backup ngay lại nếu bạn cần một bản mới.',
-          ),
-          duration: 10000,
-        });
-      } else {
-        toast.success(translate("Bot đã tạo xong bản backup mới"), {
-          description: translate(
-            "Bản backup mới đã có trong danh sách bên dưới và được lưu trên cloud.",
-          ),
-        });
-      }
+    if (importStatus.backupUnchanged) {
+      toast.info(translate("Server không có thay đổi kể từ bản backup gần nhất"), {
+        description: translate(
+          'Bot không tạo bản trùng lặp. Bật "Kèm tin nhắn" hoặc chỉnh cấu trúc server rồi bấm Backup ngay lại nếu bạn cần một bản mới.',
+        ),
+        duration: 10000,
+      });
+    } else {
+      toast.success(translate("Bot đã tạo xong bản backup mới"), {
+        description: translate(
+          "Bản backup mới đã có trong danh sách bên dưới và được lưu trên cloud.",
+        ),
+      });
     }
     setBackupWatch(null);
     refresh();
@@ -509,7 +590,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     }
   }
 
-  async function restore(backup: BackupInfo, restoreKey?: string) {
+  async function restore(backup: RescuableBackup, restoreKey?: string) {
     // Bot OFFLINE → yêu cầu khôi phục sẽ nằm chờ vô hạn — chặn sớm với lý do rõ ràng.
     if (importStatus && importStatus.botOnline === false) {
       toast.error(translate("Bot đang OFFLINE — không thể khôi phục lúc này"), {
@@ -1395,8 +1476,8 @@ function BackupLookupCard({
 }: {
   busy: "backup" | string | null;
   planBusy: string | null;
-  onRestore: (backup: BackupInfo, restoreKey?: string) => void;
-  onPlan: (backup: BackupInfo, restoreKey?: string) => void;
+  onRestore: (backup: RescuableBackup, restoreKey?: string) => void;
+  onPlan: (backup: RescuableBackup, restoreKey?: string) => void;
 }) {
   const [showKeys, setShowKeys] = useState(false);
   const [keyInput, setKeyInput] = useState("");
@@ -1412,10 +1493,27 @@ function BackupLookupCard({
 
   // Tra cứu là QUERY của Convex (không phải mutation): nên nó reactive + được
   // cache sẵn, và chỉ chạy khi có mã đã bấm. `undefined` = đang tải.
+  // Kiểu mô tả ĐÚNG những gì `backup:lookupBackup` trả về (không có `guildId`,
+  // nhưng PHẢI có `_id` để bấm Khôi phục / Xem kế hoạch gửi lại được).
   const looked = useQuery(
     api.backup.lookupBackup,
     submittedKey ? { token: TOKEN(), restoreKey: submittedKey } : "skip",
-  ) as (BackupInfo & { pushedToGithub: boolean }) | null | undefined;
+  ) as
+    | {
+        _id: Id<"guildBackups">;
+        guildName: string;
+        createdAt: number;
+        roleCount: number;
+        channelCount: number;
+        emojiCount: number;
+        stickerCount: number;
+        messageCount: number;
+        source: string;
+        pushedToGithub: boolean;
+        githubUrl: string | null;
+      }
+    | null
+    | undefined;
   const searching = !!submittedKey && looked === undefined;
   const found = looked ?? null;
   const notFound = !!submittedKey && looked === null;

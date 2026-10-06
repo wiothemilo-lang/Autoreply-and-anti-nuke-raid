@@ -34,6 +34,7 @@ import {
 } from "../src/lib/mediaQuery";
 import { simulateAutoReply, type SimInput, type SimRule } from "../src/lib/autoreplySim";
 import { toBranding } from "../src/lib/useBranding";
+import { judgeJobWatch, type JobWatch } from "../src/lib/backupWatch";
 import {
   INCIDENT_SLOW,
   LATENCY_FAST,
@@ -920,6 +921,114 @@ console.log("── #14 branding ──");
     /useQuery\(api\.hidden\.getBotBranding\)/.test(brandingSrc),
   );
   check("hook đi qua hàm thuần toBranding", /return toBranding\(useQuery\(/.test(brandingSrc));
+}
+
+console.log("── #15 theo dõi kết quả backup/khôi phục (chống báo sai kết quả) ──");
+{
+  // Bug thật: sau khi bấm, trạng thái Convex trong React còn là bản CŨ của lượt
+  // trước (kết quả mutation về trước, kết quả query tới sau một nhịp). Đọc thẳng
+  // bản cũ ⇒ vừa bấm "Khôi phục" đã toast "Bot đã khôi phục xong", và lượt theo
+  // dõi bị khoá nên lỗi thật không bao giờ hiện. judgeJobWatch chỉ cho kết luận
+  // khi có bằng chứng của CHÍNH lượt này.
+  const startedAt = T;
+
+  // 1) Lượt vừa bấm, số liệu còn của lượt TRƯỚC (không cờ, không lỗi, mốc xong cũ).
+  const staleDone = judgeJobWatch(
+    { startedAt },
+    { requested: false, error: null, errorAt: null, finishedAt: startedAt - 60_000 },
+    { hasFinishMarker: true },
+  );
+  check(
+    "trạng thái CŨ (mốc xong của lượt trước) → vẫn CHỜ, không báo xong",
+    staleDone.outcome === "waiting",
+  );
+
+  const staleError = judgeJobWatch(
+    { startedAt },
+    { requested: false, error: "lỗi lượt trước", errorAt: startedAt - 60_000 },
+    { hasFinishMarker: true },
+  );
+  check("lỗi của lượt TRƯỚC → vẫn CHỜ, không báo lỗi oan", staleError.outcome === "waiting");
+
+  // 2) Đang chạy: ghi nhớ đã thấy cờ bật, và KHÔNG tạo object mới ở nhịp sau
+  //    (object mới mỗi nhịp ⇒ setState vô hạn ⇒ render loop).
+  const running = judgeJobWatch(
+    { startedAt },
+    { requested: true, error: null, errorAt: null, finishedAt: null },
+    { hasFinishMarker: true },
+  );
+  check(
+    "cờ yêu cầu đang bật → chờ + đánh dấu đã thấy cờ",
+    running.outcome === "waiting" && running.watch.sawPending === true,
+  );
+  const armed: JobWatch = { startedAt, sawPending: true };
+  const runningAgain = judgeJobWatch(
+    armed,
+    { requested: true, error: null, errorAt: null, finishedAt: null },
+    { hasFinishMarker: true },
+  );
+  check(
+    "đang chờ ở nhịp sau → giữ nguyên object watch (không render loop)",
+    runningAgain.outcome === "waiting" && runningAgain.watch === armed,
+  );
+
+  // 3) Kết quả THẬT của lượt này.
+  const freshError = judgeJobWatch(
+    armed,
+    { requested: false, error: "bot thiếu quyền", errorAt: startedAt + 1_000 },
+    { hasFinishMarker: true },
+  );
+  check("lỗi MỚI (sau lúc bấm) → báo lỗi", freshError.outcome === "error");
+  const freshDone = judgeJobWatch(
+    armed,
+    { requested: false, error: null, errorAt: null, finishedAt: startedAt + 1_000 },
+    { hasFinishMarker: true },
+  );
+  check("mốc xong MỚI hơn lúc bấm → báo xong", freshDone.outcome === "done");
+  const sameMs = judgeJobWatch(
+    armed,
+    { requested: false, error: null, errorAt: null, finishedAt: startedAt },
+    { hasFinishMarker: true },
+  );
+  check(
+    "mốc xong đúng bằng lúc bấm → CHỜ (biên: mốc này là của lượt trước)",
+    sameMs.outcome === "waiting",
+  );
+
+  // 4) Luồng KHÔNG có mốc "xong" (import — server chỉ xoá cờ yêu cầu): biết chắc
+  //    xong chỉ khi đã TỪNG thấy cờ bật lên.
+  const importStale = judgeJobWatch(
+    { startedAt },
+    { requested: false, error: null, errorAt: null },
+    { hasFinishMarker: false },
+  );
+  check(
+    "import: chưa từng thấy cờ bật → CHỜ (không báo 'khôi phục xong' ngay khi vừa bấm)",
+    importStale.outcome === "waiting",
+  );
+  const importDone = judgeJobWatch(
+    { startedAt, sawPending: true },
+    { requested: false, error: null, errorAt: null },
+    { hasFinishMarker: false },
+  );
+  check("import: cờ bật rồi tắt → báo xong", importDone.outcome === "done");
+
+  // 5) Neo nguồn: panel phải đi qua hàm thuần và truyền đúng mốc của từng lượt
+  //    (thiếu mốc ⇒ rơi vào luật "đã thấy cờ bật", tức lại chờ nhịp cập nhật).
+  const panelSrc = readFileSync(
+    fileURLToPath(new URL("../src/components/dashboard/BackupPanel.tsx", import.meta.url)),
+    "utf8",
+  );
+  check("panel dùng chung judgeJobWatch", (panelSrc.match(/judgeJobWatch\(/g)?.length ?? 0) >= 3);
+  check(
+    "lượt restore so mốc restoreFinishedAt, lượt backup so backupFinishedAt",
+    /finishedAt: importStatus\.restoreFinishedAt/.test(panelSrc) &&
+      /finishedAt: importStatus\.backupFinishedAt/.test(panelSrc),
+  );
+  check(
+    "lượt import khai báo KHÔNG có mốc xong (hasFinishMarker: false)",
+    /hasFinishMarker: false/.test(panelSrc),
+  );
 }
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);
