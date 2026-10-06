@@ -101,10 +101,11 @@ Bot tự đăng ký slash commands và đồng bộ server/kênh/role lên Conve
 ## Kiểm thử & Coverage
 
 ```bash
-bun run test            # chạy 87 suite CJS (~1 phút, song song; --serial để chạy tuần tự; thoát khác 0 nếu fail)
-bun run test:ts         # chạy 23 suite TypeScript
+bun run test            # chạy tất cả suite CJS (~1 phút, song song; --serial để chạy tuần tự; thoát khác 0 nếu fail)
+bun run test:ts         # chạy suite TypeScript
 bun run test:coverage   # chạy test + đo coverage (báo cáo HTML tại coverage/)
 bun run smoke:vps       # smoke test VPS (env + module + Convex + Discord login)
+bash scripts/update-vps-findings.sh   # sinh bản ghi findings VPS (chỉ chạy trên VPS, output docs/vps-audit-YYYY-MM-DD.md — không commit, dùng để trace resource / bot heap / proxy / dấu hiệu DDoS theo thời gian)
 ```
 
 Coverage được đo bằng [`c8`](https://github.com/bcoe/c8) (V8 native, không phải đo giả): mỗi dòng/hàm/nhánh của `bot/src` bị đánh dấu **đã chạy qua hay chưa** trong lúc test. Con số hiện tại:
