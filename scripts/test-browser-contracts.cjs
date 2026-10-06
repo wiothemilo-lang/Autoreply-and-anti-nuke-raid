@@ -72,7 +72,30 @@ const rawBrowserTest = process.env.SKIP_BROWSER_TESTS === "1" ? test.skip : test
  * sau vẫn chạy — biến "chết im lặng" thành lỗi có địa chỉ. 90s vì test nặng
  * nhất (I1) có thể tới ~50s trên runner chậm.
  */
-const browserTest = (name, fn) => rawBrowserTest(name, { timeout: BROWSER_TEST_TIMEOUT_MS }, fn);
+/**
+ * Chẩn đoán cho lần bị kill ở mức SUITE (CI 06/10: kill ở 300s, log dừng ở
+ * `ok 13` — không biết test nào đang treo). Node:test chỉ in `# Subtest:` khi
+ * test HOÀN TẤT, nên output không bao giờ nêu tên test ĐANG CHẠY. Vòng lặp
+ * này in một dòng TAP comment mỗi 20s: tên test hiện tại + số giây; runner
+ * in full tail khi suite quá hạn → chỉ đúng chỗ treo thay vì đoán.
+ */
+let currentTestName = "(chưa chạy test nào)";
+const suiteStartedAt = Date.now();
+const progressBreadcrumb = setInterval(() => {
+  console.log(
+    `# [browser-test] ${Math.round((Date.now() - suiteStartedAt) / 1000)}s — đang chạy: ${currentTestName}`,
+  );
+}, 20_000);
+// Không được giữ event loop sống: khi không còn gì chờ thì process phải thoát
+// (node:test báo cancelledByParent) — một timer ref'd vô hại có thể biến
+// "hết việc" thành "treo".
+progressBreadcrumb.unref?.();
+
+const browserTest = (name, fn) =>
+  rawBrowserTest(name, { timeout: BROWSER_TEST_TIMEOUT_MS }, async (t) => {
+    currentTestName = name;
+    return fn(t);
+  });
 
 const ROOT = path.resolve(__dirname, "..");
 /**
@@ -473,7 +496,13 @@ class Cdp {
             DEVTOOLS_HTTP_TIMEOUT_MS,
             "DevTools /json/list",
           );
-          const targets = await res.json();
+          // Đọc thân response cũng phải có trần — fetch() xong chưa có nghĩa
+          // là body về đủ; thân treo là lời chờ không tự có trần.
+          const targets = await withCeiling(
+            res.json(),
+            DEVTOOLS_HTTP_TIMEOUT_MS,
+            "Đọc JSON DevTools /json/list",
+          );
           const page = targets.find((t) => t.type === "page");
           if (page?.webSocketDebuggerUrl) return page.webSocketDebuggerUrl;
         } catch {
@@ -519,8 +548,20 @@ async function setup() {
   if (shared) return shared;
   if (!fs.existsSync(path.join(DIST, "index.html"))) {
     console.error(`[browser-test] Thiếu ${DIST}/index.html — đang build…`);
-    const build = spawnSync("bun", ["run", "build"], { cwd: ROOT, stdio: "inherit" });
-    if (build.status !== 0) throw new Error("build thất bại, không có gì để test");
+    // spawnSync KHÔNG trả lời thì event loop bị chặn: interval chẩn đoán và
+    // cả trần per-test của node:test đều KHÔNG THỂ cháy → kill suite mà không
+    // nói gì. Trần của spawnSync tự giết tiến trình build khi quá hạn.
+    const build = spawnSync("bun", ["run", "build"], {
+      cwd: ROOT,
+      stdio: "inherit",
+      timeout: 180_000,
+      killSignal: "SIGKILL",
+    });
+    if (build.status !== 0 || build.error) {
+      throw new Error(
+        `build thất bại (status=${build.status}, error=${build.error?.code ?? "none"})`,
+      );
+    }
   }
   const bin = findChromium();
   if (!bin) {
@@ -546,7 +587,13 @@ async function setup() {
         DEVTOOLS_HTTP_TIMEOUT_MS,
         "DevTools /json/new",
       );
-      const target = await res.json();
+      // Thân response phải có trần như trên — không thì lời chờ này lọt qua
+      // mọi cơ chế chặn của suite (nguyên nhân kinh điển của kill im lặng).
+      const target = await withCeiling(
+        res.json(),
+        DEVTOOLS_HTTP_TIMEOUT_MS,
+        "Đọc JSON DevTools /json/new",
+      );
       const page = await Cdp.connect(target.webSocketDebuggerUrl);
       // Headless không có cửa sổ thật → phải bật "giả lập focus" để
       // element.focus()/Tab/Enter hoạt động như trình duyệt thường.
@@ -1390,7 +1437,8 @@ browserTest("I1. Chunk bị xoá → tự tải lại ĐÚNG MỘT lần, không
   t.assert.ok(stamp, "mốc chống lặp đã được ghi");
 });
 
-// Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server
+// Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server + dừng breadcrumb
 test.after(() => {
+  clearInterval(progressBreadcrumb);
   teardown();
 });

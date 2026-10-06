@@ -195,9 +195,14 @@ jobs:
         # này điều khiển Chromium thật nên thời gian phụ thuộc tốc độ runner.
         # Đo thực tế trên ubuntu-latest: 87,3s · 91,2s · 98,2s · 100,5s (xanh)
         # nhưng 2 lần vượt 120s (đỏ) → không có biên an toàn, chỉ chờ vận may.
-        # 300s vẫn dưới trần job (30 phút) và vẫn bắt được treo thật.
+        # 06/10: 300s VẪN bị vượt — một test ăn hết trần 90s per-test
+        # (testTimeoutFailure) làm các test sau bắt đầu quá muộn, bị kill TRƯỚC
+        # khi kịp in tên → log dừng ở `ok 13`, không biết test nào treo.
+        # 420s = ~4× thời lượng xanh + đủ chỗ cho một trần per-test 90s + runner
+        # chậm; vẫn dưới trần job (30 phút) và vẫn bắt được treo thật (breadcrumb
+        # in tên test đang chạy mỗi 20s, runner in full tail khi kill).
         env:
-          TEST_SUITE_TIMEOUT_MS: "300000"
+          TEST_SUITE_TIMEOUT_MS: "420000"
         run: bun run test:coverage
       # 5 suite tầng Convex/Haimiya viết bằng TypeScript — trước đây không
       # runner nào chạy (test có mà không bao giờ chạy).

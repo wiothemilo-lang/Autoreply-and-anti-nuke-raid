@@ -225,6 +225,17 @@ function report(r) {
 /** Các dòng đáng xem của một lần chạy đỏ: dòng báo lỗi, không có thì 20 dòng cuối. */
 function failureLines(r) {
   const lines = r.out.split("\n");
+  // Bị kill vì quá hạn → in FULL tail, không lọc theo từ khóa. CI 06/10: kill
+  // ở 300s chỉ thấy `ok 13` (dòng khớp từ khóa), không thấy breadcrumb tên
+  // test đang treo vì dòng breadcrumb không chứa từ khóa lọc — đoán hoài
+  // không biết treo ở đâu. Tail giữ nguyên thứ tự nên breadcrumb + TAP cuối
+  // chỉ đúng chỗ chết.
+  if (r.timedOut) {
+    return lines
+      .filter((l) => l.trim())
+      .slice(-150)
+      .map((l) => `   ${l.trim()}`);
+  }
   const fails = lines
     .filter((l) => /FAIL|❌|✗|✖|Error|THẤT BẠI/.test(l) && !/\b0 (FAIL|fail|sai)\b/.test(l))
     .slice(0, 15);
