@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
+import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { ExternalLink, KeyRound, ShieldCheck, Loader2 } from "lucide-react";
 import { LogoMark } from "../components/BotLogo";
 import { Button } from "../components/ui/button";
 import HaimiyaChat from "../components/HaimiyaChat";
+import PageSplash from "../components/PageSplash";
 import SkipLink from "../components/SkipLink";
+import { api } from "../../convex/_generated/api";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { Card, CardContent, CardDescription, CardHeader } from "../components/ui/card";
 import {
@@ -15,9 +18,11 @@ import {
   buildAuthorizeUrl,
   generateChallenge,
   generateVerifier,
+  getSessionToken,
   randomState,
   setRememberLogin,
 } from "../lib/discord";
+import { resolveAuthPageState } from "../lib/authRoute";
 
 import LangSwitch from "../components/LangSwitch";
 
@@ -36,6 +41,35 @@ export default function AuthPage() {
   );
   const location = useLocation();
   const returnTo = new URLSearchParams(location.search).get("returnTo") ?? "/dashboard";
+  // Phiên còn sống thì `/auth` KHÔNG được hỏi lại (bug thật: bấm Back sau khi
+  // đăng nhập, hoặc mở lại bookmark `/auth`, là thấy form đăng nhập → người
+  // dùng tưởng bị đăng xuất → đăng nhập lần nữa). Quyết định nằm ở hàm thuần
+  // `resolveAuthPageState` (có test hermetic, kèm chặn đích vòng lặp `/auth`).
+  const sessionToken = getSessionToken();
+  const me = useQuery(
+    api.sessions.me,
+    sessionToken ? ({ token: sessionToken } as { token: string }) : "skip",
+  );
+  const authState = resolveAuthPageState({
+    hasToken: Boolean(sessionToken),
+    me,
+    returnTo,
+  });
+
+  if (authState.kind === "app") {
+    return <Navigate to={authState.to} replace />;
+  }
+  if (authState.kind === "splash") {
+    return (
+      <main
+        className="flex min-h-screen items-center justify-center bg-background"
+        aria-busy="true"
+      >
+        <h1 className="sr-only">{translate("Đang kiểm tra phiên đăng nhập")}</h1>
+        <PageSplash minHeight="min-h-screen" label={translate("Đang kiểm tra phiên đăng nhập…")} />
+      </main>
+    );
+  }
 
   async function startOAuth() {
     if (!clientId) return;

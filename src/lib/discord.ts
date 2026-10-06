@@ -4,11 +4,15 @@ export const OAUTH_STATE_KEY = "wio_oauth_state";
 export const REMEMBER_LOGIN_KEY = "wio_remember_login";
 
 /**
- * Luồng làm mới im lặng: prompt=none, dùng chung redirect /discord/callback.
- * PKCE verifier + state phải ở sessionStorage (khớp đúng tab vừa chuyển trang).
- * Khoá chống lặp (`thử gần nhất` / `đã hỏng`) nằm ở `silentRefresh.ts` và dùng
- * localStorage — phạm vi trình duyệt, vì sessionStorage là riêng từng tab nên
- * tab mới luôn bị đẩy sang Discord lại từ đầu (bug thật 06/10/2026).
+ * Luồng làm mới danh sách server (prompt=none) dùng chung redirect
+ * /discord/callback. PKCE verifier + state ở sessionStorage (khớp đúng tab vừa
+ * chuyển trang) và CHỈ được đọc trong trang callback.
+ *
+ * Luồng này CHỈ do người dùng bấm "Tải lại" mới chạy — không có đường tự động
+ * nào nữa, vì mỗi lượt là một lần chuyển trang thật sang Discord và bản tự động
+ * cũ lặp vô hạn trong tab đang mở (bug thật 06/10/2026, người dùng báo 2 lần).
+ * Nếu quên điều này mà thêm lại effect mount gọi hàm dưới đây, test
+ * `scripts/test-oauth-client-id.cjs` + `scripts/test-web-ux-upgrades.ts` sẽ đỏ.
  */
 export const SILENT_VERIFIER_KEY = "wio_silent_verifier";
 export const SILENT_STATE_KEY = "wio_silent_state";

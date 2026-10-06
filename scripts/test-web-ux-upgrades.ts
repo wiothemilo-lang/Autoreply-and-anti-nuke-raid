@@ -35,16 +35,7 @@ import {
 import { simulateAutoReply, type SimInput, type SimRule } from "../src/lib/autoreplySim";
 import { toBranding } from "../src/lib/useBranding";
 import { judgeJobWatch, type JobWatch } from "../src/lib/backupWatch";
-import {
-  SILENT_ATTEMPT_KEY,
-  SILENT_COOLDOWN_MS,
-  SILENT_FAILED_KEY,
-  clearSilentFailed,
-  judgeSilentRefresh,
-  markSilentAttempt,
-  markSilentFailed,
-  readSilentLock,
-} from "../src/lib/silentRefresh";
+import { isAuthLoopTarget, resolveAuthPageState } from "../src/lib/authRoute";
 import {
   INCIDENT_SLOW,
   LATENCY_FAST,
@@ -1041,95 +1032,195 @@ console.log("── #15 theo dõi kết quả backup/khôi phục (chống báo 
   );
 }
 
-console.log("── #16 khoá chống lặp làm mới im lặng (sự cố 'lặp đăng nhập') ──");
+console.log("── #16 vòng lặp đăng nhập: mô phỏng điều hướng + luật của /auth ──");
 {
-  // Vì sao test: mỗi lượt "làm mới im lặng" là một lần CHUYỂN TRANG THẬT sang
-  // Discord rồi quay về. Sai một nhánh ở đây là người dùng bị đá khỏi dashboard
-  // (hoặc bị bắt đăng nhập lại) giữa lúc làm việc. Khoá phải nằm ở phạm vi
-  // TRÌNH DUYỆT (localStorage), không phải từng tab (sessionStorage).
-  const clean = { failed: false, lastAttempt: 0 };
-  check("lần đầu (chưa từng thử) → cho phép", judgeSilentRefresh(clean, T) === null);
+  // Người dùng báo "đăng nhập vô rồi mà cứ duplicate nhảy đăng nhập và yêu cầu
+  // đăng nhập lại" HAI lần. Hai bản vá trước chỉ chỉnh KHOÁ chống lặp (sessionStorage
+  // → localStorage), mà gốc rễ là hai chỗ khác:
+  //   (a) Dashboard TỰ chuyển trang sang Discord khi effect mount chạy lại — mà
+  //       `me` đổi object mỗi lần Convex cập nhật (heartbeat ~60 giây) ⇒ cứ ~10
+  //       phút (hết cooldown) là cả trang bị nhảy sang Discord một lần nữa.
+  //   (b) `/auth` LUÔN hiện form đăng nhập, kể cả khi phiên còn sống ⇒ bấm Back
+  //       sau khi đăng nhập, hoặc mở lại bookmark /auth, là thấy "yêu cầu đăng
+  //       nhập lại"; `returnTo` trỏ về chính /auth thì vòng lặp không lối ra.
+  //
+  // Test này mô phỏng ĐIỀU HƯỚNG thật bằng chính hàm thuần của app
+  // (`resolveAuthPageState`, `safeRedirectPath`) + luật chuyển hướng của
+  // RequireAuth (có neo nguồn ngay bên dưới để bản mô phỏng không trôi lệch).
+  const requireAuthRoute = (hasToken: boolean, me: unknown, path: string): string => {
+    if (!hasToken) return "/auth";
+    if (me === undefined) return path; // đang tải → ở lại chờ splash
+    if (me === null) return "/auth";
+    return path;
+  };
+
+  type WalkResult = { visited: string[]; stopped: string; loops: boolean };
+  const walk = (
+    start: string,
+    state: { hasToken: boolean; me: unknown; returnTo: string | null },
+    maxSteps = 12,
+  ): WalkResult => {
+    const visited: string[] = [];
+    let current = start;
+    for (let i = 0; i < maxSteps; i++) {
+      visited.push(current);
+      if (current.startsWith("/auth")) {
+        const decision = resolveAuthPageState({
+          hasToken: state.hasToken,
+          me: state.me,
+          returnTo: state.returnTo,
+        });
+        if (decision.kind !== "app") return { visited, stopped: decision.kind, loops: false };
+        current = decision.to;
+        continue;
+      }
+      const next = requireAuthRoute(state.hasToken, state.me, current);
+      if (next === current) return { visited, stopped: "stay", loops: false };
+      current = next;
+    }
+    return { visited, stopped: "max", loops: true };
+  };
+
+  const authed = { hasToken: true, me: { user: { discordId: "1" }, guilds: [] } };
+  const authVisits = (r: WalkResult) => r.visited.filter((p) => p.startsWith("/auth")).length;
+
+  // (b) Quyết định của /auth — bảng sự thật.
   check(
-    "vừa thử 5 phút trước → CHẶN vì còn trong cooldown 10 phút",
-    judgeSilentRefresh({ failed: false, lastAttempt: T - 5 * 60_000 }, T) === "cooldown",
+    "chưa có token → hiện form đăng nhập",
+    resolveAuthPageState({ hasToken: false, me: null, returnTo: "/dashboard" }).kind === "login",
   );
   check(
-    "thử đúng mốc 10 phút trước → cho phép (biên cooldown)",
-    judgeSilentRefresh({ failed: false, lastAttempt: T - SILENT_COOLDOWN_MS }, T) === null,
+    "đang tải phiên (me undefined) → splash, KHÔNG hiện form đăng nhập",
+    resolveAuthPageState({ hasToken: true, me: undefined, returnTo: null }).kind === "splash",
   );
   check(
-    "lượt trước HỎNG → khoá vĩnh viễn dù đã quá 10 phút",
-    judgeSilentRefresh({ failed: true, lastAttempt: T - 24 * 3600_000 }, T) === "locked",
+    "token + phiên hợp lệ → vào thẳng app (không hỏi lại)",
+    resolveAuthPageState({ hasToken: true, me: authed.me, returnTo: "/dashboard/9" }).kind ===
+      "app",
   );
   check(
-    "hỏng thì cũng không xét cooldown (không tự mở lại sau 10 phút)",
-    judgeSilentRefresh({ failed: true, lastAttempt: T - 1_000 }, T) === "locked",
+    "token nhưng phiên đã hết hạn (me null) → hiện form (đúng: phải đăng nhập lại thật)",
+    resolveAuthPageState({ hasToken: true, me: null, returnTo: "/dashboard" }).kind === "login",
   );
   check(
-    "người dùng bấm 'Tải lại' (force) → bỏ qua CẢ khoá hỏng lẫn cooldown",
-    judgeSilentRefresh({ failed: true, lastAttempt: T - 1_000 }, T, { force: true }) === null,
+    "đích đến chặn vòng lặp: returnTo=/auth → đưa về /dashboard",
+    (() => {
+      const r = resolveAuthPageState({
+        hasToken: true,
+        me: authed.me,
+        returnTo: "/auth?returnTo=%2Fauth",
+      });
+      return r.kind === "app" && r.to === "/dashboard";
+    })(),
   );
   check(
-    "không có phiên (thiếu token/clientId) → KHÔNG nhảy sang Discord, kể cả khi force",
-    judgeSilentRefresh(clean, T, { hasSession: false }) === "no_session" &&
-      judgeSilentRefresh(clean, T, { hasSession: false, force: true }) === "no_session",
+    "đích đến chặn vòng lặp: returnTo=/discord/callback → đưa về /dashboard",
+    (() => {
+      const r = resolveAuthPageState({
+        hasToken: true,
+        me: authed.me,
+        returnTo: "/discord/callback?code=x",
+      });
+      return r.kind === "app" && r.to === "/dashboard";
+    })(),
+  );
+  check(
+    "isAuthLoopTarget: nhận đúng /auth và /discord/callback (kể cả kèm query/slash thừa)",
+    isAuthLoopTarget("/auth") &&
+      isAuthLoopTarget("/auth?returnTo=x") &&
+      isAuthLoopTarget("/auth/") &&
+      isAuthLoopTarget("/discord/callback") &&
+      !isAuthLoopTarget("/dashboard") &&
+      !isAuthLoopTarget("/dashboard/auth") &&
+      !isAuthLoopTarget("/authorize"),
+  );
+  check(
+    "returnTo ngoài origin (https://evil.com) → fallback /dashboard",
+    (() => {
+      const r = resolveAuthPageState({
+        hasToken: true,
+        me: authed.me,
+        returnTo: "https://evil.com",
+      });
+      return r.kind === "app" && r.to === "/dashboard";
+    })(),
   );
 
-  // Khoá là chuỗi có tiền tố wio_ (đồng bộ với phần còn lại của phiên web) và
-  // phải KHÁC nhau — trùng khoá thì "đã hỏng" bị hiểu thành "mốc thời gian".
-  check(
-    "khoá lưu trữ dùng đúng tên và không trùng nhau",
-    SILENT_FAILED_KEY === "wio_silent_failed" &&
-      SILENT_ATTEMPT_KEY === "wio_silent_last_attempt" &&
-      SILENT_FAILED_KEY !== SILENT_ATTEMPT_KEY,
-  );
-
-  // Hành vi khi MÔI TRƯỜNG KHÔNG CÓ localStorage (SSR/Node/chế độ riêng tư chặn):
-  // tuyệt đối không được ném — ném ở đây là trắng trang dashboard.
-  let storageOk = true;
-  try {
-    const lock = readSilentLock();
-    storageOk = typeof lock.failed === "boolean" && typeof lock.lastAttempt === "number";
-    markSilentAttempt(T);
-    markSilentFailed();
-    clearSilentFailed();
-  } catch {
-    storageOk = false;
+  // (a) Mô phỏng điều hướng: KHÔNG kịch bản nào được lặp, và mỗi lần đi qua
+  // /auth tối đa 1 lượt (nhiều hơn = người dùng bị hỏi đăng nhập lặp).
+  const scenarios: { name: string; start: string; state: Parameters<typeof walk>[1] }[] = [
+    {
+      name: "khách chưa đăng nhập mở /dashboard/123 → sang /auth đúng 1 lần rồi dừng",
+      start: "/dashboard/123",
+      state: { hasToken: false, me: null, returnTo: null },
+    },
+    {
+      name: "đã đăng nhập mở /dashboard → Ở LẠI, không đi đâu cả",
+      start: "/dashboard",
+      state: { hasToken: true, me: authed.me, returnTo: null },
+    },
+    {
+      name: "BẤM BACK sau khi đăng nhập (vào /auth?returnTo=/dashboard/123) → quay lại dashboard, KHÔNG hỏi lại",
+      start: "/auth?returnTo=%2Fdashboard%2F123",
+      state: { hasToken: true, me: authed.me, returnTo: "/dashboard/123" },
+    },
+    {
+      name: "bookmark /auth khi phiên còn sống → vào dashboard, không thấy form đăng nhập",
+      start: "/auth",
+      state: { hasToken: true, me: authed.me, returnTo: null },
+    },
+    {
+      name: "returnTo là chính /auth (URL mã hoá hai lần) → KHÔNG lặp vô hạn",
+      start: "/auth",
+      state: {
+        hasToken: true,
+        me: authed.me,
+        returnTo: "/auth?returnTo=%252Fauth%253FreturnTo%253D%25252Fauth",
+      },
+    },
+    {
+      name: "phiên hết hạn thật → về /auth và DỪNG ở form đăng nhập (không vòng)",
+      start: "/dashboard",
+      state: { hasToken: true, me: null, returnTo: null },
+    },
+    {
+      name: "đang tải phiên (me undefined) → chờ tại chỗ, không đá sang /auth",
+      start: "/dashboard",
+      state: { hasToken: true, me: undefined, returnTo: null },
+    },
+  ];
+  for (const s of scenarios) {
+    const r = walk(s.start, s.state);
+    check(`${s.name}`, !r.loops && authVisits(r) <= 1, JSON.stringify(r.visited));
   }
-  check("mọi hàm storage chạy được cả khi localStorage không tồn tại (không ném)", storageOk);
 
-  // Vòng ghi → đọc: chỉ kiểm khi môi trường THẬT SỰ có localStorage (bun/Node
-  // thuần không có), nhưng khi có thì hợp đồng phải đúng.
-  if (typeof localStorage !== "undefined") {
-    clearSilentFailed();
-    markSilentFailed();
-    const afterFail = readSilentLock();
-    markSilentAttempt(T);
-    const afterAttempt = readSilentLock();
-    clearSilentFailed();
-    check(
-      "markSilentFailed đọc lại được (khoá nằm ở phạm vi trình duyệt)",
-      afterFail.failed === true,
-    );
-    check("markSilentAttempt đọc lại được", afterAttempt.lastAttempt === T);
-    check("clearSilentFailed xoá được cờ hỏng", readSilentLock().failed === false);
-  }
-
-  // Neo nguồn: Dashboard phải hỏi hàm thuần này chứ không tự so sessionStorage —
-  // khoá theo tab chính là gốc rễ sự cố 06/10/2026.
+  // (a) Neo nguồn: bản mô phỏng phải khớp ĐÚNG luật trong RequireAuth.tsx và
+  // Dashboard phải không còn đường tự chuyển trang nào.
+  const requireAuthSrc = readFileSync(
+    fileURLToPath(new URL("../src/components/RequireAuth.tsx", import.meta.url)),
+    "utf8",
+  );
+  check(
+    "RequireAuth giữ đúng 2 điều kiện chuyển hướng mà bản mô phỏng dựa vào",
+    /if \(!token\)/.test(requireAuthSrc) &&
+      /if \(me === null\)/.test(requireAuthSrc) &&
+      (requireAuthSrc.match(/Navigate to=\{`\/auth\?returnTo=/g) || []).length === 2,
+  );
   const dashboardSrc = readFileSync(
     fileURLToPath(new URL("../src/pages/Dashboard.tsx", import.meta.url)),
     "utf8",
   );
   check(
-    "Dashboard dùng judgeSilentRefresh",
-    /judgeSilentRefresh\(readSilentLock\(\)/.test(dashboardSrc),
+    "Dashboard: 0 đường tự động sang Discord (assign nằm trong refreshServerList, gọi từ nút Tải lại)",
+    (dashboardSrc.match(/window\.location\.(assign|replace)\(/g) || []).length === 1 &&
+      /async function refreshServerList\(\)[\s\S]{0,700}?window\.location\.assign\(buildSilentAuthorizeUrl/.test(
+        dashboardSrc,
+      ) &&
+      /onClick=\{handleRefresh\}/.test(dashboardSrc),
   );
   check(
-    "Dashboard không tự đọc/ghi khoá bằng sessionStorage nữa",
-    !/sessionStorage\.(getItem|setItem|removeItem)\(\s*SILENT_(FAILED|ATTEMPT)_KEY/.test(
-      dashboardSrc,
-    ),
+    "Dashboard: effect mount không gọi làm mới (nguồn gốc vòng lặp cũ)",
+    !/useEffect\([\s\S]{0,300}?refreshServerList\(/.test(dashboardSrc),
   );
 }
 

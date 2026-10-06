@@ -170,82 +170,79 @@ check(
   !/navigate\(returnTo\.startsWith/.test(callbackTsx),
 );
 
-// ─── 7. Làm mới im lặng KHÔNG được lặp vô hạn (sự cố "lặp đăng nhập") ─────────
-// Dashboard tự nhảy sang Discord (prompt=none) để làm mới danh sách server, khoá
-// lặp nằm ở `src/lib/silentRefresh.ts`. Nếu Discord từ chối prompt=none thì cứ mở
-// dashboard lại bị đẩy sang Discord → thất bại → quay lại: đúng cảm giác "lặp
-// đăng nhập". Ba lá chắn: khoá lượt tự động khi thất bại, chỉ nút "Tải lại" mở
-// lại, và không nhảy khi phiên đã hỏng (me === null).
-//
-// Sự cố 06/10/2026 (bản trước): khoá nằm ở SESSIONSTORAGE — riêng từng tab — nên
-// mỗi tab mới lại bị đẩy sang Discord một lần nữa. Bản này bắt buộc khoá nằm ở
-// localStorage (phạm vi trình duyệt) và Dashboard KHÔNG được tự đọc/ghi
-// sessionStorage cho hai khoá đó nữa.
+// ─── 7. KHÔNG có đường TỰ ĐỘNG nhảy sang Discord (sự cố "lặp đăng nhập") ─────
+// Người dùng báo sự cố này HAI lần. Lần 1 vá bằng khoá sessionStorage (theo tab),
+// lần 2 vá bằng khoá localStorage (theo trình duyệt) — cả hai KHÔNG đủ, vì gốc rễ
+// không phải chỗ lưu khoá mà là VIỆC TỰ CHUYỂN TRANG:
+//   · Dashboard tự gọi prompt=none khi effect mount chạy lại; effect có deps `me`
+//     — giá trị reactive của Convex ĐỔI OBJECT mỗi lần server cập nhật (heartbeat
+//     bot ~60 giây) ⇒ effect chạy lại mỗi phút.
+//   · Khoá chỉ là bộ đếm COOLDOWN 10 phút ⇒ hết 10 phút là cả trang bị nhảy sang
+//     Discord lần nữa, lặp vô hạn trong một tab đang mở. Mỗi lần nhảy là tải lại
+//     trang thật + mất ngữ cảnh + quay về kèm toast lỗi.
+// Nên hợp đồng bây giờ là: luồng prompt=none CHỈ chạy khi người dùng bấm "Tải lại",
+// và mọi lần chuyển trang phải nằm trong handler của nút đó.
 const dashboardTsx = fs.readFileSync(path.join(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const silentRefreshTs = fs.readFileSync(path.join(ROOT, "src/lib/silentRefresh.ts"), "utf8");
+const authPageTsx = fs.readFileSync(path.join(ROOT, "src/pages/AuthPage.tsx"), "utf8");
+const authRouteTs = fs.readFileSync(path.join(ROOT, "src/lib/authRoute.ts"), "utf8");
 
 check(
-  "cờ SILENT_FAILED_KEY khai báo trong silentRefresh.ts",
-  /export const SILENT_FAILED_KEY\s*=\s*"wio_silent_failed"/.test(silentRefreshTs),
-);
-check(
-  "mốc SILENT_ATTEMPT_KEY khai báo trong silentRefresh.ts",
-  /export const SILENT_ATTEMPT_KEY\s*=\s*"wio_silent_last_attempt"/.test(silentRefreshTs),
-);
-check(
-  "khoá lưu ở localStorage (phạm vi TRÌNH DUYỆT, không phải từng tab)",
-  /localStorage\.setItem\(key, value\)/.test(silentRefreshTs) &&
-    /localStorage\.removeItem\(key\)/.test(silentRefreshTs) &&
-    /localStorage\.getItem\(key\)/.test(silentRefreshTs),
-);
-// Ba hàm chạm storage (readRaw/writeRaw/removeRaw) đều phải có nhánh catch: chế
-// độ riêng tư / cookie bị chặn làm localStorage NÉM lỗi, không bắt là trắng trang.
-// (Hành vi thật — gọi hàm khi KHÔNG có localStorage — được chứng minh ở
-// scripts/test-web-ux-upgrades.ts, mục "#16 khoá chống lặp làm mới im lặng".)
-check(
-  "3 hàm storage đều bọc try/catch (chế độ riêng tư ném lỗi → trắng trang)",
-  (silentRefreshTs.match(/function (readRaw|writeRaw|removeRaw)/g) || []).length === 3 &&
-    (silentRefreshTs.match(/\} catch \{/g) || []).length >= 6,
-);
-check(
-  "startSilentRefresh quyết định qua judgeSilentRefresh (hasSession = có token + clientId)",
-  /judgeSilentRefresh\(readSilentLock\(\), now, \{[\s\S]{0,200}?hasSession: Boolean\(clientId && token\)/.test(
+  "Dashboard KHÔNG còn khoá chống lặp nào (đã bỏ hẳn đường tự động)",
+  !/SILENT_(FAILED|ATTEMPT)_KEY|judgeSilentRefresh|markSilentFailed|clearSilentFailed/.test(
     dashboardTsx,
   ),
 );
 check(
-  "Dashboard KHÔNG còn tự đọc/ghi 2 khoá đó bằng sessionStorage",
-  !/sessionStorage\.(getItem|setItem|removeItem)\(\s*SILENT_(FAILED|ATTEMPT)_KEY/.test(
+  "module khoá chống lặp theo tab/trình duyệt đã bị xoá (không còn code chết)",
+  !fs.existsSync(path.join(ROOT, "src/lib/silentRefresh.ts")),
+);
+check(
+  "Dashboard KHÔNG có effect mount nào gọi làm mới (không tự chuyển trang)",
+  !/useEffect\([\s\S]{0,300}?refreshServerList\(/.test(dashboardTsx) &&
+    !/useEffect\([\s\S]{0,300}?startSilentRefresh\(/.test(dashboardTsx),
+);
+check(
+  "lượt làm mới nằm TRONG handler của nút Tải lại (handleRefresh → refreshServerList)",
+  /async function handleRefresh\(\)[\s\S]{0,200}refreshServerList\(\)/.test(dashboardTsx),
+);
+check(
+  "buildSilentAuthorizeUrl + window.location.assign nằm trong refreshServerList (do người dùng bấm)",
+  /async function refreshServerList\(\)[\s\S]{0,600}?window\.location\.assign\(buildSilentAuthorizeUrl/.test(
     dashboardTsx,
+  ) && (dashboardTsx.match(/buildSilentAuthorizeUrl\(/g) || []).length === 1,
+);
+check(
+  "sau khi quay về (?silent=ok|err) KHÔNG có hành động điều hướng nào",
+  /silent === "ok"[\s\S]{0,600}?window\.history\.replaceState/.test(dashboardTsx) &&
+    !/silent === "ok"[\s\S]{0,600}?window\.location\.(assign|replace)\(/.test(dashboardTsx),
+);
+// `/auth` phải TỰ ĐI TIẾP khi phiên còn sống — nếu không, bấm Back sau khi đăng
+// nhập (hoặc mở bookmark /auth) là thấy form đăng nhập: "đăng nhập vô rồi mà cứ
+// yêu cầu đăng nhập lại".
+check(
+  "AuthPage quyết định bằng resolveAuthPageState (hàm thuần, có test hermetic)",
+  /resolveAuthPageState\(\{/.test(authPageTsx) && /from "\.\.\/lib\/authRoute"/.test(authPageTsx),
+);
+check(
+  "AuthPage: đã đăng nhập → <Navigate> vào app, KHÔNG hiện form đăng nhập",
+  /if \(authState\.kind === "app"\)[\s\S]{0,120}<Navigate to=\{authState\.to\} replace \/>/.test(
+    authPageTsx,
   ),
 );
 check(
-  "nhánh lỗi (else sau silent=ok) khoá lượt tự động qua markSilentFailed()",
-  /if \(silent === "ok"\)[\s\S]{0,400}?\}\s*else\s*\{[\s\S]{0,400}markSilentFailed\(\)/.test(
-    dashboardTsx,
+  "AuthPage: đang kiểm tra phiên → splash, chưa hiện nút đăng nhập",
+  /authState\.kind === "splash"[\s\S]{0,400}PageSplash/.test(authPageTsx),
+);
+check(
+  "authRoute chặn đích vòng lặp (/auth, /discord/callback)",
+  /NEVER_REDIRECT_TO = \["\/auth", "\/discord\/callback"\]/.test(authRouteTs) &&
+    /isAuthLoopTarget/.test(authRouteTs),
+);
+check(
+  "callback: mất verifier/state nhưng PHIÊN CÒN SỐNG → đi tiếp, không bắt đăng nhập lại",
+  /if \(!verifier \|\| !savedState \|\| savedState !== state\)[\s\S]{0,900}?if \(getSessionToken\(\)\)[\s\S]{0,200}?navigate\(safeRedirectPath\(returnTo\)/.test(
+    callbackTsx,
   ),
-);
-check(
-  "nhánh silent=ok XOÁ cờ thất bại",
-  /silent === "ok"[\s\S]{0,200}clearSilentFailed\(\)/.test(dashboardTsx),
-);
-check(
-  "nút Tải lại (force) mở lại lượt tự động",
-  /async function handleRefresh\(\)[\s\S]{0,300}clearSilentFailed\(\)/.test(dashboardTsx),
-);
-check(
-  "KHÔNG nhảy sang Discord khi phiên đã hỏng (me null)",
-  /useEffect\(\(\) => \{\s*\n\s*if \(!me\) return;[\s\S]{0,200}startSilentRefresh\(false\)/.test(
-    dashboardTsx,
-  ),
-);
-check(
-  "đăng xuất xoá cờ thất bại (đăng nhập lại không mang theo lỗi cũ)",
-  /async function handleLogout\(\)[\s\S]{0,400}clearSilentFailed\(\)/.test(dashboardTsx),
-);
-check(
-  "discord.ts KHÔNG còn giữ 2 khoá chống lặp (một nguồn duy nhất)",
-  !/export const SILENT_(FAILED|ATTEMPT)_KEY/.test(discordTs),
 );
 
 console.log(`\nKết quả OAuth client-id guard: ${pass} PASS, ${fail} FAIL`);

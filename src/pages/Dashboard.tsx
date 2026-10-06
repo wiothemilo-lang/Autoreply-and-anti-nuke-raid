@@ -36,13 +36,6 @@ import {
   getSessionToken,
   randomState,
 } from "../lib/discord";
-import {
-  clearSilentFailed,
-  judgeSilentRefresh,
-  markSilentAttempt,
-  markSilentFailed,
-  readSilentLock,
-} from "../lib/silentRefresh";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import type { MeData } from "../lib/types";
 import { toast } from "sonner";
@@ -101,20 +94,25 @@ export default function Dashboard() {
   }
 
   /**
-   * Làm mới im lặng qua authorization code mới (prompt=none). Convex trao đổi
-   * code + PKCE verifier và tự cập nhật quyền server; browser không giữ access token.
+   * Làm mới danh sách server qua prompt=none — CHỈ khi người dùng bấm "Tải lại".
+   *
+   * ── Vì sao KHÔNG được tự chạy khi mở trang (bug thật, người dùng báo 2 lần) ──
+   * Bản cũ tự chuyển trang sang Discord mỗi khi effect mount chạy lại, và effect
+   * có deps `me` — mà `me` là giá trị reactive của Convex, ĐỔI OBJECT MỖI LẦN
+   * server cập nhật (trạng thái bot được heartbeat ghi mỗi ~60 giây). Nghĩa là
+   * cứ ~1 phút effect chạy lại; khoá chống lặp chỉ là bộ đếm 10 phút nên hết
+   * 10 phút là cả trang bị nhảy sang Discord một lần nữa — lặp vô hạn trong một
+   * tab đang mở. Đó là cảm giác "cứ duplicate nhảy đăng nhập": mỗi lần nhảy là
+   * một lần tải lại trang thật, mất vị trí đang làm, rồi quay về kèm toast lỗi
+   * (đọc như đòi đăng nhập lại).
+   *
+   * Bỏ hẳn đường TỰ ĐỘNG: không có khoá nào chống lặp đủ tốt cho một điều hướng
+   * phá huỷ ngữ cảnh trang, và tính năng không mất gì — `me` vẫn reactive (server
+   * mới mời bot tự hiện ra), còn quyền Discord thì làm mới bằng nút "Tải lại"
+   * (người dùng chủ động, thấy ngay toast kết quả).
    */
-  async function startSilentRefresh(force: boolean) {
-    // Khoá chống lặp nằm ở localStorage (phạm vi TRÌNH DUYỆT, không phải từng
-    // tab) — xem src/lib/silentRefresh.ts. Dùng sessionStorage như trước thì
-    // mỗi tab mới lại bị đẩy sang Discord một lần: đúng cảm giác "lặp đăng nhập".
-    const now = Date.now();
-    const blocked = judgeSilentRefresh(readSilentLock(), now, {
-      force,
-      hasSession: Boolean(clientId && token),
-    });
-    if (blocked) return;
-    markSilentAttempt(now);
+  async function refreshServerList() {
+    if (!clientId || !token) return;
     const verifier = generateVerifier();
     const challenge = await generateChallenge(verifier);
     const silentState = randomState();
@@ -124,30 +122,14 @@ export default function Dashboard() {
     window.location.assign(buildSilentAuthorizeUrl(clientId, silentState, challenge));
   }
 
-  // Khi mở dashboard: tự làm mới một lần để server mới mời bot hiện ra ngay.
-  // CHỈ khi phiên còn hợp lệ: `me === null` nghĩa là RequireAuth đang chuyển
-  // sang /auth — nếu vẫn nhảy sang Discord thì hai lần điều hướng tranh nhau và
-  // người dùng bị đẩy tới Discord một cách vô nghĩa, không làm được gì.
-  useEffect(() => {
-    if (!me) return;
-    void startSilentRefresh(false);
-    // startSilentRefresh đọc state hiện tại; `me` vào deps để không chạy lúc
-    // phiên còn chưa xác định.
-  }, [me, clientId, token]);
-
-  // Xử lý kết quả quay về sau luồng làm mới im lặng.
+  // Xử lý kết quả quay về sau lượt làm mới do người dùng bấm "Tải lại".
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const silent = params.get("silent");
     if (silent) {
       if (silent === "ok") {
-        clearSilentFailed();
         toast.success(translate("Đã làm mới danh sách server"));
       } else {
-        // Khoá lượt tự động cho tới khi người dùng bấm "Tải lại" — xem
-        // markSilentFailed(). Không làm thì cứ mở dashboard là lại bị đẩy sang
-        // Discord, thất bại, quay lại: cảm giác "lặp đăng nhập".
-        markSilentFailed();
         toast.error(
           translate(
             "Không làm mới được danh sách server (Discord từ chối làm mới im lặng). Bạn vẫn dùng bình thường — chỉ bấm “Tải lại” khi cần.",
@@ -171,17 +153,13 @@ export default function Dashboard() {
     await logout({ token });
     clearSessionToken();
     clearLegacyDiscordAccess();
-    // Đăng xuất rồi đăng nhập lại thì không được mang theo cờ "làm mới đã hỏng".
-    clearSilentFailed();
     navigate("/");
   }
 
   async function handleRefresh() {
     setRefreshing(true);
-    // Người dùng chủ động thử lại → mở lại lượt tự động (xem markSilentFailed).
-    clearSilentFailed();
     try {
-      await startSilentRefresh(true);
+      await refreshServerList();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : translate("Không thể làm mới danh sách server"),

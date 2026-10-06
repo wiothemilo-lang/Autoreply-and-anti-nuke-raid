@@ -121,6 +121,19 @@ export default function DiscordCallback() {
         return;
       }
       if (!verifier || !savedState || savedState !== state) {
+        // Mất verifier/state = storage của TAB này không còn (mở lại tab sau khi
+        // tắt máy, trình duyệt trong app Discord/WebView có vùng lưu trữ riêng,
+        // chế độ riêng tư, hoặc người dùng quay lại bằng Back).
+        //
+        // Nếu PHIÊN VẪN CÒN SỐNG thì tuyệt đối KHÔNG được hiện "đăng nhập lại":
+        // người dùng đã đăng nhập, chỉ là lượt trao đổi code lần này không kiểm
+        // chứng được. Trước đây rơi vào đây là màn "Đăng nhập thất bại" khô khan
+        // — đúng cái người dùng mô tả là "đăng nhập vô rồi mà cứ yêu cầu đăng
+        // nhập lại". Đưa thẳng về trang đích (returnTo đã qua safeRedirectPath).
+        if (getSessionToken()) {
+          navigate(safeRedirectPath(returnTo), { replace: true });
+          return;
+        }
         setError(translate("Phiên đăng nhập không hợp lệ. Vui lòng thử lại."));
         return;
       }
