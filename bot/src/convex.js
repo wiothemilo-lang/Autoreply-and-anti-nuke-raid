@@ -23,13 +23,18 @@ function botKeyFilePath() {
 }
 
 /**
- * Lỗi có PHẢI là Convex từ chối botKey không? Nhận diện theo thông điệp thật
- * từ convex/botAuth.ts ("Chìa khóa bot không hợp lệ (botKey)" / "Chìa khóa bot
- * chưa được cấp phát") — so khớp thông điệp vì Convex trả Server Error 500
- * (không có mã lỗi riêng cho auth), và thông điệp tiếng Việt đặc thù đủ khó
- * trùng với lỗi khác. KHÔNG khớp lỗi mạng/validator khác → không xoay oan.
+ * Lỗi có PHẢI là Convex từ chối botKey không?
+ *
+ * Đường CHÍNH: so `data.code` do ConvexError mang về — Convex production che
+ * thông điệp của Error thường thành "[Request ID: …] Server Error" nên khớp
+ * câu tiếng Việt KHÔNG BAO GIỜ đúng (bug thật 06/10/2026: 22 giờ bot không
+ * tự xoay key vì nhánh này chết lặng). Giữ khớp message tiếng Việt làm fallback
+ * cho deployment chưa nâng cấp Convex (hai bên lệch sóng deploy ~1 phút).
+ * Không khớp lỗi mạng/validator khác → không xoay oan.
  */
+const BOT_KEY_REJECTION_CODES = new Set(["BOT_KEY_INVALID", "BOT_KEY_SEED_MISSING"]);
 function isBotKeyRejection(err) {
+  if (err?.data && BOT_KEY_REJECTION_CODES.has(err.data.code)) return true;
   const msg = String(err?.message ?? err ?? "");
   return (
     msg.includes("Chìa khóa bot không hợp lệ") || msg.includes("Chìa khóa bot chưa được cấp phát")

@@ -4,6 +4,15 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 07/10/2026 — Deploy ZaloPay + vá sự cố botKey 22h (bot bị Convex từ chối, không tự xoay key được)
+
+- 🎯 **Yêu cầu**: pull + update bot/convex. Pull `5bfda45 → 53b1bbc` (ZaloPay `/donate` + Premium), **lockfile + `bot/` không đổi** → bỏ qua `bun install`.
+- 🔴 **Sự cố thấy lúc xác minh log**: từ **06/10 08:49:33** Convex từ chối **MỌI** call bot-side (`prewarm 0/10`, 85.611 dòng lỗi) — nhưng không phải do lần deploy này (lỗi có từ trước). `botStatus.lastBootstrapAt` = 08:49:33 trong khi `out.log` chỉ có **1 lần bootstrap (05/10 05:43)** và cache `bot/.bot-key` ghi **05/10 08:00** → một lượt bootstrap **ngoài luồng đã xoay seed**, bot đang chạy giữ key cũ. Chữa tức thời: xóa cache + restart → bootstrap lại → **`prewarm 10/10`**.
+- 🧠 **Gốc rễ vì sao 22h không tự lành**: `isBotKeyRejection()` so khớp câu tiếng Việt `"Chìa khóa bot không hợp lệ"`, nhưng Convex production **mask** `Error thường` thành `[Request ID: …] Server Error` (chi tiết chỉ ở tab Logs) → nhánh `rotateBotKey() + retry` **chưa bao giờ kích hoạt**. Test mock đúng câu tiếng Việt nên vẫn xanh — khoảng cách mock↔thực tế. (Bài học này từng ghi 15/09 ở mục G của `test-haimiya-action.ts`.)
+- 🛠 **Vá 2 phía, TDD RED→GREEN**: `convex/botAuth.ts` ném `ConvexError({ code, message })` — **đã kiểm live**: response có `errorData: {code:"BOT_KEY_INVALID"}` dù `errorMessage` vẫn bị mask. `bot/src/convex.js` nhận diện `err.data.code` (giữ fallback message cho đoạn lệch sóng deploy). Test mới: `test-convex-client.cjs` +1 case (39 pass), `test-haimiya-action.ts` +2 case (36 pass) — cả 3 đều RED trước khi sửa.
+- 🧪 **Kiểm chứng**: 87/87 CJS · 23/23 TS · `tsc` · lint · `format:check` · 10 check script (self-test) · codegen Convex · `npx convex deploy` production OK (không index nào bị xoá) · `pm2` online, `prewarm 10/10`, **0 lỗi 16 phút** sau restart.
+- 📁 File đụng (5): `convex/botAuth.ts` · `bot/src/convex.js` · `scripts/test-convex-client.cjs` · `scripts/test-haimiya-action.ts` · `docs/agent-journal.md`.
+
 ## 03/10/2026 (14) — #4 Nâng cấp UI phần A (nốt): dò thời gian sự cố, nhịp 24 giờ, hàng đợi việc, sheet mobile
 
 - 🎯 **Vì sao**: đợt (13) làm A2. Lượt này làm nốt **A4 → A3 → A6 → A5** theo thứ tự đã chốt (giá trị cao → dễ → khó).
@@ -903,6 +912,15 @@ dashboard/{AutoModPanel,WelcomePanel,WhitelistPanel,OnboardingChecklist}.tsx}`,
 - ✅ Kiểm chứng: **80/80 CJS + 18/18 TS** suites · tsc · lint · format · repo-map · convex-contract · i18n · settings-signal · coverage floor · mutation 12/12 · `nginx -t` trong container nginx:1.27 thật · browser suite 7/7. Cập nhật AGENTS.md + guardrails (79→80, 17→18) và repo-map.
 
 ## Đang dở
+
+- 🔎 **Chưa tìm ra AI đã xoay `botStatus.botKeySeed` lúc 06/10 08:49:33 UTC** (gây
+  22h bot bị từ chối). `out.log` không có lượt bootstrap nào của bot hôm đó, và
+  không script nào trong repo gọi `botBootstrapAction:requestBotKey` (test đều
+  mock). Cần soát: phiên agent/sandbox nào đã chạy `bun run start` ngoài `bot/`
+  (`.bot-key` ghi theo `process.cwd()` nên chạy sai thư mục là **ghi ra chỗ khác**),
+  hoặc ai gọi thẳng action production. Nếu không tìm ra, sự cố **sẽ tái diễn** mỗi
+  lần có tác nhân xoay seed ngoài luồng — vá `isBotKeyRejection` (07/10) đã làm
+  bot **tự hồi phục** được, nhưng chưa chặn được nguyên nhân sinh ra.
 
 - ✅ **Backlog rà soát 30/09: đã sửa xong phần bug kỹ thuật** (entry "01/10/2026 (1)").
   Còn lại các mục cần **người quyết định chính sách** trên đường raid — xem mục "Backlog"

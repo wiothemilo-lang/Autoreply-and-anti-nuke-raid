@@ -7,6 +7,31 @@ import {
 import { internal } from "./_generated/api";
 import { getBotStatus } from "./hidden";
 import { sha256Hex } from "./sha256";
+import { ConvexError } from "convex/values";
+
+/**
+ * Lỗi từ chối botKey — ném `ConvexError` chứ KHÔNG phải `Error thường`.
+ *
+ * Convex production CHE thông điệp của `Error` thường thành
+ * "[Request ID: …] Server Error" (chi tiết chỉ nằm ở tab Logs). Bot bên kia vì
+ * thế không phân biệt được "key bị từ chối" với 500 thông thường → không tự
+ * xoay key được: bug thật 06/10/2026, 22 giờ prewarm 0/10 mới lộ.
+ * `ConvexError` gửi kèm `data` về client DÙ message bị mask (browser.bundle:
+ * forwardData → error.data) — đó là kênh máy đọc được. Thông điệp tiếng Việt
+ * vẫn nằm trong data để người xem log đọc ra.
+ */
+/**
+ * Dữ liệu lỗi botKey — client đọc `err.data.code` (xem `isBotKeyRejection`
+ * trong bot/src/convex.js). `message` tiếng Việt chỉ để người đọc log.
+ */
+type BotKeyErrorData = {
+  code: "BOT_KEY_INVALID" | "BOT_KEY_SEED_MISSING";
+  message: string;
+};
+
+function botKeyRejected(code: BotKeyErrorData["code"], vi: string): ConvexError<BotKeyErrorData> {
+  return new ConvexError({ code, message: vi });
+}
 
 /**
  * Chìa khóa dùng chung cho các function chỉ bot được gọi.
@@ -53,7 +78,7 @@ export async function requireBotKey(
   // Chưa cài seed → chưa kích hoạt (giữ back-compat với bot cũ).
   if (!seed) return;
   if (!botKey || computeBotKey(botKey) !== seed) {
-    throw new Error("Chìa khóa bot không hợp lệ (botKey)");
+    throw botKeyRejected("BOT_KEY_INVALID", "Chìa khóa bot không hợp lệ (botKey)");
   }
 }
 
@@ -77,12 +102,13 @@ export async function requireBotKeyStrict(
   if (!seed) {
     // Seed chưa được cấp phát — bot thật phải chạy bootstrap (botBootstrap.ts)
     // trước khi dùng các function bảo mật cao. Từ chối để không có cửa hậu.
-    throw new Error(
+    throw botKeyRejected(
+      "BOT_KEY_SEED_MISSING",
       "Chìa khóa bot chưa được cấp phát — bot cần kết nối bản mới để tự cấp phát (bootstrap)",
     );
   }
   if (!botKey || computeBotKey(botKey) !== seed) {
-    throw new Error("Chìa khóa bot không hợp lệ (botKey)");
+    throw botKeyRejected("BOT_KEY_INVALID", "Chìa khóa bot không hợp lệ (botKey)");
   }
 }
 
