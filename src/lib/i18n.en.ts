@@ -1464,6 +1464,17 @@ export const EN: Record<string, string> = {
     "Protogon is maintained by one person, who pays for the server and the time out of pocket. Every feature is free and always will be — your support buys the bot more uptime, not a feature unlock.",
   "Ủng hộ qua Discord": "Support via Discord",
   "Xem gói Premium": "See premium plans",
+  "Ủng hộ trực tiếp bằng mã QR": "Support directly with a QR code",
+  "Không cần đăng nhập, không qua cổng thanh toán: mở app ngân hàng hoặc ví điện tử của bạn, quét mã rồi chuyển số tiền bạn muốn. Tiền vào thẳng ví nhà phát triển.":
+    "No sign-in and no payment gateway: open your banking or wallet app, scan the code and send whatever amount you like. The money goes straight to the developer's wallet.",
+  "Quét được bằng ZaloPay, MoMo, VietQR và app ngân hàng bất kỳ":
+    "Works with ZaloPay, MoMo, VietQR and any banking app",
+  "Chủ ví: NGUYEN DUY KHIEM — kiểm tra đúng tên trước khi chuyển":
+    "Account holder: NGUYEN DUY KHIEM — check that the name matches before sending",
+  "Ủng hộ qua QR là quà tặng cá nhân, không tự mở khoá Premium. Cần xác nhận thì nhắn trong Discord.":
+    "A QR donation is a personal gift and does not unlock Premium by itself. Message us on Discord if you need confirmation.",
+  "Mã QR nhận ủng hộ của NGUYEN DUY KHIEM": "Donation QR code of NGUYEN DUY KHIEM",
+  "Quét mã bằng app chuyển tiền bất kỳ": "Scan the code with any money transfer app",
   "Chọn mức tùy khả năng": "Pick whatever feels comfortable",
   "Đây chỉ là gợi ý. Mọi mức đều được chào đón, kể cả một lời cảm ơn.":
     "These are suggestions only. Every amount is welcome, including a simple thank-you.",
