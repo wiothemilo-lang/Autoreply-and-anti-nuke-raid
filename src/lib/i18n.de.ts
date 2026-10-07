@@ -1436,6 +1436,17 @@ export const DE: Record<string, string> = {
   "Nếu bạn cần trả lời gấp hoặc muốn cả cộng đồng cùng bàn, vào Discord — kênh hỗ trợ có người theo dõi.":
     "Wenn es schnell gehen soll oder die Community mitreden soll: komm auf Discord — der Support-Kanal wird betreut.",
   "Vào Discord": "Discord beitreten",
+  "Ủng hộ trực tiếp bằng mã QR": "Direkt per QR-Code unterstützen",
+  "Không cần đăng nhập, không qua cổng thanh toán: mở app ngân hàng hoặc ví điện tử của bạn, quét mã rồi chuyển số tiền bạn muốn. Tiền vào thẳng ví nhà phát triển.":
+    "Keine Anmeldung, kein Zahlungsanbieter dazwischen: öffne deine Banking- oder Wallet-App, scanne den Code und sende den Betrag, den du möchtest. Das Geld landet direkt im Wallet des Entwicklers.",
+  "Quét được bằng ZaloPay, MoMo, VietQR và app ngân hàng bất kỳ":
+    "Funktioniert mit ZaloPay, MoMo, VietQR und jeder Banking-App",
+  "Chủ ví: NGUYEN DUY KHIEM — kiểm tra đúng tên trước khi chuyển":
+    "Kontoinhaber: NGUYEN DUY KHIEM — prüfe den Namen, bevor du sendest",
+  "Ủng hộ qua QR là quà tặng cá nhân, không tự mở khoá Premium. Cần xác nhận thì nhắn trong Discord.":
+    "Eine QR-Spende ist ein persönliches Geschenk und schaltet Premium nicht automatisch frei. Schreib uns auf Discord, wenn du eine Bestätigung brauchst.",
+  "Mã QR nhận ủng hộ của NGUYEN DUY KHIEM": "Spenden-QR-Code von NGUYEN DUY KHIEM",
+  "Quét mã bằng app chuyển tiền bất kỳ": "Scanne den Code mit einer beliebigen Überweisungs-App",
   "Chọn mức tùy khả năng": "Wähle, was dir entspricht",
   "Đây chỉ là gợi ý. Mọi mức đều được chào đón, kể cả một lời cảm ơn.":
     "Das sind nur Vorschläge. Jeder Betrag ist willkommen, auch ein einfaches Danke.",

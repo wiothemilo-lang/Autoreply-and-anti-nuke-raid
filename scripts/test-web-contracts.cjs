@@ -2369,5 +2369,46 @@ check(
   );
 }
 
+// ─── N. Ảnh tĩnh trỏ từ src/ phải tồn tại THẬT trong public/ ────────────────
+// Bug câm: `src="/ten-sai.png"` vẫn bundle sạch, không làm build đỏ — chỉ hiện
+// icon ảnh vỡ trên production. Với ảnh QR ủng hộ thì đó là lúc khách bấm vào để
+// chuyển tiền. Mọi đường dẫn tĩnh trong src bị đối chiếu với đĩa.
+const ASSET_RE = /(?:src|href)="(\/[^"]+\.(?:png|jpe?g|webp|svg|ico|gif))"/g;
+const missingAssets = [];
+for (const [rel, src] of files) {
+  for (const m of src.matchAll(ASSET_RE)) {
+    if (!fs.existsSync(path.join(ROOT, "public", m[1].replace(/^\//, "")))) {
+      missingAssets.push(`${rel} → ${m[1]}`);
+    }
+  }
+}
+check(
+  "mọi ảnh tĩnh trỏ từ src/ đều có file thật trong public/",
+  missingAssets.length === 0,
+  missingAssets.join(", "),
+);
+
+// Trang /donate: khối QR ví cá nhân là kênh duy nhất người CHƯA đăng nhập dùng
+// được (ZaloPay checkout bắt buộc đăng nhập). Mất khối hoặc mất ảnh = mất đường
+// ủng hộ đó mà không có gì báo, nên khoá cả hai phía: ảnh được render trong
+// DonatePage kèm nhãn đã qua translate(), và file JPEG thật trên đĩa.
+const donateSrc = files.get("pages/DonatePage.tsx") ?? "";
+check(
+  "trang /donate render mã QR ví cá nhân (/payment.jpg) trong khối đã dịch",
+  donateSrc.includes('src="/payment.jpg"') &&
+    donateSrc.includes('translate("Ủng hộ trực tiếp bằng mã QR")'),
+  "ảnh /payment.jpg hoặc khối QR đã bị gỡ khỏi DonatePage.tsx",
+);
+check(
+  "public/payment.jpg là ảnh JPEG thật (không rỗng, không hỏng)",
+  (() => {
+    const p = path.join(ROOT, "public", "payment.jpg");
+    if (!fs.existsSync(p)) return false;
+    const buf = fs.readFileSync(p);
+    return buf.length > 1000 && buf[0] === 0xff && buf[1] === 0xd8;
+  })(),
+  "thiếu file hoặc không phải ảnh JPEG",
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);
