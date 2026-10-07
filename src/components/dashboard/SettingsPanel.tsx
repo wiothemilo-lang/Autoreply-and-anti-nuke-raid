@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   BarChart3,
   BellRing,
+  Clock,
   Command,
   Download,
   FileJson,
@@ -57,6 +58,9 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
   const [modLogChannelId, setModLogChannelId] = useState(data.guild.modLogChannelId ?? "none");
   const [modRoles, setModRoles] = useState<string[]>(data.guild.modRoles);
   const [adminRoles, setAdminRoles] = useState<string[]>(data.guild.adminRoles);
+  // Chống spam báo cáo khẩn (raid/nuke) — 2 knob ghi ngay bằng nút Lưu riêng.
+  const [reportMinIntervalMin, setReportMinIntervalMin] = useState(data.guild.reportMinIntervalMin);
+  const [reportMinEvents, setReportMinEvents] = useState(data.guild.reportMinEvents);
   const [theme, setTheme] = useState(data.guild.theme || DEFAULT_THEME);
   const [themeSaving, setThemeSaving] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -117,6 +121,21 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
     }
   }
 
+  /** Lưu chính sách chống spam báo cáo khẩn — chỉ ghi 2 field này. */
+  async function saveReportPolicy() {
+    try {
+      await updateSettings({
+        token: TOKEN(),
+        guildId: data.guild.discordId,
+        reportMinIntervalMin,
+        reportMinEvents,
+      });
+      toast.success(translate("Đã lưu chính sách báo cáo khẩn"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+    }
+  }
+
   async function togglePingEveryone(v: boolean) {
     try {
       await updateSettings({
@@ -141,7 +160,9 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
     logLang !== (data.guild.logLang ?? "vi") ||
     modLogChannelId !== (data.guild.modLogChannelId ?? "none") ||
     JSON.stringify(modRoles) !== JSON.stringify(data.guild.modRoles) ||
-    JSON.stringify(adminRoles) !== JSON.stringify(data.guild.adminRoles);
+    JSON.stringify(adminRoles) !== JSON.stringify(data.guild.adminRoles) ||
+    reportMinIntervalMin !== data.guild.reportMinIntervalMin ||
+    reportMinEvents !== data.guild.reportMinEvents;
   useUnsavedChanges("settings", dirty);
 
   async function handleSave() {
@@ -384,6 +405,53 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                   checked={data.guild.emergencyAlertEnabled}
                   onCheckedChange={toggleEmergencyAlert}
                 />
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-2.5">
+                <p className="text-sm font-medium">
+                  <Clock className="mr-1.5 inline h-4 w-4 text-primary" />
+                  {translate("Chống spam báo cáo khẩn")}{" "}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {translate(
+                    "Chỉ gửi cảnh báo khẩn khi đã dồn đủ số sự kiện nuke VÀ đủ khoảng cách từ báo cáo trước — sự kiện trong lúc chờ vẫn được giữ, không mất.",
+                  )}{" "}
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {translate("Phút tối thiểu giữa 2 báo cáo")}{" "}
+                    <input
+                      type="number"
+                      min={1}
+                      max={360}
+                      value={reportMinIntervalMin}
+                      onChange={(e) =>
+                        setReportMinIntervalMin(
+                          Math.max(1, Math.min(360, parseInt(e.target.value || "15", 10) || 15)),
+                        )
+                      }
+                      className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {translate("Sự kiện nuke tối thiểu")}{" "}
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={reportMinEvents}
+                      onChange={(e) =>
+                        setReportMinEvents(
+                          Math.max(1, Math.min(50, parseInt(e.target.value || "1", 10) || 1)),
+                        )
+                      }
+                      className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60"
+                    />
+                  </label>
+                  <Button size="sm" onClick={saveReportPolicy}>
+                    {translate("Lưu chính sách")}
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-secondary/30 px-3 py-2.5">

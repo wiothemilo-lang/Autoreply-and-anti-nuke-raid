@@ -507,6 +507,13 @@ export const DE: Record<string, string> = {
     "Es gibt ungespeicherte Änderungen — klicke auf Speichern.",
   "Cơ bản": "Einfach",
   "Cảnh báo khẩn khi raid/nuke": "Dringend-Alarm bei Raid/Nuke",
+  "Chống spam báo cáo khẩn": "Spam-Schutz für Dringend-Alarme",
+  "Chỉ gửi cảnh báo khẩn khi đã dồn đủ số sự kiện nuke VÀ đủ khoảng cách từ báo cáo trước — sự kiện trong lúc chờ vẫn được giữ, không mất.":
+    "Ein Dringend-Alarm wird erst gesendet, wenn sich genug Nuke-Ereignisse angesammelt haben UND genug Zeit seit dem letzten Bericht vergangen ist — Ereignisse in der Wartezeit bleiben erhalten.",
+  "Phút tối thiểu giữa 2 báo cáo": "Mindestminuten zwischen zwei Berichten",
+  "Sự kiện nuke tối thiểu": "Mindestanzahl Nuke-Ereignisse",
+  "Lưu chính sách": "Richtlinie speichern",
+  "Đã lưu chính sách báo cáo khẩn": "Richtlinie für Dringend-Berichte gespeichert",
   "Cần cấu hình Client ID": "Client ID muss konfiguriert werden",
   "Cập nhật gần nhất": "Zuletzt aktualisiert",
   "Cập nhật khung giờ ngay bây giờ": "Zeitfenster jetzt aktualisieren",
@@ -1389,6 +1396,46 @@ export const DE: Record<string, string> = {
     "Protogon wird von einer Person gepflegt, Server und Zeit laufen aus eigener Tasche. Alle Funktionen sind kostenlos und bleiben es — deine Unterstützung kauft dem Bot mehr Laufzeit, keine Entsperrung.",
   "Ủng hộ qua Discord": "Über Discord unterstützen",
   "Xem gói Premium": "Premium-Tarife ansehen",
+
+  // ── Seite Feedback (/feedback) ──
+  "Góp ý": "Feedback",
+  "Phản hồi của bạn": "Dein Feedback",
+  "Góp ý cho Protogon": "Feedback zu Protogon senden",
+  "Bạn gặp lỗi, thiếu tính năng, hay chỉ muốn góp ý? Gửi ở đây — góp ý đi thẳng tới người làm bot, không cần tài khoản Discord và không ai khác đọc được.":
+    "Fehler gefunden, Funktion vermisst oder einfach etwas loswerden? Schreib es hier — das Feedback geht direkt an den Entwickler, braucht kein Discord-Konto und niemand sonst liest mit.",
+  "Loại góp ý": "Art des Feedbacks",
+  "Báo lỗi": "Fehler melden",
+  "Bot hoặc web làm sai điều gì đó": "Der Bot oder die Website hat etwas falsch gemacht",
+  "Đề xuất tính năng": "Funktion vorschlagen",
+  "Bạn muốn bot làm được thêm gì": "Etwas, das der Bot können sollte",
+  "Góp ý chung": "Allgemeines Feedback",
+  "Cảm nhận, câu hỏi, hoặc lời cảm ơn": "Eindrücke, Fragen oder ein Dankeschön",
+  "Mô tả càng rõ càng tốt: bạn đang làm gì, thấy gì, và mong đợi điều gì.":
+    "Je genauer, desto besser: was du gemacht hast, was du gesehen hast und was du erwartet hättest.",
+  "Cần ít nhất {p0} ký tự.": "Mindestens {p0} Zeichen nötig.",
+  "{p0}/{p1} ký tự": "{p0}/{p1} Zeichen",
+  "Email (không bắt buộc)": "E-Mail (optional)",
+  "Điền nếu bạn muốn mình phản hồi lại — bỏ trống vẫn gửi được.":
+    "Nur ausfüllen, wenn du eine Antwort möchtest — leer lassen ist in Ordnung.",
+  "Gửi góp ý": "Feedback senden",
+  "Đang gửi…": "Wird gesendet…",
+  "Không gửi được góp ý — thử lại sau ít phút nhé.":
+    "Feedback konnte nicht gesendet werden — bitte in ein paar Minuten erneut versuchen.",
+  "Hệ thống vừa nhận quá nhiều góp ý — bạn thử lại sau ít phút nhé, hoặc nhắn trực tiếp trong Discord.":
+    "Das System hat gerade sehr viel Feedback erhalten — bitte in ein paar Minuten erneut versuchen oder direkt auf Discord schreiben.",
+  "Email chưa đúng dạng — bỏ trống cũng được nếu bạn không cần phản hồi.":
+    "Diese E-Mail sieht nicht korrekt aus — leer lassen, wenn du keine Antwort brauchst.",
+  "Không cần đăng nhập. Mình không chia sẻ góp ý của bạn cho ai khác.":
+    "Keine Anmeldung nötig. Dein Feedback wird nicht an Dritte weitergegeben.",
+  "Đã nhận góp ý của bạn": "Dein Feedback ist angekommen",
+  "Cảm ơn bạn! Mình đọc hết góp ý và sẽ trả lời qua email nếu bạn có để lại địa chỉ.":
+    "Danke! Ich lese jede Nachricht und antworte per E-Mail, wenn du eine Adresse hinterlassen hast.",
+  "Gửi thêm góp ý": "Weiteres Feedback senden",
+  "Vào Discord để trao đổi trực tiếp": "Auf Discord direkt austauschen",
+  "Muốn trao đổi trực tiếp?": "Lieber direkt sprechen?",
+  "Nếu bạn cần trả lời gấp hoặc muốn cả cộng đồng cùng bàn, vào Discord — kênh hỗ trợ có người theo dõi.":
+    "Wenn es schnell gehen soll oder die Community mitreden soll: komm auf Discord — der Support-Kanal wird betreut.",
+  "Vào Discord": "Discord beitreten",
   "Ủng hộ trực tiếp bằng mã QR": "Direkt per QR-Code unterstützen",
   "Không cần đăng nhập, không qua cổng thanh toán: mở app ngân hàng hoặc ví điện tử của bạn, quét mã rồi chuyển số tiền bạn muốn. Tiền vào thẳng ví nhà phát triển.":
     "Keine Anmeldung, kein Zahlungsanbieter dazwischen: öffne deine Banking- oder Wallet-App, scanne den Code und sende den Betrag, den du möchtest. Das Geld landet direkt im Wallet des Entwicklers.",

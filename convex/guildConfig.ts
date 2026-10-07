@@ -28,6 +28,14 @@
  */
 
 import { HEAT_DEFAULTS } from "./modules";
+// Ngưỡng chính sách báo cáo khẩn — lấy từ nguồn số duy nhất (`reports.ts`),
+// không gõ lại ở đây để ba bản sao (UI, Convex, bot) không lệch nhau.
+import {
+  REPORT_MIN_EVENTS_MAX,
+  REPORT_MIN_EVENTS_MIN,
+  REPORT_MIN_INTERVAL_MINUTES_MAX,
+  REPORT_MIN_INTERVAL_MINUTES_MIN,
+} from "./reports";
 
 /**
  * Bump khi thêm/bỏ field trong allowlist, để file cũ nạp vẫn được (và để
@@ -80,6 +88,8 @@ export const PORTABLE_CONFIG_FIELDS = [
   "adminRoles",
   "dailyReportEnabled",
   "emergencyAlertEnabled",
+  "reportMinIntervalMin",
+  "reportMinEvents",
   "logPingEveryone",
   "welcomeEnabled",
   "welcomeChannelId",
@@ -193,6 +203,10 @@ const NUMBER_RANGES: Record<string, readonly [number, number]> = {
   warnStrikeLimit: [0, 20],
   warnStrikeWindowMin: [1, 1440],
   joinGateMinAgeDays: [0, 3650],
+  // Chính sách báo cáo khẩn — LẤY từ `reports.ts` (nguồn số duy nhất), không
+  // gõ lại: gõ lại là có ngày lệch với clamp của updateSettings/bot.
+  reportMinIntervalMin: [REPORT_MIN_INTERVAL_MINUTES_MIN, REPORT_MIN_INTERVAL_MINUTES_MAX],
+  reportMinEvents: [REPORT_MIN_EVENTS_MIN, REPORT_MIN_EVENTS_MAX],
 };
 
 /** Field chuỗi thuần — `null`/rỗng ⇒ xoá (undefined), còn lại bị cắt theo trần. */

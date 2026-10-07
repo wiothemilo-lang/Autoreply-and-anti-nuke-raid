@@ -31,6 +31,7 @@ export type RouteSeoKind =
   | "data-deletion"
   | "monitor"
   | "donate"
+  | "feedback"
   | "premium"
   | "auth"
   | "dashboard"

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBotStatus, type BotStatus } from "./useBotStatus";
 import { dateLocale } from "./i18n";
 import { convexPingUrl } from "./convexUrl";
+import { BOT_SYNC_INTERVAL_MS } from "./utils";
 
 /**
  * URL ping — TÍNH LÚC CẦN, không gọi `convexPingUrl()` ở top-level.
@@ -25,8 +26,15 @@ function pingEndpoint(): string {
 export const LATENCY_FAST = 300;
 export const LATENCY_SLOW = 800;
 export const INCIDENT_SLOW = 1200;
-/** Bot sync dữ liệu lên Convex mỗi 60 giây (xem bot/src/handlers/guildSync.js). */
-export const SYNC_INTERVAL_MS = 60_000;
+/**
+ * Nhịp bot đẩy dữ liệu lên Convex: 180s (`setTimeout(runSyncLoop, 180_000)`
+ * trong bot/src/index.js), lấy từ hằng số dùng chung ở lib/utils.ts.
+ *
+ * Trước đây khai 60s ở đây → khung "Cập nhật tiếp theo" luôn hiện một mốc đã
+ * trôi qua và dòng chú thích ghi "mỗi 60 giây" trong khi bot thật sự 180s —
+ * người dùng nhìn mốc cũ rồi tưởng bot đứng.
+ */
+export const SYNC_INTERVAL_MS = BOT_SYNC_INTERVAL_MS;
 
 export interface MonitorIncident {
   time: number;

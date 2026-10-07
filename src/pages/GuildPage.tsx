@@ -34,7 +34,7 @@ import { Badge } from "../components/ui/badge";
 import { cn } from "../lib/utils";
 import { buildBotInviteUrl, discordGuildIconUrl, getSessionToken } from "../lib/discord";
 import { usePublicConfig } from "../lib/usePublicConfig";
-import { isHeartbeatFresh, timeAgo } from "../lib/utils";
+import { GUILD_HEARTBEAT_FRESH_MS, isGuildHeartbeatFresh, timeAgo } from "../lib/utils";
 import type { GuildData } from "../lib/types";
 import OverviewPanel from "../components/dashboard/OverviewPanel";
 import OnboardingChecklist from "../components/dashboard/OnboardingChecklist";
@@ -275,11 +275,16 @@ export default function GuildPage() {
   }
 
   const icon = discordGuildIconUrl({ id: data.guild.discordId, icon: data.guild.icon });
-  const online = data.guild.botInGuild && isHeartbeatFresh(data.guild.lastHeartbeat);
+  // `lastHeartbeat` ở đây là của RIÊNG guild (bot refresh mỗi 5 nhịp sync ~15
+  // phút) — dùng ngưỡng toàn cục 6 phút thì mọi server đều hiện "Bot offline".
+  const online = data.guild.botInGuild && isGuildHeartbeatFresh(data.guild.lastHeartbeat);
   const sync = syncState({
     settingsChangedAt: data.guild.settingsChangedAt,
     botOnline: online,
     lastHeartbeat: data.guild.lastHeartbeat,
+    // Cùng lý do: ngưỡng "heartbeat đã cũ" phải theo nhịp refresh của guild,
+    // nếu không trạng thái "đã áp dụng" bị đổi thành "bot offline" oan.
+    staleHeartbeatMs: GUILD_HEARTBEAT_FRESH_MS,
   });
 
   // Badge trạng thái server — khai báo 1 lần, dùng lại ở hàng desktop (dưới

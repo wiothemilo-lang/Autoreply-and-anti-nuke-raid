@@ -138,6 +138,10 @@ export interface GuildData {
     dailyReportEnabled: boolean;
     lastReportAt: number | null;
     emergencyAlertEnabled: boolean;
+    /** Phút tối thiểu giữa 2 báo cáo khẩn (raid/nuke) — chống spam báo cáo. */
+    reportMinIntervalMin: number;
+    /** Số sự kiện nuke tối thiểu mới đủ điều kiện gửi báo cáo khẩn. */
+    reportMinEvents: number;
     logPingEveryone: boolean;
     welcomeEnabled: boolean;
     welcomeChannelId: string | null;

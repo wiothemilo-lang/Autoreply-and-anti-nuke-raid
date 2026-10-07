@@ -427,8 +427,138 @@ check(
 const utils = files.get("lib/utils.ts") ?? "";
 const overviewPanel = files.get("components/dashboard/OverviewPanel.tsx") ?? "";
 check(
-  "online status dùng chung heartbeat freshness helper",
-  /isHeartbeatFresh/.test(utils) && /isHeartbeatFresh/.test(overviewPanel),
+  "online status dùng chung helper tươi — tách ngưỡng toàn cục vs theo-guild",
+  /export function isHeartbeatFresh/.test(utils) &&
+    /export function isGuildHeartbeatFresh/.test(utils) &&
+    /isGuildHeartbeatFresh/.test(overviewPanel),
+);
+
+// ─── N-bis. Nhịp tim bot ⇄ ngưỡng hiển thị trạng thái ───────────────────────
+// Bản vá bug thật: web báo "bot mất kết nối" trong khi bot đang chạy.
+//
+// Ngưỡng "còn tươi" nằm ở 4 file khác ngôn ngữ/tiến trình (bot CommonJS, hằng
+// số dùng chung của Convex, web TS) — lệch một nơi là có màn hình hiển thị sai.
+// Test này đọc SỐ THẬT trong từng file rồi so khớp với nhịp thật của bot, thay
+// vì tin vào comment: comment nói "180s" mà code ghi 60s là đúng lỗi đã xảy ra
+// (useBotMonitor khai SYNC_INTERVAL_MS = 60_000 và test cũ khoá luôn con số
+// sai đó).
+//
+// Vì sao không `eval`: ESLint cấm no-new-func, và test chỉ cần số học +, *,
+// ngoặc — evaluator 20 dòng dưới đây đủ và chạy được cả khi chuỗi không hợp lệ
+// (trả NaN ⇒ check đỏ, không ném).
+function evalArith(raw, scope) {
+  const tokens = String(raw).match(/\d[\d_]*|[A-Za-z_][A-Za-z0-9_]*|[+*()]/g) || [];
+  let i = 0;
+  const eat = (t) => (tokens[i] === t ? (i++, true) : false);
+  function primary() {
+    const t = tokens[i];
+    if (t === undefined) return NaN;
+    if (/^\d/.test(t)) {
+      i++;
+      return Number(t.replace(/_/g, ""));
+    }
+    if (t === "(") {
+      i++;
+      const v = expr();
+      eat(")");
+      return v;
+    }
+    i++;
+    return typeof scope[t] === "number" ? scope[t] : NaN;
+  }
+  function term() {
+    let v = primary();
+    while (eat("*")) v *= primary();
+    return v;
+  }
+  function expr() {
+    let v = term();
+    while (eat("+")) v += term();
+    return v;
+  }
+  const value = expr();
+  return Number.isFinite(value) ? value : NaN;
+}
+
+/** Các hằng số `export const TÊN = <số học>;` trong một file nguồn. */
+function readConsts(src) {
+  const scope = {};
+  for (const m of src.matchAll(/export const ([A-Z][A-Z0-9_]*)\s*=\s*([^;]+);/g)) {
+    scope[m[1]] = evalArith(m[2], scope);
+  }
+  return scope;
+}
+
+// Tiền tố hb* để không đụng tên đã dùng ở mục R bên dưới (botIndexSrc…).
+const hbBotIndexSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "index.js"), "utf8");
+const hbGuildSyncSrc = fs.readFileSync(
+  path.join(ROOT, "bot", "src", "handlers", "guildSync.js"),
+  "utf8",
+);
+const convexHeartbeatSrc = fs.readFileSync(path.join(ROOT, "convex", "heartbeat.ts"), "utf8");
+const statusSrc = fs.readFileSync(path.join(ROOT, "convex", "status.ts"), "utf8");
+const backupSrc = fs.readFileSync(path.join(ROOT, "convex", "backup.ts"), "utf8");
+const monitorSrc = files.get("lib/useBotMonitor.ts") ?? "";
+const webConsts = readConsts(utils);
+const convexConsts = readConsts(convexHeartbeatSrc);
+
+const botCadenceMs = (() => {
+  const m = hbBotIndexSrc.match(/setTimeout\(runSyncLoop,\s*([\d_]+)\)/);
+  return m ? Number(m[1].replace(/_/g, "")) : NaN;
+})();
+const guildRefreshEvery = (() => {
+  const m = hbGuildSyncSrc.match(/const refreshHeartbeat = runCounter % (\d+) === 0/);
+  return m ? Number(m[1]) : NaN;
+})();
+
+check(
+  "đọc được nhịp sync thật của bot (bot/src/index.js)",
+  Number.isFinite(botCadenceMs) && botCadenceMs > 0,
+  `nhận ${botCadenceMs}`,
+);
+check(
+  "đọc được chu kỳ refresh heartbeat của guild (guildSync.js)",
+  Number.isFinite(guildRefreshEvery) && guildRefreshEvery > 1,
+  `nhận ${guildRefreshEvery}`,
+);
+check(
+  "nhịp sync web = nhịp sync thật của bot",
+  webConsts.BOT_SYNC_INTERVAL_MS === botCadenceMs,
+  `web ${webConsts.BOT_SYNC_INTERVAL_MS} vs bot ${botCadenceMs}`,
+);
+check(
+  "nhịp sync khai ở hai phía (Convex ⇄ web) phải bằng nhau",
+  convexConsts.BOT_SYNC_INTERVAL_MS === webConsts.BOT_SYNC_INTERVAL_MS,
+  `convex ${convexConsts.BOT_SYNC_INTERVAL_MS} vs web ${webConsts.BOT_SYNC_INTERVAL_MS}`,
+);
+check(
+  "ngưỡng online hai phía bằng nhau (Convex ⇄ web — không màn hình nào trả lời khác)",
+  convexConsts.BOT_ONLINE_WINDOW_MS === webConsts.BOT_ONLINE_WINDOW_MS,
+  `convex ${convexConsts.BOT_ONLINE_WINDOW_MS} vs web ${webConsts.BOT_ONLINE_WINDOW_MS}`,
+);
+check(
+  "ngưỡng online RỘNG HƠN một nhịp sync (bằng 1 nhịp = nhấp nháy offline mỗi chu kỳ)",
+  convexConsts.BOT_ONLINE_WINDOW_MS > botCadenceMs,
+  `ngưỡng ${convexConsts.BOT_ONLINE_WINDOW_MS} vs nhịp ${botCadenceMs}`,
+);
+check(
+  "ngưỡng tươi của guild = chu kỳ refresh + biên (dùng ngưỡng toàn cục cho guild là báo offline oan ~12/15 phút)",
+  webConsts.GUILD_HEARTBEAT_REFRESH_MS === guildRefreshEvery * botCadenceMs &&
+    webConsts.GUILD_HEARTBEAT_FRESH_MS > webConsts.GUILD_HEARTBEAT_REFRESH_MS,
+  `refresh ${webConsts.GUILD_HEARTBEAT_REFRESH_MS} (bot: ${guildRefreshEvery} × ${botCadenceMs}) · fresh ${webConsts.GUILD_HEARTBEAT_FRESH_MS}`,
+);
+check(
+  "useBotMonitor lấy nhịp sync từ hằng số dùng chung (không tự khai số khác)",
+  /export const SYNC_INTERVAL_MS = BOT_SYNC_INTERVAL_MS/.test(monitorSrc),
+);
+check(
+  "convex/status.ts dùng hằng số nhịp dùng chung, không tự khai lại ngưỡng",
+  /import \{ BOT_ONLINE_WINDOW_MS \} from "\.\/heartbeat"/.test(statusSrc) &&
+    !/const BOT_ONLINE_WINDOW_MS/.test(statusSrc),
+);
+check(
+  "convex/backup.ts không tự khai 180s cho trạng thái bot",
+  /BOT_ONLINE_WINDOW_MS/.test(backupSrc) && !/< 180_000/.test(backupSrc),
 );
 const useBotStatusSrc = files.get("lib/useBotStatus.ts") ?? "";
 check(
@@ -439,6 +569,104 @@ check(
 check(
   "useBotStatus dùng CHUNG một ticker cho mọi consumer (Footer + Taskbar cùng mount trên Landing — không mỗi đứa một interval, tab ẩn thì im)",
   /nowListeners/.test(useBotStatusSrc) && /document\.hidden/.test(useBotStatusSrc),
+);
+
+// ─── N-ter. Chính sách báo cáo khẩn (raid/nuke) ⇄ bot ⇄ dashboard ───────────
+// Bug thật: bot SPAM báo cáo khẩn. Cửa sổ cũ cứng 5 phút/guild, nên một vụ
+// raid kéo dài (hoặc một false positive lặp lại) làm bot đăng lại "CẢNH BÁO
+// KHẨN" + @everyone mỗi 5 phút suốt nhiều giờ.
+//
+// Nay có 2 knob cấu hình được (khoảng cách tối thiểu + số sự kiện tối thiểu),
+// và số canonical nằm ở `convex/reports.ts`. Bot chạy CommonJS nên KHÔNG import
+// được TS → phải đọc SỐ THẬT từ cả hai file rồi so; lệch là ví dụ đúng kiểu
+// "dashboard hứa 15 phút, bot vẫn 5 phút" mà không gì báo sai.
+const rpReportsSrc = fs.readFileSync(path.join(ROOT, "convex", "reports.ts"), "utf8");
+const rpIncidentSrc = fs.readFileSync(
+  path.join(ROOT, "bot", "src", "handlers", "incidentReport.js"),
+  "utf8",
+);
+const rpUpdateSrc = fs.readFileSync(
+  path.join(ROOT, "convex", "guilds", "updateSettings.ts"),
+  "utf8",
+);
+const rpGuildsSrc = fs.readFileSync(path.join(ROOT, "convex", "guilds.ts"), "utf8");
+const rpTypesSrc = fs.readFileSync(path.join(ROOT, "src", "lib", "types.ts"), "utf8");
+const rpConvexConsts = readConsts(rpReportsSrc);
+/** Hằng số `const TÊN = <số học>` trong file bot (CommonJS, không export). */
+const rpBotConsts = (() => {
+  const scope = {};
+  for (const m of rpIncidentSrc.matchAll(/const ([A-Z][A-Z0-9_]*)\s*=\s*([^;\n]+);/g)) {
+    const v = evalArith(m[2], scope);
+    if (Number.isFinite(v)) scope[m[1]] = v;
+  }
+  return scope;
+})();
+
+check(
+  "đọc được hằng số chính sách báo cáo ở CẢ hai phía (convex/reports.ts ⇄ incidentReport.js)",
+  Number.isFinite(rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES) &&
+    Number.isFinite(rpBotConsts.DEFAULT_REPORT_MIN_INTERVAL_MIN),
+  `convex ${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES} · bot ${rpBotConsts.DEFAULT_REPORT_MIN_INTERVAL_MIN}`,
+);
+check(
+  "khoảng cách tối thiểu mặc định: Convex = bot",
+  rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES === rpBotConsts.DEFAULT_REPORT_MIN_INTERVAL_MIN,
+  `convex ${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES} vs bot ${rpBotConsts.DEFAULT_REPORT_MIN_INTERVAL_MIN}`,
+);
+check(
+  "biên khoảng cách tối thiểu: Convex = bot",
+  rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MIN === rpBotConsts.REPORT_MIN_INTERVAL_MIN &&
+    rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MAX === rpBotConsts.REPORT_MIN_INTERVAL_MAX,
+  `convex ${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MIN}..${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MAX} vs bot ${rpBotConsts.REPORT_MIN_INTERVAL_MIN}..${rpBotConsts.REPORT_MIN_INTERVAL_MAX}`,
+);
+check(
+  "số sự kiện nuke tối thiểu: mặc định + biên đều khớp giữa Convex và bot",
+  rpConvexConsts.REPORT_MIN_EVENTS === rpBotConsts.DEFAULT_REPORT_MIN_EVENTS &&
+    rpConvexConsts.REPORT_MIN_EVENTS_MIN === rpBotConsts.REPORT_MIN_EVENTS_MIN &&
+    rpConvexConsts.REPORT_MIN_EVENTS_MAX === rpBotConsts.REPORT_MIN_EVENTS_MAX,
+  `convex ${rpConvexConsts.REPORT_MIN_EVENTS} (${rpConvexConsts.REPORT_MIN_EVENTS_MIN}..${rpConvexConsts.REPORT_MIN_EVENTS_MAX}) vs bot ${rpBotConsts.DEFAULT_REPORT_MIN_EVENTS}`,
+);
+// Biên phải CHẶN ĐƯỢC spam thật: mặc định mới rộng hơn hẳn cửa sổ cứng 5 phút
+// cũ, nếu không thì "vá" chỉ là đổi tên biến.
+check(
+  "mặc định mới rộng hơn cửa sổ 5 phút cũ (bug spam 5 phút/lần)",
+  rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES >= 10,
+  `mặc định ${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES} phút`,
+);
+check(
+  "bot dùng clamp của mình cho cấu hình đọc từ guild (không tin số thô)",
+  /clampReportMinIntervalMin\(config\.reportMinIntervalMin\)/.test(rpIncidentSrc) &&
+    /clampReportMinEvents\(config\.reportMinEvents\)/.test(rpIncidentSrc),
+);
+check(
+  "bot DỒN sự kiện thay vì bỏ mất: đếm lại sau khi gửi + hết cửa sổ 60 phút mới reset",
+  /state\.count \+= 1/.test(rpIncidentSrc) &&
+    /if \(state\.count < minEvents\) return;/.test(rpIncidentSrc) &&
+    /REPORT_EVENT_WINDOW_MS/.test(rpIncidentSrc),
+);
+check(
+  "Convex kẹp khi LƯU (updateSettings) và trả mặc định khi ĐỌC (getBotConfig/getGuild)",
+  /clampReportMinIntervalMinutes\(args\.reportMinIntervalMin\)/.test(rpUpdateSrc) &&
+    /clampReportMinEvents\(args\.reportMinEvents\)/.test(rpUpdateSrc) &&
+    (rpGuildsSrc.match(/clampReportMinIntervalMinutes\(guild\.reportMinIntervalMin\)/g) || [])
+      .length === 2,
+  "getGuild + getBotConfig đều phải trả 2 field mới",
+);
+check(
+  "dashboard nhập số trong ĐÚNG biên Convex (1..360 phút · 1..50 sự kiện)",
+  new RegExp(`min=\\{${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MIN}\\}`).test(settings) &&
+    new RegExp(`max=\\{${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MAX}\\}`).test(settings) &&
+    new RegExp(`max=\\{${rpConvexConsts.REPORT_MIN_EVENTS_MAX}\\}`).test(settings),
+);
+check(
+  "web khai đủ 2 field mới trong GuildData.guild (thiếu → panel hiển thị undefined)",
+  /reportMinIntervalMin: number;/.test(rpTypesSrc) && /reportMinEvents: number;/.test(rpTypesSrc),
+);
+check(
+  "config xuất/nhập mang theo 2 field mới (đổi host không mất chính sách chống spam)",
+  /"reportMinIntervalMin",/.test(
+    fs.readFileSync(path.join(ROOT, "convex", "guildConfig.ts"), "utf8"),
+  ),
 );
 
 // ─── N. IP-detect ngôn ngữ ban đầu (không persist) ─────────────────────────

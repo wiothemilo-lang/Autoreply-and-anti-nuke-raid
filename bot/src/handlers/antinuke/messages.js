@@ -372,7 +372,8 @@ module.exports = function createAntiNukeLayer({
       // AI xác nhận raid → CẢNH BÁO KHẨN cho server (fire-and-forget), giống
       // nhánh pattern ở handleMessagePatterns. Trước đây chỉ nhánh pattern
       // gọi: spam là đường raid phổ biến nhất lại im lặng — server bị ban +
-      // khoá kênh mà không ai trong đó được báo. Hàm tự chặn trùng 5 phút và
+      // khoá kênh mà không ai trong đó được báo. Hàm tự chặn trùng theo chính
+      // sách báo cáo (khoảng cách + số sự kiện tối thiểu, cấu hình trên web) và
       // tôn trọng tắt `emergencyAlertEnabled`, nên gọi thêm ở đây không gây spam.
       emergencyRaidAlert(client, store, message.guild, {
         summary: raidAlertSummary(moduleCfg.module, fresh.length, moduleCfg.windowSeconds),
