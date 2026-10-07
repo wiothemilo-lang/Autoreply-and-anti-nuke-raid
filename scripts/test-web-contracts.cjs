@@ -567,7 +567,7 @@ check(
     /visibilitychange[\s\S]{0,220}broadcastNow/.test(useBotStatusSrc),
 );
 check(
-  "useBotStatus dùng CHUNG một ticker cho mọi consumer (Footer + Taskbar cùng mount trên Landing — không mỗi đứa một interval, tab ẩn thì im)",
+  "useBotStatus dùng CHUNG một ticker cho mọi consumer (nhiều nơi cùng đọc trạng thái bot — không mỗi đứa một interval, tab ẩn thì im)",
   /nowListeners/.test(useBotStatusSrc) && /document\.hidden/.test(useBotStatusSrc),
 );
 

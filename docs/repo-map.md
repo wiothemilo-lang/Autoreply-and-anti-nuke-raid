@@ -19,7 +19,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 
 | Trang                       | Vai trò                                                                                                     |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `pages/Landing.tsx`         | Trang chủ mono + Taskbar pill trái + hero stagger                                                           |
+| `pages/Landing.tsx`         | Trang chủ mono + header riêng (`landing/Nav` có `PagesMenu`) + hero stagger                                 |
 | `pages/AuthPage.tsx`        | Đăng nhập Discord OAuth                                                                                     |
 | `pages/Dashboard.tsx`       | Danh sách server của user                                                                                   |
 | `pages/GuildPage.tsx`       | Trang cấu hình 1 server (tabs → các panel dưới)                                                             |
@@ -43,7 +43,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `components/ui/`                  | shadcn/ui nền tảng (button border-first, card mono)                                                                                                                                                                                                         |
 | `components/SiteNav.tsx`          | Header chung (dải sticky `h-12`) + `PagesMenu` — bộ chọn trang nằm trong header, nút nói rõ đang ở trang nào; landing cắm cùng `PagesMenu` vào `landing/Nav.tsx`. Thay dock nổi cũ (07/10/2026): dock từng "mất" vì thiếu neo dọc ở desktop                 |
 | `components/HaimiyaChat.tsx`      | Chat nhân vật Haimiya (giữ màu brand illustration)                                                                                                                                                                                                          |
-| `components/LangSwitch.tsx`       | Công tắc ngôn ngữ VI/EN/DE — nhúng vào chrome mọi trang (nav, taskbar, header dashboard, trang auth)                                                                                                                                                        |
+| `components/LangSwitch.tsx`       | Công tắc ngôn ngữ VI/EN/DE — nhúng vào chrome mọi trang (header chung, header dashboard, trang auth)                                                                                                                                                        |
 | `components/SkipLink.tsx`         | Lối tắt "Bỏ qua tới nội dung" (WCAG 2.4.1) — render MỘT lần ở `App.tsx`, đứng TRƯỚC header chung; mỗi trang chỉ còn giữ đích `#main` (để trong trang thì Tab phải qua cả header mới tới lối tắt)                                                            |
 | `components/MobilePanelSheet.tsx` | Sheet full-screen bọc panel cấu hình khi màn hình < `lg` (đợt #4). Render qua **portal** ra `document.body` vì `PageReveal` đặt `transform` trên `<main>` — `fixed` bên trong sẽ bám `<main>` thay vì viewport. Khoá cuộn nền, Esc đóng, focus vào nút đóng |
 | `lib/i18n.tsx`                    | Lõi đa ngôn ngữ gettext: LangProvider/useT, `translate()`, `ensureDictionary` (nạp lười EN/DE)                                                                                                                                                              |
