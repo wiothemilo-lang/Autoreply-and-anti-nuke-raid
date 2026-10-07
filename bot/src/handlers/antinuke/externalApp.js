@@ -355,7 +355,8 @@ module.exports = function createAntiNukeLayer({ client, store, state, core, ai, 
     await sendLog(guild, config, embed, "raid");
 
     // BÁO CÁO KHẨN: AI quét chat + tổng hợp tình hình → cảnh báo mọi người
-    // (tối đa 1 lần / 5 phút / server, fire-and-forget). DM owner kèm theo —
+    // (chống spam bằng khoảng cách + số sự kiện tối thiểu cấu hình trên web,
+    // fire-and-forget). DM owner kèm theo —
     // app raid giả MEE6/Nitro là kỹ thuật tinh vi nhất, chủ server cần biết ngay.
     void alertOwner(client, store, {
       guild,

@@ -10,6 +10,7 @@ import { v } from "convex/values";
 import type { ObjectType } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { clampReportMinEvents, clampReportMinIntervalMinutes } from "../reports";
 import { getUserByToken, canManageGuild } from "../auth";
 import { HEAT_DEFAULTS } from "../modules";
 import { GREETING_IMAGE_SLOTS, storageIdFromUrl } from "./greetingImages";
@@ -55,6 +56,10 @@ export const updateSettingsArgs = {
   adminRoles: v.optional(v.array(v.string())),
   dailyReportEnabled: v.optional(v.boolean()),
   emergencyAlertEnabled: v.optional(v.boolean()),
+  /** Phút tối thiểu giữa 2 báo cáo khẩn (1..360) — chống spam báo cáo raid. */
+  reportMinIntervalMin: v.optional(v.number()),
+  /** Số sự kiện nuke tối thiểu mới gửi báo cáo khẩn (1..50). */
+  reportMinEvents: v.optional(v.number()),
   logPingEveryone: v.optional(v.boolean()),
   // Welcome/Goodbye — dashboard cấu hình chào thành viên mới / tạm biệt.
   welcomeEnabled: v.optional(v.boolean()),
@@ -184,6 +189,12 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   if (args.dailyReportEnabled !== undefined) patch.dailyReportEnabled = args.dailyReportEnabled;
   if (args.emergencyAlertEnabled !== undefined)
     patch.emergencyAlertEnabled = args.emergencyAlertEnabled;
+  // Hai knob chống spam báo cáo khẩn: KẸP ở server (không tin client) — số
+  // ngoài biên về biên, giá trị rác (Number không hợp lệ) về mặc định.
+  if (args.reportMinIntervalMin !== undefined)
+    patch.reportMinIntervalMin = clampReportMinIntervalMinutes(args.reportMinIntervalMin);
+  if (args.reportMinEvents !== undefined)
+    patch.reportMinEvents = clampReportMinEvents(args.reportMinEvents);
   if (args.logPingEveryone !== undefined) patch.logPingEveryone = args.logPingEveryone;
   // Welcome/Goodbye: message cắt 1000 ký tự + nullable cho phép xoá nội dung.
   if (args.welcomeEnabled !== undefined) patch.welcomeEnabled = args.welcomeEnabled;

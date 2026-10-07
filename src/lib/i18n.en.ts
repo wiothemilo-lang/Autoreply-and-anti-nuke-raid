@@ -527,6 +527,13 @@ export const EN: Record<string, string> = {
   "Có thay đổi chưa lưu — bấm Lưu để áp dụng.": "You have unsaved changes — click Save to apply.",
   "Cơ bản": "Basic",
   "Cảnh báo khẩn khi raid/nuke": "Urgent alert on raid/nuke",
+  "Chống spam báo cáo khẩn": "Emergency alert spam control",
+  "Chỉ gửi cảnh báo khẩn khi đã dồn đủ số sự kiện nuke VÀ đủ khoảng cách từ báo cáo trước — sự kiện trong lúc chờ vẫn được giữ, không mất.":
+    "Only send an urgent alert once enough nuke events have piled up AND enough time has passed since the previous report — events raised while waiting are kept, not dropped.",
+  "Phút tối thiểu giữa 2 báo cáo": "Minimum minutes between two reports",
+  "Sự kiện nuke tối thiểu": "Minimum nuke events",
+  "Lưu chính sách": "Save policy",
+  "Đã lưu chính sách báo cáo khẩn": "Emergency report policy saved",
   "Cần cấu hình Client ID": "Client ID required",
   "Cập nhật gần nhất": "Last updated",
   "Cập nhật khung giờ ngay bây giờ": "Update the schedule now",

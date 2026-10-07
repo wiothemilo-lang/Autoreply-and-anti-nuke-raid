@@ -507,6 +507,13 @@ export const DE: Record<string, string> = {
     "Es gibt ungespeicherte Änderungen — klicke auf Speichern.",
   "Cơ bản": "Einfach",
   "Cảnh báo khẩn khi raid/nuke": "Dringend-Alarm bei Raid/Nuke",
+  "Chống spam báo cáo khẩn": "Spam-Schutz für Dringend-Alarme",
+  "Chỉ gửi cảnh báo khẩn khi đã dồn đủ số sự kiện nuke VÀ đủ khoảng cách từ báo cáo trước — sự kiện trong lúc chờ vẫn được giữ, không mất.":
+    "Ein Dringend-Alarm wird erst gesendet, wenn sich genug Nuke-Ereignisse angesammelt haben UND genug Zeit seit dem letzten Bericht vergangen ist — Ereignisse in der Wartezeit bleiben erhalten.",
+  "Phút tối thiểu giữa 2 báo cáo": "Mindestminuten zwischen zwei Berichten",
+  "Sự kiện nuke tối thiểu": "Mindestanzahl Nuke-Ereignisse",
+  "Lưu chính sách": "Richtlinie speichern",
+  "Đã lưu chính sách báo cáo khẩn": "Richtlinie für Dringend-Berichte gespeichert",
   "Cần cấu hình Client ID": "Client ID muss konfiguriert werden",
   "Cập nhật gần nhất": "Zuletzt aktualisiert",
   "Cập nhật khung giờ ngay bây giờ": "Zeitfenster jetzt aktualisieren",

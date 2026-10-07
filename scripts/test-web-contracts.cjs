@@ -571,6 +571,104 @@ check(
   /nowListeners/.test(useBotStatusSrc) && /document\.hidden/.test(useBotStatusSrc),
 );
 
+// ─── N-ter. Chính sách báo cáo khẩn (raid/nuke) ⇄ bot ⇄ dashboard ───────────
+// Bug thật: bot SPAM báo cáo khẩn. Cửa sổ cũ cứng 5 phút/guild, nên một vụ
+// raid kéo dài (hoặc một false positive lặp lại) làm bot đăng lại "CẢNH BÁO
+// KHẨN" + @everyone mỗi 5 phút suốt nhiều giờ.
+//
+// Nay có 2 knob cấu hình được (khoảng cách tối thiểu + số sự kiện tối thiểu),
+// và số canonical nằm ở `convex/reports.ts`. Bot chạy CommonJS nên KHÔNG import
+// được TS → phải đọc SỐ THẬT từ cả hai file rồi so; lệch là ví dụ đúng kiểu
+// "dashboard hứa 15 phút, bot vẫn 5 phút" mà không gì báo sai.
+const rpReportsSrc = fs.readFileSync(path.join(ROOT, "convex", "reports.ts"), "utf8");
+const rpIncidentSrc = fs.readFileSync(
+  path.join(ROOT, "bot", "src", "handlers", "incidentReport.js"),
+  "utf8",
+);
+const rpUpdateSrc = fs.readFileSync(
+  path.join(ROOT, "convex", "guilds", "updateSettings.ts"),
+  "utf8",
+);
+const rpGuildsSrc = fs.readFileSync(path.join(ROOT, "convex", "guilds.ts"), "utf8");
+const rpTypesSrc = fs.readFileSync(path.join(ROOT, "src", "lib", "types.ts"), "utf8");
+const rpConvexConsts = readConsts(rpReportsSrc);
+/** Hằng số `const TÊN = <số học>` trong file bot (CommonJS, không export). */
+const rpBotConsts = (() => {
+  const scope = {};
+  for (const m of rpIncidentSrc.matchAll(/const ([A-Z][A-Z0-9_]*)\s*=\s*([^;\n]+);/g)) {
+    const v = evalArith(m[2], scope);
+    if (Number.isFinite(v)) scope[m[1]] = v;
+  }
+  return scope;
+})();
+
+check(
+  "đọc được hằng số chính sách báo cáo ở CẢ hai phía (convex/reports.ts ⇄ incidentReport.js)",
+  Number.isFinite(rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES) &&
+    Number.isFinite(rpBotConsts.DEFAULT_REPORT_MIN_INTERVAL_MIN),
+  `convex ${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES} · bot ${rpBotConsts.DEFAULT_REPORT_MIN_INTERVAL_MIN}`,
+);
+check(
+  "khoảng cách tối thiểu mặc định: Convex = bot",
+  rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES === rpBotConsts.DEFAULT_REPORT_MIN_INTERVAL_MIN,
+  `convex ${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES} vs bot ${rpBotConsts.DEFAULT_REPORT_MIN_INTERVAL_MIN}`,
+);
+check(
+  "biên khoảng cách tối thiểu: Convex = bot",
+  rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MIN === rpBotConsts.REPORT_MIN_INTERVAL_MIN &&
+    rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MAX === rpBotConsts.REPORT_MIN_INTERVAL_MAX,
+  `convex ${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MIN}..${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MAX} vs bot ${rpBotConsts.REPORT_MIN_INTERVAL_MIN}..${rpBotConsts.REPORT_MIN_INTERVAL_MAX}`,
+);
+check(
+  "số sự kiện nuke tối thiểu: mặc định + biên đều khớp giữa Convex và bot",
+  rpConvexConsts.REPORT_MIN_EVENTS === rpBotConsts.DEFAULT_REPORT_MIN_EVENTS &&
+    rpConvexConsts.REPORT_MIN_EVENTS_MIN === rpBotConsts.REPORT_MIN_EVENTS_MIN &&
+    rpConvexConsts.REPORT_MIN_EVENTS_MAX === rpBotConsts.REPORT_MIN_EVENTS_MAX,
+  `convex ${rpConvexConsts.REPORT_MIN_EVENTS} (${rpConvexConsts.REPORT_MIN_EVENTS_MIN}..${rpConvexConsts.REPORT_MIN_EVENTS_MAX}) vs bot ${rpBotConsts.DEFAULT_REPORT_MIN_EVENTS}`,
+);
+// Biên phải CHẶN ĐƯỢC spam thật: mặc định mới rộng hơn hẳn cửa sổ cứng 5 phút
+// cũ, nếu không thì "vá" chỉ là đổi tên biến.
+check(
+  "mặc định mới rộng hơn cửa sổ 5 phút cũ (bug spam 5 phút/lần)",
+  rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES >= 10,
+  `mặc định ${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES} phút`,
+);
+check(
+  "bot dùng clamp của mình cho cấu hình đọc từ guild (không tin số thô)",
+  /clampReportMinIntervalMin\(config\.reportMinIntervalMin\)/.test(rpIncidentSrc) &&
+    /clampReportMinEvents\(config\.reportMinEvents\)/.test(rpIncidentSrc),
+);
+check(
+  "bot DỒN sự kiện thay vì bỏ mất: đếm lại sau khi gửi + hết cửa sổ 60 phút mới reset",
+  /state\.count \+= 1/.test(rpIncidentSrc) &&
+    /if \(state\.count < minEvents\) return;/.test(rpIncidentSrc) &&
+    /REPORT_EVENT_WINDOW_MS/.test(rpIncidentSrc),
+);
+check(
+  "Convex kẹp khi LƯU (updateSettings) và trả mặc định khi ĐỌC (getBotConfig/getGuild)",
+  /clampReportMinIntervalMinutes\(args\.reportMinIntervalMin\)/.test(rpUpdateSrc) &&
+    /clampReportMinEvents\(args\.reportMinEvents\)/.test(rpUpdateSrc) &&
+    (rpGuildsSrc.match(/clampReportMinIntervalMinutes\(guild\.reportMinIntervalMin\)/g) || [])
+      .length === 2,
+  "getGuild + getBotConfig đều phải trả 2 field mới",
+);
+check(
+  "dashboard nhập số trong ĐÚNG biên Convex (1..360 phút · 1..50 sự kiện)",
+  new RegExp(`min=\\{${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MIN}\\}`).test(settings) &&
+    new RegExp(`max=\\{${rpConvexConsts.REPORT_MIN_INTERVAL_MINUTES_MAX}\\}`).test(settings) &&
+    new RegExp(`max=\\{${rpConvexConsts.REPORT_MIN_EVENTS_MAX}\\}`).test(settings),
+);
+check(
+  "web khai đủ 2 field mới trong GuildData.guild (thiếu → panel hiển thị undefined)",
+  /reportMinIntervalMin: number;/.test(rpTypesSrc) && /reportMinEvents: number;/.test(rpTypesSrc),
+);
+check(
+  "config xuất/nhập mang theo 2 field mới (đổi host không mất chính sách chống spam)",
+  /"reportMinIntervalMin",/.test(
+    fs.readFileSync(path.join(ROOT, "convex", "guildConfig.ts"), "utf8"),
+  ),
+);
+
 // ─── N. IP-detect ngôn ngữ ban đầu (không persist) ─────────────────────────
 // Bug thực tế: người quốc tế mở landing lần đầu vẫn đọc tiếng Việt vì web chỉ
 // theo navigator.language. Dò theo IP qua endpoint Convex /geo_lang (CSP chỉ

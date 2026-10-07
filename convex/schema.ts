@@ -227,6 +227,16 @@ export default defineSchema({
     reportRequestedAt: v.optional(v.number()),
     /** AI Incident Report: bật/tắt cảnh báo khẩn khi raid/nuke được xác nhận. */
     emergencyAlertEnabled: v.optional(v.boolean()),
+    /**
+     * Số phút TỐI THIỂU giữa 2 báo cáo khẩn (raid/nuke) — chống spam report.
+     * Chưa đặt thì bot dùng mặc định trong `convex/reports.ts`.
+     */
+    reportMinIntervalMin: v.optional(v.number()),
+    /**
+     * Số sự kiện nuke TỐI THIỂU mới đủ điều kiện gửi báo cáo khẩn (sự kiện
+     * được dồn lại khi bị chặn bởi khoảng cách thời gian).
+     */
+    reportMinEvents: v.optional(v.number()),
     /** AI Incident Report: cảnh báo khẩn có ping @everyone không. */
     logPingEveryone: v.optional(v.boolean()),
     /** Welcome/Goodbye: chào thành viên mới + tạm biệt thành viên rời server. */

@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getUserByToken, canManageGuild, guildAccessibleBy } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { hiddenPasswordIsSet, isBotOwnerUser } from "./hidden";
+import { clampReportMinEvents, clampReportMinIntervalMinutes } from "./reports";
 import {
   ANTI_NUKE_MODULES,
   HEAT_DEFAULTS,
@@ -229,6 +230,11 @@ export const getGuild = query({
         dailyReportEnabled: guild.dailyReportEnabled ?? true,
         lastReportAt: guild.lastReportAt ?? null,
         emergencyAlertEnabled: guild.emergencyAlertEnabled ?? true,
+        // Chính sách báo cáo khẩn — kẹp về biên như `updateSettings`, không trả
+        // giá trị thô: document sửa tay hay dữ liệu cũ cũng không làm web hiển
+        // thị số vô lý (0 phút = báo liên tục) rồi người dùng tưởng bot hỏng.
+        reportMinIntervalMin: clampReportMinIntervalMinutes(guild.reportMinIntervalMin),
+        reportMinEvents: clampReportMinEvents(guild.reportMinEvents),
         logPingEveryone: guild.logPingEveryone ?? true,
         badWords: guild.badWords ?? [],
         // Welcome/Goodbye + Autorole — panel WelcomePanel đọc TRỰC TIẾP các field này
@@ -518,6 +524,10 @@ export const getBotConfig = query({
       lockdownRequested: guild.lockdownRequested ?? false,
       dailyReportEnabled: guild.dailyReportEnabled ?? true,
       emergencyAlertEnabled: guild.emergencyAlertEnabled ?? true,
+      // Bot đọc qua getBotConfig (TTL cache 30 phút) — thiếu ở đây thì hai knob
+      // trên dashboard báo "đã lưu" mà bot vẫn chạy mặc định (bug thật 23/09).
+      reportMinIntervalMin: clampReportMinIntervalMinutes(guild.reportMinIntervalMin),
+      reportMinEvents: clampReportMinEvents(guild.reportMinEvents),
       logPingEveryone: guild.logPingEveryone ?? true,
       // Welcome/Goodbye — bot gửi chào/tạm biệt theo config dashboard.
       welcomeEnabled: guild.welcomeEnabled ?? false,

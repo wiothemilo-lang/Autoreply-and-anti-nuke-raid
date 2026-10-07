@@ -75,7 +75,12 @@ Module._load = function (request, parent, isMain) {
   return origLoad.call(this, request, parent, isMain);
 };
 
-const { reportInteractive, emergencyRaidAlert } = require("../bot/src/handlers/incidentReport.js");
+const {
+  reportInteractive,
+  emergencyRaidAlert,
+  clampReportMinIntervalMin,
+  clampReportMinEvents,
+} = require("../bot/src/handlers/incidentReport.js");
 const { Collection } = require(DJS_MOCK);
 
 let pass = 0;
@@ -428,9 +433,12 @@ Giữ nguyên phạt, bật join gate.`;
     );
     check("emergency: embed level raid → color đỏ (từ reason 'massBan')", !!sent[0]?.embeds?.[0]);
 
-    // Cooldown 5 phút: gọi lại ngay → KHÔNG gửi thêm.
+    // Chưa đủ khoảng cách tối thiểu (mặc định 15 phút, guild chưa đặt) → KHÔNG gửi thêm.
     await emergencyRaidAlert({}, store, guild, { reason: "x" });
-    check("emergency: trong 5 phút → không gửi lần 2", sent.length === 1);
+    check(
+      "emergency: gọi lại ngay → không gửi lần 2 (cách nhau < khoảng cách tối thiểu)",
+      sent.length === 1,
+    );
 
     // Toggle tắt: guild khác với emergencyAlertEnabled=false → không gửi.
     const guild2 = { ...guild, id: "g-emg-2" };
@@ -474,6 +482,143 @@ Giữ nguyên phạt, bật join gate.`;
     check("emergency: getConfig lỗi → không gửi", sent.length === 0);
     await emergencyRaidAlert({}, flakyStore, guild, { reason: "massChannelDelete lần 2" });
     check(`emergency: lượt sau vẫn gửi được cảnh báo (thực tế ${sent.length})`, sent.length === 1);
+  }
+
+  // ── 6c. Chống spam báo cáo khẩn: 2 knob (khoảng cách + số sự kiện) ────────
+  // Đây là bản vá bug thật "bot liên tục spam báo cáo nuke": cửa sổ cứng 5
+  // phút trước đây làm bot đăng lại CẢNH BÁO KHẨN + @everyone mỗi 5 phút suốt
+  // một vụ raid dài. Hai knob phải chặn được spam, và KHÔNG được làm mất sự
+  // kiện: chúng được dồn để báo một lần gộp.
+  {
+    // Đồng hồ giả: nhích giờ để kiểm đúng ngưỡng mà không phải sleep 16 phút.
+    const realNow = Date.now;
+    let fakeNow = realNow();
+    Date.now = () => fakeNow;
+    try {
+      aiOnline = false;
+      const logCh = makeChannel("log-spam", []);
+      const guild = {
+        id: "g-spam",
+        name: "Spam Guild",
+        memberCount: 3,
+        channels: {
+          cache: new Collection([["log-spam", logCh]]),
+          fetch: async (cid) => (cid === "log-spam" ? logCh : null),
+        },
+        members: { me: { id: "me" } },
+      };
+      const sent = [];
+      logCh.send = async (p) => {
+        sent.push(p);
+        return p;
+      };
+      const store = makeStore({
+        config: { logChannelId: "log-spam", reportMinEvents: 3, reportMinIntervalMin: 15 },
+      });
+
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 1" });
+      check("spam: sự kiện 1/3 → CHƯA gửi (chưa đủ số sự kiện)", sent.length === 0);
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 2" });
+      check("spam: sự kiện 2/3 → chưa gửi", sent.length === 0);
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 3" });
+      check("spam: sự kiện 3/3 → gửi 1 báo cáo", sent.length === 1);
+
+      fakeNow += 60_000; // mới 1 phút kể từ báo cáo trước
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 4" });
+      fakeNow += 13 * 60_000; // tổng 14 phút — vẫn dưới ngưỡng 15
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 5" });
+      check("spam: dưới khoảng cách tối thiểu → hoãn, không gửi", sent.length === 1);
+
+      fakeNow += 2 * 60_000; // tổng 16 phút
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 6" });
+      check(
+        "spam: qua khoảng cách → báo GỘP cho sự kiện đã dồn (không mất sự kiện)",
+        sent.length === 2,
+      );
+
+      // Sự kiện rải rác cách xa nhau không phải một vụ: hết cửa sổ 60 phút thì
+      // đếm lại từ đầu, không ghép sự kiện lẻ tháng trước vào vụ hôm nay.
+      fakeNow += 61 * 60_000;
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 7" });
+      check("spam: sự kiện ngoài cửa sổ dồn → đếm lại từ 1, chưa báo", sent.length === 2);
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 8" });
+      await emergencyRaidAlert({}, store, guild, { reason: "massBan 9" });
+      check("spam: đủ 3 sự kiện của vụ mới → báo", sent.length === 3);
+    } finally {
+      Date.now = realNow;
+    }
+
+    // Knob khoảng cách: đặt 1 phút vẫn phải chặn lượt gọi ngay sau đó.
+    const logCh2 = makeChannel("log-spam-2", []);
+    const guild2 = {
+      id: "g-spam-2",
+      name: "Spam Guild 2",
+      memberCount: 2,
+      channels: {
+        cache: new Collection([["log-spam-2", logCh2]]),
+        fetch: async (cid) => (cid === "log-spam-2" ? logCh2 : null),
+      },
+      members: { me: { id: "me" } },
+    };
+    const sent2 = [];
+    logCh2.send = async (p) => {
+      sent2.push(p);
+      return p;
+    };
+    const store2 = makeStore({
+      config: { logChannelId: "log-spam-2", reportMinIntervalMin: 1, reportMinEvents: 1 },
+    });
+    await emergencyRaidAlert({}, store2, guild2, { reason: "massBan A" });
+    await emergencyRaidAlert({}, store2, guild2, { reason: "massBan B" });
+    check("spam: khoảng cách = 1 phút vẫn chặn lượt gọi sát nhau", sent2.length === 1);
+
+    // Giá trị rác/hỏng trong cấu hình KHÔNG được kẹp về 0 (0 phút = báo mỗi
+    // sự kiện = spam lại đúng như cũ) mà phải về mặc định an toàn.
+    check(
+      "clamp: 0 phút → biên dưới 1 (không cho 0 = báo liên tục)",
+      clampReportMinIntervalMin(0) === 1,
+    );
+    check("clamp: 9999 phút → trần 360", clampReportMinIntervalMin(9999) === 360);
+    check(
+      "clamp: rác ('abc'/undefined) → mặc định 15 phút",
+      clampReportMinIntervalMin("abc") === 15 && clampReportMinIntervalMin(undefined) === 15,
+    );
+    check(
+      "clamp: số sự kiện rác → mặc định 1",
+      clampReportMinEvents("abc") === 1 && clampReportMinEvents(0) === 1,
+    );
+    check("clamp: số sự kiện 999 → trần 50", clampReportMinEvents(999) === 50);
+
+    // Cấu hình rác trên thực tế: 'abc' → mặc định 1 sự kiện, và vì khoảng cách
+    // mặc định 15 phút nên guild MỚI vẫn báo được ngay lượt đầu.
+    const logCh3 = makeChannel("log-spam-3", []);
+    const guild3 = {
+      id: "g-spam-3",
+      name: "Spam Guild 3",
+      memberCount: 2,
+      channels: {
+        cache: new Collection([["log-spam-3", logCh3]]),
+        fetch: async (cid) => (cid === "log-spam-3" ? logCh3 : null),
+      },
+      members: { me: { id: "me" } },
+    };
+    const sent3 = [];
+    logCh3.send = async (p) => {
+      sent3.push(p);
+      return p;
+    };
+    await emergencyRaidAlert(
+      {},
+      makeStore({
+        config: { logChannelId: "log-spam-3", reportMinIntervalMin: "abc", reportMinEvents: "abc" },
+      }),
+      guild3,
+      { reason: "massBan rác" },
+    );
+    check(
+      "spam: cấu hình rác → dùng mặc định và vẫn báo được (không kẹt im lặng)",
+      sent3.length === 1,
+    );
   }
 
   // ── 7. emergencyRaidAlert — kênh log chết → fallback sendLog không ném ────
