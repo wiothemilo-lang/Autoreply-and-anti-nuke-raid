@@ -15,12 +15,15 @@
 // scripts/test-presets-convex.ts).
 import {
   FEEDBACK_KINDS,
+  FEEDBACK_KEEP_MAX,
+  FEEDBACK_TRIM_BATCH,
   MESSAGE_MAX,
   MESSAGE_MIN,
   SPAM_MAX_IN_WINDOW,
   SPAM_WINDOW_MS,
   list,
   submit,
+  trimFeedback,
   validateFeedback,
 } from "../convex/feedback";
 
@@ -55,7 +58,7 @@ function makeCtx(
   token = "",
   opts: { ownerDiscordId?: string } = {},
 ) {
-  const writes = { insert: [] as any[] };
+  const writes = { insert: [] as any[], delete: [] as string[] };
   const db = {
     query(table: string) {
       const rows = tables[table] ?? [];
@@ -89,6 +92,10 @@ function makeCtx(
       const id = `new-${table}-${writes.insert.length}`;
       (tables[table] ||= []).push({ _id: id, ...doc });
       return id;
+    },
+    delete: async (id: string) => {
+      writes.delete.push(id);
+      for (const key of Object.keys(tables)) tables[key] = tables[key].filter((r) => r._id !== id);
     },
   };
   // Phiên đăng nhập: cần authVersion hiện hành (phiên cũ bị từ chối).
@@ -381,6 +388,108 @@ console.log("\n── #4 list: cổng quyền ──");
     limit: 10_000,
   });
   check("limit khổng lồ bị kẹp về trần 200 (không kéo cả bảng qua dây)", huge.length === 2);
+}
+
+// ─── 5. Trần lưu trữ: giữ tối đa FEEDBACK_KEEP_MAX, xoá dòng CŨ NHẤT ───────
+// Endpoint công khai không có trần tổng = một script có thể nhét ~4.300
+// dòng/ngày (trần 30/10 phút vẫn cho qua) tới ~6 KB/dòng ⇒ cạn storage gói
+// Free. Ba điều phải đúng: (a) vượt trần thì chỉ xoá CŨ NHẤT và chỉ một lô,
+// (b) chưa vượt trần thì không xoá gì, (c) lỗi dọn không làm hỏng việc gửi.
+console.log("\n── #5 trần lưu trữ: dọn dòng cũ ──");
+{
+  const rows = Array.from({ length: FEEDBACK_KEEP_MAX + FEEDBACK_TRIM_BATCH + 20 }, (_, i) => ({
+    _id: `k${i}`,
+    kind: "other",
+    message: "x".repeat(20),
+    createdAt: 1_000 + i,
+  }));
+  const ctx = makeCtx({ feedback: rows });
+  const removed = await trimFeedback(ctx);
+  check(
+    `vượt trần → xoá đúng ${FEEDBACK_TRIM_BATCH} dòng cũ nhất (một lô)`,
+    removed === FEEDBACK_TRIM_BATCH && ctx.writes.delete.length === FEEDBACK_TRIM_BATCH,
+    `removed=${removed}`,
+  );
+  check(
+    "chỉ xoá dòng CŨ NHẤT (giữ lại nguyên số mới nhất)",
+    ctx.writes.delete[0] === "k0" && ctx.writes.delete.at(-1) === `k${FEEDBACK_TRIM_BATCH - 1}`,
+    ctx.writes.delete.slice(0, 3).join(","),
+  );
+  check(
+    "giữ lại đúng trần (không xoá quá tay)",
+    ctx.tables.feedback.length === FEEDBACK_KEEP_MAX + 20,
+    `còn ${ctx.tables.feedback.length}`,
+  );
+}
+{
+  const rows = Array.from({ length: FEEDBACK_KEEP_MAX }, (_, i) => ({
+    _id: `e${i}`,
+    kind: "other",
+    message: "x".repeat(20),
+    createdAt: 1_000 + i,
+  }));
+  const ctx = makeCtx({ feedback: rows });
+  const removed = await trimFeedback(ctx);
+  check(
+    "đúng trần → KHÔNG xoá gì (không đọc/ghi thừa khi bình thường)",
+    removed === 0 &&
+      ctx.writes.delete.length === 0 &&
+      ctx.tables.feedback.length === FEEDBACK_KEEP_MAX,
+  );
+}
+{
+  // Xác suất 1/25: phần lớn lượt gửi KHÔNG kéo theo việc dọn.
+  const rows = Array.from({ length: FEEDBACK_KEEP_MAX + 5 }, (_, i) => ({
+    _id: `p${i}`,
+    kind: "bug",
+    message: "x".repeat(20),
+    createdAt: 1_000 + i,
+  }));
+  const realRandom = Math.random;
+  try {
+    Math.random = () => 0.99; // trượt xác suất
+    const ctx = makeCtx({ feedback: rows });
+    await submitHandler(ctx, { kind: "bug", message: "x".repeat(20) });
+    check(
+      "lượt gửi trượt xác suất → không dọn (không tốn thêm gì)",
+      ctx.writes.delete.length === 0,
+    );
+
+    Math.random = () => 0; // trúng xác suất
+    const ctx2 = makeCtx({ feedback: rows });
+    await submitHandler(ctx2, { kind: "bug", message: "x".repeat(20) });
+    check(
+      "lượt gửi trúng xác suất → có dọn bớt dòng cũ",
+      ctx2.writes.delete.length > 0 && ctx2.writes.insert.length === 1,
+      `xoá ${ctx2.writes.delete.length}`,
+    );
+  } finally {
+    Math.random = realRandom;
+  }
+}
+{
+  // BEST-EFFORT: dọn lỗi KHÔNG được biến thành lỗi gửi góp ý.
+  const rows = Array.from({ length: FEEDBACK_KEEP_MAX + 5 }, (_, i) => ({
+    _id: `f${i}`,
+    kind: "idea",
+    message: "x".repeat(20),
+    createdAt: 1_000 + i,
+  }));
+  const realRandom = Math.random;
+  try {
+    Math.random = () => 0;
+    const ctx = makeCtx({ feedback: rows });
+    ctx.db.delete = async () => {
+      throw new Error("Convex quá tải");
+    };
+    const r = await submitHandler(ctx, { kind: "idea", message: "x".repeat(20) });
+    check(
+      "dọn lỗi → người gửi VẪN nhận ok và góp ý đã được ghi",
+      r.ok === true && r.stored === true && ctx.writes.insert.length === 1,
+    );
+  } finally {
+    Math.random = realRandom;
+  }
 }
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);
