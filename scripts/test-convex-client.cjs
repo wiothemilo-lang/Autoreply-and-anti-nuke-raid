@@ -396,6 +396,64 @@ function freshStore() {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 
+  // ── 12b. Từ chối botKey dạng ConvexError — hình dạng THẬT Convex production ──
+  // Bug thật 06/10/2026 (22 giờ downtime): Convex production CHE thông điệp của
+  // Error thường thành "[Request ID: …] Server Error". isBotKeyRejection so khớp
+  // câu tiếng Việt "Chìa khóa bot không hợp lệ" nên KHÔNG BAO GIỜ khớp → nhánh
+  // xoay key + retry chết lặng, bot kẹt vĩnh viễn với key cache lệch (prewarm
+  // 0/10). Máy phải nhận diện theo errorData — ConvexError vẫn gửi data về
+  // client dù message bị mask (browser.bundle.js: forwardData → error.data).
+  {
+    process.env.CONVEX_URL = "https://test.convex.cloud";
+    delete process.env.BOT_KEY;
+    process.env.DISCORD_TOKEN = "test-token-for-bootstrap";
+    calls.length = 0;
+    const store = new ConvexStore();
+    store.botKey = "stale-key-from-cache";
+    const os = require("os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "convex-test-"));
+    const realCwd = process.cwd();
+    let rotations = 0;
+    const rawQuery = store._rawClient.query.bind(store._rawClient);
+    store._rawClient.query = async (name, args) => {
+      if (args?.botKey === "stale-key-from-cache") {
+        // Đúng hình dạng ConvexHttpClient ném ra khi server throw ConvexError.
+        // KHÔNG có câu tiếng Việt trong message — đó là lý do test này phải red.
+        const e = new Error(
+          '[CONVEX Q(guilds:getBotConfig)] ConvexError {\n  "code": "BOT_KEY_INVALID"\n}\nCalled by client',
+        );
+        e.data = { code: "BOT_KEY_INVALID" };
+        e.statusCode = 500;
+        throw e;
+      }
+      return rawQuery(name, args);
+    };
+    store._rawClient.action = async (name) => {
+      if (name === "botBootstrapAction:requestBotKey") {
+        rotations++;
+        calls.push({ kind: "action", name, args: { botToken: "***" } });
+        return { ok: true, botKey: `fresh-key-${rotations}` };
+      }
+      return { ok: true };
+    };
+    process.chdir(tmpDir);
+    let res = null;
+    let threw = false;
+    try {
+      res = await store.getConfig("g-key-rotate-errcode");
+    } catch {
+      threw = true;
+    }
+    process.chdir(realCwd);
+    check(
+      "ConvexError code BOT_KEY_INVALID (không có message tiếng Việt) → vẫn xoay key + retry",
+      !threw && res?.config === true && rotations === 1,
+      `rotations=${rotations}, threw=${threw}`,
+    );
+    delete process.env.DISCORD_TOKEN;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+
   // ── Tự xoá cache sau khi CHÍNH BOT ghi cấu hình (proxy CONFIG_WRITE_MUTATIONS) ──
   // Bug thật 23/09/2026: 7/35 chỗ gọi bot_writes quên store.invalidate() → bot
   // chạy cấu hình CŨ tới 30 phút. Hệ quả đo được: server bị khoá kênh lâu hơn

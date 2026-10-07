@@ -3,7 +3,7 @@
 // Gọi TRỰC TIẾP handler của action (handler không dùng ctx) với fetch mock —
 // xác minh provider chain, system prompt, history, fallback offline. Không cần key thật.
 import { ask, classifyViolation } from "../convex/haimiya";
-import { computeBotKey } from "../convex/botAuth";
+import { computeBotKey, requireBotKeyStrict } from "../convex/botAuth";
 
 // Convex bọc handler trong function object — lấy handler gốc để gọi trực tiếp.
 const askHandler = (ask as any)._handler;
@@ -238,6 +238,35 @@ const okReply = async () =>
     rejected = true;
   }
   check("không botKey → bị từ chối (requireBotKeyStrict)", rejected);
+
+  // Bug thật 06/10/2026: Convex production CHE thông điệp của Error thường thành
+  // "[Request ID: …] Server Error". Bot so khớp câu tiếng Việt không bao giờ
+  // đúng → mất 22h không tự xoay key. Lỗi từ chối PHẢI mang code máy đọc được
+  // qua ConvexError — errorData vẫn về client dù message bị mask.
+  let keyErr: any = null;
+  try {
+    await requireBotKeyStrict(
+      { runQuery: async () => ({ botKeySeed: computeBotKey(BOT_KEY) }) } as any,
+      "stale-key-from-cache",
+    );
+  } catch (e) {
+    keyErr = e;
+  }
+  check(
+    "key sai → lỗi có data.code máy đọc được (không dựa vào message)",
+    keyErr?.data?.code === "BOT_KEY_INVALID",
+  );
+
+  let seedErr: any = null;
+  try {
+    await requireBotKeyStrict({ runQuery: async () => ({}) } as any, "any-key");
+  } catch (e) {
+    seedErr = e;
+  }
+  check(
+    "seed chưa cấp phát → lỗi có data.code máy đọc được",
+    seedErr?.data?.code === "BOT_KEY_SEED_MISSING",
+  );
 
   console.log("\nG) Hợp đồng KHÔNG-THROW (Convex prod mask message action):");
   // 15/09/2026: ask throw ConvexError "Vui lòng đăng nhập..." → prod Convex mask
