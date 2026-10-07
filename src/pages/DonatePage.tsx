@@ -9,6 +9,7 @@ import {
   Heart,
   Loader2,
   MessageCircle,
+  QrCode,
   Sparkles,
   Star,
 } from "lucide-react";
@@ -32,6 +33,12 @@ import { api } from "../../convex/_generated/api";
  * ủng hộ. Nút thanh toán ZaloPay chạy THẬT (tạo đơn + ký MAC ở Convex —
  * convex/payments.ts): trang chỉ nhận paymentUrl rồi redirect, giá do server
  * chốt theo plan, không bao giờ nhận số tiền từ client.
+ *
+ * Kèm khối QR ví cá nhân (public/payment.jpg): ZaloPay checkout bắt buộc đăng
+ * nhập, mà người muốn ủng hộ 20k thì không đăng nhập chỉ để ủng hộ. QR ví là
+ * kênh duy nhất khách VÃNG LAI dùng được — quét bằng app nào cũng xong, tiền
+ * vào thẳng ví người nhận. Ảnh tĩnh phải tồn tại thật trong public/ (check
+ * ở scripts/test-web-contracts.cjs) vì ảnh sai đường dẫn không làm build đỏ.
  */
 
 /** Mức quyền góp gợi ý. Số tiền do người dùng chọn, không gắn gói dịch vụ. */
@@ -214,6 +221,58 @@ export default function DonatePage() {
               "Thanh toán một lần qua ZaloPay — không lưu thông tin thẻ, không tự động trừ tiền.",
             )}
           </p>
+        </section>
+
+        {/* QR ví cá nhân — kênh duy nhất người CHƯA đăng nhập dùng được. */}
+        <section className="mt-16">
+          <div className="grid items-center gap-8 rounded-2xl border border-border bg-card p-6 sm:p-8 md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
+            <div>
+              <h2 className="flex items-center gap-2 font-display text-xl font-bold text-foreground">
+                <QrCode className="h-5 w-5" />
+                {translate("Ủng hộ trực tiếp bằng mã QR")}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                {translate(
+                  "Không cần đăng nhập, không qua cổng thanh toán: mở app ngân hàng hoặc ví điện tử của bạn, quét mã rồi chuyển số tiền bạn muốn. Tiền vào thẳng ví nhà phát triển.",
+                )}
+              </p>
+              <ul className="mt-4 space-y-2 text-sm text-foreground">
+                <li className="flex items-start gap-2.5">
+                  <span
+                    aria-hidden
+                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground"
+                  />
+                  {translate("Quét được bằng ZaloPay, MoMo, VietQR và app ngân hàng bất kỳ")}
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span
+                    aria-hidden
+                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground"
+                  />
+                  {translate("Chủ ví: NGUYEN DUY KHIEM — kiểm tra đúng tên trước khi chuyển")}
+                </li>
+              </ul>
+              <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+                {translate(
+                  "Ủng hộ qua QR là quà tặng cá nhân, không tự mở khoá Premium. Cần xác nhận thì nhắn trong Discord.",
+                )}
+              </p>
+            </div>
+            <figure className="mx-auto w-full max-w-xs">
+              <img
+                src="/payment.jpg"
+                alt={translate("Mã QR nhận ủng hộ của NGUYEN DUY KHIEM")}
+                width={720}
+                height={960}
+                loading="lazy"
+                decoding="async"
+                className="w-full rounded-2xl border border-border bg-white"
+              />
+              <figcaption className="mt-3 text-center text-xs text-muted-foreground">
+                {translate("Quét mã bằng app chuyển tiền bất kỳ")}
+              </figcaption>
+            </figure>
+          </div>
         </section>
 
         {/* Quyền góp mua được gì — nói thật, không hứa hẹn */}
