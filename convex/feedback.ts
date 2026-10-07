@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken } from "./auth";
 import { getBotStatus, isBotOwnerUser } from "./hidden";
@@ -27,6 +27,50 @@ export const EMAIL_MAX = 200;
 /** Trần chống spam: tối đa 30 góp ý trong 10 phút (mọi người gộp lại). */
 export const SPAM_WINDOW_MS = 10 * 60_000;
 export const SPAM_MAX_IN_WINDOW = 30;
+
+/**
+ * ── Trần lưu trữ: số góp ý GIỮ LẠI + cách dọn ─────────────────────────────
+ *
+ * Vì sao cần: `submit` là endpoint CÔNG KHAI. Trần chống spam (30 góp ý/10
+ * phút) giới hạn TỐC ĐỘ nhưng không giới hạn TỔNG: bị đốt liên tục vẫn vào
+ * được ~4.300 dòng/ngày, mỗi dòng tới 2.000 ký tự (tiếng Việt ~6 KB) ⇒ gói
+ * Free 0,5 GB storage có thể cạn trong vài tuần. Bảng này không có UI xoá
+ * tay nên phải tự dọn.
+ *
+ * Vì sao 300: góp ý thật của dự án tính theo tuần — 300 dòng là nhiều tháng,
+ * đủ rộng để không bao giờ xoá mất góp ý chưa đọc lúc bình thường, mà vẫn
+ * chặn được rác khi bị đốt.
+ *
+ * Vì sao theo XÁC SUẤT + LÔ: Convex tính tiền theo LƯỢT GỌI hàm (read trong
+ * cùng mutation không thêm lượt), nhưng dọn mỗi lượt gửi thì mọi người dùng
+ * đều phải chờ đọc ~330 dòng vô ích. 1/25 lượt gửi × tối đa 30 dòng cũ nhất
+ * ⇒ dưới tải tấn công (khoảng 1,7 lượt gửi/phút ở trần) vẫn nhanh hơn tốc
+ * độ ghi (2 dòng/phút so với 1,7) nên bảng hội tụ về trần; lúc bình thường
+ * gần như không bao giờ chạy.
+ */
+export const FEEDBACK_KEEP_MAX = 300;
+export const FEEDBACK_TRIM_BATCH = 30;
+export const FEEDBACK_TRIM_CHANCE = 1 / 25;
+
+/**
+ * Giữ tối đa `FEEDBACK_KEEP_MAX` dòng, xoá dần các dòng CŨ NHẤT theo lô.
+ * Trả về số dòng đã xoá (0 = chưa vượt trần) — export để test đọc thẳng.
+ *
+ * Đọc tối đa KEEP_MAX + BATCH dòng mỗi lượt: đủ để biết "vượt bao nhiêu" mà
+ * không bao giờ kéo cả bảng qua dây (bảng có thể đang vượt trần nhiều lần).
+ */
+export async function trimFeedback(ctx: MutationCtx): Promise<number> {
+  const rows = await ctx.db
+    .query("feedback")
+    .withIndex("by_createdAt")
+    .order("asc")
+    .take(FEEDBACK_KEEP_MAX + FEEDBACK_TRIM_BATCH);
+  const excess = rows.length - FEEDBACK_KEEP_MAX;
+  if (excess <= 0) return 0;
+  const doomed = rows.slice(0, Math.min(excess, FEEDBACK_TRIM_BATCH));
+  for (const row of doomed) await ctx.db.delete(row._id);
+  return doomed.length;
+}
 
 /** Loại góp ý — nguồn duy nhất cho cả validator Convex lẫn UI/test. */
 export const FEEDBACK_KINDS = ["bug", "idea", "other"] as const;
@@ -126,6 +170,16 @@ export const submit = mutation({
       page: args.page?.slice(0, 120),
       createdAt: now,
     });
+
+    // Dọn dòng cũ — BEST-EFFORT: người dùng đã gửi xong, lỗi dọn KHÔNG được
+    // biến thành lỗi gửi (lượt dọn kế tiếp sẽ xử lý tiếp).
+    if (Math.random() < FEEDBACK_TRIM_CHANCE) {
+      try {
+        await trimFeedback(ctx);
+      } catch {
+        // dọn là việc phụ — cố ý không ném ra ngoài
+      }
+    }
     return { ok: true as const, stored: true as const, id };
   },
 });
