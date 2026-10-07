@@ -37,6 +37,7 @@ const StatsPage = lazy(() => import("./pages/StatsPage"));
 // dung nằm ở src/lib/legalContent.ts, không nhân bản code 3 lần.
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 const DonatePage = lazy(() => import("./pages/DonatePage"));
+const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
 const PremiumPage = lazy(() => import("./pages/PremiumPage"));
 
 function RouteMetadataSync({ lang }: { lang: "vi" | "en" | "de" }) {
@@ -133,6 +134,7 @@ export default function App() {
             {/* Ủng hộ nhà phát triển + xem trước gói Premium. Cả hai trang công
                 khai: ai cũng đọc được, kể cả khách chưa đăng nhập. */}
             <Route path="/donate" element={<DonatePage />} />
+            <Route path="/feedback" element={<FeedbackPage />} />
             <Route path="/premium" element={<PremiumPage />} />
             {/* Trang tính năng công khai (SEO quốc tế, nội dung 3 thứ tiếng). */}
             <Route path="/features" element={<FeaturesPage />} />

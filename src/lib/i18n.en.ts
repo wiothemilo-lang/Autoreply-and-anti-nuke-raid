@@ -527,6 +527,13 @@ export const EN: Record<string, string> = {
   "Có thay đổi chưa lưu — bấm Lưu để áp dụng.": "You have unsaved changes — click Save to apply.",
   "Cơ bản": "Basic",
   "Cảnh báo khẩn khi raid/nuke": "Urgent alert on raid/nuke",
+  "Chống spam báo cáo khẩn": "Emergency alert spam control",
+  "Chỉ gửi cảnh báo khẩn khi đã dồn đủ số sự kiện nuke VÀ đủ khoảng cách từ báo cáo trước — sự kiện trong lúc chờ vẫn được giữ, không mất.":
+    "Only send an urgent alert once enough nuke events have piled up AND enough time has passed since the previous report — events raised while waiting are kept, not dropped.",
+  "Phút tối thiểu giữa 2 báo cáo": "Minimum minutes between two reports",
+  "Sự kiện nuke tối thiểu": "Minimum nuke events",
+  "Lưu chính sách": "Save policy",
+  "Đã lưu chính sách báo cáo khẩn": "Emergency report policy saved",
   "Cần cấu hình Client ID": "Client ID required",
   "Cập nhật gần nhất": "Last updated",
   "Cập nhật khung giờ ngay bây giờ": "Update the schedule now",
@@ -1464,6 +1471,57 @@ export const EN: Record<string, string> = {
     "Protogon is maintained by one person, who pays for the server and the time out of pocket. Every feature is free and always will be — your support buys the bot more uptime, not a feature unlock.",
   "Ủng hộ qua Discord": "Support via Discord",
   "Xem gói Premium": "See premium plans",
+
+  // ── Trang Góp ý (/feedback) ──
+  "Góp ý": "Feedback",
+  "Phản hồi của bạn": "Your feedback",
+  "Góp ý cho Protogon": "Send feedback about Protogon",
+  "Bạn gặp lỗi, thiếu tính năng, hay chỉ muốn góp ý? Gửi ở đây — góp ý đi thẳng tới người làm bot, không cần tài khoản Discord và không ai khác đọc được.":
+    "Found a bug, missing a feature, or just want to say something? Send it here — feedback goes straight to the bot's developer, needs no Discord account, and nobody else can read it.",
+  "Loại góp ý": "Feedback type",
+  "Báo lỗi": "Bug report",
+  "Bot hoặc web làm sai điều gì đó": "The bot or the website did something wrong",
+  "Đề xuất tính năng": "Feature request",
+  "Bạn muốn bot làm được thêm gì": "Something you wish the bot could do",
+  "Góp ý chung": "General comment",
+  "Cảm nhận, câu hỏi, hoặc lời cảm ơn": "Impressions, questions, or a thank-you",
+  "Mô tả càng rõ càng tốt: bạn đang làm gì, thấy gì, và mong đợi điều gì.":
+    "The more detail the better: what you were doing, what you saw, and what you expected.",
+  "Cần ít nhất {p0} ký tự.": "At least {p0} characters needed.",
+  "{p0}/{p1} ký tự": "{p0}/{p1} characters",
+  "Email (không bắt buộc)": "Email (optional)",
+  "Điền nếu bạn muốn mình phản hồi lại — bỏ trống vẫn gửi được.":
+    "Fill this in if you want a reply — you can leave it empty.",
+  "Gửi góp ý": "Send feedback",
+  "Đang gửi…": "Sending…",
+  "Không gửi được góp ý — thử lại sau ít phút nhé.":
+    "Could not send your feedback — please try again in a few minutes.",
+  "Hệ thống vừa nhận quá nhiều góp ý — bạn thử lại sau ít phút nhé, hoặc nhắn trực tiếp trong Discord.":
+    "The system just received too much feedback — please try again in a few minutes, or message directly on Discord.",
+  "Email chưa đúng dạng — bỏ trống cũng được nếu bạn không cần phản hồi.":
+    "That email doesn't look right — leave it empty if you don't need a reply.",
+  "Không cần đăng nhập. Mình không chia sẻ góp ý của bạn cho ai khác.":
+    "No sign-in needed. I don't share your feedback with anyone else.",
+  "Đã nhận góp ý của bạn": "Your feedback has been received",
+  "Cảm ơn bạn! Mình đọc hết góp ý và sẽ trả lời qua email nếu bạn có để lại địa chỉ.":
+    "Thank you! I read every message and will reply by email if you left an address.",
+  "Gửi thêm góp ý": "Send more feedback",
+  "Vào Discord để trao đổi trực tiếp": "Join Discord to talk directly",
+  "Muốn trao đổi trực tiếp?": "Want to talk it through?",
+  "Nếu bạn cần trả lời gấp hoặc muốn cả cộng đồng cùng bàn, vào Discord — kênh hỗ trợ có người theo dõi.":
+    "If you need a quick answer, or want the community to weigh in, join Discord — the support channel is monitored.",
+  "Vào Discord": "Join Discord",
+  "Ủng hộ trực tiếp bằng mã QR": "Support directly with a QR code",
+  "Không cần đăng nhập, không qua cổng thanh toán: mở app ngân hàng hoặc ví điện tử của bạn, quét mã rồi chuyển số tiền bạn muốn. Tiền vào thẳng ví nhà phát triển.":
+    "No sign-in and no payment gateway: open your banking or wallet app, scan the code and send whatever amount you like. The money goes straight to the developer's wallet.",
+  "Quét được bằng ZaloPay, MoMo, VietQR và app ngân hàng bất kỳ":
+    "Works with ZaloPay, MoMo, VietQR and any banking app",
+  "Chủ ví: NGUYEN DUY KHIEM — kiểm tra đúng tên trước khi chuyển":
+    "Account holder: NGUYEN DUY KHIEM — check that the name matches before sending",
+  "Ủng hộ qua QR là quà tặng cá nhân, không tự mở khoá Premium. Cần xác nhận thì nhắn trong Discord.":
+    "A QR donation is a personal gift and does not unlock Premium by itself. Message us on Discord if you need confirmation.",
+  "Mã QR nhận ủng hộ của NGUYEN DUY KHIEM": "Donation QR code of NGUYEN DUY KHIEM",
+  "Quét mã bằng app chuyển tiền bất kỳ": "Scan the code with any money transfer app",
   "Chọn mức tùy khả năng": "Pick whatever feels comfortable",
   "Đây chỉ là gợi ý. Mọi mức đều được chào đón, kể cả một lời cảm ơn.":
     "These are suggestions only. Every amount is welcome, including a simple thank-you.",

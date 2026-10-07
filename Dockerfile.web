@@ -80,7 +80,7 @@ RUN printf '%s\n' \
   "  # không có ở vercel.json lẫn nginx). Bộ test scripts/test-web-contracts.cjs" \
   "  # suy danh sách này từ src/lib/routes.json — thêm route công khai mà quên" \
   "  # sửa cả hai hosting sẽ bị CI chặn." \
-  "  location ~ ^/(features|monitor|terms|privacy|data-deletion|donate|premium)/?$ {" \
+  "  location ~ ^/(features|monitor|terms|privacy|data-deletion|donate|feedback|premium)/?$ {" \
   "    try_files /index.html =404;" \
   "    include /etc/nginx/security-headers.conf;" \
   "  }" \

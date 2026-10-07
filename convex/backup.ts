@@ -5,6 +5,10 @@ import { requireBotKeyStrict } from "./botAuth";
 import { reassembleBackupJsonForRead } from "./backupChunks";
 import { findBackupByRestoreKey, normalizeRestoreKey } from "./backupKeys";
 import { claimIsActive } from "./bot_writes/shared";
+// Cửa sổ "bot còn online" dùng CHUNG với convex/status.ts — trước đây file này
+// tự khai 180s (bằng đúng nhịp sync) nên bảng Backup báo "bot offline" trong
+// khi bot vẫn sync đều. Xem convex/heartbeat.ts.
+import { BOT_ONLINE_WINDOW_MS } from "./heartbeat";
 
 /**
  * Backup server → đám mây GitHub.
@@ -566,13 +570,15 @@ export const importStatus = query({
       .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
       .first();
     if (!guild || !canManageGuild(user, guild)) return null;
-    // Trạng thái bot (heartbeat mỗi 60s) để web tự chẩn đoán: bot offline / bản cũ
-    // không xử lý được import là 2 lý do phổ biến nhất khi "không có gì xảy ra".
+    // Trạng thái bot (nhịp sync 180s — xem convex/heartbeat.ts) để web tự chẩn đoán:
+    // bot offline / bản cũ không xử lý được import là 2 lý do phổ biến nhất khi
+    // "không có gì xảy ra".
     const status = await ctx.db
       .query("botStatus")
       .withIndex("by_kind", (q) => q.eq("kind", "status"))
       .first();
-    const botOnline = !!status?.online && Date.now() - (status.lastHeartbeat ?? 0) < 180_000;
+    const botOnline =
+      !!status?.online && Date.now() - (status.lastHeartbeat ?? 0) < BOT_ONLINE_WINDOW_MS;
     return {
       requested: !!guild.importRestoreRequested,
       fileName: guild.importFileName ?? null,

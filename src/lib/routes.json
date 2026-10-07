@@ -78,6 +78,17 @@
       "note": "future paid tiers - page is honest about not being on sale yet"
     },
     {
+      "path": "/feedback",
+      "match": "exact",
+      "seoKind": "feedback",
+      "visibility": "public",
+      "index": true,
+      "sitemap": true,
+      "spaFallback": true,
+      "redirect": null,
+      "note": "góp ý người dùng (báo lỗi/đề xuất) — không cần đăng nhập, chỉ chủ bot đọc được"
+    },
+    {
       "path": "/monitor",
       "match": "exact",
       "seoKind": "monitor",

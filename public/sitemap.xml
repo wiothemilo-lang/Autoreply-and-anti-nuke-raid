@@ -37,6 +37,13 @@
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
+  <!-- Góp ý: trang công khai, không cần đăng nhập — đích đến của người gặp
+       lỗi nhưng không muốn vào Discord để kể lại. -->
+  <url>
+    <loc>https://protogon.freebuff.app/feedback</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
   <!-- Gói Premium: trang công khai để người dùng xem trước tính năng và giá
        trước khi nó thực sự mở bán. -->
   <url>

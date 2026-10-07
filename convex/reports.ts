@@ -227,6 +227,45 @@ export const getGuildEvents = query({
 const MIN_REPORT_INTERVAL_MS = 20 * 60 * 60 * 1000;
 
 /**
+ * ── Chính sách báo cáo KHẨN (raid/nuke) — NGUỒN SỐ DUY NHẤT phía Convex ─────
+ *
+ * Vì sao tách khỏi UI và khỏi bot: cùng một câu hỏi "khi nào thì báo?" được
+ * trả lời ở ba nơi — `updateSettings` (kẹp khi lưu), `getBotConfig` (mặc định
+ * cho guild cũ), và `bot/src/handlers/incidentReport.js` (thực thi). Ba bản
+ * sao lệch nhau = dashboard hứa một đằng, bot làm một nẻo, không gì báo sai.
+ * Bot chạy CommonJS nên KHÔNG import được file này; `scripts/test-web-contracts.cjs`
+ * đọc số THẬT từ cả hai file và chốt hạ.
+ *
+ * Vì sao có 2 knob: khoảng cách thời gian chặn "báo liên tục" (một vụ raid
+ * kích nhiều module trong nhiều giờ), còn số sự kiện chặn "báo vì một sự kiện
+ * lẻ" (false positive đơn lẻ). Sự kiện bị chặn bởi khoảng cách vẫn được DỒN,
+ * không bị mất — hết khoảng cách là báo ngay lượt kế tiếp.
+ */
+export const REPORT_MIN_INTERVAL_MINUTES = 15;
+export const REPORT_MIN_INTERVAL_MINUTES_MIN = 1;
+export const REPORT_MIN_INTERVAL_MINUTES_MAX = 360;
+export const REPORT_MIN_EVENTS = 1;
+export const REPORT_MIN_EVENTS_MIN = 1;
+export const REPORT_MIN_EVENTS_MAX = 50;
+
+/** Kẹp số phút giữa 2 báo cáo khẩn — giá trị rác về mức mặc định, không về biên. */
+export function clampReportMinIntervalMinutes(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return REPORT_MIN_INTERVAL_MINUTES;
+  return Math.max(
+    REPORT_MIN_INTERVAL_MINUTES_MIN,
+    Math.min(REPORT_MIN_INTERVAL_MINUTES_MAX, Math.round(n)),
+  );
+}
+
+/** Kẹp số sự kiện nuke tối thiểu để gửi báo cáo khẩn. */
+export function clampReportMinEvents(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return REPORT_MIN_EVENTS;
+  return Math.max(REPORT_MIN_EVENTS_MIN, Math.min(REPORT_MIN_EVENTS_MAX, Math.round(n)));
+}
+
+/**
  * Cron Convex (đợt #4): thay vòng `reportInterval` 15 phút của bot.
  *
  * Đồng hồ "đến hạn báo cáo ngày" thuộc SERVER: mỗi lượt cron quét guild đang có

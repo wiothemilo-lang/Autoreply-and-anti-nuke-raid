@@ -3,15 +3,10 @@ import { v } from "convex/values";
 import { getUserByToken } from "./auth";
 import { isBotOwnerUser } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
-
-/**
- * Cửa sổ coi bot còn "online". Bot đẩy heartbeat trong vòng sync guild mỗi
- * 180s (bot/src/index.js), và vòng đó hẹn nhịp KẾ TIẾP sau khi lượt trước chạy
- * xong — nên ngay trước mỗi nhịp, tuổi heartbeat đã > 180s một chút. Lấy đúng
- * 180s làm ngưỡng thì huy hiệu online nhấp nháy offline vài giây mỗi 3 phút.
- * Rộng 2 nhịp = bỏ qua được 1 nhịp lỡ mà vẫn phát hiện bot chết trong ~6 phút.
- */
-const BOT_ONLINE_WINDOW_MS = 360_000;
+// Cửa sổ "bot còn online" (2 nhịp sync) — hằng số dùng CHUNG với
+// convex/backup.ts để hai màn hình không trả lời hai đáp án khác nhau về
+// cùng một con bot. Nhịp thật + lý do chọn 2 nhịp: xem convex/heartbeat.ts.
+import { BOT_ONLINE_WINDOW_MS } from "./heartbeat";
 
 /**
  * Trạng thái tổng thể của bot (công khai, không nhạy cảm): online hay không,

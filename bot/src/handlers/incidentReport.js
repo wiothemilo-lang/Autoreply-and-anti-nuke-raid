@@ -10,7 +10,9 @@
  *     nhầm ai không, khuyến nghị cho mod. Kết quả gửi lên server + log.
  *  2. emergencyRaidAlert(client, store, guild, info) — khi anti-nuke XÁC NHẬN
  *     raid/nuke: quét chat mới nhất rồi gửi một tin CẢNH BÁO KHẨN (mention
- *     @everyone khi server bật) tóm tắt tình huống cho mọi người.
+ *     @everyone khi server bật) tóm tắt tình huống cho mọi người. Chống spam
+ *     bằng 2 knob cấu hình: khoảng cách tối thiểu giữa 2 báo cáo và số sự
+ *     kiện nuke tối thiểu (xem khối hằng số bên dưới).
  *
  * AI offline (không có key) → vẫn hoạt động: báo cáo d determinstic từ dữ liệu
  * audit/phạt + tin nhắn, không AI. Không bao giờ throw về caller.
@@ -36,10 +38,60 @@ const PROMPT_CHAR_BUDGET = 14000;
 const REPORT_COOLDOWN_MS = 60_000;
 const lastReportAt = new Map();
 
-/** Cảnh báo khẩn: tối đa 1 lần / 5 phút / server (1 raid nhiều module confirm
- * cùng lúc → chỉ 1 alert). */
-const EMERGENCY_COOLDOWN_MS = 5 * 60_000;
-const lastEmergencyAt = new Map();
+/**
+ * ── Chính sách báo cáo khẩn (raid/nuke) — HAI knob chống spam ──────────────
+ *
+ * PHẢI khớp `convex/reports.ts` (nguồn số phía Convex, cũng là nơi
+ * `updateSettings` kẹp giá trị). Bot chạy CommonJS nên không import được TS;
+ * `scripts/test-web-contracts.cjs` đọc số THẬT từ cả hai file nên lệch là đỏ.
+ *
+ * Vì sao cần: cửa sổ cũ cứng 5 phút nghĩa là một vụ raid kéo dài (hoặc một
+ * false positive lặp lại) làm bot đăng lại "CẢNH BÁO KHẨN" + @everyone mỗi 5
+ * phút, suốt nhiều giờ — đúng kiểu "bot spam báo cáo nuke" người dùng báo.
+ *
+ *   · reportMinIntervalMin — khoảng cách TỐI THIỂU giữa 2 báo cáo. Sự kiện
+ *     xảy ra trong lúc bị chặn KHÔNG bị mất: chúng được dồn lại, hết khoảng
+ *     cách là báo một lần gộp.
+ *   · reportMinEvents — số sự kiện nuke TỐI THIỂU để đủ điều kiện báo, chặn
+ *     "báo vì một sự kiện lẻ" (false positive đơn lẻ, AI run tay).
+ *
+ * Cả hai đều do chủ server chỉnh trên dashboard → tab Cài đặt.
+ */
+const DEFAULT_REPORT_MIN_INTERVAL_MIN = 15;
+const REPORT_MIN_INTERVAL_MIN = 1;
+const REPORT_MIN_INTERVAL_MAX = 360;
+const DEFAULT_REPORT_MIN_EVENTS = 1;
+const REPORT_MIN_EVENTS_MIN = 1;
+const REPORT_MIN_EVENTS_MAX = 50;
+/** Sự kiện cách nhau quá lâu KHÔNG phải một vụ: ngoài cửa sổ này thì đếm lại
+ * từ đầu, nếu không một sự kiện lẻ hôm nay + một sự kiện lẻ tháng sau sẽ ghép
+ * thành "vụ raid" và bắn báo cáo sai. */
+const REPORT_EVENT_WINDOW_MS = 60 * 60_000;
+
+/** Số phút tối thiểu giữa 2 báo cáo — giá trị rác về mặc định, không về biên. */
+function clampReportMinIntervalMin(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_REPORT_MIN_INTERVAL_MIN;
+  return Math.max(REPORT_MIN_INTERVAL_MIN, Math.min(REPORT_MIN_INTERVAL_MAX, Math.round(n)));
+}
+
+/** Số sự kiện nuke tối thiểu để gửi báo cáo khẩn. */
+function clampReportMinEvents(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_REPORT_MIN_EVENTS;
+  return Math.max(REPORT_MIN_EVENTS_MIN, Math.min(REPORT_MIN_EVENTS_MAX, Math.round(n)));
+}
+
+/** Trạng thái chống spam theo guild: mốc gửi gần nhất + số sự kiện đang dồn. */
+const emergencyState = new Map();
+function emergencyStateFor(guildId) {
+  let s = emergencyState.get(guildId);
+  if (!s) {
+    s = { lastAt: 0, count: 0, lastEventAt: 0 };
+    emergencyState.set(guildId, s);
+  }
+  return s;
+}
 
 /** Đang chạy — chặn 2 lệnh song song trong cùng server. */
 const running = new Set();
@@ -265,22 +317,36 @@ function buildReportEmbed({
 /**
  * Báo cáo khẩn khi anti-nuke xác nhận raid/nuke. Được gọi từ antinuke.js.
  * Fire-and-forget: không chặn luồng xử lý phạt.
+ *
+ * Chống spam bằng 2 knob cấu hình được (xem khối hằng số ở đầu file):
+ * đủ số sự kiện dồn + đủ khoảng cách từ báo cáo trước mới gửi.
  */
 async function emergencyRaidAlert(client, store, guild, info = {}) {
   try {
     if (!guild || !store) return;
-    // 1 alert / 5 phút / guild — một vụ raid kích nhiều module không spam alert.
-    // Đánh dấu cooldown SAU khi đã biết chắc sẽ gửi: đọc cấu hình lỗi (Convex
-    // quá tải đúng lúc raid) không được ăn mất suất cảnh báo của cả đợt.
-    // Check + set dồn 1 chỗ sau await — vẫn chống trùng khi nhiều module cùng
-    // kích hoạt (đoạn này chạy đồng bộ, không await lần nào).
+    // Đọc cấu hình TRƯỚC khi ghi nhận sự kiện: đọc lỗi (Convex quá tải đúng
+    // lúc raid) không được ăn mất suất cảnh báo của cả đợt, cũng không được
+    // cộng dồn sự kiện vào một lượt không thực sự xử lý.
     const config = await store.getConfig(guild.id);
     if (!config) return;
     // Tôn trọng toggle: chủ server tắt cảnh báo khẩn trên web → không gửi.
     if (config.emergencyAlertEnabled === false) return;
     const now = Date.now();
-    if (now - (lastEmergencyAt.get(guild.id) ?? 0) < EMERGENCY_COOLDOWN_MS) return;
-    lastEmergencyAt.set(guild.id, now);
+    const state = emergencyStateFor(guild.id);
+    // Sự kiện ngoài cửa sổ dồn → bắt đầu vụ mới, không cộng dồn xuyên tháng.
+    if (now - state.lastEventAt > REPORT_EVENT_WINDOW_MS) state.count = 0;
+    state.count += 1;
+    state.lastEventAt = now;
+
+    const minEvents = clampReportMinEvents(config.reportMinEvents);
+    const minIntervalMs = clampReportMinIntervalMin(config.reportMinIntervalMin) * 60_000;
+    // Chưa đủ số sự kiện → chưa báo (để dành cho lượt sau).
+    if (state.count < minEvents) return;
+    // Quá sát báo cáo trước → hoãn, sự kiện vẫn nằm trong state.count.
+    if (now - state.lastAt < minIntervalMs) return;
+    // Đủ điều kiện: khoá khoảng cách + xoá bộ đếm (vụ sau đếm lại từ đầu).
+    state.lastAt = now;
+    state.count = 0;
 
     const [chatLines, audit] = await Promise.all([
       collectRecentMessages(guild, null),
@@ -475,4 +541,10 @@ function parseAnalysis(raw) {
   return { level, security, punishmentReview, recommendation };
 }
 
-module.exports = { reportInteractive, emergencyRaidAlert };
+module.exports = {
+  reportInteractive,
+  emergencyRaidAlert,
+  // Xuất cho test hermetic: luật kẹp phải khớp convex/reports.ts.
+  clampReportMinIntervalMin,
+  clampReportMinEvents,
+};

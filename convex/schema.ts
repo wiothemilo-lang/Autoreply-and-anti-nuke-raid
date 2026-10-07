@@ -227,6 +227,16 @@ export default defineSchema({
     reportRequestedAt: v.optional(v.number()),
     /** AI Incident Report: bật/tắt cảnh báo khẩn khi raid/nuke được xác nhận. */
     emergencyAlertEnabled: v.optional(v.boolean()),
+    /**
+     * Số phút TỐI THIỂU giữa 2 báo cáo khẩn (raid/nuke) — chống spam report.
+     * Chưa đặt thì bot dùng mặc định trong `convex/reports.ts`.
+     */
+    reportMinIntervalMin: v.optional(v.number()),
+    /**
+     * Số sự kiện nuke TỐI THIỂU mới đủ điều kiện gửi báo cáo khẩn (sự kiện
+     * được dồn lại khi bị chặn bởi khoảng cách thời gian).
+     */
+    reportMinEvents: v.optional(v.number()),
     /** AI Incident Report: cảnh báo khẩn có ping @everyone không. */
     logPingEveryone: v.optional(v.boolean()),
     /** Welcome/Goodbye: chào thành viên mới + tạm biệt thành viên rời server. */
@@ -1471,4 +1481,26 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_discordId", ["discordId"]),
+
+  /**
+   * Góp ý người dùng gửi từ trang /feedback (công khai, KHÔNG cần đăng nhập).
+   *
+   * Đây là "hệ thống nội bộ" nhận góp ý: dòng nằm trong Convex, chỉ chủ bot
+   * đọc được qua `feedback:list` (guard isBotOwnerUser). Nội dung do người ngoài
+   * nhập nên tuyệt đối không được render ra UI công khai.
+   *
+   * Index `by_createdAt` phục vụ 2 việc: đếm chống spam theo cửa sổ thời gian
+   * (chỉ đọc N dòng mới nhất) và danh sách cho chủ bot (mới nhất trước).
+   */
+  feedback: defineTable({
+    /** bug = báo lỗi, idea = đề xuất tính năng, other = góp ý chung. */
+    kind: v.union(v.literal("bug"), v.literal("idea"), v.literal("other")),
+    message: v.string(),
+    /** Tùy chọn — chỉ có khi người gửi muốn được phản hồi. */
+    email: v.optional(v.string()),
+    /** Ngôn ngữ + đường dẫn lúc gửi: đọc góp ý mà không phải hỏi lại. */
+    lang: v.optional(v.string()),
+    page: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_createdAt", ["createdAt"]),
 });

@@ -186,13 +186,22 @@ function makeClient() {
       gsConvex.includes("if (changed || refreshHeartbeat === true)"),
     );
 
-    // status.ts: ngưỡng online phải RỘNG HƠN 1 nhịp sync 180s — dùng đúng
-    // 180s là huy hiệu online nhấp nháy offline vài giây mỗi chu kỳ (tuổi
-    // heartbeat vượt ngưỡng ngay trước khi nhịp kế tiếp ghi).
+    // Ngưỡng online phải RỘNG HƠN 1 nhịp sync 180s — dùng đúng 180s là huy
+    // hiệu online nhấp nháy offline vài giây mỗi chu kỳ (tuổi heartbeat vượt
+    // ngưỡng ngay trước khi nhịp kế tiếp ghi). Từ 10/2026 con số này nằm ở
+    // convex/heartbeat.ts (nguồn DUY NHẤT, status.ts + backup.ts cùng import)
+    // nên kiểm ở đó, kèm cổng chặn status.ts tự khai bản sao mới.
+    const hbSrc = fs.readFileSync(path.join(__dirname, "..", "convex", "heartbeat.ts"), "utf8");
     const statusSrc = fs.readFileSync(path.join(__dirname, "..", "convex", "status.ts"), "utf8");
     check(
-      "status.ts: cửa sổ online 360s = 2 nhịp sync (chống nhấp nháy offline)",
-      statusSrc.includes("BOT_ONLINE_WINDOW_MS = 360_000") &&
+      "heartbeat.ts: cửa sổ online = 2 nhịp sync 180s (chống nhấp nháy offline)",
+      /BOT_SYNC_INTERVAL_MS = 180_000/.test(hbSrc) &&
+        /BOT_ONLINE_WINDOW_MS = 2 \* BOT_SYNC_INTERVAL_MS/.test(hbSrc),
+    );
+    check(
+      "status.ts: dùng chung ngưỡng từ heartbeat.ts, không tự khai bản sao",
+      statusSrc.includes('from "./heartbeat"') &&
+        !/BOT_ONLINE_WINDOW_MS\s*=/.test(statusSrc) &&
         !/lastHeartbeat[^\n]*[<>]\s*180_000/.test(statusSrc),
     );
   }

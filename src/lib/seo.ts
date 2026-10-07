@@ -60,6 +60,11 @@ const COPY: Record<Lang, Copy> = {
       description:
         "Giúp duy trì Protogon — bot Discord miễn phí do một người làm. Mọi tính năng luôn miễn phí, quyền góp giúp bot có thêm máy chủ và người sửa lỗi.",
     },
+    feedback: {
+      title: "Góp ý — Protogon",
+      description:
+        "Gửi báo lỗi, đề xuất tính năng hoặc góp ý cho bot Protogon — không cần tài khoản Discord, góp ý đi thẳng tới người làm bot.",
+    },
     premium: {
       title: "Gói Premium — Protogon",
       description:
@@ -117,6 +122,11 @@ const COPY: Record<Lang, Copy> = {
       title: "Support the developer — Protogon",
       description:
         "Help keep Protogon running — a free Discord bot maintained by one person. Every feature stays free; contributions pay for the server and the bug fixes.",
+    },
+    feedback: {
+      title: "Feedback — Protogon",
+      description:
+        "Report a bug, suggest a feature, or send general feedback about the Protogon bot — no Discord account needed, it goes straight to the developer.",
     },
     premium: {
       title: "Premium plans — Protogon",
@@ -176,6 +186,11 @@ const COPY: Record<Lang, Copy> = {
       title: "Entwickler unterstützen — Protogon",
       description:
         "Protogon am Laufen halten — ein kostenloser Discord-Bot, gepflegt von einer Person. Alle Funktionen bleiben kostenlos; Spenden finanzieren Server und Fehlerbehebungen.",
+    },
+    feedback: {
+      title: "Feedback — Protogon",
+      description:
+        "Fehler melden, Funktionen vorschlagen oder allgemeines Feedback zum Protogon-Bot senden — ohne Discord-Konto, direkt an den Entwickler.",
     },
     premium: {
       title: "Premium-Tarife — Protogon",
