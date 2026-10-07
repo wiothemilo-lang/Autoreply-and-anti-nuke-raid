@@ -1621,4 +1621,13 @@ export const DE: Record<string, string> = {
   "Không kiểm tra được trạng thái": "Status kann nicht abgefragt werden",
   "Lỗi kết nối — thử lại sau ít phút.":
     "Verbindungsfehler – bitte in wenigen Minuten erneut versuchen.",
+  /* ==== Chuẩn hoá ảnh avatar (07/10/2026) ==== Ablehnungsfehler beim
+     Avatar-Upload (src/lib/avatarImage.ts). */
+  "Kích thước ảnh không hợp lệ.": "Ungültige Bildabmessungen.",
+  "Ảnh không đọc được — hãy chọn file JPG/PNG/WebP khác.":
+    "Dieses Bild kann nicht gelesen werden – bitte eine andere JPG/PNG/WebP-Datei wählen.",
+  "Trình duyệt không vẽ được ảnh — thử trình duyệt khác nhé.":
+    "Dein Browser kann dieses Bild nicht darstellen – probiere einen anderen Browser.",
+  "Không nén được ảnh — hãy chọn file ảnh khác.":
+    "Bild konnte nicht komprimiert werden – bitte ein anderes Bild wählen.",
 };

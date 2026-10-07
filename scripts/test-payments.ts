@@ -36,6 +36,8 @@ import {
   verifyCallbackMacHex,
 } from "../convex/payments";
 import { hmacSha256Hex, sha256Hex } from "../convex/sha256";
+import { ConvexError } from "convex/values";
+import { startPayment } from "../convex/paymentsAction";
 import { CURRENT_SESSION_AUTH_VERSION } from "../convex/auth";
 
 let pass = 0;
@@ -576,6 +578,109 @@ const run = async () => {
       tables.entitlements[0].plan === "pioneer",
     );
     check("hạn pioneer không bị đụng", tables.entitlements[0].expiresAt === t + 20 * 86_400_000);
+  }
+
+  // ── startPayment: MỌI nhánh lỗi phải về client bằng ConvexError ────────────
+  // Bug thật 07/10/2026: khách bấm "Ủng hộ" trên /donate thấy nguyên
+  // "[CONVEX A(paymentsAction:startPayment)] [Request ID: …] Server Error
+  // Called by client" — Convex production mask message của Error THƯỜNG.
+  // ConvexError vẫn forward data (err.data.message) → web đọc được lý do thật.
+  console.log("── startPayment ném ConvexError (không bị mask) ──");
+  {
+    const startHandler = (startPayment as any)._handler;
+    check("lấy được handler của action startPayment", typeof startHandler === "function");
+
+    const args = { token: "tok-good", kind: "donate" as const, plan: "50000" };
+    const savedAppId = process.env.ZALOPAY_APP_ID;
+    const savedKey1 = process.env.ZALOPAY_KEY1;
+    const restoreEnv = () => {
+      if (savedAppId === undefined) delete process.env.ZALOPAY_APP_ID;
+      else process.env.ZALOPAY_APP_ID = savedAppId;
+      if (savedKey1 === undefined) delete process.env.ZALOPAY_KEY1;
+      else process.env.ZALOPAY_KEY1 = savedKey1;
+    };
+
+    try {
+      // (a) thiếu cấu hình ZaloPay
+      delete process.env.ZALOPAY_APP_ID;
+      delete process.env.ZALOPAY_KEY1;
+      const ctxNoCfg: any = { runMutation: async () => null, runQuery: async () => null };
+      try {
+        await startHandler(ctxNoCfg, args);
+        check("thiếu key ZaloPay → bắt buộc ném lỗi", false);
+      } catch (e: any) {
+        check(
+          "thiếu key ZaloPay → ConvexError PAYMENT_NOT_CONFIGURED + message VI",
+          e instanceof ConvexError &&
+            e.data?.code === "PAYMENT_NOT_CONFIGURED" &&
+            String(e.data?.message ?? "").includes("Cổng thanh toán"),
+          e?.data ?? String(e),
+        );
+      }
+
+      // (b) intent thất bại (spam đơn / plan sai…) — lý do tiếng Việt phải giữ nguyên
+      process.env.ZALOPAY_APP_ID = "2553";
+      process.env.ZALOPAY_KEY1 = "k1-test";
+      const ctxIntentFail: any = {
+        runMutation: async () => {
+          throw new Error("Mức ủng hộ không hợp lệ: 999");
+        },
+      };
+      try {
+        await startHandler(ctxIntentFail, args);
+        check("intent thất bại → bắt buộc ném lỗi", false);
+      } catch (e: any) {
+        check(
+          "intent thất bại → ConvexError PAYMENT_INTENT_FAILED giữ đúng lý do tiếng Việt",
+          e instanceof ConvexError &&
+            e.data?.code === "PAYMENT_INTENT_FAILED" &&
+            e.data?.message === "Mức ủng hộ không hợp lệ: 999",
+          e?.data ?? String(e),
+        );
+      }
+
+      // (c) ZaloPay không gọi được → ZALOPAY_UNAVAILABLE + ghi payments.error
+      const intent = {
+        paymentId: "p1",
+        appTransId: "261007_x",
+        amount: 50_000,
+        kind: "donate" as const,
+        plan: "50000",
+        discordId: "123456789012345678",
+        createdAt: Date.now(),
+      };
+      let recorded: any = null;
+      const ctxNet: any = {
+        runMutation: async (_fn: any, a: any) => {
+          // Phân biệt theo shape args: createIntentInternal nhận token phiên,
+          // recordErrorInternal chỉ nhận { appTransId, error }.
+          if (a && "token" in a) return intent;
+          recorded = a;
+          return null;
+        },
+      };
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = (async () => {
+        throw new Error("ECONNRESET");
+      }) as any;
+      try {
+        await startHandler(ctxNet, args);
+        check("mạng chết → bắt buộc ném lỗi", false);
+      } catch (e: any) {
+        check(
+          "mạng chết → ConvexError ZALOPAY_UNAVAILABLE + đã ghi payments.error",
+          e instanceof ConvexError &&
+            e.data?.code === "ZALOPAY_UNAVAILABLE" &&
+            !!recorded &&
+            String(recorded.error ?? "").includes("create:"),
+          e?.data ?? String(e),
+        );
+      } finally {
+        globalThis.fetch = realFetch;
+      }
+    } finally {
+      restoreEnv();
+    }
   }
 
   console.log(`\n${pass}/${pass + fail} assertion xanh`);

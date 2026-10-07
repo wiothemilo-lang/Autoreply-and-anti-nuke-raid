@@ -762,7 +762,18 @@ browserTest("B. /boot.js chạy bình thường → preloader đóng đúng thi�
   t.after(() => page.close());
   await page.send("Network.setBlockedURLs", { urls: [] });
   await page.goto(ctx.base + "/");
-  await new Promise((r) => setTimeout(r, 1600));
+  // CHỜ ĐIỀU KIỆN thay vì ngủ cứng 1600ms: đo thật 07/10 — #boot gỡ ở
+  // ~load+1450–1600ms (bootDone ~load+600 + ramp ~250ms + fade 700ms), ngủ
+  // cứng 1600 là đứng NGAY RANH GIỚI → máy chậm/chậm khung hình là fail ngẫu
+  // nhiên. Điều kiện và assertion GIỮ NGUYÊN ("removed" là bắt buộc) — chỉ
+  // cho phép chờ tới 5s thay vì một mốc cố định.
+  const bootDeadline = Date.now() + 5000;
+  let overlay;
+  for (;;) {
+    overlay = await page.evaluate(OVERLAY_STATE);
+    if (overlay === "removed" || Date.now() > bootDeadline) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
 
   const state = await page.evaluate(`(() => ({
     bootDone: typeof window.__bootDone,

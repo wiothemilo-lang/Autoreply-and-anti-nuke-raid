@@ -27,6 +27,8 @@ import {
 } from "../src/lib/utils";
 import { ensureDictionary, lookupTranslation, translate } from "../src/lib/i18n";
 import { safeRedirectPath } from "../src/lib/discord";
+import { friendlyConvexError } from "../src/lib/convexError";
+import { AVATAR_MAX_DIM, planAvatarResize } from "../src/lib/avatarImage";
 import { CHUNK_RELOAD_COOLDOWN_MS, installStaleChunkRecovery } from "../src/lib/staleChunk";
 import { evaluateConfigHealth, healthGrade, HEALTH_TARGETS } from "../src/lib/configHealth";
 import {
@@ -945,6 +947,48 @@ console.log("── #14 branding ──");
     /useQuery\(api\.hidden\.getBotBranding\)/.test(brandingSrc),
   );
   check("hook đi qua hàm thuần toBranding", /return toBranding\(useQuery\(/.test(brandingSrc));
+
+  // ── Chuẩn hoá avatar trước upload (bug 07/10/2026) ──────────────────────
+  // Avatar Haimiya đang lưu là ảnh 3600×2025 ~1.1MB cho khung 192px: điện
+  // thoại decode chậm, bitmap ~29MB, trang chủ hiện sọc nhăng. Contract:
+  // BrandingPanel PHẢI đi qua normalizeAvatarFile (co ≤512px + chặn file hỏng).
+  check("planAvatarResize: ảnh 3600×2025 → 512×288 (không giữ 7MP)", () => {
+    const r = planAvatarResize(3600, 2025);
+    return r.width === 512 && r.height === 288 && r.scale < 1;
+  });
+  check("planAvatarResize: ảnh đã nhỏ KHÔNG bị phóng to", () => {
+    const r = planAvatarResize(192, 192);
+    return r.width === 192 && r.height === 192 && r.scale === 1;
+  });
+  check("planAvatarResize: ảnh dọc vẫn co theo cạnh dài nhất", () => {
+    const r = planAvatarResize(800, 2400);
+    return r.width === 171 && r.height === AVATAR_MAX_DIM;
+  });
+  check("planAvatarResize: kích thước rỗng/âm bị từ chối", () => {
+    try {
+      planAvatarResize(0, 100);
+      return false;
+    } catch {
+      try {
+        planAvatarResize(-1, 100);
+        return false;
+      } catch {
+        return true;
+      }
+    }
+  });
+  const brandPanelSrc = readFileSync(
+    fileURLToPath(new URL("../src/components/dashboard/BrandingPanel.tsx", import.meta.url)),
+    "utf8",
+  );
+  check(
+    "BrandingPanel upload ĐÃ qua normalizeAvatarFile (file thô không được lên storage)",
+    /const \{ blob \} = await normalizeAvatarFile\(file\)/.test(brandPanelSrc) &&
+      /headers: \{ "Content-Type": blob\.type/.test(brandPanelSrc) &&
+      /body: blob[,}]/.test(brandPanelSrc),
+    "BrandingPanel lại upload file thô — ảnh 3600px/file hỏng sẽ lên production",
+  );
+  check("BrandingPanel vẫn chặn file >2MB trước khi decode", brandPanelSrc.includes("2_000_000"));
 }
 
 console.log("── #15 theo dõi kết quả backup/khôi phục (chống báo sai kết quả) ──");
@@ -1397,6 +1441,73 @@ console.log("── #11 bộ chọn trang ở header: vai trò + nhãn ──");
     "trang ngoài bảng chọn (pháp lý/404) trả null để nơi gọi tự đặt chữ",
     navLabelFor("/terms") === null && navLabelFor("/khong-ton-tai") === null,
   );
+}
+
+// ── #17 bóc lỗi Convex cho người dùng (bug /donate 07/10/2026) ─────────────
+// Convex production mask message của Error thường thành
+// "[Request ID: …] Server Error Called by client" — trang /donate từng in
+// nguyên khối đó cho khách. friendlyConvexError phải luôn trả text đọc được.
+console.log("── #17 friendlyConvexError ──");
+{
+  const fb = "Không tạo được đơn thanh toán — thử lại sau ít phút.";
+  check(
+    "đúng hình mask production → trả fallback, KHÔNG trả envelope Convex",
+    friendlyConvexError(
+      new Error(
+        "[CONVEX A(paymentsAction:startPayment)] [Request ID: 096091acd38ce4ee] Server Error Called by client",
+      ),
+      fb,
+    ) === fb,
+  );
+  check(
+    "ConvexError data.message thắng mọi thứ (kênh không bị mask)",
+    friendlyConvexError(
+      Object.assign(new Error("[CONVEX A(x)] Server Error"), {
+        data: {
+          code: "ZALOPAY_UNAVAILABLE",
+          message: "Không kết nối được ZaloPay — thử lại sau ít phút nhé.",
+        },
+      }),
+      fb,
+    ) === "Không kết nối được ZaloPay — thử lại sau ít phút nhé.",
+  );
+  check(
+    "dev gửi 'Uncaught Error: …' → giữ nguyên lý do tiếng Việt",
+    friendlyConvexError(
+      new Error(
+        "[CONVEX A(x)] [Request ID: abc] Server Error Uncaught Error: Cổng thanh toán chưa được cấu hình.",
+      ),
+      fb,
+    ) === "Cổng thanh toán chưa được cấu hình.",
+  );
+  check(
+    "message JSON của ConvexError khi data không tới tay → bóc được",
+    friendlyConvexError(
+      new Error(
+        '[CONVEX A(x)] ConvexError {\n  "message": "Đơn bị từ chối (spam)."\n}\nCalled by client',
+      ),
+      fb,
+    ) === "Đơn bị từ chối (spam).",
+  );
+  check(
+    "lỗi thuần của server (không envelope) → giữ nguyên",
+    friendlyConvexError(new Error("ZaloPay từ chối tạo đơn (đã trừ phí)."), fb) ===
+      "ZaloPay từ chối tạo đơn (đã trừ phí).",
+  );
+  check("không phải Error / rỗng → fallback", friendlyConvexError(undefined, fb) === fb);
+  check(
+    "message chỉ toàn 'Server Error' → fallback",
+    friendlyConvexError(new Error("Server Error"), fb) === fb,
+  );
+
+  // Trang /donate còn lại cũng phải dùng helper (không còn regex cũ).
+  for (const rel of ["pages/DonatePage.tsx", "pages/PremiumPage.tsx", "pages/FeedbackPage.tsx"]) {
+    const src = readFileSync(new URL(`../src/${rel}`, import.meta.url), "utf8");
+    check(
+      `${rel} bóc lỗi qua friendlyConvexError (không còn regex Uncaught riêng lẻ)`,
+      src.includes("friendlyConvexError(") && !src.includes("replace(/^Uncaught"),
+    );
+  }
 }
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);

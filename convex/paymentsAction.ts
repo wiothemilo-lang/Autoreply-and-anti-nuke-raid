@@ -21,7 +21,7 @@ declare const process: {
  * Bí mật KHÔNG BAO GIỜ xuất hiện trong error trả client: mọi thông điệp ném
  * ra đều là tiếng Việt chung chung; chi tiết API chỉ ghi vào payments.error.
  */
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
@@ -31,6 +31,21 @@ import {
   queryOrderMacHex,
   verifyCallbackMacHex,
 } from "./payments";
+
+/**
+ * Lỗi trỏ tới client — ConvexError chứ KHÔNG phải Error thường.
+ *
+ * Convex production CHE message của Error thường thành
+ * "[Request ID: …] Server Error Called by client" (bug /donate 07/10/2026:
+ * khách bấm ủng hộ thấy nguyên hàng lỗi Convex thay vì lý do thật). ConvexError
+ * vẫn gửi `data` về client DÙ message bị mask (xem botAuth.ts) — web đọc
+ * `err.data.message` rồi bóc bằng friendlyConvexError (src/lib/convexError.ts).
+ * Code luôn viết HOA để client map được khi cần (giống isBotKeyRejection).
+ */
+type PaymentErrorData = { code: string; message: string };
+function paymentError(code: string, message: string): ConvexError<PaymentErrorData> {
+  return new ConvexError({ code, message });
+}
 
 type OrderConfig = { appId: string; key1: string; baseUrl: string };
 
@@ -74,7 +89,8 @@ function readConfig(): OrderConfig {
   const appId = process.env.ZALOPAY_APP_ID;
   const key1 = process.env.ZALOPAY_KEY1;
   if (!appId || !key1) {
-    throw new Error(
+    throw paymentError(
+      "PAYMENT_NOT_CONFIGURED",
       "Cổng thanh toán chưa được cấu hình — thiếu ZALOPAY_APP_ID/ZALOPAY_KEY1. Liên hệ admin để mở.",
     );
   }
@@ -111,12 +127,22 @@ export const startPayment = action({
   },
   handler: async (ctx, args): Promise<StartPaymentResult> => {
     const cfg = readConfig();
-    const intent: IntentInfo = await ctx.runMutation(internal.payments.createIntentInternal, {
-      token: args.token,
-      kind: args.kind,
-      plan: args.plan,
-      customAmount: args.customAmount,
-    });
+    let intent: IntentInfo;
+    try {
+      intent = await ctx.runMutation(internal.payments.createIntentInternal, {
+        token: args.token,
+        kind: args.kind,
+        plan: args.plan,
+        customAmount: args.customAmount,
+      });
+    } catch (e) {
+      // Lỗi từ chối đơn (plan sai, spam đơn, chưa đăng nhập…) là tiếng Việt
+      // sẵn — chuyển thành ConvexError để client thấy ĐÚNG lý do thay vì
+      // "[Request ID: …] Server Error Called by client".
+      if (e instanceof ConvexError) throw e;
+      const reason = e instanceof Error ? e.message : String(e);
+      throw paymentError("PAYMENT_INTENT_FAILED", reason.slice(0, 300));
+    }
 
     // Trả về sau khi thanh toán: trang /donate|/premium?order=<appTransId>.
     // Thiếu DASHBOARD_URL/OAUTH_REDIRECT_URI → bỏ redirecturl, ZaloPay dùng
@@ -158,7 +184,10 @@ export const startPayment = action({
         appTransId: intent.appTransId,
         error: `create: không gọi được ZaloPay (${String(e).slice(0, 120)})`,
       });
-      throw new Error("Không kết nối được ZaloPay — thử lại sau ít phút nhé.");
+      throw paymentError(
+        "ZALOPAY_UNAVAILABLE",
+        "Không kết nối được ZaloPay — thử lại sau ít phút nhé.",
+      );
     }
     if (data && data.return_code === 1 && data.order_url) {
       return {
@@ -172,7 +201,10 @@ export const startPayment = action({
       appTransId: intent.appTransId,
       error: `create ${String(data?.return_code)}: ${detail}`,
     });
-    throw new Error(`ZaloPay từ chối tạo đơn (${detail}). Thử lại sau ít phút.`);
+    throw paymentError(
+      "ZALOPAY_REJECTED",
+      `ZaloPay từ chối tạo đơn (${detail}). Thử lại sau ít phút.`,
+    );
   },
 });
 

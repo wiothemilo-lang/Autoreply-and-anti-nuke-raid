@@ -10,6 +10,7 @@ import { Card, CardContent } from "../ui/card";
 import type { GenericId } from "convex/values";
 import { getSessionToken } from "../../lib/discord";
 import { useBranding } from "../../lib/useBranding";
+import { normalizeAvatarFile } from "../../lib/avatarImage";
 import { HaimiyaAvatar } from "../HaimiyaChat";
 import type { GuildData } from "../../lib/types";
 
@@ -69,13 +70,18 @@ export default function BrandingPanel({ data }: { data: GuildData }) {
     const slot = pendingSlot;
     setUploading(slot);
     try {
+      // Chuẩn hoá TRƯỚC khi upload: decode thật + co ≤512px + encode JPEG/PNG
+      // chuẩn (xem src/lib/avatarImage.ts). File không đọc được bị TỪ CHỐI ở
+      // đây với thông điệp rõ ràng, không âm thầm lên production rồi vỡ avatar
+      // trên trang chủ (bug ảnh 3600px nhòe sọc 07/10/2026).
+      const { blob } = await normalizeAvatarFile(file);
       const uploadUrl = await generateUploadUrl({ token, guildId });
       // Convex storage upload URL yêu cầu POST (không phải PUT) — PUT bị chặn
       // bởi CORS preflight nên fetch báo "Failed to fetch".
       const res = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "Content-Type": file.type || "image/png" },
-        body: file,
+        headers: { "Content-Type": blob.type || "image/jpeg" },
+        body: blob,
       });
       if (!res.ok)
         throw new Error(translate("Tải ảnh lên máy chủ thất bại (HTTP {p0})", { p0: res.status }));

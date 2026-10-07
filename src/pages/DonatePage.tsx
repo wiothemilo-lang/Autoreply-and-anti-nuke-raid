@@ -22,6 +22,7 @@ import LangSwitch from "../components/LangSwitch";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { translate } from "../lib/i18n";
 import { getSessionToken } from "../lib/discord";
+import { friendlyConvexError } from "../lib/convexError";
 import { api } from "../../convex/_generated/api";
 
 /**
@@ -75,9 +76,11 @@ export default function DonatePage() {
       const r = await startPayment({ token, kind: "donate", plan, customAmount: custom });
       window.location.assign(r.paymentUrl);
     } catch (e) {
-      // Lỗi backend đã viết sẵn tiếng Việt (thiếu key, spam đơn…) — bóc prefix Convex nếu có.
-      const msg = e instanceof Error ? e.message.replace(/^Uncaught \w+:\s*/, "").trim() : "";
-      setPayError(msg || translate("Không tạo được đơn thanh toán — thử lại sau ít phút."));
+      // Lỗi backend là tiếng Việt qua ConvexError data — friendlyConvexError bóc
+      // envelope Convex, khách KHÔNG BAO GIỜ thấy "[Request ID: …] Server Error".
+      setPayError(
+        friendlyConvexError(e, translate("Không tạo được đơn thanh toán — thử lại sau ít phút.")),
+      );
       setBusy(null);
     }
   };

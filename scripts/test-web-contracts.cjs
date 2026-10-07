@@ -2504,5 +2504,53 @@ check(
   "thiếu file hoặc không phải ảnh JPEG",
 );
 
+// ─── V. Lỗi 07/10/2026: avatar upload + lỗi thanh toán + luồng ZaloPay ─────
+// 1) Avatar: file thô KHÔNG được lên Convex storage — BrandingPanel phải đi
+//    qua normalizeAvatarFile (co ≤512px, chặn file không decode được). Bug:
+//    avatar Haimiya 3600×2025 ~1.1MB cho khung 192px → điện thoại hiện sọc nhăng.
+const brandPanelSrc = files.get("components/dashboard/BrandingPanel.tsx") ?? "";
+check(
+  "upload avatar đã qua normalizeAvatarFile (chuẩn hoá ≤512px, chặn file hỏng)",
+  brandPanelSrc.includes("await normalizeAvatarFile(file)") && brandPanelSrc.includes("body: blob"),
+  "BrandingPanel upload file thô — ảnh to/vỡ sẽ lên production rồi vỡ ở trang chủ",
+);
+
+// 2) Lỗi Convex phải bóc qua friendlyConvexError — không trang nào còn in
+//    envelope "[Request ID: …] Server Error" hay regex Uncaught riêng lẻ.
+const uncaughtLeftovers = [...files.entries()]
+  .filter(([, src]) => src.includes("replace(/^Uncaught"))
+  .map(([rel]) => rel);
+check(
+  "không trang nào còn tự bóc lỗi Convex bằng regex Uncaught cũ",
+  uncaughtLeftovers.length === 0,
+  uncaughtLeftovers.join(", "),
+);
+for (const rel of ["pages/DonatePage.tsx", "pages/PremiumPage.tsx", "pages/FeedbackPage.tsx"]) {
+  check(
+    `${rel} hiện lỗi qua friendlyConvexError (fallback đã dịch)`,
+    (files.get(rel) ?? "").includes("friendlyConvexError("),
+  );
+}
+
+// 3) Luồng ZaloPay yêu cầu đăng nhập, QR tĩnh thì công khai CÓ NGHĨA — khoá
+//    ranh giới bảo mật này: QR là ảnh tĩnh gửi tiền thẳng vào ví chủ, không qua
+//    server; còn tạo đơn ZaloPay (gọi API, rate-limit tại ZaloPay) phải qua phiên.
+const premiumSrc = files.get("pages/PremiumPage.tsx") ?? "";
+check(
+  "tạo đơn ZaloPay trên /donate bắt buộc có token phiên (chưa đăng nhập → /auth)",
+  donateSrc.includes("if (!token)") && donateSrc.includes("/auth?returnTo="),
+  "DonatePage cho phép gọi startPayment không cần đăng nhập",
+);
+check(
+  "tạo đơn ZaloPay trên /premium cũng bắt buộc token phiên",
+  premiumSrc.includes("if (!token)") && premiumSrc.includes("/auth?returnTo="),
+  "PremiumPage cho phép gọi startPayment không cần đăng nhập",
+);
+check(
+  "khối QR công khai vẫn còn chú thích 'không cần đăng nhập' + tên chủ ví (cân bằng minh bạch)",
+  donateSrc.includes("Không cần đăng nhập, không qua cổng thanh toán"),
+  "chuỗi minh bạch khối QR bị xoá — khách không biết tiền đi đâu",
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

@@ -1693,4 +1693,14 @@ export const EN: Record<string, string> = {
   "Không lưu được.": "Could not save.",
   "Không kiểm tra được trạng thái": "Can't check the status",
   "Lỗi kết nối — thử lại sau ít phút.": "Connection error — try again in a few minutes.",
+  /* ==== Chuẩn hoá ảnh avatar (07/10/2026) ==== Lỗi từ chối file hỏng lúc
+     upload avatar (src/lib/avatarImage.ts) — file không decode được bị chặn
+     ngay tại máy khách thay vì âm thầm lên production rồi vỡ avatar. */
+  "Kích thước ảnh không hợp lệ.": "Invalid image dimensions.",
+  "Ảnh không đọc được — hãy chọn file JPG/PNG/WebP khác.":
+    "This image can't be read — please choose another JPG/PNG/WebP file.",
+  "Trình duyệt không vẽ được ảnh — thử trình duyệt khác nhé.":
+    "Your browser can't render this image — try a different browser.",
+  "Không nén được ảnh — hãy chọn file ảnh khác.":
+    "Couldn't compress the image — please pick another image.",
 };

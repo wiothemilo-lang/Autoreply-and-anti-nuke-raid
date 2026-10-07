@@ -18,6 +18,7 @@ import Footer from "../components/landing/Footer";
 import LangSwitch from "../components/LangSwitch";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { currentLanguage, translate } from "../lib/i18n";
+import { friendlyConvexError } from "../lib/convexError";
 import { api } from "../../convex/_generated/api";
 
 /**
@@ -88,8 +89,9 @@ export default function FeedbackPage() {
       });
       setSent(true);
     } catch (e) {
-      const msg = e instanceof Error ? e.message.replace(/^Uncaught \w+:\s*/, "").trim() : "";
-      setError(msg || translate("Không gửi được góp ý — thử lại sau ít phút nhé."));
+      setError(
+        friendlyConvexError(e, translate("Không gửi được góp ý — thử lại sau ít phút nhé.")),
+      );
     } finally {
       setBusy(false);
     }

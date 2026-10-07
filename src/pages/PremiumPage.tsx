@@ -12,6 +12,7 @@ import LangSwitch from "../components/LangSwitch";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { dateLocale, translate } from "../lib/i18n";
 import { getSessionToken } from "../lib/discord";
+import { friendlyConvexError } from "../lib/convexError";
 import { api } from "../../convex/_generated/api";
 
 /**
@@ -123,8 +124,9 @@ export default function PremiumPage() {
       const r = await startPayment({ token, kind: "premium", plan: planId });
       window.location.assign(r.paymentUrl);
     } catch (e) {
-      const msg = e instanceof Error ? e.message.replace(/^Uncaught \w+:\s*/, "").trim() : "";
-      setPayError(msg || translate("Không tạo được đơn thanh toán — thử lại sau ít phút."));
+      setPayError(
+        friendlyConvexError(e, translate("Không tạo được đơn thanh toán — thử lại sau ít phút.")),
+      );
       setBusy(null);
     }
   };
