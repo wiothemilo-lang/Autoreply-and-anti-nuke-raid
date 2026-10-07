@@ -4,6 +4,16 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 07/10/2026 (4) — Khôi phục dock chọn trang góc dưới trái (lối tắt thứ hai)
+
+- 🎯 **Yêu cầu**: "kiểm tra cái menu taskbar nhỏ nhỏ góc dưới bên trái còn không, thêm lại nếu mất". Nó đã bị gỡ ở đợt (3) khi nav lên header.
+- 🧭 **Cách làm**: KHÔNG dựng lại bản dock cũ (nó có panel riêng = danh sách trang thứ hai dễ lệch). Tách `PagesPanel` ra khỏi `PagesMenu` để **cả header và dock dùng CHUNG một bảng** — mở cái này thì cái kia tự đóng (sự kiện `protogon:pages-menu-open`), nên không bao giờ có 2 bảng cùng nội dung ở 2 góc. Dock đặt SAU nội dung trang trong cây DOM ⇒ thứ tự tab giữ nguyên như bản cũ (nội dung trước, phụ kiện nổi sau).
+- 🧠 **Vì sao vẫn cần dock dù đã có nav ở header**: trên điện thoại góc dưới trái nằm trong tầm ngón tay cái, còn nút ở header thì phải với tay; và nó là lối vào quen tay của người dùng.
+- 🐛 **Nhớ lại bài học định vị**: dock cũ từng BIẾN MẤT trên desktop vì lớp neo dọc chỉ có nhánh `max-md:*` (fixed mà top/bottom đều auto ⇒ rơi về vị trí tĩnh sau nội dung). Dock mới neo đáy cho mọi bề mặt (`bottom-4` + `md:bottom-6` + safe-area cho mobile + `top-auto`) và có test cổng tĩnh chặn tái diễn.
+- 🧪 **Test**: cổng tĩnh +5 luật (mount ở App, nằm sau `</Suspense>`, neo đáy mọi bề mặt, safe-area, dùng chung 1 panel, hai lối loại trừ nhau) · trình duyệt **J3** mới (dock nằm nửa trái/nửa dưới khung nhìn ở cả đỉnh lẫn đáy trang, cách đáy ≤40px, mở ra danh sách trang, và mở bảng header sau đó ⇒ đúng 1 bảng) + J2 kiểm thêm dock trên mobile 390×844.
+- 🧪 **Kiểm chứng**: 87/87 CJS suite (Chromium thật 18/18 browser test) · 25/25 TS suite · tsc · lint · format:check · 10 cổng tĩnh · i18n (+`Mở bảng chọn trang`, `Sáng`, `Tối`; dọn 1 key chết)
+- 📁 File đụng: `src/components/SiteNav.tsx` · `src/App.tsx` · `src/lib/i18n.{en,de}.ts` · `src/lib/i18n.{en,de}.panels.ts` · `scripts/test-web-contracts.cjs` · `scripts/test-browser-contracts.cjs` · `docs/repo-map.md`
+
 ## 07/10/2026 (3) — Bộ chọn trang lên header + quyền Admin cho cả team
 
 - 🎯 **Yêu cầu**: (a) chuyển bộ chọn trang lên header, thiết kế lại cho dễ nhìn; (b) mở cửa sổ Admin cho **quản trị viên nhóm** của team sở hữu bot, không chỉ owner; (c) verify đủ rồi commit + push.

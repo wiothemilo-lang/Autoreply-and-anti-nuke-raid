@@ -1744,6 +1744,42 @@ check(
     // Chỉ chặn MÃ còn dùng `ownerOnly`; nhắc lại trong comment lịch sử thì được.
     !/ownerOnly[?:]/.test(navSrc),
 );
+// ── DOCK GÓC DƯỚI TRÁI (khôi phục 07/10/2026 theo yêu cầu) ──
+// Dock là lối tắt thứ hai mở CÙNG bảng chọn với header. Hai luật:
+//   (1) nó phải mount ở App.tsx cho mọi trang không tạm (không nhét vào 1 trang),
+//   (2) nó phải có NEO DỌC cho MỌI bề mặt. Đây đúng là lỗi làm bản dock cũ
+//       "biến mất" trên desktop: chỉ có nhánh `max-md:*` ⇒ position:fixed với
+//       top/bottom đều auto ⇒ phần tử rơi về vị trí tĩnh sau nội dung trang.
+check(
+  "dock góc dưới trái mount ở App.tsx cho mọi trang (không phải chỉ 1 trang)",
+  /\{!transient && <PagesDock \/>\}/.test(appFileSrc),
+);
+check(
+  "dock nằm SAU nội dung trang trong cây DOM (thứ tự tab: nội dung trước, phụ kiện nổi sau)",
+  appFileSrc.indexOf("<PagesDock />") > appFileSrc.indexOf("</Suspense>"),
+);
+const dockSrc = siteNavSrc.slice(
+  siteNavSrc.indexOf("export function PagesDock"),
+  siteNavSrc.indexOf("function PagesPanel"),
+);
+check(
+  "dock neo đáy cho MỌI bề mặt + top-auto (không rơi về vị trí tĩnh)",
+  /bottom-4/.test(dockSrc) && /md:bottom-6/.test(dockSrc) && /top-auto/.test(dockSrc),
+  "thiếu một nhánh là dock trôi khỏi khung nhìn ở đúng breakpoint đó",
+);
+check(
+  "mobile dùng safe-area ở đáy (không bị thanh home che)",
+  /max-md:bottom-\[max\(1rem,env\(safe-area-inset-bottom\)\)\]/.test(dockSrc),
+);
+check(
+  "hai lối mở dùng CHUNG một bảng chọn (không nhân bản danh sách trang)",
+  (siteNavSrc.match(/<PagesPanel/g) ?? []).length === 2 &&
+    (siteNavSrc.match(/data-testid="pages-menu-panel"/g) ?? []).length === 1,
+);
+check(
+  "hai lối mở loại trừ nhau (mở cái này thì cái kia đóng — không 2 bảng cùng lúc)",
+  /protogon:pages-menu-open/.test(siteNavSrc) && /detail !== instanceId/.test(siteNavSrc),
+);
 // Trang đang mở phải tô đậm được: isNavItemActive phân biệt "/" (chỉ khớp
 // chính nó) với "/dashboard" (khớp cả "/dashboard/:guildId").
 const activeFn = navSrc.slice(navSrc.indexOf("export function isNavItemActive"));

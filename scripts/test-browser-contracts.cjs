@@ -1461,8 +1461,8 @@ browserTest("I1. Chunk bị xoá → tự tải lại ĐÚNG MỘT lần, không
 // test này khoá đúng thứ người dùng cần: nút phải nằm TRỌN trong khung nhìn ở
 // cả đỉnh lẫn đáy trang, điểm giữa của nó phải thuộc về chính nút (không lớp
 // nào che), và bấm vào phải MỞ RA DANH SÁCH TRANG — không chỉ "có trong DOM".
-const NAV_STATE = `(() => {
-  const d = document.querySelector('[data-testid="pages-menu"]');
+const NAV_STATE = (testid) => `(() => {
+  const d = document.querySelector('[data-testid="${testid}"]');
   if (!d) return { found: false };
   const r = d.getBoundingClientRect();
   const cs = getComputedStyle(d);
@@ -1485,13 +1485,13 @@ const NAV_STATE = `(() => {
  * đáy trang (nội dung dài). Mốc thứ hai là mốc chết của lỗi cũ: nút neo vào
  * dòng chảy nội dung thay vì vào header thì nó trôi theo chiều dài trang.
  */
-async function assertNavUsable(t, page, label) {
+async function assertNavUsable(t, page, label, testid = "pages-menu") {
   for (const where of ["đỉnh trang", "cuộn tới đáy"]) {
     await page.evaluate(
       where === "đỉnh trang" ? `scrollTo(0, 0)` : `scrollTo(0, document.body.scrollHeight)`,
     );
     await new Promise((r) => setTimeout(r, 200));
-    const s = await page.evaluate(NAV_STATE);
+    const s = await page.evaluate(NAV_STATE(testid));
     t.diagnostic(`${label} — ${where}: ${JSON.stringify(s)}`);
     t.assert.ok(s.found, `${label}: phải có nút chuyển trang trong DOM`);
     if (!s.found) return;
@@ -1505,9 +1505,9 @@ async function assertNavUsable(t, page, label) {
 }
 
 /** Mở bảng chọn trang và đòi thấy danh sách trang thật (không chỉ nút). */
-async function assertPagesListOpens(t, page, label) {
+async function assertPagesListOpens(t, page, label, testid = "pages-menu") {
   const opened = await page.evaluate(`(() => {
-    const d = document.querySelector('[data-testid="pages-menu"]');
+    const d = document.querySelector('[data-testid="${testid}"]');
     if (!d) return "không thấy nút chuyển trang";
     d.click();
     return "ok";
@@ -1566,6 +1566,78 @@ browserTest("J2. Mobile: bộ chọn trang ở header dùng được trên trang
   t.assert.ok(ready, "trang chủ phải render xong trên khung nhìn mobile");
   await assertNavUsable(t, page, "mobile 390×844");
   await assertPagesListOpens(t, page, "mobile 390×844");
+
+  // Dock phải dùng được cả trên MOBILE — đó là lý do chính nó tồn tại (góc
+  // dưới trái nằm trong tầm ngón tay cái, nút ở header thì phải với tay).
+  const dockReady = await waitForPage(
+    page,
+    `!!document.querySelector('[data-testid="pages-dock"]')`,
+    8000,
+  );
+  t.assert.ok(dockReady, "mobile phải có dock góc dưới trái");
+  await assertNavUsable(t, page, "mobile 390×844 dock", "pages-dock");
+  const dockBox = await page.evaluate(NAV_STATE("pages-dock"));
+  t.assert.ok(
+    dockBox.left < dockBox.vw / 2 && dockBox.bottom > dockBox.vh / 2,
+    `dock mobile phải ở góc dưới trái — hộp (${dockBox.left},${dockBox.top})→(${dockBox.right},${dockBox.bottom}) trong ${dockBox.vw}×${dockBox.vh}`,
+  );
+  t.assert.ok(
+    dockBox.right <= dockBox.vw && dockBox.vh - dockBox.bottom <= 40,
+    `dock mobile phải nằm trong màn và sát đáy (cách đáy ${dockBox.vh - dockBox.bottom}px) — không tràn ngang, không bị thanh home che`,
+  );
+});
+
+// J3 — DOCK GÓC DƯỚI TRÁI (khôi phục 07/10 theo yêu cầu người dùng).
+// Bản dock cũ từng BIẾN MẤT khỏi màn hình desktop vì thiếu neo dọc; test này
+// khoá đúng hai điều người dùng thấy: nút nằm trong khung nhìn ở GÓC DƯỚI TRÁI
+// (nửa dưới, nửa trái) ở cả đỉnh lẫn đáy trang, và bấm vào mở ra DANH SÁCH
+// trang. Kiểm cùng lúc hai lối mở loại trừ nhau: mở dock thì bảng header đóng.
+browserTest("J3. Desktop: dock góc dưới trái hiện đúng chỗ và mở được bảng chọn", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width: 1280,
+    height: 800,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await page.goto(ctx.base + "/monitor");
+  const ready = await waitForPage(
+    page,
+    `${OVERLAY_GONE} && !!document.querySelector('[data-testid="pages-dock"]')`,
+    25000,
+  );
+  t.assert.ok(ready, "trang /monitor phải render xong và có dock góc dưới trái");
+  await assertNavUsable(t, page, "desktop /monitor dock", "pages-dock");
+
+  // Đúng GÓC: phải nằm ở nửa trái + nửa dưới khung nhìn (không phải "đâu đó").
+  const corner = await page.evaluate(NAV_STATE("pages-dock"));
+  t.assert.ok(
+    corner.left < corner.vw / 2 && corner.bottom > corner.vh / 2,
+    `dock phải ở góc dưới trái — hộp (${corner.left},${corner.top})→(${corner.right},${corner.bottom}) trong ${corner.vw}×${corner.vh}`,
+  );
+  t.assert.ok(
+    corner.vh - corner.bottom <= 40,
+    `dock phải sát đáy khung nhìn (cách đáy ${corner.vh - corner.bottom}px)`,
+  );
+
+  await assertPagesListOpens(t, page, "desktop /monitor dock", "pages-dock");
+
+  // Hai lối mở KHÔNG được cùng hiện bảng: mở bảng ở header sau khi dock đã mở.
+  const exclusive = await page.evaluate(`(async () => {
+    const header = document.querySelector('[data-testid="pages-menu"]');
+    const dock = document.querySelector('[data-testid="pages-dock"]');
+    if (!header || !dock) return "thiếu nút";
+    header.click();
+    await new Promise((r) => setTimeout(r, 250));
+    return document.querySelectorAll('[data-testid="pages-menu-panel"]').length;
+  })()`);
+  t.assert.strictEqual(
+    exclusive,
+    1,
+    "mở bảng từ header sau khi dock đã mở ⇒ chỉ còn ĐÚNG MỘT bảng (không 2 bảng cùng lúc)",
+  );
 });
 
 // Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server + dừng breadcrumb

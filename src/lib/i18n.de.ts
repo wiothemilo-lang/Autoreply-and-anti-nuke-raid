@@ -1586,6 +1586,10 @@ export const DE: Record<string, string> = {
   Trang: "Seiten",
   "Bảng chọn trang": "Seitenmenü",
   "Chuyển trang": "Seite wechseln",
+  "Mở bảng chọn trang": "Seitenmenü öffnen",
+  // Nút chọn giao diện sáng/tối trong bảng chọn trang.
+  Sáng: "Hell",
+  Tối: "Dunkel",
   "Đóng bảng chọn trang": "Seitenmenü schließen",
   "Bot đang chạy": "Bot läuft",
   "Bot mất kết nối": "Bot ist offline",

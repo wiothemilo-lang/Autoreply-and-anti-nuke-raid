@@ -1659,6 +1659,10 @@ export const EN: Record<string, string> = {
   Trang: "Pages",
   "Bảng chọn trang": "Page menu",
   "Chuyển trang": "Switch page",
+  "Mở bảng chọn trang": "Open the page menu",
+  // Nút chọn giao diện sáng/tối trong bảng chọn trang.
+  Sáng: "Light",
+  Tối: "Dark",
   "Đóng bảng chọn trang": "Close the page menu",
   "Bot đang chạy": "Bot is running",
   "Bot mất kết nối": "Bot is offline",

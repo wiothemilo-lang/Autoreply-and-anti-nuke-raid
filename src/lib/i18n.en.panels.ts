@@ -179,8 +179,6 @@ export const EN_PANELS: Record<string, string> = {
   "Đã bật bảo vệ ✅ — dán giá trị seed VỪA NHẬP vào BOT_KEY trên VPS (không hiện lại ở đây).":
     "Protection enabled ✅ — paste the seed you JUST entered into BOT_KEY on the VPS (it is not shown here again).",
   "Lỗi khi đặt seed — thử lại.": "Failed to set the seed — try again.",
-  "Cửa sổ Admin chỉ hiển thị trong taskbar với":
-    "The Admin window only appears in the taskbar for the",
   "Cho phép AI tổng hợp (Mimo V2.5 qua Kira AI — free 30M tokens/ngày riêng cho việc học; tổng hợp mỗi lượt khi có dữ liệu mới, không đụng hạn mức Groq/NVIDIA)":
     "Allow AI synthesis (Mimo V2.5 via Kira AI — 30M free tokens/day dedicated to learning; synthesises each run when there is new data, without touching the Groq/NVIDIA quota)",
   "Nguồn lượt trước": "Sources last run",

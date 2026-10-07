@@ -5,7 +5,7 @@ import { MotionConfig } from "framer-motion";
 import { Toaster } from "sonner";
 import NotFound from "./pages/NotFound";
 import RequireAuth from "./components/RequireAuth";
-import SiteNav from "./components/SiteNav";
+import SiteNav, { PagesDock } from "./components/SiteNav";
 import RouteLoader from "./components/RouteLoader";
 import SkipLink from "./components/SkipLink";
 
@@ -212,6 +212,11 @@ export default function App() {
           </Routes>
         </Suspense>
       </MotionConfig>
+      {/* Dock nổi góc dưới trái — lối tắt quen tay mở CÙNG bảng chọn với header.
+          Đặt SAU nội dung trang (ngoài <Suspense>) là cố ý: thứ tự tab giữ
+          nguyên như bản dock cũ (nội dung trước, phụ kiện nổi sau), và nằm
+          ngoài Suspense nên không bị gỡ ra lắp lại mỗi lần tải chunk route. */}
+      {!transient && <PagesDock />}
       <Toaster
         position="top-right"
         theme="system"
