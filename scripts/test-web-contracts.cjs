@@ -1961,6 +1961,24 @@ check(
   /Chromium/.test(browserSrc) && /process\.exit|throw/.test(browserSrc),
 );
 
+// (2b) dist phải MỚI HƠN nguồn, không chỉ "tồn tại". 07/10/2026: điều kiện cũ
+// là existsSync(dist/index.html) → dist để lại từ 05/10 nên suite kiểm tra
+// bundle 2 ngày trước;4 test mới đi tìm data-testid="pages-menu" trong bundle
+// vẫn còn "taskbar-dock" ⇒4 đỏ oan, còn các test khác có thể XANH GIẢ trên
+// code đã bị thay. Không được quay lại kiểm tra thuần tồn tại.
+check(
+  "test-browser-contracts build lại khi dist CŨ hơn nguồn (không chỉ khi thiếu)",
+  /function distNeedsBuild\(\)/.test(browserSrc) &&
+    /stat\.mtimeMs < newestSourceMtime\(\)/.test(browserSrc) &&
+    !/if \(!fs\.existsSync\(path\.join\(DIST, "index\.html"\)\)\)/.test(browserSrc),
+);
+// Build xong mà dist vẫn cũ thì môi trường bất thường — chạy tiếp = test đỏ mơ
+// hồ không rõ lý do. Cổng này giữ nhánh chặn đứng thay vì im lặng.
+check(
+  "test-browser-contracts chặn đứng khi build xong mà dist vẫn cũ",
+  /vẫn không mới hơn nguồn sau khi build/.test(browserSrc),
+);
+
 // (3) test-browser-contracts KHÔNG ĐƯỢC treo. Trần 120s của runner từng che
 // một lỗi thật: `Cdp.send()` lưu promise vào `pending` rồi chờ browser trả
 // lời mãi — renderer treo là CẢ SUITE đứng, không test nào báo kết quả. Đã

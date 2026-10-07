@@ -548,10 +548,72 @@ class Cdp {
 // ─── Dựng dữ liệu dùng chung ────────────────────────────────────────────────
 let shared = null;
 
+/**
+ * Bundle phải MỚI HƠN nguồn, không chỉ "tồn tại".
+ *
+ * Trước 07/10/2026 điều kiện là `fs.existsSync(dist/index.html)` — dist để lại
+ * từ 05/10 nên suite kiểm tra bundle 2 NGÀY TRƯỚC:4 test mới đi tìm
+ * `data-testid="pages-menu"` trong bundle vẫn còn `taskbar-dock` ⇒4 đỏ oan
+ * và (nguy hiểm hơn) các test khác XANH GIẢ trên code đã bị thay. Dấu hiệu
+ * nhận biết:4 test cùng báo "chờ render xong" dù overlay vẫn biến mất đúng ở
+ * test A/B/F — nghĩa là `OVERLAY_GONE` pass, chỉ `pages-menu` là vắng mặt.
+ */
+const BUILD_INPUTS = ["index.html", "vite.config.ts", path.join("scripts", "build.mjs")];
+
+/** Mtime mới nhất trong mọi đầu vào sinh ra bundle (src/, public/, cấu hình). */
+function newestSourceMtime() {
+  let newest = 0;
+  const touch = (file) => {
+    try {
+      const m = fs.statSync(file).mtimeMs;
+      if (m > newest) newest = m;
+    } catch {
+      // không đọc được thì coi như không mới hơn — không chặn build
+    }
+  };
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else touch(full);
+    }
+  };
+  walk(path.join(ROOT, "src"));
+  const pub = path.join(ROOT, "public");
+  if (fs.existsSync(pub)) walk(pub);
+  for (const rel of BUILD_INPUTS) touch(path.join(ROOT, rel));
+  return newest;
+}
+
+/**
+ * "" = dist dùng được · "thiếu" = chưa có · "cũ" = cũ hơn nguồn → phải build.
+ * Trả thay vì build thẳng để `setup()` in được đúng lý do trong log.
+ */
+function distNeedsBuild() {
+  let stat;
+  try {
+    stat = fs.statSync(path.join(DIST, "index.html"));
+  } catch {
+    return "thiếu";
+  }
+  return stat.mtimeMs < newestSourceMtime() ? "cũ" : "";
+}
+
 async function setup() {
   if (shared) return shared;
-  if (!fs.existsSync(path.join(DIST, "index.html"))) {
-    console.error(`[browser-test] Thiếu ${DIST}/index.html — đang build…`);
+  const stale = distNeedsBuild();
+  if (stale) {
+    console.error(
+      stale === "cũ"
+        ? `[browser-test] ${DIST}/index.html CŨ hơn nguồn — đang build lại…`
+        : `[browser-test] Thiếu ${DIST}/index.html — đang build…`,
+    );
     // spawnSync KHÔNG trả lời thì event loop bị chặn: interval chẩn đoán và
     // cả trần per-test của node:test đều KHÔNG THỂ cháy → kill suite mà không
     // nói gì. Trần của spawnSync tự giết tiến trình build khi quá hạn.
@@ -564,6 +626,13 @@ async function setup() {
     if (build.status !== 0 || build.error) {
       throw new Error(
         `build thất bại (status=${build.status}, error=${build.error?.code ?? "none"})`,
+      );
+    }
+    if (distNeedsBuild()) {
+      // Build xong mà vẫn cũ/thiếu → môi trường bất thường. Im lặng tiếp tục
+      // nghĩa là test đỏ mơ hồ không rõ lý do (đúng kiểu07/10): phải chặn.
+      throw new Error(
+        `${DIST}/index.html vẫn không mới hơn nguồn sau khi build — kiểm tra scripts/build.mjs`,
       );
     }
   }

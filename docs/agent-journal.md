@@ -4,6 +4,16 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 07/10/2026 (5) — Browser test đi kiểm tra bundle 2 ngày trước (dist không bao giờ rebuild)
+
+- 🎯 **Yêu cầu**: `/deploy` — pull code mới nhất → 4 lớp kiểm chứng → deploy Convex → restart bot. Bước 3 **đỏ**: `test-browser-contracts` 86/87, 4 test cùng treo chờ render (G: "CDP `Runtime.evaluate` không trả lời 30000ms"; J1/J2/J3: "trang /monitor phải render xong").
+- 🔍 **Gốc rễ — KHÔNG phải lỗi code**: `setup()` chỉ build khi `dist/index.html` **thiếu**, nên dist còn của 05/10 (2 ngày) trong khi pull này đổi testid `taskbar-dock → pages-menu` + thêm J1/J2/J3. Test A/B/F vẫn xanh vì chỉ đòi `OVERLAY_GONE` (overlay có thật ở bundle cũ) ⇒ 4 test kia đi tìm `pages-menu` trong bundle chưa hề có component đó. Nguy hiểm hơn chiều ngược lại: **suite có thể XANH GIẢ trên code đã bị thay** — đang kiểm tra bản build cũ.
+- 🧭 **Sửa gốc**: thêm `distNeedsBuild()` — so mtime `dist/index.html` với đầu vào build mới nhất (`src/`, `public/`, `index.html`, `vite.config.ts`, `scripts/build.mjs`) → rebuild khi **thiếu hoặc cũ**; build xong mà vẫn cũ thì **chặn đứng** kèm lý do, thay vì chạy tiếp rồi đỏ mơ hồ không rõ nguyên do.
+- 🧪 **Chứng minh hành vi**: `touch src/App.tsx` → log `[browser-test] …/dist/index.html CŨ hơn nguồn — đang build lại…` → 18/18 ✅. Thêm **2 gate** vào `test-web-contracts.cjs`: (a) cấm quay lại kiểm tra thuần `existsSync`, (b) giữ nhánh chặn đứng → **361 PASS / 0 FAIL** (trước: 359).
+- 🧪 **Kiểm chứng**: 87/87 CJS · **25/25 TS** · `tsc` · lint · `format:check` · 10 cổng tĩnh self-test · Convex codegen. Đồng bộ số liệu hợp đồng: `AGENTS.md` `test:ts` 24 → **25** (pull thêm `test-team-admins.ts`); `CONTRACT_SUITES = 87` giữ nguyên.
+- 🚀 **Deploy**: pull `b16fbf8 → 61eefdc` (3 commit, fast-forward, lockfile không đổi) · Convex → `accomplished-chipmunk-74` (5 file `convex/`; `schema.ts` chỉ **thêm optional** `teamAdminDiscordIds` — bot không đọc/ghi, không index nào bị xoá) · `pm2 restart` → **online ↺11**, `20 slash commands`, `prewarm 10/10 guild`, **0 lỗi** từ 11:17 (dòng lỗi cuối vẫn `07:19:40`).
+- 📁 File đụng: `scripts/test-browser-contracts.cjs` · `scripts/test-web-contracts.cjs` · `AGENTS.md`
+
 ## 07/10/2026 (4) — Khôi phục dock chọn trang góc dưới trái (lối tắt thứ hai)
 
 - 🎯 **Yêu cầu**: "kiểm tra cái menu taskbar nhỏ nhỏ góc dưới bên trái còn không, thêm lại nếu mất". Nó đã bị gỡ ở đợt (3) khi nav lên header.
