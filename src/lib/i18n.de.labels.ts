@@ -488,6 +488,9 @@ export const DE_LABELS: Record<string, string> = {
   "Ủng hộ nhà phát triển — Protogon": "Entwickler unterstützen — Protogon",
   "Giúp duy trì Protogon — bot Discord miễn phí do một người làm. Mọi tính năng luôn miễn phí, quyền góp giúp bot có thêm máy chủ và người sửa lỗi.":
     "Protogon am Laufen halten — ein kostenloser Discord-Bot, gepflegt von einer Person. Alle Funktionen bleiben kostenlos; Spenden finanzieren Server und Fehlerbehebungen.",
+  "Góp ý — Protogon": "Feedback — Protogon",
+  "Gửi báo lỗi, đề xuất tính năng hoặc góp ý cho bot Protogon — không cần tài khoản Discord, góp ý đi thẳng tới người làm bot.":
+    "Fehler melden, Funktionen vorschlagen oder allgemeines Feedback zum Protogon-Bot senden — ohne Discord-Konto, direkt an den Entwickler.",
   "Gói Premium — Protogon": "Premium-Tarife — Protogon",
   "Xem trước các gói Premium của Protogon: nhiều kênh riêng hơn, báo cáo nâng cao, tên bot riêng và hỗ trợ ưu tiên. Gói miễn phí luôn được giữ nguyên.":
     "Protogon Premium-Tarife ansehen: mehr eigene Kanäle, erweiterte Berichte, eigener Bot-Name und priorisierter Support. Der kostenlose Tarif bleibt unverändert.",

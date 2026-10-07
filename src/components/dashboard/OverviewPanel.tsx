@@ -18,7 +18,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { buildBotInviteUrl, getSessionToken } from "../../lib/discord";
 import { usePublicConfig } from "../../lib/usePublicConfig";
-import { isHeartbeatFresh, timeAgo } from "../../lib/utils";
+import { isGuildHeartbeatFresh, timeAgo } from "../../lib/utils";
 import { ANTINUKE_MODULE_META } from "../../lib/constants";
 import { SafetyBar, TopOffenders } from "./HeatBar";
 import ConfigHealthCard from "./ConfigHealthCard";
@@ -117,7 +117,9 @@ export default function OverviewPanel({
 }) {
   const { clientId } = usePublicConfig();
   const enabledModules = data.modules.filter((m) => m.enabled).length;
-  const botOnline = data.guild.botInGuild && isHeartbeatFresh(data.guild.lastHeartbeat);
+  // Heartbeat của guild thưa hơn heartbeat toàn cục 5 lần (bot chỉ refresh
+  // mỗi 5 nhịp sync) — phải dùng đúng ngưỡng theo-guild, xem lib/utils.ts.
+  const botOnline = data.guild.botInGuild && isGuildHeartbeatFresh(data.guild.lastHeartbeat);
   const logChannel = data.channels.find((c) => c.channelId === data.guild.logChannelId);
 
   const stats = [

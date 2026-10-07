@@ -44,7 +44,7 @@ import LangSwitch from "../components/LangSwitch";
 import SkipLink from "../components/SkipLink";
 
 import { dateLocale, translate } from "../lib/i18n";
-import { isHeartbeatFresh } from "../lib/utils";
+import { isGuildHeartbeatFresh } from "../lib/utils";
 export default function Dashboard() {
   const navigate = useNavigate();
   const motionSet = useProductMotion();
@@ -172,7 +172,9 @@ export default function Dashboard() {
   const avatar = discordAvatarUrl({ id: me.user.discordId, avatar: me.user.avatar });
   const managed = me.guilds;
   const onlineCount = managed.filter(
-    (g) => g.botInGuild && isHeartbeatFresh(g.lastHeartbeat),
+    // Heartbeat của TỪNG guild được bot refresh mỗi 5 nhịp sync (~15 phút) —
+    // dùng ngưỡng toàn cục 6 phút ở đây là báo "offline" gần như mọi lúc.
+    (g) => g.botInGuild && isGuildHeartbeatFresh(g.lastHeartbeat),
   ).length;
   const totalMembers = managed.reduce((a, g) => a + (g.memberCount ?? 0), 0);
 
@@ -372,7 +374,7 @@ export default function Dashboard() {
               >
                 {managed.map((guild) => {
                   const icon = discordGuildIconUrl({ id: guild.discordId, icon: guild.icon });
-                  const online = guild.botInGuild && isHeartbeatFresh(guild.lastHeartbeat);
+                  const online = guild.botInGuild && isGuildHeartbeatFresh(guild.lastHeartbeat);
                   return (
                     <motion.div
                       key={guild.discordId}

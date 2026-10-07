@@ -6,6 +6,7 @@ import {
   Home,
   LayoutDashboard,
   Lock,
+  MessageSquareHeart,
   Sparkles,
 } from "lucide-react";
 
@@ -48,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: "/", icon: Home, label: "Trang chủ" },
       { to: "/features", icon: Sparkles, label: "Tính năng" },
       { to: "/monitor", icon: Activity, label: "Giám sát bot" },
+      { to: "/feedback", icon: MessageSquareHeart, label: "Góp ý" },
     ],
   },
   {

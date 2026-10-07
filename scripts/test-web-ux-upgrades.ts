@@ -15,6 +15,15 @@ import {
 } from "../src/lib/useUnsavedChanges";
 import { filterCommands, foldDiacritics, scoreCommand } from "../src/components/CommandPalette";
 import { syncState, SETTINGS_APPLY_WINDOW_MS, STALE_HEARTBEAT_MS } from "../src/lib/syncState";
+import {
+  BOT_ONLINE_WINDOW_MS,
+  BOT_SYNC_INTERVAL_MS,
+  GUILD_HEARTBEAT_FRESH_MS,
+  GUILD_HEARTBEAT_REFRESH_MS,
+  HEARTBEAT_FRESH_MS,
+  isGuildHeartbeatFresh,
+  isHeartbeatFresh,
+} from "../src/lib/utils";
 import { ensureDictionary, lookupTranslation, translate } from "../src/lib/i18n";
 import { safeRedirectPath } from "../src/lib/discord";
 import { CHUNK_RELOAD_COOLDOWN_MS, installStaleChunkRecovery } from "../src/lib/staleChunk";
@@ -816,7 +825,16 @@ console.log("── #13 độ trễ và giờ Việt Nam ──");
     "ngưỡng tăng dần: nhanh < trung bình < sự cố",
     LATENCY_FAST < LATENCY_SLOW && LATENCY_SLOW < INCIDENT_SLOW,
   );
-  check("bot sync mỗi 60s", SYNC_INTERVAL_MS === 60_000);
+  // Nhịp THẬT của bot là 180s (`setTimeout(runSyncLoop, 180_000)` trong
+  // bot/src/index.js, heartbeat gộp vào chính lượt sync đó). Trước đây test
+  // này khoá 60_000 — một kỳ vọng SAI được ghi vào test, nên đúng lúc code
+  // hiển thị sai (khung "Cập nhật tiếp theo" và dòng "mỗi 60 giây") thì
+  // không có gì đỏ. Nay khoá theo hằng số dùng chung.
+  check(
+    "nhịp sync của bot = 180s, đúng nhịp thật trong bot/src/index.js",
+    SYNC_INTERVAL_MS === 180_000,
+  );
+  check("nhịp web dùng chung hằng số với nhịp bot", SYNC_INTERVAL_MS === BOT_SYNC_INTERVAL_MS);
 
   // Biên đúng bằng số phải rơi vào nhóm kế tiếp — `<` chứ không phải `<=`.
   check(
@@ -1221,6 +1239,110 @@ console.log("── #16 vòng lặp đăng nhập: mô phỏng điều hướng 
   check(
     "Dashboard: effect mount không gọi làm mới (nguồn gốc vòng lặp cũ)",
     !/useEffect\([\s\S]{0,300}?refreshServerList\(/.test(dashboardSrc),
+  );
+}
+
+// ── #16 nhịp tim bot ⇄ ngưỡng hiển thị trạng thái (bản vá "web báo bot mất kết nối") ──
+// Gốc rễ: heartbeat toàn cục của bot được ghi mỗi 180s
+// (`setTimeout(runSyncLoop, 180_000)` — hẹn nhịp KẾ TIẾP sau khi lượt trước chạy
+// xong, nên chu kỳ ≥ 180s), còn web lấy ĐÚNG 180s làm ngưỡng "còn tươi" ⇒ cứ
+// vài phút lại có một quãng web hiện "mất kết nối" trong khi bot đang chạy.
+// Riêng heartbeat của TỪNG guild còn thưa hơn 5 lần (~15 phút/lần vì bot chỉ
+// ghi lại field đó mỗi `runCounter % 5 === 0`), nên dùng chung ngưỡng 180s thì
+// gần như mọi server đều hiện "Bot offline".
+console.log("── #16 nhịp tim bot ⇄ ngưỡng hiển thị ──");
+{
+  const now = T;
+
+  check(
+    "ngưỡng online rộng ít nhất 2 nhịp sync (bỏ qua được 1 nhịp lỡ)",
+    BOT_ONLINE_WINDOW_MS >= 2 * BOT_SYNC_INTERVAL_MS,
+  );
+  check(
+    "ngưỡng online phải RỘNG HƠN 1 nhịp (đúng lỗi cũ: bằng 1 nhịp là nhấp nháy offline)",
+    BOT_ONLINE_WINDOW_MS > BOT_SYNC_INTERVAL_MS,
+  );
+  check(
+    "HEARTBEAT_FRESH_MS (tên cũ) nay trỏ đúng ngưỡng toàn cục",
+    HEARTBEAT_FRESH_MS === BOT_ONLINE_WINDOW_MS,
+  );
+
+  // Ca chính của bản vá: heartbeat 200s tuổi là TRẠNG THÁI BÌNH THƯỜNG giữa
+  // chu kỳ 180s — tuyệt đối không được coi là mất kết nối.
+  check(
+    "heartbeat 200s tuổi (giữa chu kỳ bình thường) vẫn TƯƠI",
+    isHeartbeatFresh(now - 200_000, now) === true,
+  );
+  check(
+    "isHeartbeatFresh tất định + biên kín (đúng ngưỡng là hết tươi)",
+    isHeartbeatFresh(now - BOT_ONLINE_WINDOW_MS + 1, now) === true &&
+      isHeartbeatFresh(now - BOT_ONLINE_WINDOW_MS, now) === false,
+  );
+  check(
+    "heartbeat 10 phút tuổi → mất kết nối (bot chết thật)",
+    isHeartbeatFresh(now - 600_000, now) === false,
+  );
+  check(
+    "giá trị rác (null / NaN) không được coi là online",
+    isHeartbeatFresh(null, now) === false && isHeartbeatFresh(Number.NaN, now) === false,
+  );
+
+  check(
+    "nhịp refresh heartbeat của guild = 5 nhịp sync (đúng guildSync.js)",
+    GUILD_HEARTBEAT_REFRESH_MS === 5 * BOT_SYNC_INTERVAL_MS,
+  );
+  check(
+    "ngưỡng tươi của guild rộng hơn 1 chu kỳ refresh",
+    GUILD_HEARTBEAT_FRESH_MS > GUILD_HEARTBEAT_REFRESH_MS,
+  );
+  // Ca chính thứ hai: 14 phút là tuổi heartbeat BÌNH THƯỜNG của một guild.
+  check(
+    "heartbeat guild 14 phút tuổi vẫn TƯƠI",
+    isGuildHeartbeatFresh(now - 14 * 60_000, now) === true,
+  );
+  check(
+    "heartbeat guild quá ngưỡng → hết tươi",
+    isGuildHeartbeatFresh(now - GUILD_HEARTBEAT_FRESH_MS, now) === false,
+  );
+  check(
+    "isGuildHeartbeatFresh ≠ isHeartbeatFresh (không dùng lẫn ngưỡng)",
+    isHeartbeatFresh(now - 14 * 60_000, now) === false &&
+      isGuildHeartbeatFresh(now - 14 * 60_000, now) === true,
+  );
+
+  // Trang server dùng CẢ HAI: badge "Bot online" (theo guild) + dải trạng thái
+  // đồng bộ (syncState). Hai ngưỡng lệch nhau là tự mâu thuẫn ngay trên một
+  // màn hình: badge nói online, dải nói "bot-offline".
+  const settingsAt = now - SETTINGS_APPLY_WINDOW_MS - 1;
+  const guildHeartbeat = now - 14 * 60_000;
+  check(
+    "syncState mặc định (heartbeat toàn cục) vẫn báo offline khi 14 phút im lặng",
+    syncState({
+      settingsChangedAt: settingsAt,
+      botOnline: true,
+      lastHeartbeat: guildHeartbeat,
+      now,
+    }) === "bot-offline",
+  );
+  check(
+    "syncState với ngưỡng theo-guild → không báo offline oan",
+    syncState({
+      settingsChangedAt: settingsAt,
+      botOnline: true,
+      lastHeartbeat: guildHeartbeat,
+      staleHeartbeatMs: GUILD_HEARTBEAT_FRESH_MS,
+      now,
+    }) === "sent",
+  );
+  check(
+    "ngưỡng theo-guild không che bot chết thật (30 phút im lặng vẫn offline)",
+    syncState({
+      settingsChangedAt: settingsAt,
+      botOnline: true,
+      lastHeartbeat: now - 30 * 60_000,
+      staleHeartbeatMs: GUILD_HEARTBEAT_FRESH_MS,
+      now,
+    }) === "bot-offline",
   );
 }
 

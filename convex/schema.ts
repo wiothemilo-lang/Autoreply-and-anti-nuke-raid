@@ -1471,4 +1471,26 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_discordId", ["discordId"]),
+
+  /**
+   * Góp ý người dùng gửi từ trang /feedback (công khai, KHÔNG cần đăng nhập).
+   *
+   * Đây là "hệ thống nội bộ" nhận góp ý: dòng nằm trong Convex, chỉ chủ bot
+   * đọc được qua `feedback:list` (guard isBotOwnerUser). Nội dung do người ngoài
+   * nhập nên tuyệt đối không được render ra UI công khai.
+   *
+   * Index `by_createdAt` phục vụ 2 việc: đếm chống spam theo cửa sổ thời gian
+   * (chỉ đọc N dòng mới nhất) và danh sách cho chủ bot (mới nhất trước).
+   */
+  feedback: defineTable({
+    /** bug = báo lỗi, idea = đề xuất tính năng, other = góp ý chung. */
+    kind: v.union(v.literal("bug"), v.literal("idea"), v.literal("other")),
+    message: v.string(),
+    /** Tùy chọn — chỉ có khi người gửi muốn được phản hồi. */
+    email: v.optional(v.string()),
+    /** Ngôn ngữ + đường dẫn lúc gửi: đọc góp ý mà không phải hỏi lại. */
+    lang: v.optional(v.string()),
+    page: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_createdAt", ["createdAt"]),
 });

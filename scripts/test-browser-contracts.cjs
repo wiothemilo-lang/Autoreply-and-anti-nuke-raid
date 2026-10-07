@@ -928,7 +928,7 @@ browserTest("G. Không có lỗi console trong suốt các route công khai", as
     pageErrors.push(params.exceptionDetails?.text ?? "unknown");
   });
 
-  for (const route of ["/", "/features", "/monitor", "/terms", "/privacy", "/data-deletion"]) {
+  for (const route of ["/", "/features", "/monitor", "/terms", "/privacy", "/data-deletion", "/feedback"]) {
     await page.goto(ctx.base + route);
     await new Promise((r) => setTimeout(r, 800));
   }

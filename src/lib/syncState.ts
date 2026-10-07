@@ -34,6 +34,13 @@ export function syncState(input: {
   botOnline: boolean;
   lastHeartbeat?: number | null;
   now?: number;
+  /**
+   * Ngưỡng "heartbeat đã cũ". Mặc định 10 phút — đúng cho heartbeat TOÀN CỤC
+   * (nhịp 180s). Khi dữ liệu truyền vào là `lastHeartbeat` RIÊNG CỦA GUILD
+   * (nhịp refresh thưa hơn 5 lần ≈ 900s) thì phải truyền ngưỡng theo-guild
+   * (`GUILD_HEARTBEAT_FRESH_MS`), nếu không trang server báo "bot offline" oan.
+   */
+  staleHeartbeatMs?: number;
 }): SyncState {
   const now = input.now ?? Date.now();
   const changedAt = input.settingsChangedAt ?? 0;
@@ -46,7 +53,8 @@ export function syncState(input: {
   // Mốc thời gian chưa tới: nói "đang nhận" chứ đừng vời xong.
   if (elapsed < SETTINGS_APPLY_WINDOW_MS) return "just-saved";
   // Heartbeat quá cũ trong lúc có cấu hình mới → coi như bot không còn sống.
-  if (typeof input.lastHeartbeat === "number" && now - input.lastHeartbeat > STALE_HEARTBEAT_MS) {
+  const staleMs = input.staleHeartbeatMs ?? STALE_HEARTBEAT_MS;
+  if (typeof input.lastHeartbeat === "number" && now - input.lastHeartbeat > staleMs) {
     return "bot-offline";
   }
   return "sent";
