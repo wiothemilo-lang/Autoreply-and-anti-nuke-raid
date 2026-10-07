@@ -51,6 +51,57 @@ export function isBotOwnerUser(
   return !!ownerDiscordId && ownerDiscordId === user?.discordId;
 }
 
+/** Trần số quản trị viên nhóm — đủ cho một team nhỏ, chặn danh sách phình vô hạn. */
+export const MAX_TEAM_ADMINS = 20;
+
+/**
+ * Danh sách Discord ID quản trị viên nhóm đã CHUẨN HOÁ.
+ *
+ * Vì sao phải chuẩn hoá ở tầng đọc thay vì tin dữ liệu trong DB: đây là dữ
+ * liệu quyết định AI ĐƯỢC VÀO cửa sổ Admin, nên mọi giá trị lạ (khoảng trắng,
+ * chuỗi rác, ID trùng, chính chủ bot) phải bị loại ngay tại chỗ dùng — không
+ * có đường nào để một dòng bẩn trong DB biến thành quyền.
+ * Chủ bot luôn có quyền nên ID của chủ bot bị loại khỏi danh sách (tránh hiểu
+ * nhầm rằng quyền của chủ bot phụ thuộc danh sách này).
+ */
+export function canonicalTeamAdminIds(
+  status: { ownerDiscordId?: string; teamAdminDiscordIds?: string[] } | null | undefined,
+): string[] {
+  const owner = canonicalBotOwnerId(status);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of status?.teamAdminDiscordIds ?? []) {
+    const id = typeof raw === "string" ? raw.trim() : "";
+    if (!DISCORD_SNOWFLAKE_RE.test(id) || id === owner || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= MAX_TEAM_ADMINS) break;
+  }
+  return out;
+}
+
+/**
+ * Chủ bot HOẶC quản trị viên nhóm.
+ *
+ * Cổng vào CỬA SỔ ADMIN (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research,
+ * self-diagnose) và mặt hàng nav "Cửa sổ Admin". KHÔNG dùng cho tính năng ẩn,
+ * mật khẩu ẩn hay OWNER_SEED — những thứ đó vẫn `requireBotOwner`.
+ * Chưa có chủ bot (owner trống/không hợp lệ) ⇒ không ai là admin: giữ nguyên
+ * tính chất "chưa khởi tạo thì cửa đóng" của requireBotOwner.
+ */
+export function isBotAdminUser(
+  user: { discordId: string } | null,
+  status: { ownerDiscordId?: string; teamAdminDiscordIds?: string[] } | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (isBotOwnerUser(user, status)) return true;
+  // Chưa có chủ bot (chưa bootstrap) ⇒ cửa VẪN ĐÓNG: quyền quản trị viên nhóm
+  // là quyền ĐƯỢC CHỦ BOT CẤP, không thể tồn tại trước chủ bot. Bỏ nhánh này
+  // là mở cửa sổ Admin cho một danh sách mồ côi khi dữ liệu botStatus bị xoá.
+  if (!canonicalBotOwnerId(status)) return false;
+  return canonicalTeamAdminIds(status).includes(user.discordId);
+}
+
 /**
  * Chỉ admin SỞ HỮU bot mới được tương tác mật khẩu / tính năng ẩn.
  * (Panel reaction role, giveaway, DM, auto-reply ẩn, branding…)
@@ -69,6 +120,99 @@ export async function requireBotOwner(
   }
   return status;
 }
+
+/**
+ * Như `requireBotOwner` nhưng cho cả QUẢN TRỊ VIÊN NHÓM — dùng cho cửa sổ
+ * Admin. Không dùng cho tính năng ẩn / mật khẩu / bot secret.
+ */
+export async function requireBotAdmin(
+  ctx: QueryCtx | MutationCtx,
+  user: { discordId: string } | null,
+) {
+  if (!user) throw new Error("Vui lòng đăng nhập");
+  const status = await getBotStatus(ctx);
+  if (!canonicalBotOwnerId(status)) {
+    throw new Error("Chủ sở hữu bot chưa được khởi tạo hoặc không hợp lệ");
+  }
+  if (!isBotAdminUser(user, status)) {
+    throw new Error("Chỉ chủ sở hữu bot hoặc quản trị viên nhóm mới được phép 🔒");
+  }
+  return status;
+}
+
+/**
+ * Danh sách quản trị viên nhóm cho chủ bot quản lý (CHỈ chủ bot đọc được —
+ * danh sách này nói ai đang có quyền vào cửa sổ Admin).
+ *
+ * Trả kèm hồ sơ từ bảng `users` khi người đó đã từng đăng nhập web; chưa
+ * đăng nhập thì chỉ có ID — hiển thị "chưa từng đăng nhập" thay vì im lặng
+ * (chủ bot cần biết ID đó có thật sự hoạt động không).
+ */
+export const getTeamAdmins = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const user = await getUserByToken(ctx, token);
+    const status = await requireBotOwner(ctx, user);
+    const ids = canonicalTeamAdminIds(status);
+    const members = [];
+    for (const discordId of ids) {
+      const row = await ctx.db
+        .query("users")
+        .withIndex("by_discordId", (q) => q.eq("discordId", discordId))
+        .first();
+      members.push({
+        discordId,
+        username: row?.username ?? null,
+        globalName: row?.globalName ?? null,
+        avatar: row?.avatar ?? null,
+        lastLoginAt: row?.lastLoginAt ?? null,
+      });
+    }
+    return { max: MAX_TEAM_ADMINS, members };
+  },
+});
+
+/**
+ * Đặt lại danh sách quản trị viên nhóm (CHỈ chủ bot).
+ *
+ * Vì sao chỉ chủ bot: đây là quyền tự nâng cấp quyền — người trong danh sách
+ * không được phép thêm người khác, nếu không một tài khoản bị lộ là cả team
+ * mất kiểm soát. Danh sách gửi lên được chuẩn hoá + chặn trần; giá trị không
+ * phải snowflake bị TỪ CHỐI kèm lý do (không âm thầm bỏ — chủ bot phải biết
+ * mình gõ sai ID nào).
+ */
+export const setTeamAdmins = mutation({
+  args: { token: v.string(), discordIds: v.array(v.string()) },
+  handler: async (ctx, { token, discordIds }) => {
+    const user = await getUserByToken(ctx, token);
+    const status = await requireBotOwner(ctx, user);
+    const owner = canonicalBotOwnerId(status);
+    const cleaned: string[] = [];
+    const bad: string[] = [];
+    for (const raw of discordIds) {
+      const id = typeof raw === "string" ? raw.trim() : "";
+      // Bỏ qua chính chủ bot: quyền của chủ bot không nằm trong danh sách này.
+      if (id === owner) continue;
+      if (!DISCORD_SNOWFLAKE_RE.test(id)) {
+        bad.push(id || "(trống)");
+        continue;
+      }
+      if (!cleaned.includes(id)) cleaned.push(id);
+    }
+    if (bad.length > 0) {
+      throw new Error(
+        `Discord ID không hợp lệ (phải là 15-21 chữ số): ${bad.slice(0, 5).join(", ")}`,
+      );
+    }
+    if (cleaned.length > MAX_TEAM_ADMINS) {
+      throw new Error(`Tối đa ${MAX_TEAM_ADMINS} quản trị viên nhóm`);
+    }
+    const statusRow = await getBotStatus(ctx);
+    if (!statusRow) throw new Error("Chưa có bản ghi trạng thái bot");
+    await ctx.db.patch(statusRow._id, { teamAdminDiscordIds: cleaned });
+    return { ok: true, discordIds: cleaned };
+  },
+});
 
 /**
  * Kết hợp: quản lý server + LÀ CHỦ SỞ HỮU BOT.

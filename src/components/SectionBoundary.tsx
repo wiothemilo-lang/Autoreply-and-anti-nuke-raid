@@ -11,7 +11,7 @@ interface State {
 }
 
 /**
- * Lớp chặn lỗi cho TỪNG PHẦN NHỎ của trang (nav, taskbar, avatar…).
+ * Lớp chặn lỗi cho TỪNG PHẦN NHỎ của trang (nav, header, avatar…).
  * Khi query Convex của phần đó thất bại (vd: backend đang down), phần này
  * tự ẩn đi thay vì làm sập cả trang — phần còn lại vẫn hiển thị bình thường.
  */

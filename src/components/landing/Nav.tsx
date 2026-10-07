@@ -13,6 +13,9 @@ import {
 } from "../../lib/discord";
 import { useMeSession } from "./shared";
 import LangSwitch from "../LangSwitch";
+// Bảng chọn trang dùng CHUNG với SiteNav (header các trang khác) — một nguồn
+// duy nhất cho danh sách trang + quyền admin, không nhân bản thành 2 bản lệch.
+import { PagesMenu } from "../SiteNav";
 
 import { translate } from "../../lib/i18n";
 /** Thanh điều hướng cố định trên landing — đăng nhập thì hiện menu tài khoản. */
@@ -72,6 +75,7 @@ export default function Nav() {
           ))}
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
+          <PagesMenu />
           <LangSwitch />
           {me ? (
             <div className="relative">

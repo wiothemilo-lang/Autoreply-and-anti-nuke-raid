@@ -16,7 +16,6 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import Footer from "../components/landing/Footer";
 import LangSwitch from "../components/LangSwitch";
-import SkipLink from "../components/SkipLink";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { currentLanguage, translate } from "../lib/i18n";
 import { api } from "../../convex/_generated/api";
@@ -105,8 +104,6 @@ export default function FeedbackPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SkipLink />
-
       {/* Thanh đầu trang — cùng khuôn với /donate và /features */}
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 pt-6">
         <Link

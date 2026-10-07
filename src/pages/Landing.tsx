@@ -15,7 +15,6 @@ import {
   CtaBanner,
 } from "../components/landing/sections";
 import { DashboardCta, SafeHaimiyaAvatar } from "../components/landing/shared";
-import SkipLink from "../components/SkipLink";
 import { usePublicConfig } from "../lib/usePublicConfig";
 
 import { translate } from "../lib/i18n";
@@ -35,7 +34,6 @@ export default function Landing() {
   }, []);
   return (
     <div className="relative min-h-screen text-foreground">
-      <SkipLink />
       {/* Các phần phụ thuộc backend được bọc chặn lỗi riêng — backend down thì
           phần đó tự ẩn, hero/tính năng/footer vẫn hiển thị đầy đủ. */}
       <Nav />

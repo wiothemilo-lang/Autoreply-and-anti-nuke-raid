@@ -41,7 +41,6 @@ import type { MeData } from "../lib/types";
 import { toast } from "sonner";
 
 import LangSwitch from "../components/LangSwitch";
-import SkipLink from "../components/SkipLink";
 
 import { dateLocale, translate } from "../lib/i18n";
 import { isGuildHeartbeatFresh } from "../lib/utils";
@@ -180,10 +179,11 @@ export default function Dashboard() {
 
   return (
     <div className="relative min-h-screen">
-      <SkipLink />
       <HaimiyaChat position="dashboard" />
       <div className="relative z-10">
-        <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
+        {/* top-12 = h-12 của SiteNav: header này dính NGAY DƯỚI thanh điều hướng
+            chung, không chồng lên nó (cả hai đều sticky top-0 thì cái sau che cái trước). */}
+        <header className="sticky top-12 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
           <div className="container flex h-16 items-center justify-between">
             <button onClick={() => navigate("/")} className="flex items-center gap-2.5">
               <LogoMark className="h-9 w-9" />

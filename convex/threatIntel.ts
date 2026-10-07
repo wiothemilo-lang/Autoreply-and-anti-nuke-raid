@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken } from "./auth";
-import { getBotStatus, isBotOwnerUser } from "./hidden";
+import { getBotStatus, isBotAdminUser } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
 
 /**
@@ -40,7 +40,7 @@ export const getSettings = query({
     const user = await getUserByToken(ctx, token);
     if (!user) return null;
     const status = await getBotStatus(ctx);
-    if (!status || !isBotOwnerUser(user, status)) return null;
+    if (!status || !isBotAdminUser(user, status)) return null;
     return {
       researchEnabled: status?.threatResearchEnabled ?? false,
       aiWeeklyEnabled: status?.threatResearchAiWeekly ?? true,
@@ -86,8 +86,8 @@ export const setResearchSettings = mutation({
     const user = await getUserByToken(ctx, token);
     if (!user) throw new Error("Vui lòng đăng nhập");
     const status = await getBotStatus(ctx);
-    if (!isBotOwnerUser(user, status)) {
-      throw new Error("Chỉ admin sở hữu bot mới được đổi cài đặt Threat Intel 🔒");
+    if (!isBotAdminUser(user, status)) {
+      throw new Error("Chỉ chủ bot hoặc quản trị viên nhóm mới được đổi cài đặt Threat Intel 🔒");
     }
     const patch: Record<string, unknown> = {};
     if (enabled !== undefined) patch.threatResearchEnabled = enabled;
@@ -251,8 +251,8 @@ export const removeKeyword = mutation({
     const user = await getUserByToken(ctx, token);
     if (!user) throw new Error("Vui lòng đăng nhập");
     const status = await getBotStatus(ctx);
-    if (!isBotOwnerUser(user, status)) {
-      throw new Error("Chỉ admin sở hữu bot mới được sửa Threat Intel 🔒");
+    if (!isBotAdminUser(user, status)) {
+      throw new Error("Chỉ chủ bot hoặc quản trị viên nhóm mới được sửa Threat Intel 🔒");
     }
     if (!status) return { ok: false };
     if (kind === "keyword") {
@@ -273,7 +273,7 @@ export const sampleStats = query({
     const user = await getUserByToken(ctx, token);
     if (!user) return { total: 0, last30d: 0, byModule: [] };
     const status = await getBotStatus(ctx);
-    if (!isBotOwnerUser(user, status)) {
+    if (!isBotAdminUser(user, status)) {
       return { total: 0, last30d: 0, byModule: [] };
     }
     const all = await ctx.db.query("raidSamples").collect();
@@ -306,7 +306,7 @@ export const getResearchHistory = query({
       const user = await getUserByToken(ctx, token);
       if (!user) return [];
       const status = await getBotStatus(ctx);
-      if (!isBotOwnerUser(user, status)) return [];
+      if (!isBotAdminUser(user, status)) return [];
       isOwner = true;
     } else {
       await requireBotKeyStrict(ctx, botKey);
@@ -353,8 +353,8 @@ export const requestManualLearn = mutation({
       const user = await getUserByToken(ctx, token);
       if (!user) throw new Error("Vui lòng đăng nhập");
       const status = await getBotStatus(ctx);
-      if (!isBotOwnerUser(user, status)) {
-        throw new Error("Chỉ admin sở hữu bot mới được kích hoạt học thủ công 🔒");
+      if (!isBotAdminUser(user, status)) {
+        throw new Error("Chỉ chủ bot hoặc quản trị viên nhóm mới được kích hoạt học thủ công 🔒");
       }
       isOwner = true;
     } else {

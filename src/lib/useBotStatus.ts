@@ -21,7 +21,7 @@ export interface BotStatus {
  * MỘT bộ đếm "bây giờ là mấy giờ" dùng chung cho MỌI component gọi
  * useBotStatus.
  *
- * Vì sao gộp (đo 28/09): Landing mount ĐỒNG THỜI Footer và Taskbar — hai
+ * Vì sao gộp (đo 28/09): Landing mount ĐỒNG THỜI Footer và bảng chọn trang — hai
  * consumer, trước đây mỗi đứa tự chạy một setInterval 15s, và cả hai đều
  * chạy tiếp kể cả khi tab đang ẩn (người dùng chuyển sang tab khác/cuộn
  * app khác trên điện thoại). Tab ẩn thì không ai nhìn đồng hồ "còn tươi

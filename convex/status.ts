@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken } from "./auth";
-import { isBotOwnerUser } from "./hidden";
+import { isBotAdminUser, isBotOwnerUser } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
 // Cửa sổ "bot còn online" (2 nhịp sync) — hằng số dùng CHUNG với
 // convex/backup.ts để hai màn hình không trả lời hai đáp án khác nhau về
@@ -24,6 +24,28 @@ export const isOwner = query({
       .withIndex("by_kind", (q) => q.eq("kind", "status"))
       .first();
     return isBotOwnerUser(user, status);
+  },
+});
+
+/**
+ * Người đăng nhập có được vào CỬA SỔ ADMIN không — chủ bot HOẶC quản trị
+ * viên nhóm (danh sách do chủ bot đặt ở `hidden.setTeamAdmins`).
+ *
+ * Vì sao tách khỏi `isOwner` thay vì nới luôn `isOwner`: còn những thứ CHỈ
+ * chủ bot được làm (mật khẩu ẩn, tính năng ẩn, `setBotSecrets` — tức là
+ * OWNER_SEED = chìa khoá vạn năng của bot). Gộp hai khái niệm là mở đường
+ * cho thành viên nhóm chiếm bot.
+ */
+export const isAdmin = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const user = await getUserByToken(ctx, token);
+    if (!user) return false;
+    const status = await ctx.db
+      .query("botStatus")
+      .withIndex("by_kind", (q) => q.eq("kind", "status"))
+      .first();
+    return isBotAdminUser(user, status);
   },
 });
 
@@ -149,7 +171,7 @@ export const getJobBacklog = query({
       .query("botStatus")
       .withIndex("by_kind", (q) => q.eq("kind", "status"))
       .first();
-    if (!isBotOwnerUser(user, status)) return null;
+    if (!isBotAdminUser(user, status)) return null;
 
     const now = Date.now();
     const guilds = await ctx.db.query("guilds").collect();
@@ -211,7 +233,7 @@ export const getHostHealth = query({
       .query("botStatus")
       .withIndex("by_kind", (q) => q.eq("kind", "status"))
       .first();
-    if (!isBotOwnerUser(user, status)) return null;
+    if (!isBotAdminUser(user, status)) return null;
     const health = status?.hostHealth;
     if (!health) return null;
     return { stale: Date.now() - health.reportedAt >= 1_800_000, ...health };
@@ -227,7 +249,7 @@ export const getAiHealth = query({
       .query("botStatus")
       .withIndex("by_kind", (q) => q.eq("kind", "status"))
       .first();
-    if (!isBotOwnerUser(user, status)) return null;
+    if (!isBotAdminUser(user, status)) return null;
     const ai = status?.aiHealth;
     if (!ai) return null;
     // Bot ngừng sync quá 2 nhịp (lỡ 1 nhịp + dư) → số liệu cũ coi như mất kết nối.

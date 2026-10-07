@@ -1232,6 +1232,17 @@ check(
 // <main id="main"> là nút bấm chết (nhảy không tới đâu).
 // MỌI trang .tsx trong src/pages — danh sách phải khớp thư mục thật, không
 // gõ tay từng trang: thêm trang mới mà quên skip link = CI đỏ.
+// 07/10/2026 — ĐỔI CHỖ ĐẶT SKIP LINK: trước đây MỖI trang tự render <SkipLink/>,
+// nhưng từ khi bộ chọn trang nằm trong header CHUNG (App.tsx render SiteNav
+// trước nội dung trang) thì skip link trong trang bị đẩy ra SAU header → Tab
+// đầu tiên dừng ở logo/menu thay vì ở lối tắt. Nay chỉ có MỘT skip link ở
+// App.tsx, đứng trước cả header; mỗi trang chỉ còn phải giữ ĐÍCH nhảy.
+const appSrcForSkip = files.get("App.tsx") ?? "";
+check(
+  "App.tsx render đúng MỘT SkipLink và nó đứng trước SiteNav (Tab đầu tiên là lối tắt)",
+  (appSrcForSkip.match(/<SkipLink \/>/g) ?? []).length === 1 &&
+    appSrcForSkip.indexOf("<SkipLink />") < appSrcForSkip.indexOf("<SiteNav />"),
+);
 const SKIP_LINK_PAGES = fs
   .readdirSync(path.join(ROOT, "src", "pages"))
   .filter((f) => f.endsWith(".tsx"))
@@ -1244,8 +1255,12 @@ for (const page of SKIP_LINK_PAGES) {
   const hasOwnMain = /<main[^>]*id="main"[^>]*tabIndex=\{-1\}/.test(src);
   const usesPageReveal = /<PageReveal id="main"/.test(src);
   check(
-    `${page} có SkipLink + đích nhảy nhận được focus (<main tabIndex={-1}> hoặc PageReveal)`,
-    /<SkipLink/.test(src) && (hasOwnMain || usesPageReveal),
+    `${page} có đích nhảy nhận được focus (<main tabIndex={-1}> hoặc PageReveal)`,
+    hasOwnMain || usesPageReveal,
+  );
+  check(
+    `${page} KHÔNG tự render SkipLink nữa (tránh 2 lối tắt trùng trong tab order)`,
+    !/<SkipLink/.test(src),
   );
 }
 const bootBoundary = files.get("components/RootErrorBoundary.tsx") ?? "";
@@ -1665,7 +1680,7 @@ check(
 );
 
 // ── BỘ CHỌN TRANG: mọi trang phải CÓ ĐƯỜNG VÀO từ giao diện ──
-// Lỗi thật 30/09/2026: bảng chọn trang (Taskbar) chỉ liệt kê 3 mục trong khi
+// Lỗi thật 30/09/2026: bảng chọn trang (dock nổi) chỉ liệt kê 3 mục trong khi
 // web có 12 route, và nó chỉ được mount trên Landing — nên 9 trang không có
 // đường vào nào mà không ai báo lỗi. Hai luật bên dưới chặn tái diễn:
 //   (1) mọi route công khai phải xuất hiện trong bảng chọn trang,
@@ -1700,13 +1715,34 @@ check(
 );
 check(
   "bảng chọn trang mount ở App.tsx (mọi trang đều có, không riêng Landing)",
-  /\{!transient && <Taskbar \/>\}/.test(appFileSrc),
+  /\{!transient && !isLanding && <SiteNav \/>\}/.test(appFileSrc),
 );
 check(
-  "không trang nào tự mount Taskbar thêm lần nữa (tránh render trùng)",
+  "không trang nào tự mount SiteNav thêm lần nữa (tránh render trùng)",
   ![...files.values()].some(
-    (src) => /import Taskbar from/.test(src) && !src.includes("routes.json"),
+    (src) => /import SiteNav from/.test(src) && !src.includes("routes.json"),
   ),
+);
+// Landing KHÔNG có SiteNav (header riêng to hơn) — nếu thiếu luật này, bỏ
+// `PagesMenu` khỏi header landing là trang chủ mất luôn đường vào 8 trang kia
+// mà không có gì báo sai.
+const landingNavSrc = fs.readFileSync(path.join(SRC, "components", "landing", "Nav.tsx"), "utf8");
+check(
+  "landing cắm PagesMenu vào header riêng (đường vào các trang khác từ trang chủ)",
+  /<PagesMenu \/>/.test(landingNavSrc) && /import \{[^}]*PagesMenu[^}]*\} from/.test(landingNavSrc),
+);
+// Bộ chọn trang nằm trong HEADER, không còn dock nổi — dock nổi là thứ từng
+// "mất" vì thiếu neo dọc ở desktop.
+const siteNavSrc = fs.readFileSync(path.join(SRC, "components", "SiteNav.tsx"), "utf8");
+check(
+  "SiteNav là dải header dính trên đỉnh (không phải dock nổi góc dưới)",
+  /<header className="sticky top-0 /.test(siteNavSrc),
+);
+check(
+  "mọi mục chỉ dành cho admin dùng `adminOnly` (không còn `ownerOnly` sót lại)",
+  /adminOnly\?: boolean/.test(navSrc) &&
+    // Chỉ chặn MÃ còn dùng `ownerOnly`; nhắc lại trong comment lịch sử thì được.
+    !/ownerOnly[?:]/.test(navSrc),
 );
 // Trang đang mở phải tô đậm được: isNavItemActive phân biệt "/" (chỉ khớp
 // chính nó) với "/dashboard" (khớp cả "/dashboard/:guildId").
@@ -1716,6 +1752,10 @@ check(
   /if \(to === "\/"\) return path === "\/"/.test(activeFn) &&
     /path\.startsWith\(`\$\{to\}\/`\)/.test(activeFn),
 );
+
+// Luật lọc theo vai trò + nhãn "đang ở trang nào" được kiểm bằng cách GỌI
+// THẬT hàm (không so chuỗi nguồn) ở scripts/test-web-ux-upgrades.ts — nơi bun
+// nạp được module TS. Ở đây chỉ chốt thứ đọc được từ văn bản nguồn.
 
 // Thông báo sau khi bật/tắt phải dựa trên giá trị MỚI. `enabled` trong closure là
 // giá trị CŨ: dùng nó chọn thông báo thì bật xong hiện "Đã tắt" (bug thật ở

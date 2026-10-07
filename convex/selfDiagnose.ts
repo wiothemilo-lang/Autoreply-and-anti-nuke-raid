@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken } from "./auth";
-import { getBotStatus, isBotOwnerUser, requireBotOwner } from "./hidden";
+import { getBotStatus, isBotAdminUser, requireBotAdmin } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
 
 /**
@@ -15,21 +15,21 @@ import { requireBotKeyStrict } from "./botAuth";
  * lần/giờ — quyết định ở phía bot (memory), Convex chỉ lưu thống kê.
  */
 
-/** Kiểm tra user token là chủ bot — trả user hoặc throw. */
-async function requireOwner(ctx: Parameters<typeof getBotStatus>[0], token: string) {
+/** Kiểm tra user token là chủ bot HOẶC quản trị viên nhóm — trả user hoặc throw. */
+async function requireAdmin(ctx: Parameters<typeof getBotStatus>[0], token: string) {
   const user = await getUserByToken(ctx, token);
-  const status = await requireBotOwner(ctx, user);
+  const status = await requireBotAdmin(ctx, user);
   return { user, status };
 }
 
-/** Trạng thái self-diagnose — hiển thị trong panel Admin (chỉ chủ bot). */
+/** Trạng thái self-diagnose — hiển thị trong panel Admin (chủ bot + quản trị viên nhóm). */
 export const getSettings = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
     const user = await getUserByToken(ctx, token);
     if (!user) return null;
     const status = await getBotStatus(ctx);
-    if (!status || !isBotOwnerUser(user, status)) return null;
+    if (!status || !isBotAdminUser(user, status)) return null;
     return {
       enabled: status.selfDiagnoseEnabled ?? false,
       lastAt: status.selfDiagnoseLastAt ?? null,
@@ -38,11 +38,11 @@ export const getSettings = query({
   },
 });
 
-/** Bật/tắt self-diagnose — chỉ chủ bot. */
+/** Bật/tắt self-diagnose — chủ bot + quản trị viên nhóm (đây là công tắc của cửa sổ Admin). */
 export const setEnabled = mutation({
   args: { token: v.string(), enabled: v.boolean() },
   handler: async (ctx, { token, enabled }) => {
-    await requireOwner(ctx, token);
+    await requireAdmin(ctx, token);
     const status = await getBotStatus(ctx);
     if (status) {
       await ctx.db.patch(status._id, { selfDiagnoseEnabled: enabled });

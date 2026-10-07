@@ -145,12 +145,16 @@ check(
 const statusSrc = read("convex/status.ts");
 const aiHealthQuery =
   statusSrc.match(/export const getAiHealth = query\(\{[\s\S]*?\n\}\);/)?.[0] ?? "";
+// 07/10/2026 — YÊU CẦU ĐỔI: cửa sổ Admin mở cho cả QUẢN TRỊ VIÊN NHÓM (do
+// chủ bot đặt), nên guard đúng là isBotAdminUser = chủ bot HOẶC quản trị viên
+// nhóm. Điều KHÔNG được đổi: phải có guard và phải nằm TRƯỚC khi đọc aiHealth,
+// nếu không provider/model AI lộ công khai.
 check(
-  "getAiHealth guard owner TRƯỚC khi đọc aiHealth (người thường phải nhận null)",
+  "getAiHealth guard admin TRƯỚC khi đọc aiHealth (người thường phải nhận null)",
   aiHealthQuery.includes("getUserByToken") &&
-    aiHealthQuery.includes("isBotOwnerUser") &&
-    aiHealthQuery.indexOf("isBotOwnerUser") < aiHealthQuery.indexOf("const ai ="),
-  "thiếu guard owner → provider/model AI lộ công khai qua API Convex",
+    aiHealthQuery.includes("isBotAdminUser") &&
+    aiHealthQuery.indexOf("isBotAdminUser") < aiHealthQuery.indexOf("const ai ="),
+  "thiếu guard → provider/model AI lộ công khai qua API Convex",
 );
 const adminSrc = read("src/pages/Admin.tsx");
 check(

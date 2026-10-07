@@ -369,8 +369,6 @@ export const EN: Record<string, string> = {
     "(anti-nuke / auto-mod — Responsible moderator shows as “Automated”) and",
   "(hiển thị tên người thực hiện). Lý do để trống → ghi “không có lý do”. Chọn":
     "(shows the moderator's name). Empty reason → recorded as “no reason”. Choose",
-  "(khớp tài khoản Discord đã tạo bot). Người dùng khác không thấy nút này và không truy cập được trang này.":
-    "(matching the Discord account that created the bot). Other users cannot see this button or open this page.",
   "(kể cả raid/nuke phát hiện qua AI). Role ở server khác không ảnh hưởng.":
     "(including AI-detected raids/nukes). Roles from other servers have no effect.",
   "(tên, màu, hoist, mentionable, quyền),": "(name, colour, hoist, mentionable, permissions),",
@@ -465,7 +463,6 @@ export const EN: Record<string, string> = {
   "Bảng hình phạt": "Punishment log",
   "Bảng xếp hạng nhiệt độ": "Heat leaderboard",
   "Bảng điều khiển": "Dashboard",
-  "Bảng điều khiển nhanh": "Quick panel",
   "Bảo mật": "Security",
   "Bật Join Gate": "Enable Join Gate",
   "Bật bảo vệ": "Enable protection",
@@ -497,8 +494,6 @@ export const EN: Record<string, string> = {
   "Chặn đứng kẻ phá hoại": "Stop vandals in their tracks",
   "Chế độ an toàn (chống chặn nhầm)": "Safe mode (avoid false positives)",
   Chỉ: "Only",
-  "Chỉ chủ sở hữu bot nhìn thấy · theo dõi lỗi & dữ liệu bot":
-    "Visible to the bot owner only · monitors bot errors & data",
   "Chỉ phạt khi có": "Only punish with",
   "Chọn emoji": "Choose emoji",
   "Chọn kênh": "Choose channel",
@@ -542,8 +537,6 @@ export const EN: Record<string, string> = {
   "Cửa sổ (giây)": "Window (seconds)",
   "Cửa sổ (phút)": "Window (minutes)",
   "Cửa sổ Admin": "Admin window",
-  "Cửa sổ Admin là khu vực riêng tư của chủ sở hữu bot — người dùng khác không nhìn thấy và không vào được.":
-    "The Admin window is a private area for the bot owner — other users can't see or open it.",
   "Cửa sổ tái phạm (phút)": "Repeat window (minutes)",
   "DM chào mừng": "Welcome DM",
   "DM chào mừng bật": "Welcome DM on",
@@ -670,7 +663,6 @@ export const EN: Record<string, string> = {
   "Lọc từ ngữ xấu": "Bad-word filter",
   "Lời chúc mừng riêng khi gửi DM người thắng (tùy chọn)":
     "Custom congratulation in the winner DM (optional)",
-  "Miễn phí · cập nhật tự động từ Discord": "Free · auto-updated from Discord",
   "Miễn trừ hoàn toàn khỏi mọi module chống nuke.": "Fully exempt from every anti-nuke module.",
   "Moderation — thông báo sau khi phạt": "Moderation — post-punishment notice",
   "Module đang bảo vệ": "Modules protecting",
@@ -692,7 +684,6 @@ export const EN: Record<string, string> = {
   "Mời thêm": "Invite more",
   "Mở Discord": "Open Discord",
   "Mở Discord server": "Open Discord server",
-  "Mở bảng điều khiển nhanh": "Open the quick panel",
   "Mở dashboard": "Open dashboard",
   "Mở khóa": "Unlock",
   "Mở khóa ngay": "Unlock now",
@@ -1016,7 +1007,6 @@ export const EN: Record<string, string> = {
   "Đã đặt mật khẩu tính năng ẩn": "Hidden features password set",
   Đóng: "Close",
   "Đóng góp signature (khi bị raid)": "Contribute signatures (when raided)",
-  "Đóng taskbar": "Close taskbar",
   "Đăng nhập": "Sign in",
   "Đăng nhập thất bại": "Sign-in failed",
   "Đăng nhập vào Protogon": "Sign in to Protogon",
@@ -1662,6 +1652,41 @@ export const EN: Record<string, string> = {
   "Đăng nhập lại để kiểm tra đơn": "Sign in again to check this order",
   "Phiên đăng nhập cần thiết để xem trạng thái đơn thanh toán này.":
     "You need to be signed in to see the status of this payment.",
+  /* ==== Bộ chọn trang ở HEADER + quản trị viên nhóm (07/10/2026) ====
+     Dock nổi góc dưới trái → dải header dính trên đỉnh (components/SiteNav.tsx)
+     + cửa sổ Admin mở cho team (convex/hidden.ts: isBotAdminUser). */
+  "Về trang chủ Protogon": "Back to the Protogon home page",
+  Trang: "Pages",
+  "Bảng chọn trang": "Page menu",
+  "Chuyển trang": "Switch page",
+  "Đóng bảng chọn trang": "Close the page menu",
+  "Bot đang chạy": "Bot is running",
+  "Bot mất kết nối": "Bot is offline",
+  "Quản trị viên nhóm": "Team admins",
+  "Chủ sở hữu bot & quản trị viên nhóm · theo dõi lỗi & dữ liệu bot":
+    "Bot owner & team admins · monitors bot errors & data",
+  "Cửa sổ Admin là khu vực riêng tư của chủ sở hữu bot và quản trị viên nhóm — người dùng khác không nhìn thấy và không vào được.":
+    "The Admin window is private to the bot owner and the team admins — other users can't see or open it.",
+  "Cửa sổ Admin chỉ hiển thị với": "The Admin window is only shown to",
+  "và những người trong": "and the people on the",
+  "danh sách quản trị viên nhóm": "team admin list",
+  "(do chủ bot đặt). Người dùng khác không thấy nút này và không truy cập được trang này.":
+    "(set by the bot owner). Other users don't see this entry and can't open the page.",
+  "Thêm thành viên trong team để họ cũng vào được cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn hay chìa khoá bảo mật API.":
+    "Add team members so they can also open the Admin window (errors, host health, AI, threat research). They can NOT touch the hidden password or the API security key.",
+  "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.":
+    "You are a team admin — the bot owner manages this list. Ask the bot owner to add or remove people.",
+  "Chưa có ai — hiện chỉ chủ bot vào được cửa sổ này.":
+    "Nobody yet — currently only the bot owner can open this window.",
+  "Chưa từng đăng nhập web": "Never signed in on the web",
+  "Bỏ quyền quản trị viên nhóm": "Revoke team admin",
+  "Discord ID (15-21 chữ số)": "Discord ID (15-21 digits)",
+  "Tối đa": "Up to",
+  "người.": "people.",
+  "Cách lấy ID: bật Chế độ nhà phát triển trong Discord → chuột phải vào người dùng → Sao chép ID.":
+    "How to get the ID: enable Developer Mode in Discord → right-click the user → Copy ID.",
+  "Đã lưu danh sách quản trị viên nhóm.": "Team admin list saved.",
+  "Không lưu được.": "Could not save.",
   "Không kiểm tra được trạng thái": "Can't check the status",
   "Lỗi kết nối — thử lại sau ít phút.": "Connection error — try again in a few minutes.",
 };

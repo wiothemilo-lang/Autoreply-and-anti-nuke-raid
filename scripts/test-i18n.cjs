@@ -127,8 +127,10 @@ check(
     /\["de", "DE"\]/.test(OPTIONS_SRC),
 );
 
+// Header dùng chung (SiteNav) + header riêng của landing: cả hai phải có công
+// tắc ngôn ngữ — thiếu là người dùng kẹt một ngôn ngữ ở đúng chỗ dễ đổi nhất.
 const chrome = [
-  "src/components/Taskbar.tsx",
+  "src/components/SiteNav.tsx",
   "src/components/landing/Nav.tsx",
   "src/pages/Dashboard.tsx",
   "src/pages/GuildPage.tsx",

@@ -15,23 +15,31 @@ import {
   Play,
   Server,
   ShieldCheck,
+  Trash2,
+  UserPlus,
   X,
 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import RequireAuth from "../components/RequireAuth";
 import UpdateWindow from "../components/UpdateWindow";
-import { getSessionToken } from "../lib/discord";
+import { discordAvatarUrl, getSessionToken } from "../lib/discord";
 import { latencyLabel, useBotMonitor } from "../lib/useBotMonitor";
 import { cn } from "../lib/utils";
 
 import LangSwitch from "../components/LangSwitch";
-import SkipLink from "../components/SkipLink";
 import PageSplash from "../components/PageSplash";
 
 import { dateLocale, translate } from "../lib/i18n";
 function AdminContent() {
   const token = getSessionToken();
+  // Hai vai trò KHÁC nhau, cố ý tách: `isAdmin` = vào được cửa sổ này (chủ bot
+  // hoặc quản trị viên nhóm do chủ bot thêm); `isOwner` = còn được đụng những
+  // thứ chỉ chủ bot (mật khẩu ẩn, tính năng ẩn, seed chìa khoá bot).
   const isOwner = useQuery(api.status.isOwner, token ? { token } : "skip");
+  const isAdmin = useQuery(api.status.isAdmin, token ? { token } : "skip");
+  // Danh sách quản trị viên nhóm chỉ chủ bot đọc được (query tự guard).
+  const teamAdmins = useQuery(api.hidden.getTeamAdmins, isOwner ? { token } : "skip");
+  const saveTeamAdmins = useMutation(api.hidden.setTeamAdmins);
   const { status, latency, avg, incidents, lastUpdate, nextUpdate, refresh } = useBotMonitor(60000);
   const threat = useQuery(api.threatIntel.getSettings, { token });
   const researchHistory = useQuery(api.threatIntel.getResearchHistory, { token });
@@ -44,7 +52,7 @@ function AdminContent() {
   const [ownerSeedInput, setOwnerSeedInput] = useState("");
   const [secretMsg, setSecretMsg] = useState<string | null>(null);
 
-  if (isOwner === undefined) {
+  if (isAdmin === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <PageSplash minHeight="min-h-screen" />
@@ -52,14 +60,14 @@ function AdminContent() {
     );
   }
 
-  if (isOwner === false) {
+  if (isAdmin === false) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 text-center">
         <Bug className="h-10 w-10 text-muted-foreground" />
         <p className="font-display text-lg font-semibold">{translate("Không có quyền truy cập")}</p>
         <p className="max-w-sm text-sm text-muted-foreground">
           {translate(
-            "Cửa sổ Admin là khu vực riêng tư của chủ sở hữu bot — người dùng khác không nhìn thấy và không vào được.",
+            "Cửa sổ Admin là khu vực riêng tư của chủ sở hữu bot và quản trị viên nhóm — người dùng khác không nhìn thấy và không vào được.",
           )}{" "}
         </p>
         <Link to="/" className="text-sm text-primary hover:underline">
@@ -74,7 +82,6 @@ function AdminContent() {
 
   return (
     <div className="relative min-h-screen">
-      <SkipLink />
       <div className="relative z-10">
         <header className="border-b border-border/60 bg-background/70 backdrop-blur">
           <div className="container flex items-center gap-3 py-5">
@@ -92,7 +99,9 @@ function AdminContent() {
               <div>
                 <h1 className="font-display text-xl font-bold">{translate("Cửa sổ Admin")}</h1>
                 <p className="text-xs text-muted-foreground">
-                  {translate("Chỉ chủ sở hữu bot nhìn thấy · theo dõi lỗi & dữ liệu bot")}{" "}
+                  {translate(
+                    "Chủ sở hữu bot & quản trị viên nhóm · theo dõi lỗi & dữ liệu bot",
+                  )}{" "}
                 </p>
               </div>
             </div>
@@ -233,76 +242,95 @@ function AdminContent() {
                   }
                 }}
               />
-              <div className="rounded-xl border border-border bg-card p-4">
-                <p className="flex items-center gap-1.5 font-display text-sm font-bold">
-                  <ShieldCheck className="h-4 w-4" /> {translate("Chìa khóa bảo mật API")}{" "}
-                </p>
-                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                  {translate(
-                    "Khi đã đặt seed, MỌI lệnh của bot yêu cầu chìa khóa khớp — kẻ ngoài không thể giả mạo heartbeat/backup/lockdown. Trên VPS dán giá trị seed VỪA NHẬP vào biến",
-                  )}{" "}
-                  <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px]">BOT_KEY</code>{" "}
-                  {translate("trong bot/.env rồi")}{" "}
-                  <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
-                    pm2 restart protogon-bot
-                  </code>
-                  {translate(". Bot chưa có BOT_KEY sẽ")}{" "}
-                  <b>{translate("tự cấp phát chìa khóa an toàn")}</b>{" "}
-                  {translate(
-                    "khi khởi động (xác minh token Discord thật) — không cần thao tác gì thêm.",
-                  )}{" "}
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <input
-                    type="password"
-                    value={ownerSeedInput}
-                    onChange={(e) => setOwnerSeedInput(e.target.value)}
-                    placeholder={translate("Seed bí mật (dòng bất kỳ, ví dụ: chuỗi ngẫu nhiên)")}
-                    className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                  <button
-                    type="button"
-                    disabled={ownerSeedInput.trim().length < 8}
-                    onClick={async () => {
-                      setSecretMsg(null);
-                      try {
-                        // Server tự băm seed và lưu bản băm — client không tính gì cả,
-                        // và chính seed vừa nhập chính là giá trị BOT_KEY cần dán ở VPS.
-                        await setSecrets({
-                          token,
-                          guildId: "__admin__",
-                          ownerSeed: ownerSeedInput.trim(),
-                        });
-                        setSecretMsg(
-                          translate(
-                            "Đã bật bảo vệ ✅ — dán giá trị seed VỪA NHẬP vào BOT_KEY trên VPS (không hiện lại ở đây).",
-                          ),
-                        );
-                        setOwnerSeedInput("");
-                      } catch {
-                        setSecretMsg(translate("Lỗi khi đặt seed — thử lại."));
-                      }
-                    }}
-                    className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    {translate("Bật bảo vệ")}{" "}
-                  </button>
+              <TeamAdminsCard
+                isOwner={isOwner === true}
+                data={teamAdmins}
+                onSave={async (discordIds) => {
+                  try {
+                    await saveTeamAdmins({ token, discordIds });
+                    return { ok: true };
+                  } catch (e) {
+                    return {
+                      ok: false,
+                      error: e instanceof Error ? e.message : translate("Lỗi kết nối"),
+                    };
+                  }
+                }}
+              />
+              {isOwner === true && (
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="flex items-center gap-1.5 font-display text-sm font-bold">
+                    <ShieldCheck className="h-4 w-4" /> {translate("Chìa khóa bảo mật API")}{" "}
+                  </p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                    {translate(
+                      "Khi đã đặt seed, MỌI lệnh của bot yêu cầu chìa khóa khớp — kẻ ngoài không thể giả mạo heartbeat/backup/lockdown. Trên VPS dán giá trị seed VỪA NHẬP vào biến",
+                    )}{" "}
+                    <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px]">BOT_KEY</code>{" "}
+                    {translate("trong bot/.env rồi")}{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                      pm2 restart protogon-bot
+                    </code>
+                    {translate(". Bot chưa có BOT_KEY sẽ")}{" "}
+                    <b>{translate("tự cấp phát chìa khóa an toàn")}</b>{" "}
+                    {translate(
+                      "khi khởi động (xác minh token Discord thật) — không cần thao tác gì thêm.",
+                    )}{" "}
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      type="password"
+                      value={ownerSeedInput}
+                      onChange={(e) => setOwnerSeedInput(e.target.value)}
+                      placeholder={translate("Seed bí mật (dòng bất kỳ, ví dụ: chuỗi ngẫu nhiên)")}
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                    <button
+                      type="button"
+                      disabled={ownerSeedInput.trim().length < 8}
+                      onClick={async () => {
+                        setSecretMsg(null);
+                        try {
+                          // Server tự băm seed và lưu bản băm — client không tính gì cả,
+                          // và chính seed vừa nhập chính là giá trị BOT_KEY cần dán ở VPS.
+                          await setSecrets({
+                            token,
+                            guildId: "__admin__",
+                            ownerSeed: ownerSeedInput.trim(),
+                          });
+                          setSecretMsg(
+                            translate(
+                              "Đã bật bảo vệ ✅ — dán giá trị seed VỪA NHẬP vào BOT_KEY trên VPS (không hiện lại ở đây).",
+                            ),
+                          );
+                          setOwnerSeedInput("");
+                        } catch {
+                          setSecretMsg(translate("Lỗi khi đặt seed — thử lại."));
+                        }
+                      }}
+                      className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      {translate("Bật bảo vệ")}{" "}
+                    </button>
+                  </div>
+                  {secretMsg && (
+                    <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-muted/60 p-2 text-[11px] text-foreground">
+                      {secretMsg}
+                    </pre>
+                  )}
                 </div>
-                {secretMsg && (
-                  <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-muted/60 p-2 text-[11px] text-foreground">
-                    {secretMsg}
-                  </pre>
-                )}
-              </div>
+              )}
               <div className="rounded-xl border border-border bg-secondary/30 p-4 text-xs leading-relaxed text-muted-foreground">
                 <p className="mb-1 font-semibold text-foreground">
                   {translate("🔒 Quyền riêng tư")}
                 </p>
                 <p>
-                  {translate("Cửa sổ Admin chỉ hiển thị trong taskbar với")}{" "}
+                  {translate("Cửa sổ Admin chỉ hiển thị với")}{" "}
                   <b className="text-foreground">{translate("chủ sở hữu bot")}</b>{" "}
+                  {translate("và những người trong")}{" "}
+                  <b className="text-foreground">{translate("danh sách quản trị viên nhóm")}</b>{" "}
                   {translate(
-                    "(khớp tài khoản Discord đã tạo bot). Người dùng khác không thấy nút này và không truy cập được trang này.",
+                    "(do chủ bot đặt). Người dùng khác không thấy nút này và không truy cập được trang này.",
                   )}{" "}
                 </p>
               </div>
@@ -1193,6 +1221,165 @@ function ThreatIntelCard({
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Quản trị viên nhóm — danh sách Discord ID được vào cửa sổ Admin như chủ bot.
+ *
+ * VÌ SAO CẦN: trước đây cửa sổ Admin chỉ mở cho DUY NHẤT tài khoản owner
+ * (`botStatus.ownerDiscordId`). Team vận hành bot có nhiều người: một người
+ * giữ bot, người khác trực sự cố — trước đây họ phải dùng chung tài khoản owner
+ * (mất dấu ai làm gì) hoặc không vào được.
+ *
+ * RANH GIỚI QUYỀN (cố ý giữ hẹp): quản trị viên nhóm vào cửa sổ Admin + bật/tắt
+ * self-diagnose, threat research; KHÔNG đụng mật khẩu ẩn, tính năng ẩn hay
+ * seed chìa khoá bot (những thứ đó = chiếm được bot). Vì vậy danh sách này CHỈ
+ * chủ bot sửa được: người trong danh sách không tự thêm người khác.
+ */
+/** Hồ sơ hiển thị của một quản trị viên nhóm (khớp `hidden.getTeamAdmins`). */
+type TeamAdminMember = {
+  discordId: string;
+  username: string | null;
+  globalName: string | null;
+  avatar: string | null;
+  lastLoginAt: number | null;
+};
+
+function TeamAdminsCard({
+  isOwner,
+  data,
+  onSave,
+}: {
+  isOwner: boolean;
+  data: { max: number; members: TeamAdminMember[] } | undefined;
+  onSave: (discordIds: string[]) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const ids = (data?.members ?? []).map((m) => m.discordId);
+  const max = data?.max ?? 20;
+
+  async function save(next: string[]) {
+    setBusy(true);
+    setMsg(null);
+    const res = await onSave(next);
+    setBusy(false);
+    if (res.ok) {
+      setMsg({ kind: "ok", text: translate("Đã lưu danh sách quản trị viên nhóm.") });
+    } else {
+      setMsg({ kind: "err", text: res.error ?? translate("Không lưu được.") });
+    }
+    return res.ok;
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
+        <UserPlus className="h-4 w-4" /> {translate("Quản trị viên nhóm")}{" "}
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+        {translate(
+          "Thêm thành viên trong team để họ cũng vào được cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn hay chìa khoá bảo mật API.",
+        )}{" "}
+      </p>
+
+      {!isOwner ? (
+        <p className="mt-3 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+          {translate(
+            "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.",
+          )}{" "}
+        </p>
+      ) : data === undefined ? (
+        <p className="mt-3 text-xs text-muted-foreground">{translate("đang tải…")}</p>
+      ) : (
+        <>
+          {data.members.length === 0 ? (
+            <p className="mt-3 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+              {translate("Chưa có ai — hiện chỉ chủ bot vào được cửa sổ này.")}{" "}
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-1.5">
+              {data.members.map((m) => {
+                const name = m.globalName ?? m.username;
+                const avatar = discordAvatarUrl({ id: m.discordId, avatar: m.avatar });
+                return (
+                  <li
+                    key={m.discordId}
+                    className="flex items-center gap-2.5 rounded-lg border border-border bg-secondary/30 px-2.5 py-2"
+                  >
+                    {avatar ? (
+                      <img src={avatar} alt="" className="h-8 w-8 rounded-full" />
+                    ) : (
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold">
+                        {(name ?? "?").slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">
+                        {name ?? translate("Chưa từng đăng nhập web")}{" "}
+                      </span>
+                      <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                        {m.discordId}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void save(ids.filter((id) => id !== m.discordId))}
+                      aria-label={translate("Bỏ quyền quản trị viên nhóm")}
+                      className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div className="mt-3 flex gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              inputMode="numeric"
+              placeholder={translate("Discord ID (15-21 chữ số)")}
+              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <button
+              type="button"
+              disabled={busy || input.trim().length === 0 || ids.length >= max}
+              onClick={async () => {
+                const added = input.trim();
+                if (await save([...ids, added])) setInput("");
+              }}
+              className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              {translate("Thêm")}{" "}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {translate("Tối đa")} {max} {translate("người.")}{" "}
+            {translate(
+              "Cách lấy ID: bật Chế độ nhà phát triển trong Discord → chuột phải vào người dùng → Sao chép ID.",
+            )}{" "}
+          </p>
+        </>
+      )}
+
+      {msg && (
+        <p
+          className={cn(
+            "mt-2 text-[11px] font-medium",
+            msg.kind === "ok" ? "text-foreground" : "text-danger",
+          )}
+        >
+          {msg.text}
+        </p>
+      )}
     </div>
   );
 }

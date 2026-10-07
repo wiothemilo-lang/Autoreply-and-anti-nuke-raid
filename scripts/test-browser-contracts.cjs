@@ -15,6 +15,10 @@
  *      nhảy vào <main>), không chỉ "tồn tại trong source".
  *   E. Route public mở trực tiếp (SPA fallback) + private route noindex +
  *      route lạ 404 có thương hiệu.
+ *   J. Bộ chọn trang ở HEADER phải nằm trong khung nhìn và MỞ ĐƯỢC ở cả
+ *      desktop lẫn mobile, trên trang chủ lẫn trang trong (desktop 07/10/2026:
+ *      dock cũ từng "biến mất" vì thiếu neo dọc — nút trôi xuống dưới đáy
+ *      khung nhìn, cách ~4.800px, dù DOM vẫn còn).
  *
  * KHÔNG cài dependency mới: điều khiển Chromium bằng DevTools Protocol qua
  * WebSocket, phục vụ dist/ bằng http server của Node. WebSocket lấy theo thứ tự:
@@ -1174,7 +1178,7 @@ browserTest("G. Chuyển route không nháy màn chờ toàn màn hình (React g
         // mount khi <Suspense> xong) VÀ preloader đã rời DOM — thiếu điều
         // kiện thứ hai thì #boot còn nằm trong DOM và assert phía dưới đỏ oan.
         if (
-          document.querySelector('[data-testid="taskbar-dock"]') &&
+          document.querySelector('[data-testid="pages-menu"]') &&
           !document.getElementById("boot")
         ) { clearInterval(i); r(1); }
         else if (Date.now() - t0 > 30000) { clearInterval(i); r(0); }
@@ -1193,8 +1197,8 @@ browserTest("G. Chuyển route không nháy màn chờ toàn màn hình (React g
   });
 
   const opened = await page.evaluate(`(() => {
-      const d = document.querySelector('[data-testid="taskbar-dock"]');
-      if (!d) return "không thấy dock";
+      const d = document.querySelector('[data-testid="pages-menu"]');
+      if (!d) return "không thấy nút chuyển trang";
       d.click();
       return "ok";
     })()`);
@@ -1443,6 +1447,125 @@ browserTest("I1. Chunk bị xoá → tự tải lại ĐÚNG MỘT lần, không
   t.assert.ok(Number(errors) >= 2, "cả hai tài liệu đều gặp lỗi chunk (lần 2 nằm trong cooldown)");
   t.assert.strictEqual(loads, "2", "đúng 1 lần tải lại (nạp đầu + 1 reload), không lặp vô hạn");
   t.assert.ok(stamp, "mốc chống lặp đã được ghi");
+});
+
+// ─── J. Bộ chọn trang ở HEADER phải THỰC SỰ dùng được ──────────────────────
+// VÌ SAO CÓ TEST NÀY (bài học 07/10/2026): bộ chọn trang từng là dock nổi,
+// lớp neo dọc chỉ có nhánh `max-md:*` (CHỈ dưới 768px). Desktop thiếu neo ⇒
+// `position: fixed` không có top/bottom ⇒ trình duyệt đặt nút tại VỊ TRÍ TĨNH
+// của nó, tức SAU toàn bộ nội dung trang ⇒ nút nằm ngoài khung nhìn (~4.800px
+// dưới đáy màn), cách người dùng vài nghìn pixel — "mất taskbar" dù DOM còn
+// nguyên. Test G chỉ kiểm nút có trong DOM (`querySelector`) nên KHÔNG bắt
+// được loại lỗi đó.
+// Nay bộ chọn trang nằm trong header (SiteNav sticky / Nav của landing), và
+// test này khoá đúng thứ người dùng cần: nút phải nằm TRỌN trong khung nhìn ở
+// cả đỉnh lẫn đáy trang, điểm giữa của nó phải thuộc về chính nút (không lớp
+// nào che), và bấm vào phải MỞ RA DANH SÁCH TRANG — không chỉ "có trong DOM".
+const NAV_STATE = `(() => {
+  const d = document.querySelector('[data-testid="pages-menu"]');
+  if (!d) return { found: false };
+  const r = d.getBoundingClientRect();
+  const cs = getComputedStyle(d);
+  const cx = Math.floor(r.left + r.width / 2);
+  const cy = Math.floor(r.top + r.height / 2);
+  const hit = document.elementFromPoint(cx, cy);
+  return {
+    found: true,
+    left: Math.round(r.left), top: Math.round(r.top),
+    right: Math.round(r.right), bottom: Math.round(r.bottom),
+    w: Math.round(r.width), h: Math.round(r.height),
+    vw: innerWidth, vh: innerHeight, scrollY: Math.round(scrollY),
+    topCss: cs.top, bottomCss: cs.bottom,
+    hitInside: !!hit && (hit === d || d.contains(hit)),
+  };
+})()`;
+
+/**
+ * Bắt nút chuyển trang nằm trong khung nhìn ở CẢ HAI mốc cuộn: đỉnh trang và
+ * đáy trang (nội dung dài). Mốc thứ hai là mốc chết của lỗi cũ: nút neo vào
+ * dòng chảy nội dung thay vì vào header thì nó trôi theo chiều dài trang.
+ */
+async function assertNavUsable(t, page, label) {
+  for (const where of ["đỉnh trang", "cuộn tới đáy"]) {
+    await page.evaluate(
+      where === "đỉnh trang" ? `scrollTo(0, 0)` : `scrollTo(0, document.body.scrollHeight)`,
+    );
+    await new Promise((r) => setTimeout(r, 200));
+    const s = await page.evaluate(NAV_STATE);
+    t.diagnostic(`${label} — ${where}: ${JSON.stringify(s)}`);
+    t.assert.ok(s.found, `${label}: phải có nút chuyển trang trong DOM`);
+    if (!s.found) return;
+    t.assert.ok(
+      s.top >= 0 && s.left >= 0 && s.bottom <= s.vh && s.right <= s.vw,
+      `${label} (${where}): nút chuyển trang phải nằm TRỌN trong khung nhìn — ` +
+        `hộp (${s.left},${s.top})→(${s.right},${s.bottom}) trong ${s.vw}×${s.vh}`,
+    );
+    t.assert.ok(s.hitInside, `${label} (${where}): không lớp nào được che nút chuyển trang`);
+  }
+}
+
+/** Mở bảng chọn trang và đòi thấy danh sách trang thật (không chỉ nút). */
+async function assertPagesListOpens(t, page, label) {
+  const opened = await page.evaluate(`(() => {
+    const d = document.querySelector('[data-testid="pages-menu"]');
+    if (!d) return "không thấy nút chuyển trang";
+    d.click();
+    return "ok";
+  })()`);
+  t.assert.strictEqual(opened, "ok", `${label}: phải bấm được nút chuyển trang`);
+  const shown = await waitForPage(
+    page,
+    `(() => {
+      const panel = document.querySelector('[data-testid="pages-menu-panel"]');
+      if (!panel) return false;
+      const hrefs = [...panel.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+      return ["/donate", "/feedback", "/monitor"].every((p) => hrefs.includes(p));
+    })()`,
+    8000,
+  );
+  t.assert.ok(shown, `${label}: bảng chọn phải liệt kê đường tới các trang khác`);
+}
+
+browserTest("J1. Desktop: bộ chọn trang ở header dùng được trên trang trong", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width: 1280,
+    height: 800,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await page.goto(ctx.base + "/monitor");
+  const ready = await waitForPage(
+    page,
+    `${OVERLAY_GONE} && !!document.querySelector('[data-testid="pages-menu"]')`,
+    25000,
+  );
+  t.assert.ok(ready, "trang /monitor phải render xong (preloader rời DOM, header có mặt)");
+  await assertNavUsable(t, page, "desktop 1280×800 /monitor");
+  await assertPagesListOpens(t, page, "desktop 1280×800 /monitor");
+});
+
+browserTest("J2. Mobile: bộ chọn trang ở header dùng được trên trang chủ", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await page.goto(ctx.base + "/");
+  const ready = await waitForPage(
+    page,
+    `${OVERLAY_GONE} && !!document.querySelector('[data-testid="pages-menu"]')`,
+    25000,
+  );
+  t.assert.ok(ready, "trang chủ phải render xong trên khung nhìn mobile");
+  await assertNavUsable(t, page, "mobile 390×844");
+  await assertPagesListOpens(t, page, "mobile 390×844");
 });
 
 // Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server + dừng breadcrumb

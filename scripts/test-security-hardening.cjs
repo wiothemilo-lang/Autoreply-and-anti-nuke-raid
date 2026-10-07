@@ -272,16 +272,31 @@ check(
       bootstrapAction,
     ),
 );
+// 07/10/2026: phạm vi kiểm được THU HẸP cho đúng điều nó tuyên bố. Trước đây
+// nó soi cả file từ đầu tới `botSetOwner`, nên mọi truy vấn `users` hợp lệ ở
+// giữa file (vd `getTeamAdmins` đọc hồ sơ để hiển thị) đều làm nó đỏ — trong
+// khi điều cần bảo vệ là: HÀM XÁC ĐỊNH CHỦ BOT không đọc bảng `users` (chủ bot
+// phải suy ra từ botStatus, không phụ thuộc người đó đã đăng nhập web hay chưa).
+const ownerHelper = hidden.slice(
+  hidden.indexOf("export function isBotOwnerUser"),
+  hidden.indexOf("export const MAX_TEAM_ADMINS"),
+);
 check(
   "canonical owner không phụ thuộc users row và chỉ nhận snowflake hợp lệ",
   hidden.includes("export function isBotOwnerUser") &&
     /DISCORD_SNOWFLAKE_RE\.test\(ownerDiscordId\)/.test(hidden) &&
-    !hidden.slice(0, hidden.indexOf("export const botSetOwner")).includes('query("users")'),
+    ownerHelper.length > 0 &&
+    !ownerHelper.includes('query("users")'),
 );
+// 07/10/2026: có HAI helper chuẩn cho hai mức quyền — `isBotOwnerUser`/
+// `requireBotOwner` (chỉ chủ bot: mật khẩu ẩn, tính năng ẩn, OWNER_SEED) và
+// `isBotAdminUser`/`requireBotAdmin` (chủ bot HOẶC quản trị viên nhóm: cửa sổ
+// Admin). Cả hai đều là helper chuẩn; điều cấm vẫn là tự so sánh owner bằng
+// tay (luật thứ hai bên dưới).
 check(
-  "mọi path owner toàn cục dùng helper chuẩn, không còn so sánh owner yếu",
+  "mọi path owner/admin toàn cục dùng helper chuẩn, không còn so sánh owner yếu",
   [statusSrc, selfDiagnoseSrc, threatIntelSrc, relaySrc, guildsSrc].every((src) =>
-    /isBotOwnerUser\(|requireBotOwner\(/.test(src),
+    /isBotOwnerUser\(|requireBotOwner\(|isBotAdminUser\(|requireBotAdmin\(/.test(src),
   ) &&
     [statusSrc, selfDiagnoseSrc, threatIntelSrc, relaySrc, guildsSrc].every(
       (src) => !/(owner|status)\?\.ownerDiscordId\s*&&/.test(src),

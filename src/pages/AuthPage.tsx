@@ -7,7 +7,6 @@ import { LogoMark } from "../components/BotLogo";
 import { Button } from "../components/ui/button";
 import HaimiyaChat from "../components/HaimiyaChat";
 import PageSplash from "../components/PageSplash";
-import SkipLink from "../components/SkipLink";
 import { api } from "../../convex/_generated/api";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { Card, CardContent, CardDescription, CardHeader } from "../components/ui/card";
@@ -91,7 +90,6 @@ export default function AuthPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-      <SkipLink />
       <HaimiyaChat position="dashboard" />
       <LangSwitch showIcon className="absolute right-4 top-4 z-20" />
 

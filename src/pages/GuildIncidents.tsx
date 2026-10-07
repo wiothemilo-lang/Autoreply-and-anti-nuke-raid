@@ -42,7 +42,6 @@ import { cn } from "../lib/utils";
 import type { GuildData } from "../lib/types";
 
 import LangSwitch from "../components/LangSwitch";
-import SkipLink from "../components/SkipLink";
 
 import { dateLocale, translate } from "../lib/i18n";
 
@@ -157,7 +156,6 @@ export default function GuildIncidents() {
 
   return (
     <div className="min-h-screen">
-      <SkipLink />
       <header className="border-b border-border/60 bg-background/70 backdrop-blur">
         <div className="container py-6">
           <div className="flex flex-wrap items-center gap-4">

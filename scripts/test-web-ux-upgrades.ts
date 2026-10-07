@@ -14,6 +14,7 @@ import {
   unsavedPanelIds,
 } from "../src/lib/useUnsavedChanges";
 import { filterCommands, foldDiacritics, scoreCommand } from "../src/components/CommandPalette";
+import { navLabelFor, navPaths, visibleNavGroups } from "../src/lib/navItems";
 import { syncState, SETTINGS_APPLY_WINDOW_MS, STALE_HEARTBEAT_MS } from "../src/lib/syncState";
 import {
   BOT_ONLINE_WINDOW_MS,
@@ -590,9 +591,13 @@ console.log("── #10 hàng đợi việc (Admin) ──");
     statusSrc.indexOf("export const getHostHealth"),
   );
   check("getJobBacklog là query", /export const getJobBacklog = query\(/.test(statusSrc));
+  // 07/10/2026 — YÊU CẦU ĐỔI: cửa sổ Admin mở cho cả QUẢN TRỊ VIÊN NHÓM (do
+  // chủ bot đặt trong `hidden.setTeamAdmins`), nên guard đúng là isBotAdminUser
+  // (= chủ bot HOẶC quản trị viên nhóm). Vẫn phải trả null cho tài khoản
+  // thường — đó là điều check này bảo vệ.
   check(
-    "getJobBacklog guard owner (isBotOwnerUser) → null",
-    /isBotOwnerUser\(user, status\)\) return null/.test(backlogBody),
+    "getJobBacklog guard admin (isBotAdminUser) → null cho tài khoản thường",
+    /isBotAdminUser\(user, status\)\) return null/.test(backlogBody),
   );
   check("getJobBacklog nhận token qua args", /args: \{ token: v\.string\(\) \}/.test(backlogBody));
   check(
@@ -1343,6 +1348,54 @@ console.log("── #16 nhịp tim bot ⇄ ngưỡng hiển thị ──");
       staleHeartbeatMs: GUILD_HEARTBEAT_FRESH_MS,
       now,
     }) === "bot-offline",
+  );
+}
+
+// ── Bộ chọn trang trong HEADER: vai trò + nhãn "đang ở trang nào" ─────────────
+// (07/10/2026) Hai hàm thuần này quyết định ai thấy mục "Cửa sổ Admin" và nút
+// ở header ghi gì. Kiểm bằng cách GỌI THẬT — sai luật lọc ở đây là lỗi quyền
+// (lộ cửa sổ Admin cho người thường) hoặc lỗi điều hướng (trang không có
+// đường vào), cả hai đều im lặng nếu chỉ so chuỗi nguồn.
+console.log("── #11 bộ chọn trang ở header: vai trò + nhãn ──");
+{
+  const asUser = visibleNavGroups({ isAdmin: false });
+  const asAdmin = visibleNavGroups({ isAdmin: true });
+  const flat = (groups: typeof asUser) => groups.flatMap((g) => g.items.map((i) => i.to));
+
+  check("người dùng thường KHÔNG thấy mục /admin", !flat(asUser).includes("/admin"));
+  check("admin (chủ bot hoặc quản trị viên nhóm) THẤY /admin", flat(asAdmin).includes("/admin"));
+  check(
+    "hai vai trò chỉ khác NHAU đúng mục /admin (không ẩn/lộ nhầm mục khác)",
+    JSON.stringify(flat(asUser)) === JSON.stringify(flat(asAdmin).filter((p) => p !== "/admin")),
+  );
+  check(
+    "không nhóm nào rỗng sau khi lọc (tiêu đề trống không được vẽ)",
+    asUser.every((g) => g.items.length > 0) && asAdmin.every((g) => g.items.length > 0),
+  );
+  check(
+    "lọc theo vai trò KHÔNG đụng dữ liệu gốc (navPaths vẫn đủ mọi trang)",
+    navPaths().includes("/admin") && navPaths().length >= 8,
+  );
+
+  check(
+    "nhãn trang hiện tại: trang con dùng nhãn mục cha",
+    navLabelFor("/dashboard/42") === "Bảng điều khiển",
+  );
+  check(
+    "nhãn trang hiện tại: khớp sâu hơn thắng",
+    navLabelFor("/dashboard/42/history") === "Bảng điều khiển",
+  );
+  check(
+    "nhãn trang hiện tại: /monitor → đúng nhãn mục",
+    navLabelFor("/monitor") === "Giám sát bot",
+  );
+  // /status là ALIAS của /monitor (hosting 301 về /monitor, xem routes.json)
+  // nên nó cố ý không nằm trong bảng chọn: gặp trực tiếp trong dev thì nút
+  // ghi chữ mặc định chứ không hiện hai mục cùng trỏ một trang.
+  check("alias /status không phải mục riêng trong bảng chọn", navLabelFor("/status") === null);
+  check(
+    "trang ngoài bảng chọn (pháp lý/404) trả null để nơi gọi tự đặt chữ",
+    navLabelFor("/terms") === null && navLabelFor("/khong-ton-tai") === null,
   );
 }
 

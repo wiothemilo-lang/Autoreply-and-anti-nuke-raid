@@ -883,6 +883,14 @@ export default defineSchema({
     version: v.string(),
     /** Discord ID của admin sở hữu bot (người duy nhất được phép mở khóa tính năng ẩn). */
     ownerDiscordId: v.optional(v.string()),
+    /**
+     * Discord ID của QUẢN TRỊ VIÊN NHÓM (team sở hữu bot) — được vào cửa sổ
+     * Admin như chủ bot, nhưng KHÔNG được đụng tính năng ẩn / mật khẩu /
+     * OWNER_SEED. Chỉ chủ bot sửa được danh sách (`hidden.setTeamAdmins`).
+     * Vì sao lưu ở DB chứ không phải env: chủ bot cần thêm/xoá ngay trên
+     * dashboard và thấy đúng người đang có quyền; bot KHÔNG đọc field này.
+     */
+    teamAdminDiscordIds: v.optional(v.array(v.string())),
     /** Avatar bot hiển thị trên web (logo, quản lý…). */
     botAvatarUrl: v.optional(v.string()),
     /** Avatar trợ lý AI Haimiya-senpai hiển thị trên web. */

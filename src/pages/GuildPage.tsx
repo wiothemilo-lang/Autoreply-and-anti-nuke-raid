@@ -48,7 +48,6 @@ import MobilePanelSheet from "../components/MobilePanelSheet";
 import { HOME_SECTION, shouldUsePanelSheet, useNarrowViewport } from "../lib/mediaQuery";
 
 import LangSwitch from "../components/LangSwitch";
-import SkipLink from "../components/SkipLink";
 
 import { dateLocale, translate } from "../lib/i18n";
 // Code-split theo panel: mở tab nào mới tải JS của tab đó. Chỉ OverviewPanel
@@ -393,7 +392,6 @@ export default function GuildPage() {
     <div className="relative min-h-screen overflow-x-clip" style={themeVars}>
       <HaimiyaChat position="dashboard" />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} items={commands} />
-      <SkipLink />
       <div className="relative z-10">
         <header className="border-b border-border/60 bg-background/70 backdrop-blur">
           {/* Header 2 hàng cho điện thoại: hàng 1 là điều hướng + nhận diện

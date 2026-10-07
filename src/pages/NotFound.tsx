@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, LayoutDashboard } from "lucide-react";
 import { Button } from "../components/ui/button";
-import SkipLink from "../components/SkipLink";
 import { getSessionToken } from "../lib/discord";
 
 import { translate } from "../lib/i18n";
@@ -14,7 +13,6 @@ export default function NotFound() {
       tabIndex={-1}
       className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
     >
-      <SkipLink />
       <p className="font-mono text-sm font-semibold text-muted-foreground">404</p>
       <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-3xl">
         {translate("Không tìm thấy trang này")}{" "}

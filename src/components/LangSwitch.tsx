@@ -10,7 +10,7 @@ const OPTIONS = [
 
 /**
  * Công tắc ngôn ngữ VI ⇄ EN ⇄ DE — nhúng vào chrome của mọi trang (nav landing,
- * taskbar, header dashboard). Lựa chọn được lưu ở localStorage và đổi ngay,
+ * header chung, header dashboard). Lựa chọn được lưu ở localStorage và đổi ngay,
  * không cần tải lại trang.
  *
  * Dùng hook useT() (không phải translate() toàn cục) để component này là
@@ -22,7 +22,7 @@ export default function LangSwitch({
   showIcon = false,
 }: {
   className?: string;
-  /** Hiện icon quả địa cầu phía trước — dùng ở nơi thoáng (taskbar/nav). */
+  /** Hiện icon quả địa cầu phía trước — dùng ở nơi thoáng (header/nav). */
   showIcon?: boolean;
 }) {
   const { lang, setLang, t } = useT();

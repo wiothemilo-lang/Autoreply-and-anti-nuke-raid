@@ -5,8 +5,9 @@ import { MotionConfig } from "framer-motion";
 import { Toaster } from "sonner";
 import NotFound from "./pages/NotFound";
 import RequireAuth from "./components/RequireAuth";
-import Taskbar from "./components/Taskbar";
+import SiteNav from "./components/SiteNav";
 import RouteLoader from "./components/RouteLoader";
+import SkipLink from "./components/SkipLink";
 
 import { useT } from "./lib/i18n";
 import { finishBootOverlay } from "./lib/bootOverlay";
@@ -110,14 +111,27 @@ export default function App() {
   // translate() ở ngôn ngữ mới (translate đọc trạng thái module lúc render).
   const { lang } = useT();
   const { pathname } = useLocation();
-  // Bộ chọn trang nổi: trước đây chỉ Landing mount, nên mọi trang còn lại
-  // không có đường vào nào (chính là lý do nó "không ai thấy"). Ẩn trên
-  // /auth và /discord/callback — hai màn hình tạm, có nút riêng và nút quay
-  // lại rõ ràng, thêm menu ở đó chỉ gây nhiễu.
+  // Bộ chọn trang nằm trong HEADER (SiteNav). Ẩn trên /auth và
+  // /discord/callback — hai màn hình tạm, thêm nav ở đó chỉ gây nhiễu. Ẩn
+  // trên landing vì landing có header riêng to hơn (components/landing/Nav
+  // đã cắm cùng `PagesMenu` vào cụm bên phải) — hai header chồng nhau sẽ
+  // thành hai tầng dính trên đỉnh.
   const transient = pathname === "/auth" || pathname === "/discord/callback";
+  const isLanding = pathname === "/";
   return (
     <>
+      {/* SKIP LINK PHẢI ĐỨNG TRƯỚC MỌI THỨ FOCUS ĐƯỢC — đặt ở đây (không
+          trong từng trang) chính vì header chung nằm trước nội dung trang:
+          để trong trang thì người dùng bàn phím phải Tab qua TOÀN BỘ header
+          (logo, menu trang) trước khi tới được lối tắt — đúng thứ WCAG 2.4.1
+          sinh ra để tránh. Test trình duyệt E khoá điều này: Tab đầu tiên
+          trong mọi trang phải dừng ở liên kết "Bỏ qua tới nội dung". */}
+      <SkipLink />
       <RouteMetadataSync lang={lang} />
+      {/* NGOÀI <Suspense> là cố ý: header không phụ thuộc chunk route nào, để
+          trong Suspense thì mỗi lần tải chunk nó bị gỡ ra lắp lại — header
+          nháy trắng đúng lúc người dùng đang chờ trang mới. */}
+      {!transient && !isLanding && <SiteNav />}
       <MotionConfig reducedMotion="user">
         <Suspense fallback={<RouteFallback />}>
           <BootSignal />
@@ -196,7 +210,6 @@ export default function App() {
             />
             <Route path="*" element={<NotFound />} />
           </Routes>
-          {!transient && <Taskbar />}
         </Suspense>
       </MotionConfig>
       <Toaster

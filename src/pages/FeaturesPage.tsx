@@ -6,7 +6,6 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import Footer from "../components/landing/Footer";
 import LangSwitch from "../components/LangSwitch";
-import SkipLink from "../components/SkipLink";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { featuresDoc } from "../lib/featuresContent";
 import { translate, useT } from "../lib/i18n";
@@ -28,7 +27,6 @@ export default function FeaturesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SkipLink />
       {/* Thanh đầu trang: về trang chủ + đổi ngôn ngữ — dùng chung khuôn LegalPage */}
       <div className="mx-auto flex max-w-4xl items-center justify-between px-6 pt-6">
         <Link

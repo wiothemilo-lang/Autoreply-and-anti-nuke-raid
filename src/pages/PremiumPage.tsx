@@ -9,7 +9,6 @@ import { Button } from "../components/ui/button";
 import PaymentReturn from "../components/PaymentReturn";
 import Footer from "../components/landing/Footer";
 import LangSwitch from "../components/LangSwitch";
-import SkipLink from "../components/SkipLink";
 import { usePublicConfig } from "../lib/usePublicConfig";
 import { dateLocale, translate } from "../lib/i18n";
 import { getSessionToken } from "../lib/discord";
@@ -132,8 +131,6 @@ export default function PremiumPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SkipLink />
-
       {/* Thanh đầu trang — cùng khuôn với /features */}
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 pt-6">
         <Link

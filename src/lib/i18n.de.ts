@@ -349,8 +349,6 @@ export const DE: Record<string, string> = {
     "(Anti-Nuke / Auto-Mod — Verantwortlicher Moderator erscheint als „Automatisch“) als auch",
   "(hiển thị tên người thực hiện). Lý do để trống → ghi “không có lý do”. Chọn":
     "(zeigt den Ausführenden). Leerer Grund → als „kein Grund“ vermerkt. Wähle",
-  "(khớp tài khoản Discord đã tạo bot). Người dùng khác không thấy nút này và không truy cập được trang này.":
-    "(identisch mit dem Discord-Konto, das den Bot erstellt hat). Andere Nutzer sehen diese Schaltfläche nicht und können die Seite nicht öffnen.",
   "(kể cả raid/nuke phát hiện qua AI). Role ở server khác không ảnh hưởng.":
     "(auch KI-erkannte Raids/Nukes). Rollen anderer Server bleiben ohne Wirkung.",
   "(tên, màu, hoist, mentionable, quyền),": "(Name, Farbe, Hoist, Nennbar, Rechte),",
@@ -444,7 +442,6 @@ export const DE: Record<string, string> = {
   "Bảng hình phạt": "Strafprotokoll",
   "Bảng xếp hạng nhiệt độ": "Heat-Bestenliste",
   "Bảng điều khiển": "Dashboard",
-  "Bảng điều khiển nhanh": "Schnellpanel",
   "Bảo mật": "Sicherheit",
   "Bật Join Gate": "Join Gate einschalten",
   "Bật bảo vệ": "Schutz einschalten",
@@ -476,8 +473,6 @@ export const DE: Record<string, string> = {
   "Chặn đứng kẻ phá hoại": "Vandalen stoppen",
   "Chế độ an toàn (chống chặn nhầm)": "Sicherer Modus (weniger Fehlalarme)",
   Chỉ: "Nur",
-  "Chỉ chủ sở hữu bot nhìn thấy · theo dõi lỗi & dữ liệu bot":
-    "Nur für den Bot-Besitzer sichtbar · überwacht Bot-Fehler & -Daten",
   "Chỉ phạt khi có": "Straft nur bei",
   "Chọn emoji": "Emoji wählen",
   "Chọn kênh": "Kanal wählen",
@@ -522,8 +517,6 @@ export const DE: Record<string, string> = {
   "Cửa sổ (giây)": "Zeitfenster (Sekunden)",
   "Cửa sổ (phút)": "Zeitfenster (Minuten)",
   "Cửa sổ Admin": "Admin-Fenster",
-  "Cửa sổ Admin là khu vực riêng tư của chủ sở hữu bot — người dùng khác không nhìn thấy và không vào được.":
-    "Das Admin-Fenster ist ein privater Bereich des Bot-Besitzers — andere Nutzer sehen und betreten ihn nicht.",
   "Cửa sổ tái phạm (phút)": "Wiederholungszeitraum (Minuten)",
   "DM chào mừng": "Willkommens-DM",
   "DM chào mừng bật": "Willkommens-DM an",
@@ -648,7 +641,6 @@ export const DE: Record<string, string> = {
   "Lọc từ ngữ xấu": "Schimpfwortfilter",
   "Lời chúc mừng riêng khi gửi DM người thắng (tùy chọn)":
     "Eigener Glückwunsch in der Gewinner-DM (optional)",
-  "Miễn phí · cập nhật tự động từ Discord": "Kostenlos · automatisch aus Discord aktualisiert",
   "Miễn trừ hoàn toàn khỏi mọi module chống nuke.":
     "Vollständig von allen Anti-Nuke-Modulen ausgenommen.",
   "Moderation — thông báo sau khi phạt": "Moderation — Hinweis nach der Strafe",
@@ -670,7 +662,6 @@ export const DE: Record<string, string> = {
   "Mời thêm": "Mehr einladen",
   "Mở Discord": "Discord öffnen",
   "Mở Discord server": "Discord-Server öffnen",
-  "Mở bảng điều khiển nhanh": "Schnellpanel öffnen",
   "Mở dashboard": "Dashboard öffnen",
   "Mở khóa": "Entsperren",
   "Mở khóa ngay": "Jetzt entsperren",
@@ -1001,7 +992,6 @@ export const DE: Record<string, string> = {
   "Đã đặt mật khẩu tính năng ẩn": "Passwort für versteckte Funktionen gesetzt",
   Đóng: "Schließen",
   "Đóng góp signature (khi bị raid)": "Signaturen beitragen (bei Raid)",
-  "Đóng taskbar": "Taskbar schließen",
   "Đăng nhập": "Anmelden",
   "Đăng nhập thất bại": "Anmeldung fehlgeschlagen",
   "Đăng nhập vào Protogon": "Bei Protogon anmelden",
@@ -1591,6 +1581,39 @@ export const DE: Record<string, string> = {
   "Đăng nhập lại để kiểm tra đơn": "Erneut anmelden, um diese Bestellung zu prüfen",
   "Phiên đăng nhập cần thiết để xem trạng thái đơn thanh toán này.":
     "Für den Status dieser Zahlung musst du angemeldet sein.",
+  /* ==== Seitenauswahl im HEADER + Team-Admins (07.10.2026) ==== */
+  "Về trang chủ Protogon": "Zurück zur Protogon-Startseite",
+  Trang: "Seiten",
+  "Bảng chọn trang": "Seitenmenü",
+  "Chuyển trang": "Seite wechseln",
+  "Đóng bảng chọn trang": "Seitenmenü schließen",
+  "Bot đang chạy": "Bot läuft",
+  "Bot mất kết nối": "Bot ist offline",
+  "Quản trị viên nhóm": "Team-Admins",
+  "Chủ sở hữu bot & quản trị viên nhóm · theo dõi lỗi & dữ liệu bot":
+    "Bot-Inhaber & Team-Admins · überwacht Bot-Fehler & Daten",
+  "Cửa sổ Admin là khu vực riêng tư của chủ sở hữu bot và quản trị viên nhóm — người dùng khác không nhìn thấy và không vào được.":
+    "Das Admin-Fenster ist privat für den Bot-Inhaber und die Team-Admins — andere Nutzer sehen und öffnen es nicht.",
+  "Cửa sổ Admin chỉ hiển thị với": "Das Admin-Fenster ist nur sichtbar für",
+  "và những người trong": "und die Personen auf der",
+  "danh sách quản trị viên nhóm": "Team-Admin-Liste",
+  "(do chủ bot đặt). Người dùng khác không thấy nút này và không truy cập được trang này.":
+    "(vom Bot-Inhaber festgelegt). Andere Nutzer sehen diesen Eintrag nicht und können die Seite nicht öffnen.",
+  "Thêm thành viên trong team để họ cũng vào được cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn hay chìa khoá bảo mật API.":
+    "Team-Mitglieder hinzufügen, damit sie das Admin-Fenster ebenfalls öffnen können (Fehler, Host-Zustand, KI, Threat Research). Sie können das versteckte Passwort und den API-Sicherheitsschlüssel NICHT ändern.",
+  "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.":
+    "Du bist Team-Admin — diese Liste verwaltet der Bot-Inhaber. Bitte den Bot-Inhaber, Personen hinzuzufügen oder zu entfernen.",
+  "Chưa có ai — hiện chỉ chủ bot vào được cửa sổ này.":
+    "Noch niemand — derzeit kann nur der Bot-Inhaber dieses Fenster öffnen.",
+  "Chưa từng đăng nhập web": "Noch nie im Web angemeldet",
+  "Bỏ quyền quản trị viên nhóm": "Team-Admin-Rechte entziehen",
+  "Discord ID (15-21 chữ số)": "Discord-ID (15-21 Ziffern)",
+  "Tối đa": "Höchstens",
+  "người.": "Personen.",
+  "Cách lấy ID: bật Chế độ nhà phát triển trong Discord → chuột phải vào người dùng → Sao chép ID.":
+    "ID ermitteln: Entwicklermodus in Discord aktivieren → Nutzer rechtsklicken → ID kopieren.",
+  "Đã lưu danh sách quản trị viên nhóm.": "Team-Admin-Liste gespeichert.",
+  "Không lưu được.": "Speichern nicht möglich.",
   "Không kiểm tra được trạng thái": "Status kann nicht abgefragt werden",
   "Lỗi kết nối — thử lại sau ít phút.":
     "Verbindungsfehler – bitte in wenigen Minuten erneut versuchen.",

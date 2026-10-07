@@ -4,6 +4,25 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 07/10/2026 (3) — Bộ chọn trang lên header + quyền Admin cho cả team
+
+- 🎯 **Yêu cầu**: (a) chuyển bộ chọn trang lên header, thiết kế lại cho dễ nhìn; (b) mở cửa sổ Admin cho **quản trị viên nhóm** của team sở hữu bot, không chỉ owner; (c) verify đủ rồi commit + push.
+- 🧭 **(a) Nav lên header**: `components/Taskbar.tsx` (dock nổi) → `components/SiteNav.tsx` (dải sticky `h-12`, logo + trạng thái bot + `PagesMenu`). Nút mở nay NÓI RÕ đang ở trang nào ("Bảng điều khiển ▾" thay vì "Menu") — người dùng không phải bấm để biết mình đang ở đâu. Landing không có SiteNav (đã có header riêng to hơn) nên cắm CÙNG `PagesMenu` vào `landing/Nav.tsx` — một nguồn danh sách trang duy nhất. Hai header dính (`Dashboard`, `LegalPage`) đổi `top-0` → `top-12` để không chồng lên thanh chung.
+- 🔐 **(b) Quyền**: `botStatus.teamAdminDiscordIds` (optional array) + hai helper tách bạch — `isBotOwnerUser`/`requireBotOwner` (CHỈ chủ bot: mật khẩu ẩn, tính năng ẩn, OWNER_SEED) và `isBotAdminUser`/`requireBotAdmin` (chủ bot HOẶC quản trị viên nhóm: cửa sổ Admin). Nới guard đúng phạm vi: `status.getAiHealth/getHostHealth/getJobBacklog`, `threatIntel.*`, `selfDiagnose.*`; `status.isOwner` vẫn nguyên cho phần chỉ chủ bot. Danh sách do chủ bot quản lý (`hidden.getTeamAdmins`/`setTeamAdmins`, có panel ở /admin): quản trị viên nhóm KHÔNG tự thêm người khác (chặn tự nâng quyền), ID sai bị TỪ CHỐI kèm chính ID đó, trần 20 người. Owner chưa bootstrap ⇒ không ai là admin (cửa vẫn đóng).
+- 🐛 **Bẫy a11y phát hiện khi verify**: đưa nav lên App khiến header đứng TRƯỚC skip-link trong thứ tự tab (test trình duyệt E đỏ). Sửa gốc: skip-link chuyển lên `App.tsx` (đứng trước header), **gỡ `<SkipLink/>` khỏi cả 16 trang** (chỉ giữ đích `#main`) — tránh 2 lối tắt trùng trong tab order.
+- 🧪 **Test mới**: `test-team-admins.ts` (29 case: chuẩn hoá danh sách, hai mức quyền, chỉ chủ bot sửa được, lỗi rõ ràng, `getTeamAdmins` khác nhau owner/admin) · `test-web-ux-upgrades.ts` +8 case gọi THẬT `visibleNavGroups`/`navLabelFor` · `test-web-contracts` chốt cấu trúc header/skip-link/adminOnly · `test-browser-contracts` J1/J2 mới: nút trong header phải nằm TRỌN trong khung nhìn ở cả đỉnh lẫn đáy trang và bấm ra DANH SÁCH trang (J1 đỏ trước khi có nav ở header).
+- 🧪 **Kiểm chứng**: 87/87 CJS suite (gồm Chromium thật, 17/17 browser test) · **25/25 TS suite** · `tsc` · lint · `format:check` · 10 cổng tĩnh self-test · `convex codegen` (schema đổi).
+- 📁 File đụng: `convex/{schema,hidden,status,threatIntel,selfDiagnose}.ts` · `src/App.tsx` · `src/components/{SiteNav.tsx (mới),Taskbar.tsx (xoá)}` · `src/components/landing/Nav.tsx` · `src/lib/{navItems,useBotStatus,i18n.en,i18n.de}.ts` · `src/pages/*` (gỡ SkipLink, /admin, top-12) · `scripts/{test-team-admins.ts (mới),test-web-ux-upgrades.ts,test-web-contracts.cjs,test-browser-contracts.cjs,test-i18n.cjs,test-security-hardening.cjs,test-bot-contracts.cjs}` · `docs/repo-map.md`.
+
+## 07/10/2026 (2) — Vá "mất taskbar": dock thiếu neo dọc trên desktop
+
+- 🐛 **Gốc rễ**: dock bộ chọn trang là `position: fixed` nhưng lớp neo dọc chỉ có nhánh `max-md:bottom-…` + `max-md:top-auto` (từ `d27a0b6`, 30/09). Trên desktop (≥768px) cả `top` lẫn `bottom` đều `auto` ⇒ trình duyệt đặt nút tại **vị trí tĩnh** — tức SAU toàn bộ nội dung trang ⇒ nút nằm ngoài khung nhìn: "mất taskbar" dù DOM vẫn còn.
+- 📏 **Đo thật bằng Chromium headless** (khung 1280×800, trang chủ): TRƯỚC khi sửa nút ở `top: 5589px` / `bottom: −4843px` (cách đáy màn ~4.800px); SAU khi sửa `bottom: 24px`, hộp (24,722)→(145,776), `elementFromPoint` trả về chính nút. Mobile 390×844 giữ `bottom: 16px` (safe-area).
+- 🧪 **Test chặn tái diễn**: J1/J2 trong `test-browser-contracts.cjs` — hộp nút phải nằm TRỌN trong khung nhìn ở cả đỉnh lẫn đáy trang, không bị lớp nào che, và `bottom` đã tính phải khác `auto`. Test G cũ chỉ `querySelector` nên không chạm tới loại lỗi này. J1 **đỏ đúng chỗ** trước khi sửa, xanh sau khi sửa.
+- 🧪 **Kiểm chứng**: 87/87 suite CJS — trong đó `test-browser-contracts` chạy **Chromium thật** (83,3s) · 24/24 suite TS · `tsc` · lint · `format:check` · 10 cổng tĩnh self-test.
+- 📁 File đụng (3): `src/components/Taskbar.tsx` · `scripts/test-browser-contracts.cjs` · `docs/agent-journal.md`.
+- 💡 Ghi chú cho phiên sau: sandbox này **có** Chromium ở `/tmp/pw-browsers/chromium-1148/chrome-linux/chrome` (cache Playwright); đặt `CHROME_BIN=<path>` là `test-browser-contracts` chạy thật — không cần chờ CI mới kiểm chứng được UI.
+
 ## 07/10/2026 — Deploy ZaloPay + vá sự cố botKey 22h (bot bị Convex từ chối, không tự xoay key được)
 
 - 🎯 **Yêu cầu**: pull + update bot/convex. Pull `5bfda45 → 53b1bbc` (ZaloPay `/donate` + Premium), **lockfile + `bot/` không đổi** → bỏ qua `bun install`.
