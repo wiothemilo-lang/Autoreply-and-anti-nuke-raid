@@ -76,28 +76,37 @@ export default function Nav() {
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
           <PagesMenu />
-          <LangSwitch />
+          {/* LangSwitch ẩn dưới sm: trên 320–390px tổng logo + bảng chọn + 3 nút
+              ngôn ngữ + avatar VƯỢT bề rộng container → flex bóp img avatar thành
+              elip (đo thật 08/10: 25×32px @390, 22×32px @360, tràn 43px @320).
+              Vẫn đổi được ngôn ngữ trong PagesPanel (nút lưới ở header) — ở đó
+              có LangSwitch đầy đủ. */}
+          <div className="hidden sm:block">
+            <LangSwitch />
+          </div>
           {me ? (
             <div className="relative">
               <button
                 onClick={() => setMenuOpen((o) => !o)}
-                className="flex items-center gap-2 rounded-full border border-border bg-card/70 py-1 pl-1 pr-2.5 transition-colors hover:bg-accent"
+                className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-card/70 py-1 pl-1 pr-2.5 transition-colors hover:bg-accent"
               >
                 {avatar ? (
                   <img
                     src={avatar}
                     alt={me.user.username}
-                    className="h-8 w-8 rounded-full ring-2 ring-primary/40"
+                    // shrink-0: AVATAR KHÔNG ĐƯỢC BÓP — khi container chật, flex
+                    // mặc định co img xuống (đo được 22–25px thay vì 32px = "bị dẹp").
+                    className="h-8 w-8 shrink-0 rounded-full ring-2 ring-primary/40"
                   />
                 ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
                     {(me.user.globalName ?? me.user.username).slice(0, 1).toUpperCase()}
                   </span>
                 )}
                 <span className="hidden max-w-[8rem] truncate text-sm font-medium sm:block">
                   {me.user.globalName ?? me.user.username}
                 </span>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-border bg-card p-2 shadow-lg backdrop-blur">

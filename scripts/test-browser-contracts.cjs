@@ -1720,6 +1720,76 @@ browserTest("J3. Desktop: dock góc dưới trái hiện đúng chỗ và mở �
   );
 });
 
+// J4 — AVATAR NGƯỜI DÙNG KHÔNG ĐƯỢC BÓP + HEADER KHÔNG TRÀN (bug 08/10/2026).
+// Người dùng báo avatar góc trên phải "bị dẹp" trên điện thoại. Đo bằng
+// Chromium thật TRƯỚC khi sửa: img avatar 32px bị flex bóp còn 25×32 @390px,
+// 22×32 @360px, và header tràn 43px @320px (avatar ra ngoài mép màn).
+//
+// Trạng thái CHƯA đăng nhập không có avatar nên test thay nút Đăng nhập bằng
+// replica avatar — markup PHẢI KHỚP Nav.tsx (gate tĩnh trong test-web-contracts
+// khoá `shrink-0` ở Nav.tsx thật; J4 này khoá SỨC CHỨA của header: ai thêm
+// mục vào header mà làm chật là test đỏ). Ba breakpoint = 3 máy phổ biến.
+browserTest("J4. Mobile: avatar người dùng không bị bóp, header không tràn", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+  for (const [w, h] of [
+    [390, 844],
+    [360, 800],
+    [320, 700],
+  ]) {
+    await page.send("Emulation.setDeviceMetricsOverride", {
+      width: w,
+      height: h,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await page.goto(ctx.base + "/");
+    const ready = await waitForPage(
+      page,
+      `${OVERLAY_GONE} && !!document.querySelector('header a[href="/auth"]')`,
+      25000,
+    );
+    t.assert.ok(ready, `trang chủ render xong @${w}px (nút đăng nhập có mặt)`);
+
+    // Thay nút Đăng nhập = replica avatar đúng markup Nav.tsx (đã đăng nhập).
+    const measured = await page.evaluate(`(() => {
+      const login = document.querySelector('header a[href="/auth"]');
+      if (!login) return JSON.stringify({ err: 'no login btn' });
+      const slot = document.createElement('div');
+      slot.className = 'relative';
+      slot.innerHTML = '<button class="flex shrink-0 items-center gap-2 rounded-full border border-border bg-card/70 py-1 pl-1 pr-2.5"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="avatar" class="h-8 w-8 shrink-0 rounded-full ring-2 ring-primary/40" /><span class="hidden max-w-[8rem] truncate text-sm font-medium sm:block">UserName</span><svg class="h-3.5 w-3.5 shrink-0" /></button>';
+      login.replaceWith(slot);
+      const img = slot.querySelector('img');
+      const r = img.getBoundingClientRect();
+      const hd = document.querySelector('header > div');
+      return JSON.stringify({
+        w: Math.round(r.width), h: Math.round(r.height),
+        right: Math.round(r.right), vw: innerWidth,
+        scrollW: hd.scrollWidth, clientW: hd.clientWidth,
+      });
+    })()`);
+    const m = JSON.parse(measured);
+    t.assert.ok(!m.err, `${w}px: phải thay được nút Đăng nhập bằng replica avatar`);
+    t.diagnostic(
+      `${w}px: avatar ${m.w}×${m.h} right=${m.right}/${m.vw} header ${m.scrollW}/${m.clientW}`,
+    );
+    t.assert.ok(
+      Math.abs(m.w - m.h) <= 1 && m.w >= 31,
+      `avatar @${w}px phải TRÒN 32×32, không bị bóp — đo được ${m.w}×${m.h} ` +
+        "(flex co img khi header chật là đúng lỗi 'bị dẹp' 08/10)",
+    );
+    t.assert.ok(
+      m.right <= m.vw,
+      `avatar @${w}px phải nằm trong màn (right=${m.right} > vw=${m.vw} = tràn mép phải)`,
+    );
+    t.assert.ok(
+      m.scrollW <= m.clientW,
+      `header @${w}px không được tràn ngang (scrollW=${m.scrollW} > clientW=${m.clientW})`,
+    );
+  }
+});
+
 // Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server + dừng breadcrumb
 test.after(() => {
   clearInterval(progressBreadcrumb);

@@ -192,15 +192,21 @@ export default function Dashboard() {
               </span>
             </button>
             <div className="flex items-center gap-3">
-              <LangSwitch />
+              {/* Ẩn dưới sm giống Nav landing: giữ đủ chỗ cho avatar — khi container
+                  chật, flex bóp img thành elip (bug 08/10). Vẫn đổi ngôn ngữ được
+                  trong PagesPanel của SiteNav (nút lưới trên header chung). */}
+              <div className="hidden sm:block">
+                <LangSwitch />
+              </div>
               {avatar ? (
                 <img
                   src={avatar}
                   alt={me.user.username}
-                  className="h-8 w-8 rounded-full ring-2 ring-primary/50"
+                  // shrink-0: không cho flex bóp avatar khi hàng chật.
+                  className="h-8 w-8 shrink-0 rounded-full ring-2 ring-primary/50"
                 />
               ) : (
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
                   {me.user.username.slice(0, 1).toUpperCase()}
                 </span>
               )}

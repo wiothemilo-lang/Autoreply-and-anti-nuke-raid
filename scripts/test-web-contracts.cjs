@@ -1780,6 +1780,39 @@ check(
   "hai lối mở loại trừ nhau (mở cái này thì cái kia đóng — không 2 bảng cùng lúc)",
   /protogon:pages-menu-open/.test(siteNavSrc) && /detail !== instanceId/.test(siteNavSrc),
 );
+// ── AVATAR NGƯỜI DÙNG KHÔNG ĐƯỢC BÓP TRÊN MOBILE (bug 08/10/2026) ──
+// Đo bằng Chromium thật: header mobile (logo + bảng chọn + 3 nút ngôn ngữ +
+// avatar) vượt container → flex bóp img avatar 32px xuống 22–25px (elip) và
+// tràn mép phải @320–360px. Hai luật chặn tái diễn:
+//   (1) img avatar + ô chữ cái PHẢI `shrink-0` (không cho flex co),
+//   (2) LangSwitch ẩn dưới sm ở header — vẫn đổi được ngôn ngữ vì PagesPanel
+//       của SiteNav có LangSwitch đầy đủ.
+const dashboardSrc = files.get("pages/Dashboard.tsx") ?? "";
+check(
+  "avatar header landing có shrink-0 (không bị bóp thành elip khi hàng chật)",
+  /h-8 w-8 shrink-0 rounded-full ring-2 ring-primary\/40/.test(landingNavSrc),
+);
+check(
+  "ô chữ cái thay avatar (landing) cũng shrink-0",
+  /flex h-8 w-8 shrink-0 items-center/.test(landingNavSrc),
+);
+check(
+  "avatar Dashboard có shrink-0",
+  /h-8 w-8 shrink-0 rounded-full ring-2 ring-primary\/50/.test(dashboardSrc) &&
+    /flex h-8 w-8 shrink-0 items-center/.test(dashboardSrc),
+);
+check(
+  "LangSwitch ẩn dưới sm ở header landing (giải phóng chỗ cho avatar @320–390px)",
+  /<div className="hidden sm:block">\s*<LangSwitch \/>/.test(landingNavSrc),
+);
+check(
+  "LangSwitch ẩn dưới sm ở header Dashboard (cùng lý do như landing)",
+  /<div className="hidden sm:block">\s*<LangSwitch \/>/.test(dashboardSrc),
+);
+check(
+  "PagesPanel vẫn có LangSwitch (mobile ẩn hẳn ngôn ngữ khỏi header nhưng vẫn đổi được)",
+  /<LangSwitch showIcon/.test(siteNavSrc),
+);
 // Trang đang mở phải tô đậm được: isNavItemActive phân biệt "/" (chỉ khớp
 // chính nó) với "/dashboard" (khớp cả "/dashboard/:guildId").
 const activeFn = navSrc.slice(navSrc.indexOf("export function isNavItemActive"));
