@@ -20,8 +20,10 @@
  */
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { getUserByToken } from "./auth";
+import { requireBotOwner } from "./hidden";
 import { hmacSha256Hex } from "./sha256";
 
 // ── Bảng giá — SERVER chốt; client chỉ gửi plan, không gửi số tiền ──────────
@@ -446,5 +448,230 @@ export const history = query({
       createdAt: p.createdAt,
       paidAt: p.paidAt,
     }));
+  },
+});
+
+// ── LUỒNG CHUYỂN KHOẢN TRỰC TIẾP (QR cá nhân — Plan A) ─────────────────────
+// Vì sao có luồng này: ZaloPay checkout cần appid/key1/key2 (chỉ chủ sở hữu
+// tổ chức cấp được); QR ví cá nhân thì không có webhook — nên "tiền về chưa"
+// do CHỦ BOT xác nhận sau khi so sao kê, và quyền lợi CHỈ được ghi qua
+// markPaidInternal (gốc duy nhất, idempotent) — client không bao giờ tự cấp
+// được Premium dù bấm bao nhiêu lần.
+
+/** Đơn QR chuyển khoản có hạn 24h (khác INTENT_TTL_MS 14 phút của ZaloPay). */
+export const TRANSFER_ORDER_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Kết quả tạo đơn — khai TƯỜNG MINH để phá vòng suy diễn type:
+ * `internal.payments.*` chứa typeof module này (gồm chính hàm dưới đây),
+ * nên để TS tự suy là lỗi TS7022/TS7023 (implicit any do vòng lẩn quẩn).
+ */
+type TransferIntentInfo = {
+  appTransId: string;
+  amount: number;
+  kind: PaymentKind;
+  plan: string;
+  createdAt: number;
+  paymentId: Id<"payments">;
+  discordId: string;
+};
+
+/**
+ * Tạo đơn chờ chuyển khoản cho người đã đăng nhập — giá vẫn CHẾT tại server
+ * (createIntentInternal: plan → amount, chặn spam, chặn mua gói thấp hơn).
+ * Khác startPayment: không gọi ZaloPay API nên không cần appid/key nào.
+ * Trả về mã đơn — dùng làm NỘI DUNG CHUYỂN KHOẢN đặc thù cho từng đơn.
+ */
+export const createTransferIntent = mutation({
+  args: {
+    token: v.string(),
+    kind: v.union(v.literal("donate"), v.literal("premium")),
+    plan: v.string(),
+    customAmount: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<TransferIntentInfo> => {
+    const intent: TransferIntentInfo = await ctx.runMutation(
+      internal.payments.createIntentInternal,
+      args,
+    );
+    return intent;
+  },
+});
+
+/**
+ * Khách bấm "Tôi đã chuyển khoản" — chuyển pending → reported.
+ * CHỈ báo cáo, KHÔNG cấp quyền lợi: quyền lợi chỉ đến khi chủ bot xác nhận
+ * (confirmTransfer → markPaidInternal). Idempotent với reported; quá 24h →
+ * đóng đơn thành expired kèm lý do rõ ràng.
+ */
+export const reportTransfer = mutation({
+  args: { token: v.string(), appTransId: v.string() },
+  handler: async (ctx, { token, appTransId }) => {
+    const user = await getUserByToken(ctx, token);
+    if (!user) throw new Error("Phiên đăng nhập không hợp lệ — hãy đăng nhập lại.");
+    const row = await ctx.db
+      .query("payments")
+      .withIndex("by_appTransId", (q) => q.eq("appTransId", appTransId))
+      .first();
+    if (!row || row.userId !== user._id) {
+      throw new Error("Không tìm thấy đơn chuyển khoản này.");
+    }
+    // Idempotent: bấm 2 lần hoặc F5 khi đang reported/paid không phá trạng thái.
+    if (row.status === "reported" || row.status === "paid") {
+      return { ok: true as const, status: row.status };
+    }
+    if (row.status !== "pending") {
+      throw new Error("Đơn này đã đóng — hãy tạo đơn mới.");
+    }
+    const now = Date.now();
+    if (now - row.createdAt > TRANSFER_ORDER_TTL_MS) {
+      await ctx.db.patch(row._id, { status: "expired", updatedAt: now });
+      throw new Error("Đơn đã quá hạn 24 giờ — hãy tạo đơn mới để có mã CK mới.");
+    }
+    await ctx.db.patch(row._id, { status: "reported", reportedAt: now, updatedAt: now });
+    return { ok: true as const, status: "reported" as const };
+  },
+});
+
+/** Trạng thái đơn CHUYỂN KHOẢN của người gọi — /premium vẽ trạng thái real-time. */
+export const orderStatus = query({
+  args: { token: v.string(), appTransId: v.string() },
+  handler: async (ctx, { token, appTransId }) => {
+    const user = await getUserByToken(ctx, token);
+    if (!user) return null;
+    const row = await ctx.db
+      .query("payments")
+      .withIndex("by_appTransId", (q) => q.eq("appTransId", appTransId))
+      .first();
+    if (!row || row.userId !== user._id) return null;
+    return {
+      status: row.status,
+      kind: row.kind,
+      plan: row.plan,
+      amount: row.amount,
+      createdAt: row.createdAt,
+      reportedAt: row.reportedAt,
+      paidAt: row.paidAt,
+    };
+  },
+});
+
+/**
+ * Danh sách đơn khách ĐÃ BÁO chuyển khoản, chờ chủ bot so sao kê — CHỈ chủ bot
+ * đọc được (requireBotOwner): doanh thu + xác nhận tiền là việc của chủ ví.
+ */
+export const listReportedOrders = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const user = await getUserByToken(ctx, token);
+    await requireBotOwner(ctx, user);
+    const rows = await ctx.db
+      .query("payments")
+      .withIndex("by_status_createdAt", (q) => q.eq("status", "reported"))
+      .order("desc")
+      .take(50);
+    return rows.map((r) => ({
+      appTransId: r.appTransId,
+      kind: r.kind,
+      plan: r.plan,
+      amount: r.amount,
+      discordId: r.discordId,
+      createdAt: r.createdAt,
+      reportedAt: r.reportedAt,
+    }));
+  },
+});
+
+/**
+ * Chủ bot xác nhận đã nhận tiền → gọi ĐÚNG markPaidInternal (gốc duy nhất ghi
+ * entitlement, idempotent). Chỉ đơn đã `reported` mới confirm được — không
+ * nhảy cóc từ pending, đúng quy trình khách phải báo trước.
+ */
+export const confirmTransfer = mutation({
+  args: { token: v.string(), appTransId: v.string() },
+  handler: async (ctx, { token, appTransId }) => {
+    const user = await getUserByToken(ctx, token);
+    await requireBotOwner(ctx, user);
+    const row = await ctx.db
+      .query("payments")
+      .withIndex("by_appTransId", (q) => q.eq("appTransId", appTransId))
+      .first();
+    if (!row) throw new Error("Không tìm thấy đơn chuyển khoản này.");
+    if (row.status === "paid") return { ok: true as const, alreadyPaid: true as const };
+    if (row.status !== "reported") {
+      throw new Error("Đơn chưa được khách báo đã chuyển khoản — không thể xác nhận.");
+    }
+    // amountPaid = amount của đơn (chủ bot đã so sao kê đúng số) → không lệch.
+    const res = await ctx.runMutation(internal.payments.markPaidInternal, {
+      appTransId,
+      amountPaid: row.amount,
+      source: "manual-transfer-confirm",
+    });
+    if (!res.ok) throw new Error("Xác nhận thất bại — đơn không tồn tại.");
+    return { ok: true as const, alreadyPaid: false as const };
+  },
+});
+
+/**
+ * Tổng doanh thu theo THÁNG (12 tháng gần nhất) và theo NĂM — chỉ chủ bot.
+ * Đếm đơn ĐÃ xác nhận (status=paid) của cả donate lẫn premium. Mốc thời gian
+ * quy về GMT+7 cho khớp ngày đối soát ngân hàng/ ví (xem buildAppTransId).
+ */
+export const revenueStats = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const user = await getUserByToken(ctx, token);
+    await requireBotOwner(ctx, user);
+    const rows = await ctx.db
+      .query("payments")
+      .withIndex("by_status_createdAt", (q) => q.eq("status", "paid"))
+      .order("desc")
+      .take(1000);
+
+    const VN_OFFSET_MS = 7 * 3600_000;
+    let total = 0;
+    let donateTotal = 0;
+    let premiumTotal = 0;
+    const monthMap = new Map<string, { total: number; count: number }>();
+    const yearMap = new Map<number, { total: number; count: number }>();
+    for (const r of rows) {
+      total += r.amount;
+      if (r.kind === "donate") donateTotal += r.amount;
+      else premiumTotal += r.amount;
+      const d = new Date((r.paidAt ?? r.createdAt) + VN_OFFSET_MS);
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const ym = `${y}-${m}`;
+      const mm = monthMap.get(ym) ?? { total: 0, count: 0 };
+      mm.total += r.amount;
+      mm.count += 1;
+      monthMap.set(ym, mm);
+      const yy = yearMap.get(y) ?? { total: 0, count: 0 };
+      yy.total += r.amount;
+      yy.count += 1;
+      yearMap.set(y, yy);
+    }
+    // 12 tháng gần nhất tính cả tháng TRỐNG (ô 0) — bảng không được nhảy cột.
+    const nowVn = Date.now() + VN_OFFSET_MS;
+    const months: { key: string; total: number; count: number }[] = [];
+    for (let k = 11; k >= 0; k--) {
+      // Lùi k tháng trên mốc GMT+7, neo về ngày1 để không trôi ngày tháng.
+      const base = new Date(nowVn);
+      base.setUTCMonth(base.getUTCMonth() - k, 1);
+      const key = `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}`;
+      const cell = monthMap.get(key) ?? { total: 0, count: 0 };
+      months.push({ key, total: cell.total, count: cell.count });
+    }
+    const years = [...yearMap.entries()]
+      .map(([year, v2]) => ({ year, total: v2.total, count: v2.count }))
+      .sort((a, b) => b.year - a.year);
+    return {
+      total,
+      count: rows.length,
+      donateTotal,
+      premiumTotal,
+      months,
+      years,
+    };
   },
 });

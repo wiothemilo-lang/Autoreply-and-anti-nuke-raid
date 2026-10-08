@@ -22,17 +22,24 @@ import {
   DONATE_TIERS_VND,
   PREMIUM_MONTH_MS,
   PREMIUM_PLAN_VND,
+  TRANSFER_ORDER_TTL_MS,
   applyEntitlement,
   buildAppTransId,
+  confirmTransfer,
   createIntentInternal,
   createOrderMacHex,
   createOrderMacInput,
+  createTransferIntent,
   dashboardOrigin,
   isEntitled,
+  listReportedOrders,
   markPaidInternal,
+  orderStatus,
   paymentDescription,
   queryOrderMacHex,
+  reportTransfer,
   resolveAmount,
+  revenueStats,
   verifyCallbackMacHex,
 } from "../convex/payments";
 import { hmacSha256Hex, sha256Hex } from "../convex/sha256";
@@ -330,6 +337,38 @@ function seed() {
     payments: [],
     entitlements: [],
   };
+  return tables;
+}
+
+/**
+ * Ctx cho mutation gọi `ctx.runMutation(internal.payments.*)` — định tuyến
+ * thẳng về handler thật trên CÙNG db giả, đúng như Convex chạy nội bộ. Thiếu
+ * `runMutation` thì `createTransferIntent`/`confirmTransfer` chết ngay.
+ */
+function makeCtxWithRun(tables: Record<string, Row[]>) {
+  const base: any = makeCtx(tables);
+  return {
+    db: base.db,
+    // Convex thật định tuyến theo FunctionReference; ở ctx giả reference là
+    // proxy rỗng (`_handler` không gọi được), nên phân biệt theo SHAPE args —
+    // đúng cách bộ test này đã làm cho recordErrorInternal. Shape lạ thì NÉM
+    // LỖI: một internal call mới không được âm thầm thành no-op rồi test xanh.
+    runMutation: async (_fn: any, args: any) => {
+      if (args && "token" in args) return createHandler(base, args);
+      if (args && "amountPaid" in args) return markHandler(base, args);
+      throw new Error(
+        `ctx giả chưa hỗ trợ runMutation với args: ${JSON.stringify(Object.keys(args ?? {}))}`,
+      );
+    },
+  } as any;
+}
+
+/** Bảng đủ cho luồng CK: thêm `botStatus` để `requireBotOwner` chạy được. */
+function seedTransfer() {
+  const tables = seed();
+  tables.botStatus = [
+    { _id: "bot1", kind: "status", ownerDiscordId: "123456789012345678", teamAdminDiscordIds: [] },
+  ];
   return tables;
 }
 
@@ -681,6 +720,336 @@ const run = async () => {
     } finally {
       restoreEnv();
     }
+  }
+
+  // ── 7. Plan A — chuyển khoản ngân hàng ───────────────────────────────────
+  // Tiền về ví cá nhân, KHÔNG có webhook: quyền lợi chỉ được ghi khi chủ bot
+  // so sao kê rồi xác nhận. Vì vậy mọi nhánh ở đây đều là "ai được cấp quyền":
+  //   · khách tự báo (reportTransfer) TUYỆT ĐỐI không được cấp quyền;
+  //   · chủ bot xác nhận (confirmTransfer) phải đi qua markPaidInternal — gốc
+  //     duy nhất, idempotent — và chỉ đơn đã `reported` mới xác nhận được.
+  console.log("── Plan A: chuyển khoản ngân hàng (ctx giả) ──");
+  const createTransferH = (createTransferIntent as any)._handler;
+  const reportH = (reportTransfer as any)._handler;
+  const confirmH = (confirmTransfer as any)._handler;
+  const statusH = (orderStatus as any)._handler;
+  const listReportedH = (listReportedOrders as any)._handler;
+  const revenueH = (revenueStats as any)._handler;
+  check(
+    "lấy được handler Plan A từ mutation/query Convex",
+    [createTransferH, reportH, confirmH, statusH, listReportedH, revenueH].every(
+      (h) => typeof h === "function",
+    ),
+  );
+
+  /** Đơn CK giả đã nằm trong bảng payments. */
+  const transferRow = (over: Row = {}): Row => ({
+    _id: "p_ck",
+    userId: "u1",
+    discordId: "123456789012345678",
+    kind: "premium",
+    plan: "supporter",
+    amount: 49_000,
+    appTransId: "261008_ck1",
+    status: "pending",
+    createdAt: Date.now(),
+    ...over,
+  });
+
+  // Tạo đơn CK: giá server chốt, KHÔNG cấp quyền lợi
+  {
+    const tables = seedTransfer();
+    const intent = await createTransferH(makeCtxWithRun(tables), {
+      token: "tok-good",
+      kind: "premium",
+      plan: "supporter",
+    });
+    const row = tables.payments[0];
+    check(
+      "đơn CK: pending + giá server chốt + mã đơn có tiền tố ngày GMT+7",
+      row?.status === "pending" &&
+        row.amount === PREMIUM_PLAN_VND.supporter &&
+        /^\d{6}_/.test(String(row.appTransId)),
+      { row, intent },
+    );
+    check("đơn CK chưa sinh quyền lợi nào", tables.entitlements.length === 0);
+    check("trả mã đơn cho khách (nội dung chuyển khoản)", intent.appTransId === row.appTransId);
+    await expectThrows(
+      "phiên sai → không tạo được đơn CK",
+      () =>
+        createTransferH(makeCtxWithRun(seedTransfer()), {
+          token: "tok-sai",
+          kind: "premium",
+          plan: "supporter",
+        }),
+      "Phiên đăng nhập không hợp lệ",
+    );
+    await expectThrows(
+      "mệnh giá client gửi bị chặn (giá chết tại server)",
+      () =>
+        createTransferH(makeCtxWithRun(seedTransfer()), {
+          token: "tok-good",
+          kind: "donate",
+          plan: "12345",
+        }),
+      "không hợp lệ",
+    );
+  }
+
+  // reportTransfer: chỉ BÁO, không cấp quyền + idempotent + hết hạn 24h
+  {
+    const tables = seedTransfer();
+    tables.payments.push(transferRow());
+    const ctx = makeCtxWithRun(tables);
+    const res = await reportH(ctx, { token: "tok-good", appTransId: "261008_ck1" });
+    check(
+      "khách báo CK → reported + có mốc reportedAt",
+      res.ok === true &&
+        tables.payments[0].status === "reported" &&
+        typeof tables.payments[0].reportedAt === "number",
+      tables.payments[0],
+    );
+    check("báo CK KHÔNG cấp quyền lợi (chờ chủ bot so sao kê)", tables.entitlements.length === 0);
+    const again = await reportH(ctx, { token: "tok-good", appTransId: "261008_ck1" });
+    check(
+      "báo lần 2 khi đang reported: idempotent, giữ nguyên mốc cũ",
+      again.ok === true && again.status === "reported",
+      again,
+    );
+    await expectThrows(
+      "đơn của người khác → không báo được",
+      () => reportH(ctx, { token: "tok-sai", appTransId: "261008_ck1" }),
+      "không hợp lệ",
+    );
+    await expectThrows(
+      "đơn không tồn tại → báo lỗi rõ ràng",
+      () => reportH(ctx, { token: "tok-good", appTransId: "khong-co" }),
+      "Không tìm thấy",
+    );
+
+    const stale = seedTransfer();
+    stale.payments.push(transferRow({ createdAt: Date.now() - TRANSFER_ORDER_TTL_MS - 1000 }));
+    await expectThrows(
+      "quá 24h chưa chuyển → đơn đóng thành expired + báo tạo đơn mới",
+      () => reportH(makeCtxWithRun(stale), { token: "tok-good", appTransId: "261008_ck1" }),
+      "quá hạn 24 giờ",
+    );
+    check(
+      "đơn quá hạn được đóng (expired), không nằm chờ xác nhận",
+      stale.payments[0].status === "expired",
+    );
+
+    const paidRow = seedTransfer();
+    paidRow.payments.push(transferRow({ status: "paid" }));
+    const onPaid = await reportH(makeCtxWithRun(paidRow), {
+      token: "tok-good",
+      appTransId: "261008_ck1",
+    });
+    check("đơn đã paid: báo lại vẫn ok, không hạ trạng thái", onPaid.status === "paid");
+  }
+
+  // confirmTransfer: chỉ chủ bot, chỉ đơn đã reported, đi qua markPaidInternal
+  {
+    const tables = seedTransfer();
+    tables.payments.push(transferRow({ status: "reported", reportedAt: Date.now() }));
+    const ctx = makeCtxWithRun(tables);
+    const res = await confirmH(ctx, { token: "tok-good", appTransId: "261008_ck1" });
+    const ent = tables.entitlements[0];
+    check(
+      "chủ bot xác nhận → paid + ghi entitlement đúng gói/hạn",
+      res.ok === true &&
+        res.alreadyPaid === false &&
+        tables.payments[0].status === "paid" &&
+        ent?.plan === "supporter" &&
+        Math.abs(ent.expiresAt - (Date.now() + PREMIUM_MONTH_MS)) < 5_000,
+      { res, ent },
+    );
+    const expAfter = tables.entitlements[0].expiresAt;
+    const again = await confirmH(ctx, { token: "tok-good", appTransId: "261008_ck1" });
+    check(
+      "xác nhận lần 2: alreadyPaid, KHÔNG cộng dồn thêm hạn",
+      again.alreadyPaid === true && tables.entitlements[0].expiresAt === expAfter,
+      again,
+    );
+
+    const pending = seedTransfer();
+    pending.payments.push(transferRow());
+    await expectThrows(
+      "đơn CHƯA được khách báo → chủ bot cũng không xác nhận được (chống nhảy cóc)",
+      () => confirmH(makeCtxWithRun(pending), { token: "tok-good", appTransId: "261008_ck1" }),
+      "chưa được khách báo",
+    );
+
+    const stranger = seedTransfer();
+    stranger.payments.push(transferRow({ status: "reported", reportedAt: Date.now() }));
+    stranger.users.push({ _id: "u2", discordId: "999999999999999999", username: "stranger" });
+    stranger.sessions.push({
+      _id: "s2",
+      token: "tok-stranger",
+      userId: "u2",
+      createdAt: Date.now(),
+      authVersion: CURRENT_SESSION_AUTH_VERSION,
+    });
+    await expectThrows(
+      "người khác (không phải chủ bot) → không xác nhận được",
+      () => confirmH(makeCtxWithRun(stranger), { token: "tok-stranger", appTransId: "261008_ck1" }),
+      "Chỉ admin sở hữu bot",
+    );
+    check("người ngoài không đổi được trạng thái đơn", stranger.payments[0].status === "reported");
+  }
+
+  // listReportedOrders: chỉ chủ bot, chỉ đơn reported, không rò field nội bộ
+  {
+    const tables = seedTransfer();
+    tables.payments.push(
+      transferRow({ _id: "p_a", appTransId: "261008_a", status: "reported", reportedAt: 1 }),
+      transferRow({ _id: "p_b", appTransId: "261008_b", status: "pending" }),
+      transferRow({ _id: "p_c", appTransId: "261008_c", status: "paid", paidAt: 2 }),
+      transferRow({
+        _id: "p_d",
+        appTransId: "261008_d",
+        status: "reported",
+        reportedAt: 3,
+        error: "zp create: timeout",
+        zpTransId: "999",
+      }),
+    );
+    const rows = await listReportedH(makeCtxWithRun(tables), { token: "tok-good" });
+    check(
+      "chỉ trả đơn đã báo — pending/paid không lọt vào hàng chờ",
+      Array.isArray(rows) &&
+        rows.length === 2 &&
+        rows.every((r: any) => r.appTransId === "261008_a" || r.appTransId === "261008_d"),
+      rows,
+    );
+    const leaked = JSON.stringify(rows).match(/error|zpTransId|userId|"token"/);
+    check("không rò field nội bộ (error/zpTransId/userId/token)", leaked === null, leaked?.[0]);
+    check(
+      "đơn chờ có đủ dữ liệu để so sao kê (kind/plan/amount/discordId/reportedAt)",
+      ["kind", "plan", "amount", "discordId", "reportedAt"].every((f) => f in (rows[0] as any)),
+      rows[0],
+    );
+    check("đơn báo sau được xếp trước (mới nhất lên đầu)", rows[1].appTransId === "261008_d");
+    await expectThrows(
+      "không phải chủ bot → không đọc được hàng chờ",
+      () => listReportedH(makeCtxWithRun(seedTransfer()), { token: "tok-sai" }),
+      "Vui lòng đăng nhập",
+    );
+  }
+
+  // revenueStats: chỉ tính tiền ĐÃ xác nhận, tách donate/premium, mốc GMT+7
+  {
+    const tables = seedTransfer();
+    const now = Date.now();
+    const vn = new Date(now + 7 * 3600_000);
+    const ym = `${vn.getUTCFullYear()}-${String(vn.getUTCMonth() + 1).padStart(2, "0")}`;
+    tables.payments.push(
+      transferRow({
+        _id: "r1",
+        kind: "donate",
+        plan: "100000",
+        amount: 100_000,
+        status: "paid",
+        paidAt: now,
+      }),
+      transferRow({
+        _id: "r2",
+        kind: "premium",
+        plan: "supporter",
+        amount: 49_000,
+        status: "paid",
+        paidAt: now,
+      }),
+      transferRow({ _id: "r3", kind: "donate", plan: "50000", amount: 50_000, status: "pending" }),
+      transferRow({
+        _id: "r4",
+        kind: "donate",
+        plan: "300000",
+        amount: 300_000,
+        status: "reported",
+        reportedAt: now,
+      }),
+      transferRow({
+        _id: "r5",
+        kind: "donate",
+        plan: "100000",
+        amount: 100_000,
+        status: "paid",
+        paidAt: Date.UTC(2024, 0, 15),
+      }),
+    );
+    const stats = await revenueH(makeCtxWithRun(tables), { token: "tok-good" });
+    check(
+      "tổng doanh thu chỉ đếm đơn ĐÃ xác nhận (pending/reported KHÔNG tính)",
+      stats.total === 249_000 && stats.count === 3,
+      stats,
+    );
+    check(
+      "tách đúng mua premium / ủng hộ",
+      stats.donateTotal === 200_000 && stats.premiumTotal === 49_000,
+      stats,
+    );
+    check(
+      "12 ô tháng liên tiếp, tháng hiện tại đúng số của tháng này",
+      stats.months.length === 12 &&
+        stats.months[11].key === ym &&
+        stats.months[11].total === 149_000 &&
+        stats.months[11].count === 2,
+      stats.months,
+    );
+    check(
+      "ô tháng TRỐNG vẫn hiện với 0 (bảng không nhảy cột)",
+      stats.months.slice(0, 11).every((m: any) => m.total === 0 && m.count === 0),
+      stats.months,
+    );
+    check(
+      "doanh thu theo năm: 2024 + năm nay, đơn cũ vào đúng năm",
+      stats.years.length === 2 &&
+        stats.years[1].year === 2024 &&
+        stats.years[1].total === 100_000 &&
+        stats.years[0].total === 149_000,
+      stats.years,
+    );
+    await expectThrows(
+      "không phải chủ bot → không đọc được doanh thu",
+      () => revenueH(makeCtxWithRun(seedTransfer()), { token: "tok-sai" }),
+      "Vui lòng đăng nhập",
+    );
+  }
+
+  // orderStatus: khách tự theo dõi đơn của MÌNH (poll sau khi báo CK)
+  {
+    const tables = seedTransfer();
+    tables.payments.push(transferRow({ status: "reported", reportedAt: 12345 }));
+    const mine = await statusH(makeCtxWithRun(tables), {
+      token: "tok-good",
+      appTransId: "261008_ck1",
+    });
+    check(
+      "chủ đơn đọc được trạng thái + mốc báo (để poll)",
+      mine?.status === "reported" && mine?.reportedAt === 12345 && mine?.amount === 49_000,
+      mine,
+    );
+    const guest = await statusH(makeCtxWithRun(tables), {
+      token: "tok-sai",
+      appTransId: "261008_ck1",
+    });
+    check("chưa đăng nhập → null (không lộ đơn)", guest === null);
+    const other = seedTransfer();
+    other.payments.push(transferRow({ status: "reported", reportedAt: 1 }));
+    other.users.push({ _id: "u3", discordId: "888888888888888888", username: "other" });
+    other.sessions.push({
+      _id: "s3",
+      token: "tok-other",
+      userId: "u3",
+      createdAt: Date.now(),
+      authVersion: CURRENT_SESSION_AUTH_VERSION,
+    });
+    const notMine = await statusH(makeCtxWithRun(other), {
+      token: "tok-other",
+      appTransId: "261008_ck1",
+    });
+    check("người khác đọc cùng mã đơn → null", notMine === null);
   }
 
   console.log(`\n${pass}/${pass + fail} assertion xanh`);

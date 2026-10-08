@@ -709,4 +709,82 @@ export const EN_PANELS: Record<string, string> = {
   "Bot dựng lại cấu trúc theo backup (kênh đúng thứ tự, kèm role và emoji/sticker nếu backup có) rồi phục hồi tin nhắn cùng media (ảnh/video…), theo đúng Tùy chỉnh khôi phục bên dưới. Các role/kênh đang có của server này được giữ nguyên.":
     "The bot rebuilds the structure from the backup (channels in the right order, plus roles and emoji/stickers when the backup has them) and then restores messages with their media (images/videos…), following the Restore options below. Roles and channels already on this server stay untouched.",
   "Tùy chỉnh đang áp dụng: {p0}.": "Options in effect: {p0}.",
+
+  // ── Plan A — mua bằng chuyển khoản ngân hàng (Premium + Admin) ──────────
+  "Chuyển khoản để mua": "Pay by bank transfer",
+  "Chuyển khoản mua gói Premium": "Bank transfer to buy Premium",
+  "Thanh toán một lần qua chuyển khoản — không tự động gia hạn":
+    "One-time bank transfer payment — no automatic renewal",
+  "Quét mã QR để chuyển khoản": "Scan the QR code to transfer",
+  "Số tiền": "Amount",
+  "Nội dung chuyển khoản (bắt buộc)": "Transfer reference (required)",
+  "SĐT nhận tiền": "Recipient phone number",
+  "Mã QR nhận chuyển khoản của NGUYEN DUY KHIEM": "QR code for transfers to NGUYEN DUY KHIEM",
+  "Đã sao chép": "Copied",
+  "Bước 1: Mở app ngân hàng hoặc ví điện tử, quét mã QR bên phải.":
+    "Step 1: Open your banking app or e-wallet and scan the QR code on the right.",
+  "Bước 2: Chuyển đúng SỐ TIỀN và gõ đúng NỘI DUNG ở trên.":
+    "Step 2: Transfer the exact AMOUNT and enter the exact REFERENCE above.",
+  'Bước 3: Bấm nút "Tôi đã chuyển khoản" và chờ xác nhận.':
+    'Step 3: Tap "I have transferred" and wait for confirmation.',
+  "đang tải trạng thái…": "loading status…",
+  "Đang tạo mã chuyển khoản…": "Creating transfer code…",
+  "Tôi đã chuyển khoản": "I have transferred",
+  "Đóng hướng dẫn": "Close instructions",
+  "Bấm sau khi bạn ĐÃ chuyển xong — chủ bot so sao kê rồi kích hoạt gói.":
+    "Tap this after you HAVE transferred — the bot owner checks the statement and activates your plan.",
+  "Đã báo chuyển khoản — chờ chủ bot xác nhận":
+    "Transfer reported — waiting for the bot owner to confirm",
+  "Thanh toán thành công": "Payment successful",
+  "Gói {goi} đã được kích hoạt — dùng tới {ngay}": "Your {goi} plan is active — valid until {ngay}",
+  "Gói của bạn đã được kích hoạt. Cảm ơn bạn đã ủng hộ!":
+    "Your plan is now active. Thank you for your support!",
+  "Không tạo được mã chuyển khoản — thử lại sau ít phút.":
+    "Could not create the transfer code — please try again in a few minutes.",
+  "Không báo được trạng thái — thử lại sau.":
+    "Could not report the status — please try again later.",
+  "Đơn này đã hết hạn hoặc bị đóng — hãy tạo mã chuyển khoản mới.":
+    "This order expired or was closed — create a new transfer code.",
+  "Gói được kích hoạt chậm nhất 24 giờ sau khi xác nhận đã nhận tiền (thường là ngay lập tức).":
+    "Your plan is activated within 24 hours of the payment being confirmed (usually immediately).",
+  "Quá 24 giờ chưa kích hoạt? Báo tại Discord kèm mã đơn {ma}.":
+    "Not activated after 24 hours? Report it on Discord with the order code {ma}.",
+  "Chính sách mua bán & cam kết dịch vụ": "Purchase policy & service commitment",
+  "Gói Premium có hiệu lực 30 ngày kể từ khi thanh toán được xác nhận. Mỗi lần mua là một giao dịch riêng, không tự động gia hạn và không lưu thông tin thẻ hay tài khoản ngân hàng của bạn.":
+    "A Premium plan is valid for 30 days from the moment the payment is confirmed. Each purchase is a separate transaction, it never renews automatically, and we do not store your card or bank account details.",
+  "Thời gian kích hoạt — chậm nhất 24 giờ:": "Activation time — at most 24 hours:",
+  "thường là ngay sau khi chủ bot xác nhận đã nhận tiền; trong mọi trường hợp gói được kích hoạt chậm nhất 24 giờ kể từ thời điểm đó.":
+    "usually right after the bot owner confirms the payment was received; in every case the plan is activated within 24 hours of that moment.",
+  "Quá 24 giờ thì sao:": "What if it takes longer than 24 hours:",
+  "nếu quá 24 giờ chưa được kích hoạt, hãy báo tại Discord của chủ bot kèm MÃ ĐƠN (nội dung chuyển khoản). Khiếu nại được xử lý trong 24 giờ tiếp theo; nếu vẫn không kích hoạt được vì lỗi từ phía dịch vụ, bạn được HOÀN 100% số tiền đã chuyển.":
+    "if it is still not activated after 24 hours, report it on the bot owner's Discord with your ORDER CODE (the transfer reference). Complaints are handled within the next 24 hours; if it still cannot be activated because of a fault on our side, you receive a 100% REFUND of the amount you transferred.",
+  "Hoàn tiền:": "Refunds:",
+  "hoàn 100% trong 7 ngày kể từ khi xác nhận nếu lỗi phát sinh từ phía dịch vụ khiến bạn không dùng được gói (không kích hoạt, lỗi kéo dài không khắc phục được). Dịch vụ là phần mềm phi vật thể nên không áp dụng đổi trả hàng hóa; khiếu nại xử lý theo hướng hoàn tiền hoặc kích hoạt lại, do bạn chọn.":
+    "a 100% refund within 7 days of confirmation if the fault is on the service side and keeps you from using the plan (no activation, a lasting failure that cannot be fixed). The service is intangible software, so goods returns do not apply; complaints are resolved either by refund or by re-activation, your choice.",
+  "Thanh toán an toàn:": "Safe payment:",
+  "chỉ quét mã QR do trang này hiển thị và kiểm tra đúng chủ ví NGUYEN DUY KHIEM trước khi chuyển. Chủ bot KHÔNG BAO GIỜ yêu cầu bạn cung cấp mật khẩu ví, mã OTP hay thông tin thẻ.":
+    "only scan the QR code shown on this page and check that the wallet owner really is NGUYEN DUY KHIEM before transferring. The bot owner NEVER asks you for your wallet password, OTP code or card details.",
+  "Cơ sở pháp lý:": "Legal basis:",
+  "giao dịch được lập bằng hình thức điện tử theo Bộ luật Dân sự 2015 (Điều 119); quyền lợi người tiêu dùng theo Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15; mua bán qua trang mạng theo Luật Thương mại điện tử số 51/2005/QH11 (sửa đổi, bổ sung). Khiếu nại gửi qua Discord của chủ bot và được phản hồi trong 48 giờ.":
+    "the transaction is made in electronic form under the 2015 Civil Code (Article 119); consumer rights under the Law on Protection of Consumer Rights No. 19/2023/QH15; online sales under the Law on E-Commerce No. 51/2005/QH11 (as amended). Complaints are sent via the bot owner's Discord and answered within 48 hours.",
+  "Bằng việc bấm mua, bạn xác nhận đã đọc chính sách này. Thanh toán là giao dịch giữa bạn và chủ ví được nêu trên — Protogon chỉ lưu mã đơn và trạng thái để kích hoạt gói.":
+    "By clicking buy you confirm that you have read this policy. The payment is a transaction between you and the wallet owner named above — Protogon only stores the order code and status in order to activate the plan.",
+
+  // ── Admin: đơn chờ xác nhận + tổng doanh thu ────────────────────────────
+  "Đơn chuyển khoản chờ xác nhận": "Bank transfers awaiting confirmation",
+  "Hiện không có đơn nào chờ xác nhận.": "No orders are awaiting confirmation right now.",
+  "Mua premium": "Premium purchase",
+  Gói: "Plan",
+  "báo lúc": "reported at",
+  "Đã nhận tiền → kích hoạt": "Payment received → activate",
+  "Đã nhận tiền và kích hoạt gói.": "Payment received — plan activated.",
+  "Tổng doanh thu theo tháng / năm": "Total revenue by month / year",
+  "tổng cộng": "total",
+  "giao dịch": "transactions",
+  "Theo tháng": "By month",
+  Tháng: "Month",
+  "Số GD": "Orders",
+  "Doanh thu": "Revenue",
+  "Chưa có giao dịch.": "No transactions yet.",
+  "Theo năm": "By year",
 };

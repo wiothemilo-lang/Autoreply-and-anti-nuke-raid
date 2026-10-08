@@ -782,4 +782,82 @@ export const DE_PANELS: Record<string, string> = {
   "Khiếu nại": "Beschwerde",
   "Hỗ trợ chung": "Allgemeiner Support",
   "Ticket & Khiếu nại": "Tickets & Beschwerden",
+
+  // ── Plan A — mua bằng chuyển khoản ngân hàng (Premium + Admin) ──────────
+  "Chuyển khoản để mua": "Per Überweisung kaufen",
+  "Chuyển khoản mua gói Premium": "Überweisung für den Premium-Tarif",
+  "Thanh toán một lần qua chuyển khoản — không tự động gia hạn":
+    "Einmalige Zahlung per Überweisung – keine automatische Verlängerung",
+  "Quét mã QR để chuyển khoản": "QR-Code zum Überweisen scannen",
+  "Số tiền": "Betrag",
+  "Nội dung chuyển khoản (bắt buộc)": "Verwendungszweck (erforderlich)",
+  "SĐT nhận tiền": "Empfänger-Telefonnummer",
+  "Mã QR nhận chuyển khoản của NGUYEN DUY KHIEM": "QR-Code für Überweisungen an NGUYEN DUY KHIEM",
+  "Đã sao chép": "Kopiert",
+  "Bước 1: Mở app ngân hàng hoặc ví điện tử, quét mã QR bên phải.":
+    "Schritt 1: Öffne deine Banking-App oder dein Wallet und scanne den QR-Code rechts.",
+  "Bước 2: Chuyển đúng SỐ TIỀN và gõ đúng NỘI DUNG ở trên.":
+    "Schritt 2: Überweise den exakten BETRAG und gib den exakten VERWENDUNGSZWECK von oben an.",
+  'Bước 3: Bấm nút "Tôi đã chuyển khoản" và chờ xác nhận.':
+    "Schritt 3: Tippe auf „Ich habe überwiesen“ und warte auf die Bestätigung.",
+  "đang tải trạng thái…": "Status wird geladen…",
+  "Đang tạo mã chuyển khoản…": "Überweisungscode wird erstellt…",
+  "Tôi đã chuyển khoản": "Ich habe überwiesen",
+  "Đóng hướng dẫn": "Anleitung schließen",
+  "Bấm sau khi bạn ĐÃ chuyển xong — chủ bot so sao kê rồi kích hoạt gói.":
+    "Tippe erst darauf, nachdem du überwiesen hast – der Bot-Besitzer prüft den Kontoauszug und aktiviert den Tarif.",
+  "Đã báo chuyển khoản — chờ chủ bot xác nhận":
+    "Überweisung gemeldet – wartet auf Bestätigung durch den Bot-Besitzer",
+  "Thanh toán thành công": "Zahlung erfolgreich",
+  "Gói {goi} đã được kích hoạt — dùng tới {ngay}": "Dein Tarif {goi} ist aktiv – gültig bis {ngay}",
+  "Gói của bạn đã được kích hoạt. Cảm ơn bạn đã ủng hộ!":
+    "Dein Tarif ist jetzt aktiv. Danke für deine Unterstützung!",
+  "Không tạo được mã chuyển khoản — thử lại sau ít phút.":
+    "Überweisungscode konnte nicht erstellt werden – bitte in einigen Minuten erneut versuchen.",
+  "Không báo được trạng thái — thử lại sau.":
+    "Status konnte nicht gemeldet werden – bitte später erneut versuchen.",
+  "Đơn này đã hết hạn hoặc bị đóng — hãy tạo mã chuyển khoản mới.":
+    "Diese Bestellung ist abgelaufen oder geschlossen – erstelle einen neuen Überweisungscode.",
+  "Gói được kích hoạt chậm nhất 24 giờ sau khi xác nhận đã nhận tiền (thường là ngay lập tức).":
+    "Der Tarif wird spätestens 24 Stunden nach Bestätigung des Zahlungseingangs aktiviert (meist sofort).",
+  "Quá 24 giờ chưa kích hoạt? Báo tại Discord kèm mã đơn {ma}.":
+    "Nach 24 Stunden noch nicht aktiviert? Melde es auf Discord mit dem Bestellcode {ma}.",
+  "Chính sách mua bán & cam kết dịch vụ": "Kaufbedingungen & Service-Zusage",
+  "Gói Premium có hiệu lực 30 ngày kể từ khi thanh toán được xác nhận. Mỗi lần mua là một giao dịch riêng, không tự động gia hạn và không lưu thông tin thẻ hay tài khoản ngân hàng của bạn.":
+    "Ein Premium-Tarif gilt 30 Tage ab Bestätigung der Zahlung. Jeder Kauf ist eine eigene Transaktion, er verlängert sich nicht automatisch, und wir speichern weder Karten- noch Kontodaten.",
+  "Thời gian kích hoạt — chậm nhất 24 giờ:": "Aktivierungszeit – höchstens 24 Stunden:",
+  "thường là ngay sau khi chủ bot xác nhận đã nhận tiền; trong mọi trường hợp gói được kích hoạt chậm nhất 24 giờ kể từ thời điểm đó.":
+    "meist direkt nachdem der Bot-Besitzer den Zahlungseingang bestätigt hat; in jedem Fall wird der Tarif innerhalb von 24 Stunden danach aktiviert.",
+  "Quá 24 giờ thì sao:": "Was passiert nach mehr als 24 Stunden:",
+  "nếu quá 24 giờ chưa được kích hoạt, hãy báo tại Discord của chủ bot kèm MÃ ĐƠN (nội dung chuyển khoản). Khiếu nại được xử lý trong 24 giờ tiếp theo; nếu vẫn không kích hoạt được vì lỗi từ phía dịch vụ, bạn được HOÀN 100% số tiền đã chuyển.":
+    "wenn nach 24 Stunden noch nichts aktiviert ist, melde es auf dem Discord des Bot-Besitzers mit dem BESTELLCODE (Verwendungszweck). Beschwerden werden innerhalb der nächsten 24 Stunden bearbeitet; lässt sich der Tarif weiterhin nicht aktivieren, weil der Fehler bei uns liegt, erhältst du 100 % des überwiesenen Betrags zurück.",
+  "Hoàn tiền:": "Rückerstattung:",
+  "hoàn 100% trong 7 ngày kể từ khi xác nhận nếu lỗi phát sinh từ phía dịch vụ khiến bạn không dùng được gói (không kích hoạt, lỗi kéo dài không khắc phục được). Dịch vụ là phần mềm phi vật thể nên không áp dụng đổi trả hàng hóa; khiếu nại xử lý theo hướng hoàn tiền hoặc kích hoạt lại, do bạn chọn.":
+    "100 % Rückerstattung innerhalb von 7 Tagen nach Bestätigung, wenn der Fehler bei unserem Dienst liegt und du den Tarif nicht nutzen kannst (keine Aktivierung, anhaltender nicht behebbarer Fehler). Der Dienst ist immaterielle Software, ein Warenumtausch gilt daher nicht; Beschwerden werden per Rückerstattung oder erneuter Aktivierung gelöst – du entscheidest.",
+  "Thanh toán an toàn:": "Sichere Zahlung:",
+  "chỉ quét mã QR do trang này hiển thị và kiểm tra đúng chủ ví NGUYEN DUY KHIEM trước khi chuyển. Chủ bot KHÔNG BAO GIỜ yêu cầu bạn cung cấp mật khẩu ví, mã OTP hay thông tin thẻ.":
+    "scanne nur den auf dieser Seite angezeigten QR-Code und prüfe vor der Überweisung, dass der Wallet-Inhaber wirklich NGUYEN DUY KHIEM ist. Der Bot-Besitzer fragt dich NIEMALS nach Wallet-Passwort, OTP-Code oder Kartendaten.",
+  "Cơ sở pháp lý:": "Rechtsgrundlage:",
+  "giao dịch được lập bằng hình thức điện tử theo Bộ luật Dân sự 2015 (Điều 119); quyền lợi người tiêu dùng theo Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15; mua bán qua trang mạng theo Luật Thương mại điện tử số 51/2005/QH11 (sửa đổi, bổ sung). Khiếu nại gửi qua Discord của chủ bot và được phản hồi trong 48 giờ.":
+    "die Transaktion erfolgt in elektronischer Form nach dem Zivilgesetzbuch 2015 (Artikel 119); Verbraucherrechte nach dem Gesetz zum Schutz der Verbraucherrechte Nr. 19/2023/QH15; Online-Verkauf nach dem E-Commerce-Gesetz Nr. 51/2005/QH11 (geändert). Beschwerden gehen über den Discord des Bot-Besitzers ein und werden innerhalb von 48 Stunden beantwortet.",
+  "Bằng việc bấm mua, bạn xác nhận đã đọc chính sách này. Thanh toán là giao dịch giữa bạn và chủ ví được nêu trên — Protogon chỉ lưu mã đơn và trạng thái để kích hoạt gói.":
+    "Mit dem Kauf bestätigst du, diese Bedingungen gelesen zu haben. Die Zahlung ist eine Transaktion zwischen dir und dem oben genannten Wallet-Inhaber – Protogon speichert nur Bestellcode und Status, um den Tarif zu aktivieren.",
+
+  // ── Admin: đơn chờ xác nhận + tổng doanh thu ────────────────────────────
+  "Đơn chuyển khoản chờ xác nhận": "Überweisungen warten auf Bestätigung",
+  "Hiện không có đơn nào chờ xác nhận.": "Derzeit warten keine Bestellungen auf Bestätigung.",
+  "Mua premium": "Premium-Kauf",
+  Gói: "Tarif",
+  "báo lúc": "gemeldet um",
+  "Đã nhận tiền → kích hoạt": "Geld erhalten → aktivieren",
+  "Đã nhận tiền và kích hoạt gói.": "Zahlung erhalten – Tarif aktiviert.",
+  "Tổng doanh thu theo tháng / năm": "Gesamtumsatz nach Monat / Jahr",
+  "tổng cộng": "insgesamt",
+  "giao dịch": "Transaktionen",
+  "Theo tháng": "Nach Monat",
+  Tháng: "Monat",
+  "Số GD": "Bestellungen",
+  "Doanh thu": "Umsatz",
+  "Chưa có giao dịch.": "Noch keine Transaktionen.",
+  "Theo năm": "Nach Jahr",
 };

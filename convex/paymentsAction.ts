@@ -56,7 +56,7 @@ type OrderConfig = { appId: string; key1: string; baseUrl: string };
  */
 type StartPaymentResult = { paymentUrl: string; appTransId: string; amount: number };
 type QueryOrderResult = {
-  status: "pending" | "paid" | "failed" | "expired";
+  status: "pending" | "reported" | "paid" | "failed" | "expired";
   kind: "donate" | "premium";
   plan: string;
   amount: number;
@@ -77,7 +77,7 @@ type OwnedOrder = {
   amount: number;
   kind: "donate" | "premium";
   plan: string;
-  status: "pending" | "paid" | "failed" | "expired";
+  status: "pending" | "reported" | "paid" | "failed" | "expired";
   createdAt: number;
 };
 

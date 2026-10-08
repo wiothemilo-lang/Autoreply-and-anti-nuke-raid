@@ -6,6 +6,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  Banknote,
   BrainCircuit,
   Bug,
   Gauge,
@@ -13,6 +14,7 @@ import {
   ListChecks,
   Loader2,
   Play,
+  Receipt,
   Server,
   ShieldCheck,
   Trash2,
@@ -40,6 +42,14 @@ function AdminContent() {
   // Danh sách quản trị viên nhóm chỉ chủ bot đọc được (query tự guard).
   const teamAdmins = useQuery(api.hidden.getTeamAdmins, isOwner ? { token } : "skip");
   const saveTeamAdmins = useMutation(api.hidden.setTeamAdmins);
+
+  // Plan A — chuyển khoản thủ công: danh sách đơn chờ xác nhận + tổng doanh
+  // thu theo tháng/năm. Cả hai query đều SKIP khi chưa phải chủ sở hữu.
+  const reportedOrders = useQuery(api.payments.listReportedOrders, isOwner ? { token } : "skip");
+  const revenue = useQuery(api.payments.revenueStats, isOwner ? { token } : "skip");
+  const confirmTransfer = useMutation(api.payments.confirmTransfer);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [transferMsg, setTransferMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const { status, latency, avg, incidents, lastUpdate, nextUpdate, refresh } = useBotMonitor(60000);
   const threat = useQuery(api.threatIntel.getSettings, { token });
   const researchHistory = useQuery(api.threatIntel.getResearchHistory, { token });
@@ -257,6 +267,33 @@ function AdminContent() {
                   }
                 }}
               />
+              {isOwner === true && (
+                <>
+                  <TransferOrdersCard
+                    orders={reportedOrders}
+                    confirming={confirming}
+                    msg={transferMsg}
+                    onConfirm={async (appTransId) => {
+                      setTransferMsg(null);
+                      setConfirming(appTransId);
+                      try {
+                        await confirmTransfer({ token, appTransId });
+                        setTransferMsg({
+                          kind: "ok",
+                          text: translate("Đã nhận tiền và kích hoạt gói."),
+                        });
+                      } catch (e) {
+                        setTransferMsg({
+                          kind: "err",
+                          text: e instanceof Error ? e.message : translate("Lỗi kết nối"),
+                        });
+                      }
+                      setConfirming(null);
+                    }}
+                  />
+                  <RevenueCard revenue={revenue} />
+                </>
+              )}
               {isOwner === true && (
                 <div className="rounded-xl border border-border bg-card p-4">
                   <p className="flex items-center gap-1.5 font-display text-sm font-bold">
@@ -1379,6 +1416,204 @@ function TeamAdminsCard({
         >
           {msg.text}
         </p>
+      )}
+    </div>
+  );
+}
+
+/* ── Plan A — chuyển khoản ngân hàng ──────────────────────────────────── */
+
+interface ReportedOrderRow {
+  appTransId: string;
+  kind: "donate" | "premium";
+  plan: string;
+  amount: number;
+  discordId: string;
+  createdAt: number;
+  reportedAt?: number;
+}
+
+interface RevenueStatsData {
+  total: number;
+  count: number;
+  donateTotal: number;
+  premiumTotal: number;
+  months: { key: string; total: number; count: number }[];
+  years: { year: number; total: number; count: number }[];
+}
+
+/**
+ * 1234567 → "1.234.567 ₫". Đi qua `dateLocale()` chứ không khoá cứng locale:
+ * UI đổi ngôn ngữ là số cũng đổi định dạng nhóm nghìn — test-i18n chặn hardcode.
+ */
+const fmtVnd = (n: number) => `${n.toLocaleString(dateLocale())} ₫`;
+
+/**
+ * Đơn khách ĐÃ chuyển khoản nhưng CHƯA báo — chủ sở hữu bấm xác nhận để
+ * kích hoạt gói ngay (thường là xử lý thủ công trong lúc Nạp chưa kịp
+ * hiện trạng thái). Mỗi dòng có nút bận riêng, không khoá cả bảng.
+ */
+function TransferOrdersCard({
+  orders,
+  confirming,
+  msg,
+  onConfirm,
+}: {
+  orders: ReportedOrderRow[] | undefined;
+  confirming: string | null;
+  msg: { kind: "ok" | "err"; text: string } | null;
+  onConfirm: (appTransId: string) => Promise<void>;
+}) {
+  const list = orders ?? [];
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
+        <Receipt className="h-4 w-4" /> {translate("Đơn chuyển khoản chờ xác nhận")}
+        {list.length > 0 && (
+          <span className="ml-auto rounded-full bg-warn/15 px-2 py-0.5 text-[11px] font-bold text-warn">
+            {list.length}
+          </span>
+        )}
+      </p>
+      {list.length === 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {translate("Hiện không có đơn nào chờ xác nhận.")}
+        </p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {list.map((o) => (
+            <li
+              key={o.appTransId}
+              className="rounded-lg border border-border bg-background/50 p-2.5"
+            >
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                <code className="font-mono text-[11px] font-bold">#{o.appTransId}</code>
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                  {o.kind === "premium" ? translate("Mua premium") : translate("Ủng hộ")}
+                </span>
+                {o.kind === "premium" && (
+                  <span className="text-muted-foreground">
+                    {translate("Gói")} {o.plan}
+                  </span>
+                )}
+                <span className="font-bold">{fmtVnd(o.amount)}</span>
+                <span className="ml-auto text-muted-foreground">
+                  {`ID ${o.discordId} · `}
+                  {translate("báo lúc")}{" "}
+                  {new Date(o.reportedAt ?? o.createdAt).toLocaleString(dateLocale())}
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={confirming !== null}
+                onClick={() => void onConfirm(o.appTransId)}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              >
+                {confirming === o.appTransId && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {translate("Đã nhận tiền → kích hoạt")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {msg && (
+        <p
+          className={cn(
+            "mt-2 text-[11px] font-medium",
+            msg.kind === "ok" ? "text-foreground" : "text-danger",
+          )}
+        >
+          {msg.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Tổng doanh thu cho chủ sở hữu: tổng + tách mua premium / ủng hộ, kèm bảng
+ * theo tháng (12 dòng gần nhất, cuộn) và theo năm — dùng để báo cáo doanh
+ * thu mà không phải xuất spreadsheet tay.
+ */
+function RevenueCard({ revenue }: { revenue: RevenueStatsData | undefined }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
+        <Banknote className="h-4 w-4" /> {translate("Tổng doanh thu theo tháng / năm")}
+      </p>
+      {!revenue ? (
+        <p className="mt-2 text-xs text-muted-foreground">{translate("Đang tải…")}</p>
+      ) : (
+        <>
+          <p className="mt-2 text-xs text-muted-foreground">
+            <b className="font-display text-base text-foreground">{fmtVnd(revenue.total)}</b>
+            {" — "}
+            {translate("tổng cộng")}
+            {` (${revenue.count} ${translate("giao dịch")})`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {translate("Mua premium")}:{" "}
+            <b className="text-foreground">{fmtVnd(revenue.premiumTotal)}</b>
+            {" · "}
+            {translate("Ủng hộ")}: <b className="text-foreground">{fmtVnd(revenue.donateTotal)}</b>
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                {translate("Theo tháng")}
+              </p>
+              <div className="max-h-44 overflow-y-auto rounded-lg border border-border">
+                <table className="w-full text-[11px]">
+                  <thead className="sticky top-0 bg-muted text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-1 text-left font-bold">{translate("Tháng")}</th>
+                      <th className="px-2 py-1 text-right font-bold">{translate("Số GD")}</th>
+                      <th className="px-2 py-1 text-right font-bold">{translate("Doanh thu")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {revenue.months.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-2 text-center text-muted-foreground">
+                          {translate("Chưa có giao dịch.")}
+                        </td>
+                      </tr>
+                    )}
+                    {revenue.months.map((m) => (
+                      <tr key={m.key} className="border-t border-border">
+                        <td className="px-2 py-1 font-mono">{m.key}</td>
+                        <td className="px-2 py-1 text-right">{m.count}</td>
+                        <td className="px-2 py-1 text-right font-bold">{fmtVnd(m.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                {translate("Theo năm")}
+              </p>
+              <ul className="space-y-1 text-[11px]">
+                {revenue.years.length === 0 && (
+                  <li className="text-muted-foreground">{translate("Chưa có giao dịch.")}</li>
+                )}
+                {revenue.years.map((y) => (
+                  <li
+                    key={y.year}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background/50 px-2 py-1.5"
+                  >
+                    <span className="font-bold">{y.year}</span>
+                    <span className="text-muted-foreground">
+                      {y.count} {translate("giao dịch")}
+                    </span>
+                    <span className="font-bold">{fmtVnd(y.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

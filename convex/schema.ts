@@ -1450,14 +1450,26 @@ export default defineSchema({
     amount: v.number(),
     /** Mã đơn ZaloPay — tiền tố yyMMdd theo giờ VN (GMT+7), duy nhất. */
     appTransId: v.string(),
+    /**
+     * Trạng thái đơn.
+     *   pending  — đã tạo, chờ khách chuyển khoản (ZaloPay redirect hoặc QR CK)
+     *   reported — khách ĐÃ BÁO đã chuyển khoản (luồng QR CK), chờ chủ bot so
+     *              sao kê rồi xác nhận — CHƯA có quyền lợi gì
+     *   paid     — tiền đã xác thực (MAC ZaloPay hoặc chủ bot bấm xác nhận)
+     *              → markPaidInternal ghi entitlement
+     *   failed / expired — lỗi API hoặc quá hạn chưa nộp tiền
+     */
     status: v.union(
       v.literal("pending"),
+      v.literal("reported"),
       v.literal("paid"),
       v.literal("failed"),
       v.literal("expired"),
     ),
     createdAt: v.number(),
     paidAt: v.optional(v.number()),
+    /** Khách báo đã chuyển khoản lúc nào (luồng QR CK) — đo cam kết ≤24h. */
+    reportedAt: v.optional(v.number()),
     /** Giao dịch ZaloPay khi thành công (đối soát với portal). */
     zpTransId: v.optional(v.string()),
     /** Lỗi API lần gần nhất — hiển thị debug, KHÔNG chứa key. */

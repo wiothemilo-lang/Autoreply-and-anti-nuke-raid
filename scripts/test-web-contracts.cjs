@@ -2585,5 +2585,109 @@ check(
   "chuỗi minh bạch khối QR bị xoá — khách không biết tiền đi đâu",
 );
 
+// ─── W. Plan A — mua bằng chuyển khoản ngân hàng (08/10/2026) ───────────────
+// Tiền về ví cá nhân, KHÔNG có webhook: quyền lợi chỉ được ghi khi chủ bot so
+// sao kê rồi bấm xác nhận. Cổng này khoá hai điều dễ vỡ nhất: (1) client không
+// bao giờ được tự cấp Premium, và (2) trang mua phải nói rõ cam kết ≤24h, nơi
+// báo khi chậm, hoàn tiền và căn cứ pháp lý — thiếu một mục là khách không có
+// cơ sở khiếu nại.
+check(
+  "PremiumPage tạo mã CK riêng từng đơn (createTransferIntent)",
+  premiumSrc.includes("api.payments.createTransferIntent"),
+  "PremiumPage không tạo được mã chuyển khoản",
+);
+check(
+  "PremiumPage khách tự báo đã CK (reportTransfer)",
+  premiumSrc.includes("api.payments.reportTransfer"),
+  "thiếu nút/luồng báo đã chuyển khoản",
+);
+// Liệt kê CHÍNH XÁC mọi hàm payments trang này gọi — chỉ được là các hàm của
+// luồng CK (tạo mã, báo, đọc trạng thái). Một hàm ghi quyền lợi lọt vào danh
+// sách này là client tự cấp Premium (đã từng là rủi ro thật).
+const premiumApiCalls = [...premiumSrc.matchAll(/api\.payments\.(\w+)/g)].map((m) => m[1]);
+const PREMIUM_ALLOWED_API = new Set([
+  "createTransferIntent",
+  "reportTransfer",
+  "orderStatus",
+  "premiumStatus",
+]);
+check(
+  "PremiumPage theo dõi trạng thái ĐƠN CỦA CHÍNH MÌNH (orderStatus) + chỉ gọi API luồng CK",
+  premiumSrc.includes("api.payments.orderStatus") &&
+    premiumApiCalls.length > 0 &&
+    premiumApiCalls.every((n) => PREMIUM_ALLOWED_API.has(n)),
+  `lời gọi lạ: ${premiumApiCalls.filter((n) => !PREMIUM_ALLOWED_API.has(n)).join(", ")}`,
+);
+check(
+  "PremiumPage KHÔNG còn gọi API ZaloPay (startPayment) — đã chuyển hẳn sang CK",
+  !premiumSrc.includes("startPayment") && !premiumSrc.includes("api.paymentsAction"),
+  "PremiumPage còn sót luồng ZaloPay",
+);
+check(
+  "chính sách cam kết kích hoạt CHẬM NHẤT 24 giờ sau khi xác nhận tiền",
+  premiumSrc.includes("chậm nhất 24 giờ") && premiumSrc.includes("xác nhận đã nhận tiền"),
+  "mất cam kết 24h — khách không biết thời hạn nhận gói",
+);
+check(
+  "chính sách chỉ rõ nơi báo khi quá 24h (Discord chủ bot + MÃ ĐƠN)",
+  premiumSrc.includes("Báo tại Discord kèm mã đơn") && premiumSrc.includes("{ma}"),
+  "mất đường khiếu nại kèm mã đơn",
+);
+check(
+  "chính sách có mục hoàn tiền 100% khi lỗi từ phía dịch vụ",
+  premiumSrc.includes("Hoàn tiền:") && premiumSrc.includes("HOÀN 100%"),
+  "mất cam kết hoàn tiền",
+);
+check(
+  "chính sách có mục thanh toán an toàn (không xin mật khẩu ví/OTP/thẻ)",
+  premiumSrc.includes("Thanh toán an toàn:") && premiumSrc.includes("mật khẩu ví"),
+  "mất cảnh báo chống lừa đảo",
+);
+check(
+  "chính sách nêu căn cứ pháp lý VN (BLDS 2015 Điều 119 · Luật BVNTD 19/2023/QH15 · TMĐT 51/2005/QH11)",
+  premiumSrc.includes("Bộ luật Dân sự 2015 (Điều 119)") &&
+    premiumSrc.includes("19/2023/QH15") &&
+    premiumSrc.includes("51/2005/QH11"),
+  "thiếu căn cứ pháp lý",
+);
+
+// ─── X. Admin: đơn chờ xác nhận + tổng doanh thu + quản trị viên nhóm ───────
+const adminSrc = files.get("pages/Admin.tsx") ?? "";
+check(
+  "Admin có hàng chờ đơn CK + tổng doanh thu theo tháng/năm",
+  adminSrc.includes("api.payments.listReportedOrders") &&
+    adminSrc.includes("api.payments.revenueStats") &&
+    adminSrc.includes('translate("Theo tháng")') &&
+    adminSrc.includes('translate("Theo năm")'),
+  "Admin thiếu bảng doanh thu / hàng chờ đơn",
+);
+check(
+  "xác nhận tiền đi qua confirmTransfer (backend mới ghi entitlement)",
+  adminSrc.includes("api.payments.confirmTransfer"),
+  "Admin tự kích hoạt gói thay vì xác nhận qua backend",
+);
+check(
+  "đơn chờ + doanh thu chỉ truy vấn khi là chủ sở hữu (skip nếu không)",
+  (adminSrc.match(/isOwner \? \{ token \} : "skip"/g) ?? []).length >= 3,
+  "có query doanh thu/đơn chờ chạy cả khi không phải chủ bot",
+);
+check(
+  "card Quản trị viên nhóm lưu qua convex hidden.setTeamAdmins",
+  adminSrc.includes("api.hidden.setTeamAdmins") && adminSrc.includes("<TeamAdminsCard"),
+  "card thêm thành viên team admin không còn nối vào backend",
+);
+check(
+  "danh sách team admin chỉ đọc khi là chủ bot (thành viên khác thấy thông báo, không lỗi)",
+  adminSrc.includes('useQuery(api.hidden.getTeamAdmins, isOwner ? { token } : "skip")') &&
+    adminSrc.includes("Bạn là quản trị viên nhóm"),
+  "thành viên team admin có thể gặp bảng trắng/lỗi",
+);
+check(
+  "thêm/xoá thành viên có trạng thái bận + hiện lỗi server (không im lặng)",
+  adminSrc.includes("Không lưu được.") &&
+    adminSrc.includes("const [busy, setBusy] = useState(false)"),
+  "lỗi lưu im lặng — chủ bot tưởng đã cấp quyền",
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);
