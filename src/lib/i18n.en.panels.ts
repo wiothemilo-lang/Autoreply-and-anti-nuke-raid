@@ -787,4 +787,64 @@ export const EN_PANELS: Record<string, string> = {
   "Doanh thu": "Revenue",
   "Chưa có giao dịch.": "No transactions yet.",
   "Theo năm": "By year",
+
+  // ── Đồng ý điều khoản + hạn mức theo server (08/10/2026) ────────────────
+  "Xác nhận mua gói": "Confirm purchase",
+  "Xác nhận mua gói {goi}": "Confirm the {goi} purchase",
+  "Server được mở gói": "Server to unlock",
+  "Server được mở:": "Server being unlocked:",
+  "Server này đang dùng gói Miễn phí.": "This server is on the Free plan.",
+  "Server này đang dùng gói {goi} — hạn tới {ngay}.":
+    "This server is on the {goi} plan — valid until {ngay}.",
+  "Gói áp dụng theo TỪNG SERVER: hạn mức nâng lên chỉ có hiệu lực ở server bạn chọn tại đây.":
+    "Plans apply PER SERVER: the higher limits only take effect on the server you pick here.",
+  "Bạn chưa quản lý server nào có bot Protogon — hãy mời bot vào server trước.":
+    "You do not manage any server with the Protogon bot yet — invite the bot to a server first.",
+  "Hãy chọn server cần mở gói trước khi mua.": "Choose the server to unlock before buying.",
+  "Gói KHÔNG được cấp tự động — bạn chỉ nhận được sau khi admin kiểm tra và kích hoạt.":
+    "The plan is NOT granted automatically — you only receive it after an admin verifies and activates it.",
+  "Thời gian kích hoạt chậm nhất 24 giờ kể từ khi xác nhận đã nhận tiền; nhanh hơn thì thường là ngay.":
+    "Activation within 24 hours of the payment being confirmed; usually it is immediate.",
+  'Sau khi chuyển khoản, bấm "Tôi đã chuyển khoản" để admin đối soát đúng đơn của bạn.':
+    'After transferring, tap "I have transferred" so an admin can match your order.',
+  "Quá 24 giờ chưa kích hoạt thì báo tại Discord chủ bot kèm mã đơn — hoàn 100% nếu lỗi từ phía dịch vụ.":
+    "Not activated after 24 hours? Report it on the bot owner's Discord with your order code — a 100% refund if the fault is on the service side.",
+  "Tôi đã đọc và đồng ý Điều khoản dịch vụ cùng Chính sách mua bán — hiểu rằng gói không được cấp tự động và chỉ được kích hoạt sau khi admin xác nhận, chậm nhất 24 giờ.":
+    "I have read and agree to the Terms of Service and the Purchase policy — and I understand the plan is not granted automatically and is only activated after an admin confirms, within 24 hours at the latest.",
+  "Tôi đồng ý và tạo mã chuyển khoản": "I agree and create the transfer code",
+  "Điều khoản phiên bản {v}.": "Terms version {v}.",
+  "Điều khoản dịch vụ": "Terms of Service",
+  "Chính sách mua bán": "Purchase policy",
+  "Gói không được cấp tự động: sau khi chuyển khoản, admin đối soát rồi kích hoạt — chậm nhất 24 giờ.":
+    "The plan is not granted automatically: after your transfer an admin matches it and activates — within 24 hours at the latest.",
+  "Còn khoảng {gio} giờ trước mốc cam kết 24 giờ.":
+    "About {gio} hours left before the 24-hour commitment.",
+  "Đã quá cam kết 24 giờ — báo ngay tại Discord kèm mã đơn để được xử lý.":
+    "The 24-hour commitment has passed — report it on Discord with your order code right away so it gets handled.",
+  "Quá 12 giờ chưa xác nhận": "Over 12 hours unconfirmed",
+
+  // ── Thẻ gói trong dashboard (PlanCard) ──────────────────────────────────
+  "Gói {goi}": "{goi} plan",
+  "còn {n} ngày": "{n} days left",
+  "Đang áp dụng cho server này — hạn tới {ngay}.": "Active on this server — valid until {ngay}.",
+  "Server đang dùng gói Miễn phí — mọi hạn mức ở mức cơ bản.":
+    "The server is on the Free plan — every limit is at the basic level.",
+  "Gia hạn": "Renew",
+  "Nâng gói": "Upgrade",
+  "Rule auto reply": "Auto-reply rules",
+  "Từ khoá cấm": "Banned words",
+  "Bản backup giữ": "Backups kept",
+  "Ngày giữ backup": "Backup retention (days)",
+  "Gói sắp hết hạn — hết hạn là hạn mức trở về mức Miễn phí ngay. Gia hạn để giữ nguyên.":
+    "The plan is about to expire — once it does the limits drop back to Free immediately. Renew to keep them.",
+  "Giữ nguyên toàn bộ tính năng bảo vệ của gói Miễn phí":
+    "Keeps every protection from the Free plan",
+  "Tối đa {n} rule auto reply mỗi server": "Up to {n} auto-reply rules per server",
+  "Tối đa {n} từ khoá cấm cho automod": "Up to {n} banned words for automod",
+  "Giữ {n} bản backup gần nhất": "Keep the {n} most recent backups",
+  "Giữ backup trong {n} ngày": "Keep backups for {n} days",
+  "Cho server lớn cần trần dữ liệu cao nhất và chặn tối đa.":
+    "For large servers that need the highest data limits and maximum filtering.",
+  "Dành cho server muốn giữ nhiều dữ liệu và chặn nhiều hơn.":
+    "For servers that want to keep more data and filter more.",
 };

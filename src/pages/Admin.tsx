@@ -1481,39 +1481,53 @@ function TransferOrdersCard({
         </p>
       ) : (
         <ul className="mt-2 space-y-2">
-          {list.map((o) => (
-            <li
-              key={o.appTransId}
-              className="rounded-lg border border-border bg-background/50 p-2.5"
-            >
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                <code className="font-mono text-[11px] font-bold">#{o.appTransId}</code>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase">
-                  {o.kind === "premium" ? translate("Mua premium") : translate("Ủng hộ")}
-                </span>
-                {o.kind === "premium" && (
-                  <span className="text-muted-foreground">
-                    {translate("Gói")} {o.plan}
-                  </span>
+          {" "}
+          {list.map((o) => {
+            // Cam kết công khai với khách là kích hoạt CHẬM NHẤT 24 giờ. Đơn đã
+            // báo quá 12 giờ chưa xác nhận được tô đỏ để không tự phá cam kết đó.
+            const slow = Date.now() - (o.reportedAt ?? o.createdAt) > 12 * 3600_000;
+            return (
+              <li
+                key={o.appTransId}
+                className={cn(
+                  "rounded-lg border bg-background/50 p-2.5",
+                  slow ? "border-danger/60 bg-danger/5" : "border-border",
                 )}
-                <span className="font-bold">{fmtVnd(o.amount)}</span>
-                <span className="ml-auto text-muted-foreground">
-                  {`ID ${o.discordId} · `}
-                  {translate("báo lúc")}{" "}
-                  {new Date(o.reportedAt ?? o.createdAt).toLocaleString(dateLocale())}
-                </span>
-              </div>
-              <button
-                type="button"
-                disabled={confirming !== null}
-                onClick={() => void onConfirm(o.appTransId)}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
-                {confirming === o.appTransId && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                {translate("Đã nhận tiền → kích hoạt")}
-              </button>
-            </li>
-          ))}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                  <code className="font-mono text-[11px] font-bold">#{o.appTransId}</code>
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                    {o.kind === "premium" ? translate("Mua premium") : translate("Ủng hộ")}
+                  </span>
+                  {o.kind === "premium" && (
+                    <span className="text-muted-foreground">
+                      {translate("Gói")} {o.plan}
+                    </span>
+                  )}
+                  <span className="font-bold">{fmtVnd(o.amount)}</span>
+                  <span className="ml-auto text-muted-foreground">
+                    {`ID ${o.discordId} · `}
+                    {translate("báo lúc")}{" "}
+                    {new Date(o.reportedAt ?? o.createdAt).toLocaleString(dateLocale())}
+                  </span>
+                  {slow && (
+                    <span className="rounded bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger">
+                      {translate("Quá 12 giờ chưa xác nhận")}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={confirming !== null}
+                  onClick={() => void onConfirm(o.appTransId)}
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {confirming === o.appTransId && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {translate("Đã nhận tiền → kích hoạt")}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {msg && (

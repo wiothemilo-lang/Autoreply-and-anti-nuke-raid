@@ -14,6 +14,7 @@ import { clampReportMinEvents, clampReportMinIntervalMinutes } from "../reports"
 import { getUserByToken, canManageGuild } from "../auth";
 import { HEAT_DEFAULTS } from "../modules";
 import { GREETING_IMAGE_SLOTS, storageIdFromUrl } from "./greetingImages";
+import { assertWithinLimit, planForGuild } from "../plans";
 
 /**
  * Ngôn ngữ nhãn log bot thật sự có bản dịch. Thêm ngôn ngữ ở đây thì PHẢI thêm
@@ -475,6 +476,10 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
     ];
   }
   if (args.badWords !== undefined) {
+    // Hạn mức theo GÓI của server: danh sách từ khoá cấm là thứ khách cảm nhận
+    // rõ nhất khi nâng gói (automod chặn được nhiều hơn hẳn).
+    const { plan } = await planForGuild(ctx, args.guildId);
+    assertWithinLimit(plan, "badWords", args.badWords.length);
     if (args.badWords.length > 100) throw new Error("Tối đa 100 từ ngữ xấu");
     const words = args.badWords
       .map((w) => w.trim().toLowerCase())

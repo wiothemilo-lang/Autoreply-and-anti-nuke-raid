@@ -22,6 +22,7 @@ import { isGuildHeartbeatFresh, timeAgo } from "../../lib/utils";
 import { ANTINUKE_MODULE_META } from "../../lib/constants";
 import { SafetyBar, TopOffenders } from "./HeatBar";
 import ConfigHealthCard from "./ConfigHealthCard";
+import PlanCard from "./PlanCard";
 import type { HealthTarget } from "../../lib/configHealth";
 import type { AntiNukeEvent, GuildData } from "../../lib/types";
 
@@ -159,6 +160,10 @@ export default function OverviewPanel({
     <div className="space-y-4 sm:space-y-6">
       {/* Điểm cấu hình đứng ĐẦU: người mới vào server thấy ngay còn thiếu gì. */}
       <ConfigHealthCard data={data} onNavigate={onNavigate} />
+
+      {/* Gói + hạn mức thật của server — trước đây chỉ /premium mới nói về gói,
+          nên khách trả tiền xong không thấy mình được gì. */}
+      <PlanCard guildId={data.guild.discordId} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (

@@ -65,6 +65,11 @@ function makeCtx(
     userGuilds?: string[];
     /** Guild thêm vào bảng `guilds` (để test phạm vi theo server). */
     extraGuilds?: string[];
+    /**
+     * Gói của server-1 (convex/plans.ts). Mặc định Miễn phí: test CRUD thường
+     * không nhằm kiểm trần gói — trần có test riêng ở test-plans-gating.ts.
+     */
+    plan?: string;
     now?: number;
   } = {},
 ) {
@@ -83,7 +88,17 @@ function makeCtx(
     ...extra.map((discordId, i) => ({ _id: `g${i + 2}`, discordId })),
   ];
   const autoReplies: Row[] = [];
-  const tables: Record<string, Row[]> = { sessions, users, guilds, autoReplies };
+  const entitlements: Row[] = opts.plan
+    ? [
+        {
+          _id: "ent1",
+          guildId: "server-1",
+          plan: opts.plan,
+          expiresAt: 4_000_000_000_000,
+        },
+      ]
+    : [];
+  const tables: Record<string, Row[]> = { sessions, users, guilds, autoReplies, entitlements };
   let seq = 0;
   const all = () => [...sessions, ...users, ...guilds, ...autoReplies];
   const ctx = {
@@ -260,7 +275,9 @@ const CH = "123456789012345678"; // 18 chữ số — hợp lệ
     );
   }
   {
-    const { ctx, autoReplies } = makeCtx();
+    // Trần CỨNG 50 rule chỉ chạm được ở gói cao nhất (trần theo gói có test
+    // riêng ở test-plans-gating.ts) — nên fixture đặt server ở gói Tiên phong.
+    const { ctx, autoReplies } = makeCtx({ plan: "pioneer" });
     for (let i = 0; i < 49; i++) {
       await addH(ctx, { ...BASE, name: `rule${i}` });
     }
@@ -268,9 +285,9 @@ const CH = "123456789012345678"; // 18 chữ số — hợp lệ
     const r = await addH(ctx, { ...BASE, name: "rule49" });
     check("thêm rule thứ 50 → OK", r.ok === true && autoReplies.length === 50);
     await expectThrow(
-      "vượt 50 rule → chặn (chống phình document)",
+      "vượt 50 rule → chặn (trần cứng trùng trần gói cao nhất, kèm lối nâng/hạ)",
       () => addH(ctx, { ...BASE, name: "rule50" }),
-      /Tối đa 50 rule/,
+      /Gói Tiên phong cho tối đa 50 rule auto reply/,
     );
   }
 

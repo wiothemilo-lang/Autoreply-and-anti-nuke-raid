@@ -5,6 +5,7 @@ import { requireBotKeyStrict } from "./botAuth";
 import { reassembleBackupJsonForRead } from "./backupChunks";
 import { findBackupByRestoreKey, normalizeRestoreKey } from "./backupKeys";
 import { claimIsActive } from "./bot_writes/shared";
+import { assertWithinLimit, planForGuild } from "./plans";
 // Cửa sổ "bot còn online" dùng CHUNG với convex/status.ts — trước đây file này
 // tự khai 180s (bằng đúng nhịp sync) nên bảng Backup báo "bot offline" trong
 // khi bot vẫn sync đều. Xem convex/heartbeat.ts.
@@ -718,8 +719,15 @@ export const setRetention = mutation({
     if (!guild || !canManageGuild(user, guild)) {
       throw new Error("Không có quyền quản lý server này");
     }
+    // Kẹp về trần cứng TRƯỚC (giữ nguyên hành vi cũ: 999 → 50, -5 → 2), rồi mới
+    // áp hạn mức theo GÓI lên giá trị đã kẹp — nhờ vậy số bậy vẫn được xử lý như
+    // trước, còn giá trị hợp lệ vượt trần gói thì báo RÕ đường nâng cấp thay vì
+    // âm thầm hạ xuống (khách tưởng đã giữ 10 bản nhưng thực tế chỉ 3).
     const count = Math.max(2, Math.min(50, Math.floor(keepCount)));
     const days = Math.max(0, Math.min(365, Math.floor(keepDays)));
+    const { plan } = await planForGuild(ctx, guildId);
+    assertWithinLimit(plan, "backupKeepCount", count);
+    assertWithinLimit(plan, "backupKeepDays", days);
     // Dọn chạy ở botStoreBackup (phía server), không qua cache của bot nên
     // KHÔNG cần settingsChangedAt — thêm vào sẽ chỉ tốn một lần vô hiệu cache.
     await ctx.db.patch(guild._id, {

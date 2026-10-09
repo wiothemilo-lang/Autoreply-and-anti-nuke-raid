@@ -1,6 +1,7 @@
 import { mutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
+import { assertWithinLimit, planForGuild } from "./plans";
 
 async function assertManage(ctx: MutationCtx, token: string, guildId: string) {
   const user = await getUserByToken(ctx, token);
@@ -74,6 +75,10 @@ export const add = mutation({
       .query("autoReplies")
       .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
       .collect();
+    // Hạn mức theo GÓI của server (plans.ts) — nói rõ trần + gói nâng cấp. Trần
+    // cứng bên dưới vẫn là chốt cuối cho mọi gói.
+    const { plan } = await planForGuild(ctx, args.guildId);
+    assertWithinLimit(plan, "autoReplyRules", total.length + 1);
     if (total.length >= MAX_RULES_PER_GUILD) {
       throw new Error(`Tối đa ${MAX_RULES_PER_GUILD} rule auto reply mỗi server`);
     }

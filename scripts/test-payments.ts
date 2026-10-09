@@ -18,6 +18,7 @@
 // Convex mutation gọi thẳng như hàm.
 import { createHmac } from "node:crypto";
 
+import { TERMS_VERSION } from "../convex/plans";
 import {
   DONATE_TIERS_VND,
   PREMIUM_MONTH_MS,
@@ -363,14 +364,28 @@ function makeCtxWithRun(tables: Record<string, Row[]>) {
   } as any;
 }
 
-/** Bảng đủ cho luồng CK: thêm `botStatus` để `requireBotOwner` chạy được. */
+const TEST_GUILD = "777777777777777777";
+
+/**
+ * Bảng đủ cho luồng CK: server + quyền quản lý (đơn mua gói BẮT BUỘC có cả
+ * hai — gói áp theo server) + `botStatus` để `requireBotOwner` chạy được.
+ */
 function seedTransfer() {
   const tables = seed();
+  tables.users[0].manageableGuildIds = [TEST_GUILD];
+  tables.guilds = [{ _id: "g1", discordId: TEST_GUILD, name: "Server test", botInGuild: true }];
   tables.botStatus = [
     { _id: "bot1", kind: "status", ownerDiscordId: "123456789012345678", teamAdminDiscordIds: [] },
   ];
   return tables;
 }
+
+/** Điều kiện hợp lệ tối thiểu của một đơn mua gói (đồng ý + chọn server). */
+const buyFields = () => ({
+  guildId: TEST_GUILD,
+  termsVersion: TERMS_VERSION,
+  consentedAt: Date.now(),
+});
 
 const createHandler = (createIntentInternal as any)._handler;
 const markHandler = (markPaidInternal as any)._handler;
@@ -410,11 +425,16 @@ const run = async () => {
     check("kind/plan được giữ nguyên", row?.kind === "donate" && row.plan === "50000");
   }
 
-  // Premium price + invalid session + bad plan
+  // Premium price + invalid session + bad plan (mua gói cần server + đồng ý)
   {
-    const tables = seed();
+    const tables = seedTransfer();
     const ctx = makeCtx(tables);
-    const out = await createHandler(ctx, { token: "tok-good", kind: "premium", plan: "pioneer" });
+    const out = await createHandler(ctx, {
+      token: "tok-good",
+      kind: "premium",
+      plan: "pioneer",
+      ...buyFields(),
+    });
     check("premium pioneer = 99.000", out.amount === 99_000);
     await expectThrows(
       "phiên sai bị chặn",
@@ -428,13 +448,14 @@ const run = async () => {
     );
   }
 
-  // Chặn mua gói thấp hơn khi gói cao đang chạy
+  // Chặn mua gói thấp hơn khi gói cao đang chạy — so theo ĐÚNG server đó
   {
-    const tables = seed();
+    const tables = seedTransfer();
     tables.entitlements.push({
       _id: "e1",
       userId: "u1",
       discordId: "123456789012345678",
+      guildId: TEST_GUILD,
       plan: "pioneer",
       startsAt: Date.now() - 86_400_000,
       expiresAt: Date.now() + 20 * 86_400_000,
@@ -443,15 +464,21 @@ const run = async () => {
       updatedAt: Date.now() - 86_400_000,
     });
     await expectThrows(
-      "mua supporter khi đang có pioneer → chặn (không thể mua rẻ gia hạn gói đắt)",
+      "mua supporter khi server đang có pioneer → chặn (không thể mua rẻ gia hạn gói đắt)",
       () =>
-        createHandler(makeCtx(tables), { token: "tok-good", kind: "premium", plan: "supporter" }),
+        createHandler(makeCtx(tables), {
+          token: "tok-good",
+          kind: "premium",
+          plan: "supporter",
+          ...buyFields(),
+        }),
       "không thể mua gói thấp hơn",
     );
     const allowed = await createHandler(makeCtx(tables), {
       token: "tok-good",
       kind: "premium",
       plan: "pioneer",
+      ...buyFields(),
     });
     check("mua lại chính gói đang chạy (gia hạn) vẫn được", allowed.amount === 99_000);
   }
@@ -747,6 +774,7 @@ const run = async () => {
     _id: "p_ck",
     userId: "u1",
     discordId: "123456789012345678",
+    guildId: TEST_GUILD,
     kind: "premium",
     plan: "supporter",
     amount: 49_000,
@@ -763,6 +791,8 @@ const run = async () => {
       token: "tok-good",
       kind: "premium",
       plan: "supporter",
+      ...buyFields(),
+      consent: true,
     });
     const row = tables.payments[0];
     check(
@@ -774,6 +804,13 @@ const run = async () => {
     );
     check("đơn CK chưa sinh quyền lợi nào", tables.entitlements.length === 0);
     check("trả mã đơn cho khách (nội dung chuyển khoản)", intent.appTransId === row.appTransId);
+    check(
+      "đơn lưu BẰNG CHỨNG đồng ý + server (đối chiếu khi có tranh chấp)",
+      row?.guildId === TEST_GUILD &&
+        row?.termsVersion === TERMS_VERSION &&
+        typeof row?.consentedAt === "number",
+      row,
+    );
     await expectThrows(
       "phiên sai → không tạo được đơn CK",
       () =>
@@ -781,8 +818,62 @@ const run = async () => {
           token: "tok-sai",
           kind: "premium",
           plan: "supporter",
+          ...buyFields(),
+          consent: true,
         }),
       "Phiên đăng nhập không hợp lệ",
+    );
+    // Cổng đồng ý điều khoản + chọn server: 4 nhánh đều chặn Ở SERVER (gọi
+    // thẳng API cũng không lách được — UI chỉ là lớp nhắc).
+    await expectThrows(
+      "không tick đồng ý điều khoản → không tạo được đơn",
+      () =>
+        createTransferH(makeCtxWithRun(seedTransfer()), {
+          token: "tok-good",
+          kind: "premium",
+          plan: "supporter",
+          guildId: TEST_GUILD,
+          termsVersion: TERMS_VERSION,
+        }),
+      "đồng ý điều khoản",
+    );
+    await expectThrows(
+      "đồng ý nhưng SAI phiên bản điều khoản (vừa cập nhật) → chặn",
+      () =>
+        createTransferH(makeCtxWithRun(seedTransfer()), {
+          token: "tok-good",
+          kind: "premium",
+          plan: "supporter",
+          guildId: TEST_GUILD,
+          termsVersion: TERMS_VERSION - 1,
+          consent: true,
+        }),
+      "đồng ý điều khoản",
+    );
+    await expectThrows(
+      "không chọn server → chặn (gói áp dụng theo server)",
+      () =>
+        createTransferH(makeCtxWithRun(seedTransfer()), {
+          token: "tok-good",
+          kind: "premium",
+          plan: "supporter",
+          termsVersion: TERMS_VERSION,
+          consent: true,
+        }),
+      "chọn server",
+    );
+    await expectThrows(
+      "server không thuộc quyền quản lý → chặn",
+      () =>
+        createTransferH(makeCtxWithRun(seedTransfer()), {
+          token: "tok-good",
+          kind: "premium",
+          plan: "supporter",
+          guildId: "888888888888888888",
+          termsVersion: TERMS_VERSION,
+          consent: true,
+        }),
+      "không quản lý server này",
     );
     await expectThrows(
       "mệnh giá client gửi bị chặn (giá chết tại server)",
@@ -856,11 +947,12 @@ const run = async () => {
     const res = await confirmH(ctx, { token: "tok-good", appTransId: "261008_ck1" });
     const ent = tables.entitlements[0];
     check(
-      "chủ bot xác nhận → paid + ghi entitlement đúng gói/hạn",
+      "chủ bot xác nhận → paid + ghi entitlement đúng gói/hạn + đúng SERVER",
       res.ok === true &&
         res.alreadyPaid === false &&
         tables.payments[0].status === "paid" &&
         ent?.plan === "supporter" &&
+        ent?.guildId === TEST_GUILD &&
         Math.abs(ent.expiresAt - (Date.now() + PREMIUM_MONTH_MS)) < 5_000,
       { res, ent },
     );

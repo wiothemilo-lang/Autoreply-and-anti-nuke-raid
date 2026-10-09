@@ -860,4 +860,65 @@ export const DE_PANELS: Record<string, string> = {
   "Doanh thu": "Umsatz",
   "Chưa có giao dịch.": "Noch keine Transaktionen.",
   "Theo năm": "Nach Jahr",
+
+  // ── Đồng ý điều khoản + hạn mức theo server (08/10/2026) ────────────────
+  "Xác nhận mua gói": "Kauf bestätigen",
+  "Xác nhận mua gói {goi}": "Kauf des Tarifs {goi} bestätigen",
+  "Server được mở gói": "Freizuschaltender Server",
+  "Server được mở:": "Freigeschalteter Server:",
+  "Server này đang dùng gói Miễn phí.": "Dieser Server nutzt den Gratis-Tarif.",
+  "Server này đang dùng gói {goi} — hạn tới {ngay}.":
+    "Dieser Server nutzt den Tarif {goi} – gültig bis {ngay}.",
+  "Gói áp dụng theo TỪNG SERVER: hạn mức nâng lên chỉ có hiệu lực ở server bạn chọn tại đây.":
+    "Tarife gelten PRO SERVER: die höheren Limits wirken nur auf dem hier gewählten Server.",
+  "Bạn chưa quản lý server nào có bot Protogon — hãy mời bot vào server trước.":
+    "Du verwaltest noch keinen Server mit dem Protogon-Bot – lade den Bot zuerst auf einen Server ein.",
+  "Hãy chọn server cần mở gói trước khi mua.":
+    "Wähle vor dem Kauf den Server, der freigeschaltet werden soll.",
+  "Gói KHÔNG được cấp tự động — bạn chỉ nhận được sau khi admin kiểm tra và kích hoạt.":
+    "Der Tarif wird NICHT automatisch vergeben – du erhältst ihn erst, nachdem ein Admin geprüft und aktiviert hat.",
+  "Thời gian kích hoạt chậm nhất 24 giờ kể từ khi xác nhận đã nhận tiền; nhanh hơn thì thường là ngay.":
+    "Aktivierung spätestens 24 Stunden nach Bestätigung des Zahlungseingangs; meist geht es sofort.",
+  'Sau khi chuyển khoản, bấm "Tôi đã chuyển khoản" để admin đối soát đúng đơn của bạn.':
+    "Tippe nach der Überweisung auf „Ich habe überwiesen“, damit ein Admin deine Bestellung zuordnen kann.",
+  "Quá 24 giờ chưa kích hoạt thì báo tại Discord chủ bot kèm mã đơn — hoàn 100% nếu lỗi từ phía dịch vụ.":
+    "Nach 24 Stunden noch nicht aktiviert? Melde es auf dem Discord des Bot-Besitzers mit dem Bestellcode – 100 % Rückerstattung, wenn der Fehler bei uns liegt.",
+  "Tôi đã đọc và đồng ý Điều khoản dịch vụ cùng Chính sách mua bán — hiểu rằng gói không được cấp tự động và chỉ được kích hoạt sau khi admin xác nhận, chậm nhất 24 giờ.":
+    "Ich habe die Nutzungsbedingungen und die Kaufbedingungen gelesen und stimme ihnen zu – und mir ist klar, dass der Tarif nicht automatisch vergeben wird und erst nach Bestätigung durch einen Admin aktiviert wird, spätestens nach 24 Stunden.",
+  "Tôi đồng ý và tạo mã chuyển khoản": "Ich stimme zu und erstelle den Überweisungscode",
+  "Điều khoản phiên bản {v}.": "Bedingungen, Version {v}.",
+  "Điều khoản dịch vụ": "Nutzungsbedingungen",
+  "Chính sách mua bán": "Kaufbedingungen",
+  "Gói không được cấp tự động: sau khi chuyển khoản, admin đối soát rồi kích hoạt — chậm nhất 24 giờ.":
+    "Der Tarif wird nicht automatisch vergeben: nach der Überweisung gleicht ein Admin ab und aktiviert – spätestens nach 24 Stunden.",
+  "Còn khoảng {gio} giờ trước mốc cam kết 24 giờ.":
+    "Noch etwa {gio} Stunden bis zur 24-Stunden-Zusage.",
+  "Đã quá cam kết 24 giờ — báo ngay tại Discord kèm mã đơn để được xử lý.":
+    "Die 24-Stunden-Zusage ist überschritten – melde es sofort auf Discord mit dem Bestellcode.",
+  "Quá 12 giờ chưa xác nhận": "Über 12 Stunden unbestätigt",
+
+  // ── Thẻ gói trong dashboard (PlanCard) ──────────────────────────────────
+  "Gói {goi}": "Tarif {goi}",
+  "còn {n} ngày": "noch {n} Tage",
+  "Đang áp dụng cho server này — hạn tới {ngay}.": "Gilt für diesen Server – gültig bis {ngay}.",
+  "Server đang dùng gói Miễn phí — mọi hạn mức ở mức cơ bản.":
+    "Der Server nutzt den Gratis-Tarif – alle Limits sind auf Basisniveau.",
+  "Gia hạn": "Verlängern",
+  "Nâng gói": "Upgrade",
+  "Rule auto reply": "Auto-Antwort-Regeln",
+  "Từ khoá cấm": "Gesperrte Wörter",
+  "Bản backup giữ": "Behaltene Backups",
+  "Ngày giữ backup": "Backup-Aufbewahrung (Tage)",
+  "Gói sắp hết hạn — hết hạn là hạn mức trở về mức Miễn phí ngay. Gia hạn để giữ nguyên.":
+    "Der Tarif läuft bald ab – danach gelten sofort wieder die Gratis-Limits. Verlängere, um sie zu behalten.",
+  "Giữ nguyên toàn bộ tính năng bảo vệ của gói Miễn phí":
+    "Behält alle Schutzfunktionen des Gratis-Tarifs",
+  "Tối đa {n} rule auto reply mỗi server": "Bis zu {n} Auto-Antwort-Regeln pro Server",
+  "Tối đa {n} từ khoá cấm cho automod": "Bis zu {n} gesperrte Wörter fürs Automod",
+  "Giữ {n} bản backup gần nhất": "Die {n} neuesten Backups behalten",
+  "Giữ backup trong {n} ngày": "Backups {n} Tage aufbewahren",
+  "Cho server lớn cần trần dữ liệu cao nhất và chặn tối đa.":
+    "Für große Server, die die höchsten Datenlimits und maximale Filterung brauchen.",
+  "Dành cho server muốn giữ nhiều dữ liệu và chặn nhiều hơn.":
+    "Für Server, die mehr Daten behalten und mehr filtern wollen.",
 };

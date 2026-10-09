@@ -1470,6 +1470,18 @@ export default defineSchema({
     paidAt: v.optional(v.number()),
     /** Khách báo đã chuyển khoản lúc nào (luồng QR CK) — đo cam kết ≤24h. */
     reportedAt: v.optional(v.number()),
+    /**
+     * Server được mở quyền lợi (phạm vi gói là THEO SERVER — xem plans.ts).
+     * Bắt buộc với đơn mua premium; đơn ủng hộ (donate) để trống.
+     */
+    guildId: v.optional(v.string()),
+    /**
+     * Bằng chứng đồng ý điều khoản tại THỜI ĐIỂM MUA: phiên bản điều khoản khách
+     * đã đọc + mốc bấm đồng ý. Có hai field này mới đối chiếu được "khách đã
+     * đồng ý bản nào" khi có tranh chấp. Không lưu IP (không thu thập thừa).
+     */
+    termsVersion: v.optional(v.number()),
+    consentedAt: v.optional(v.number()),
     /** Giao dịch ZaloPay khi thành công (đối soát với portal). */
     zpTransId: v.optional(v.string()),
     /** Lỗi API lần gần nhất — hiển thị debug, KHÔNG chứa key. */
@@ -1489,6 +1501,13 @@ export default defineSchema({
   entitlements: defineTable({
     userId: v.id("users"),
     discordId: v.string(),
+    /**
+     * Server hưởng quyền lợi — khoá quyền lợi THẬT (gói theo server, không
+     * theo người: một server có nhiều quản trị viên). Dòng cũ chưa có field này
+     * (before 08/10/2026) không mở quyền cho server nào — đúng ý nghĩa "chưa
+     * gắn server thì không áp dụng được".
+     */
+    guildId: v.optional(v.string()),
     /** "supporter" | "pioneer" — gói cao nhất đang sở hữu. */
     plan: v.string(),
     startsAt: v.number(),
@@ -1500,7 +1519,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])
-    .index("by_discordId", ["discordId"]),
+    .index("by_discordId", ["discordId"])
+    .index("by_guildId", ["guildId"]),
 
   /**
    * Góp ý người dùng gửi từ trang /feedback (công khai, KHÔNG cần đăng nhập).

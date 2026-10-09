@@ -21,9 +21,11 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import type { MutationCtx } from "./_generated/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import { getUserByToken } from "./auth";
+import { canManageGuild, getUserByToken } from "./auth";
 import { requireBotOwner } from "./hidden";
+import { PLAN_LABELS, TERMS_VERSION, asPlanId, planForGuild } from "./plans";
 import { hmacSha256Hex } from "./sha256";
 
 // ── Bảng giá — SERVER chốt; client chỉ gửi plan, không gửi số tiền ──────────
@@ -203,16 +205,77 @@ export function isEntitled(ent: { expiresAt: number } | null | undefined, now: n
  * Tạo đơn pending. Gọi MỘT LẦN từ paymentsAction.startPayment — validates
  * phiên, bảng giá, chặn mua gói thấp hơn, chặn spam pending, sinh appTransId.
  */
+/**
+ * Cổng bắt buộc của đơn MUA GÓI: phải chọn server mình quản lý được VÀ phải
+ * đồng ý điều khoản đúng phiên bản đang hiệu lực.
+ *
+ * Vì sao đặt ở tầng internal: MỌI đường tạo đơn mua gói đều đi qua đây (CK hôm
+ * nay, ZaloPay cũ) — không có cửa phụ nào tạo được đơn mua gói mà thiếu hai
+ * thứ này. UI chỉ là nhắc; chốt ở server mới là bảo vệ.
+ *
+ * Đơn ủng hộ (donate) KHÔNG đi qua cổng này: không có hàng để giao, không cần
+ * chọn server, và hợp đồng ủng hộ không phát sinh nghĩa vụ giao hàng.
+ */
+async function assertGuildPurchaseGate(
+  ctx: MutationCtx,
+  user: { _id: Id<"users">; discordId: string },
+  args: {
+    kind: "donate" | "premium";
+    guildId?: string;
+    termsVersion?: number;
+    consentedAt?: number;
+  },
+): Promise<void> {
+  if (args.kind !== "premium") return;
+  if (args.consentedAt === undefined || args.termsVersion !== TERMS_VERSION) {
+    throw new Error(
+      "Bạn cần đọc và đồng ý điều khoản mua gói trước khi tạo đơn (điều khoản có thể vừa cập nhật — tải lại trang rồi thử lại).",
+    );
+  }
+  if (!args.guildId) {
+    throw new Error("Hãy chọn server cần mở gói — quyền lợi gói áp dụng theo từng server.");
+  }
+  const guild = await ctx.db
+    .query("guilds")
+    .withIndex("by_discordId", (q) => q.eq("discordId", args.guildId as string))
+    .first();
+  if (!guild || !canManageGuild(user, guild)) {
+    throw new Error("Bạn không quản lý server này — hãy chọn server khác.");
+  }
+}
+
+/** Quyền đang chạy CỦA MỘT SERVER (gói theo server) — dạng applyEntitlement cần. */
+async function activeForGuild(ctx: MutationCtx, guildId: string) {
+  const { plan, expiresAt } = await planForGuild(ctx, guildId);
+  return expiresAt === null ? null : { plan, expiresAt };
+}
+
+/** Quyền theo NGƯỜI — chỉ dùng cho đơn cũ (trước 08/10/2026) chưa gắn server. */
+async function activeForUser(ctx: MutationCtx, userId: Id<"users">) {
+  const ent = await ctx.db
+    .query("entitlements")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .first();
+  return isEntitled(ent, Date.now()) && ent ? { plan: ent.plan, expiresAt: ent.expiresAt } : null;
+}
+
 export const createIntentInternal = internalMutation({
   args: {
     token: v.string(),
     kind: v.union(v.literal("donate"), v.literal("premium")),
     plan: v.string(),
     customAmount: v.optional(v.number()),
+    /** Server hưởng gói — bắt buộc với premium (xem assertGuildPurchaseGate). */
+    guildId: v.optional(v.string()),
+    /** Phiên bản điều khoản khách đã đọc lúc đồng ý. */
+    termsVersion: v.optional(v.number()),
+    /** Mốc khách tick ô đồng ý — chỉ có khi đã đồng ý thật. */
+    consentedAt: v.optional(v.number()),
   },
-  handler: async (ctx, { token, kind, plan, customAmount }) => {
+  handler: async (ctx, { token, kind, plan, customAmount, guildId, termsVersion, consentedAt }) => {
     const user = await getUserByToken(ctx, token);
     if (!user) throw new Error("Phiên đăng nhập không hợp lệ — hãy đăng nhập lại.");
+    await assertGuildPurchaseGate(ctx, user, { kind, guildId, termsVersion, consentedAt });
     const amount = resolveAmount(kind, plan, customAmount);
     const now = Date.now();
 
@@ -241,16 +304,16 @@ export const createIntentInternal = internalMutation({
     // Premium: từ chối mua gói thấp hơn quyền đang có TRƯỚC KHI tốn một đơn
     // ZaloPay nào (không thể "mua gói rẻ để kéo dài gói đắt").
     if (kind === "premium") {
-      const ent = await ctx.db
-        .query("entitlements")
-        .withIndex("by_userId", (q) => q.eq("userId", user._id))
-        .first();
-      const active =
-        isEntitled(ent, now) && ent ? { plan: ent.plan, expiresAt: ent.expiresAt } : null;
+      // So với gói đang chạy CỦA CHÍNH SERVER đó (gói theo server: được mua gói
+      // thấp cho server khác, nhưng không thể "mua gói rẻ để kéo dài gói đắt"
+      // trên cùng một server).
+      const active = guildId
+        ? await activeForGuild(ctx, guildId)
+        : await activeForUser(ctx, user._id);
       if (active && applyEntitlement(active, plan, now) === null) {
         const days = Math.ceil((active.expiresAt - now) / (24 * 60 * 60 * 1000));
         throw new Error(
-          `Bạn đang có gói ${active.plan} (còn ${days} ngày) — không thể mua gói thấp hơn.`,
+          `Server này đang có gói ${PLAN_LABELS[asPlanId(active.plan)]} (còn ${days} ngày) — không thể mua gói thấp hơn.`,
         );
       }
     }
@@ -280,6 +343,11 @@ export const createIntentInternal = internalMutation({
       status: "pending",
       createdAt: now,
       updatedAt: now,
+      // Bằng chứng đồng ý + server hưởng gói: ghi NGAY khi tạo đơn để đối chiếu
+      // tiền ↔ điều khoản tại đúng thời điểm mua.
+      ...(guildId ? { guildId } : {}),
+      ...(termsVersion !== undefined ? { termsVersion } : {}),
+      ...(consentedAt !== undefined ? { consentedAt } : {}),
     });
     return { paymentId, appTransId, amount, kind, plan, discordId: user.discordId, createdAt: now };
   },
@@ -342,10 +410,18 @@ export const markPaidInternal = internalMutation({
     });
 
     if (row.kind === "premium") {
-      const ent = await ctx.db
-        .query("entitlements")
-        .withIndex("by_userId", (q) => q.eq("userId", row.userId))
-        .first();
+      // Gói theo SERVER: cộng hạn vào entitlement của ĐÚNG server đã mua. Đơn cũ
+      // (trước 08/10/2026, không có guildId) xử lý theo người như luật cũ để
+      // không đụng dữ liệu đã bán.
+      const ent = row.guildId
+        ? await ctx.db
+            .query("entitlements")
+            .withIndex("by_guildId", (q) => q.eq("guildId", row.guildId as string))
+            .first()
+        : await ctx.db
+            .query("entitlements")
+            .withIndex("by_userId", (q) => q.eq("userId", row.userId))
+            .first();
       const active =
         isEntitled(ent, now) && ent
           ? { plan: ent.plan, expiresAt: ent.expiresAt, startsAt: ent.startsAt }
@@ -364,6 +440,7 @@ export const markPaidInternal = internalMutation({
           await ctx.db.insert("entitlements", {
             userId: row.userId,
             discordId: row.discordId,
+            ...(row.guildId ? { guildId: row.guildId } : {}),
             plan: next.plan,
             startsAt: next.startsAt,
             expiresAt: next.expiresAt,
@@ -488,11 +565,26 @@ export const createTransferIntent = mutation({
     kind: v.union(v.literal("donate"), v.literal("premium")),
     plan: v.string(),
     customAmount: v.optional(v.number()),
+    /** Server hưởng gói — bắt buộc với premium (gói áp dụng theo từng server). */
+    guildId: v.optional(v.string()),
+    /** Khách đã tick ô đồng ý điều khoản — server chốt mốc thời gian, không tin UI. */
+    consent: v.optional(v.boolean()),
+    /** Phiên bản điều khoản khách đã đọc (phải khớp bản đang hiệu lực). */
+    termsVersion: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<TransferIntentInfo> => {
     const intent: TransferIntentInfo = await ctx.runMutation(
       internal.payments.createIntentInternal,
-      args,
+      {
+        token: args.token,
+        kind: args.kind,
+        plan: args.plan,
+        customAmount: args.customAmount,
+        guildId: args.guildId,
+        termsVersion: args.termsVersion,
+        // Mốc đồng ý do SERVER sinh: chỉ tồn tại khi khách thực sự tick.
+        consentedAt: args.consent === true ? Date.now() : undefined,
+      },
     );
     return intent;
   },

@@ -2689,5 +2689,78 @@ check(
   "lỗi lưu im lặng — chủ bot tưởng đã cấp quyền",
 );
 
+// ─── Y. Đồng ý điều khoản + hạn mức theo GÓI (08/10/2026) ───────────────────
+// Khách phải TỰ TAY tick đồng ý (không tick sẵn), và cảnh báo "không nhận ngay"
+// phải xuất hiện trước khi trả tiền. Server vẫn là chốt cuối (xem
+// scripts/test-payments.ts), nhưng cổng này khoá phần UI khỏi bị tháo mất.
+const planCard = files.get("components/dashboard/PlanCard.tsx") ?? "";
+check(
+  "PremiumPage có ô tick đồng ý KHÔNG tick sẵn (checked={agreed} + disabled tới khi tick)",
+  premiumSrc.includes("checked={agreed}") && premiumSrc.includes("disabled={!agreed"),
+  "ô đồng ý bị tick sẵn hoặc nút mua bật khi chưa đồng ý",
+);
+check(
+  "đơn mua gửi kèm server + consent + phiên bản điều khoản (server kiểm lại)",
+  premiumSrc.includes("guildId: effectiveServer") &&
+    premiumSrc.includes("consent: true") &&
+    premiumSrc.includes("termsVersion: catalog?.termsVersion"),
+  "thiếu dữ liệu đồng ý/chọn server khi tạo đơn",
+);
+check(
+  "cảnh báo 'không được cấp tự động' có TRƯỚC khi trả tiền (dưới nút mua + trong hộp xác nhận)",
+  premiumSrc.includes(
+    'translate(\n                      "Gói không được cấp tự động: sau khi chuyển khoản, admin đối soát rồi kích hoạt — chậm nhất 24 giờ.",',
+  ) || (premiumSrc.match(/Gói không được cấp tự động/g) ?? []).length >= 2,
+  "cảnh báo nhận hàng chậm bị thiếu ở bước mua",
+);
+check(
+  "có đếm ngược tới mốc cam kết 24h + lối báo chậm kèm mã đơn khi quá hạn",
+  premiumSrc.includes("Còn khoảng {gio} giờ trước mốc cam kết 24 giờ.") &&
+    premiumSrc.includes("Đã quá cam kết 24 giờ"),
+  "mất đếm ngược/đường báo chậm — cam kết 24h không có gì đỡ",
+);
+check(
+  "quyền lợi trên trang bán lấy từ catalog (không tự viết tay danh sách tính năng)",
+  premiumSrc.includes("api.plans.catalog") &&
+    premiumSrc.includes("planBullets(plan.id)") &&
+    !premiumSrc.includes("plan.features"),
+  "trang bán còn tự quảng cáo danh sách không gắn với hạn mức thật",
+);
+check(
+  "chọn server khi mua là bắt buộc và hiện gói hiện tại của server đó",
+  premiumSrc.includes("api.guilds.listMine") &&
+    premiumSrc.includes("api.plans.guildPlan") &&
+    premiumSrc.includes('id="buy-server"'),
+  "thiếu bước chọn server — không biết gói áp cho server nào",
+);
+check(
+  "gói áp dụng theo TỪNG server được nói rõ cho khách",
+  premiumSrc.includes("Gói áp dụng theo TỪNG SERVER"),
+  "khách không biết phạm vi gói",
+);
+check(
+  "dashboard có thẻ gói + hạn mức thật của server (PlanCard dùng plans.guildPlan)",
+  planCard.includes("api.plans.guildPlan") &&
+    planCard.includes("plan.limits.autoReplyRules") &&
+    planCard.includes("plan.limits.backupKeepCount") &&
+    (files.get("components/dashboard/OverviewPanel.tsx") ?? "").includes("<PlanCard"),
+  "thẻ gói không nối vào dashboard",
+);
+check(
+  "thẻ gói nhắc trước khi hết hạn (≤3 ngày) — không để tụt hạn mức âm thầm",
+  planCard.includes("endingSoon") && planCard.includes("daysLeft <= 3"),
+  "thiếu nhắc hết hạn",
+);
+check(
+  "Admin tô đỏ đơn đã báo quá 12 giờ chưa xác nhận (giữ cam kết 24h)",
+  adminSrc.includes("Quá 12 giờ chưa xác nhận") && adminSrc.includes("12 * 3600_000"),
+  "đơn tồn không cảnh báo — cam kết 24h dễ vỡ",
+);
+check(
+  "trang bán KHÔNG còn liệt kê tính năng không có gì chặn (tên riêng bot, xuất dữ liệu…)",
+  !/Tên riêng cho bot|Báo cáo nâng cao & xuất dữ liệu|Số kênh riêng/.test(premiumSrc),
+  "còn quảng cáo thứ code không enforce",
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

@@ -11,10 +11,11 @@ import {
   Crown,
   Heart,
   Loader2,
-  Minus,
   QrCode,
+  Server,
   ShieldCheck,
   Sparkles,
+  Terminal,
 } from "lucide-react";
 
 import { Badge } from "../components/ui/badge";
@@ -61,7 +62,6 @@ interface Plan {
   price: string;
   period: string;
   tagline: string;
-  features: { label: string; included: boolean }[];
   /** Gói được nhấn mạnh — trung tâm trang. */
   featured?: boolean;
 }
@@ -73,43 +73,21 @@ const PLANS: Plan[] = [
     price: "0đ",
     period: "vĩnh viễn",
     tagline: "Đủ dùng cho hầu hết server cộng đồng.",
-    features: [
-      { label: "Tự trả lời, chặn link độc hại, 32 module chống nuke", included: true },
-      { label: "Không giới hạn số server", included: true },
-      { label: "Backup & khôi phục cấu trúc server", included: true },
-      { label: "Số kênh riêng của bot (ví dụ bảng điều khiển)", included: false },
-      { label: "Báo cáo nâng cao & xuất dữ liệu", included: false },
-      { label: "Hỗ trợ ưu tiên", included: false },
-    ],
   },
   {
     id: "supporter",
     name: "Đồng hành",
     price: "49.000đ",
     period: "mỗi tháng",
-    tagline: "Dành cho server muốn nhiều kênh riêng và báo cáo đẹp hơn.",
+    tagline: "Dành cho server muốn giữ nhiều dữ liệu và chặn nhiều hơn.",
     featured: true,
-    features: [
-      { label: "Tất cả tính năng của gói Miễn phí", included: true },
-      { label: "Tối đa 10 kênh riêng có thư mục riêng", included: true },
-      { label: "Báo cáo nâng cao & xuất dữ liệu", included: true },
-      { label: "Tên riêng cho bot (thay vì Protogon)", included: true },
-      { label: "Hỗ trợ ưu tiên", included: false },
-    ],
   },
   {
     id: "pioneer",
     name: "Tiên phong",
     price: "99.000đ",
     period: "mỗi tháng",
-    tagline: "Cho người muốn bot bám sát server mình nhất.",
-    features: [
-      { label: "Tất cả tính năng của gói Đồng hành", included: true },
-      { label: "Số kênh riêng không giới hạn", included: true },
-      { label: "Hỗ trợ ưu tiên trong 24 giờ", included: true },
-      { label: "Ý tưởng tính năng được xếp hạng đầu", included: true },
-      { label: "Avatar & biểu tượng riêng cho bot", included: true },
-    ],
+    tagline: "Cho server lớn cần trần dữ liệu cao nhất và chặn tối đa.",
   },
 ];
 
@@ -130,12 +108,58 @@ export default function PremiumPage() {
   const [reporting, setReporting] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /** Server được mở gói — GÓI THEO SERVER: đơn ghi guildId, hạn mức áp cho server đó. */
+  const [server, setServer] = useState("");
+  /** Gói đang chờ khách đọc điều khoản + tick đồng ý (null = chưa mở). */
+  const [confirmPlan, setConfirmPlan] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
   // Subscription real-time: chủ bot xác nhận ở Admin → banner "thành công"
   // tự hiện mà người mua không cần F5 (không poll thủ công).
   const orderStatus = useQuery(
     api.payments.orderStatus,
     token && order ? { token, appTransId: order.appTransId } : "skip",
   );
+
+  // Bảng quyền lợi + phiên bản điều khoản lấy từ MỘT nguồn: convex/plans.ts.
+  // Trang bán đọc chính bảng đó nên không thể hứa thứ code không enforce.
+  const mine = useQuery(api.guilds.listMine, token ? { token } : "skip");
+  const catalog = useQuery(api.plans.catalog, {});
+  const serverPlan = useQuery(
+    api.plans.guildPlan,
+    token && server ? { token, guildId: server } : "skip",
+  );
+  const servers = mine ?? [];
+  /** Server đang chọn — chỉ có 1 server thì mặc định chọn luôn cho đỡ phải bấm. */
+  const effectiveServer = server || (servers.length === 1 ? servers[0].discordId : "");
+  /**
+   * Quyền lợi hiển thị lấy THẲNG từ `catalog` (convex/plans.ts) — cũng chính là
+   * bảng server dùng để chặn vượt hạn mức. Nhờ vậy trang bán không thể quảng
+   * cáo thứ code không enforce (đúng lỗi cũ: 6 mục "hứa suông" không ai chặn).
+   */
+  const planBullets = (planId: string): string[] => {
+    const lim = catalog?.limits?.[planId as "free" | "supporter" | "pioneer"];
+    if (!lim) return [];
+    const bullets = [
+      translate("Tối đa {n} rule auto reply mỗi server", { n: lim.autoReplyRules }),
+      translate("Tối đa {n} từ khoá cấm cho automod", { n: lim.badWords }),
+      translate("Giữ {n} bản backup gần nhất", { n: lim.backupKeepCount }),
+      translate("Giữ backup trong {n} ngày", { n: lim.backupKeepDays }),
+    ];
+    if (planId !== "free") {
+      bullets.unshift(translate("Giữ nguyên toàn bộ tính năng bảo vệ của gói Miễn phí"));
+    }
+    return bullets;
+  };
+
+  /**
+   * Số giờ còn lại tới mốc cam kết 24h của đơn đang mở (âm → đã quá hạn).
+   * Tính từ createdAt của ĐƠN trên server, không tin đồng hồ trang.
+   */
+  const waitHours = (() => {
+    const created = orderStatus?.createdAt;
+    if (created === undefined) return null;
+    return Math.max(0, 24 - (Date.now() - created) / 3_600_000);
+  })();
 
   const planName = (id: string) => PLANS.find((p) => p.id === id)?.name ?? id;
   const formatDate = (ms: number) => new Date(ms).toLocaleDateString(dateLocale());
@@ -155,20 +179,51 @@ export default function PremiumPage() {
   };
 
   /**
-   * Tạo mã chuyển khoản (giá chết tại server) rồi hiện panel QR — không
-   * redirect đi đâu cả. Chưa đăng nhập → đưa qua /auth rồi quay lại đây.
+   * Bước 1 của mua hàng: chọn server + mở hộp XÁC NHẬN ĐIỀU KHOẢN.
+   *
+   * Vì sao tách khỏi lúc gọi API: khách phải ĐỌC cảnh báo "không nhận ngay" và
+   * tự tay tick đồng ý trước khi có mã chuyển khoản. Bấm Mua mà tạo đơn luôn là
+   * bán hàng không minh bạch (Luật BVNTD 19/2023/QH15 đòi thông tin TRƯỚC khi
+   * giao kết). Chưa đăng nhập → /auth rồi quay lại đây.
    */
-  const go = async (planId: string) => {
+  const openConfirm = (planId: string) => {
     if (!token) {
       navigate(`/auth?returnTo=${encodeURIComponent("/premium")}`);
       return;
     }
+    if (planId === "free") return;
+    if (!effectiveServer) {
+      setPayError(translate("Hãy chọn server cần mở gói trước khi mua."));
+      return;
+    }
+    setPayError(null);
+    setReportError(null);
+    setAgreed(false);
+    setConfirmPlan(planId);
+  };
+
+  /**
+   * Bước 2: khách đã tick đồng ý → tạo mã chuyển khoản (giá chết tại server).
+   * Server kiểm LẠI cả ba thứ: server có thuộc quyền khách, đã đồng ý, đúng
+   * phiên bản điều khoản — UI không thể "quên".
+   */
+  const confirmBuy = async () => {
+    if (!token || !confirmPlan || !agreed) return;
+    const planId = confirmPlan;
     setBusy(planId);
     setPayError(null);
     setReportError(null);
     setCopied(false);
     try {
-      const r = await createTransferIntent({ token, kind: "premium", plan: planId });
+      const r = await createTransferIntent({
+        token,
+        kind: "premium",
+        plan: planId,
+        guildId: effectiveServer,
+        consent: true,
+        termsVersion: catalog?.termsVersion ?? 0,
+      });
+      setConfirmPlan(null);
       setOrder({ appTransId: r.appTransId, amount: r.amount, plan: r.plan });
       // Kéo panel vào giữa khung nhìn — khách không phải cuộn tìm.
       requestAnimationFrame(() =>
@@ -419,6 +474,30 @@ export default function PremiumPage() {
                         "Gói được kích hoạt chậm nhất 24 giờ sau khi xác nhận đã nhận tiền (thường là ngay lập tức).",
                       )}
                     </p>
+                    {/* Đếm ngược theo cam kết đã công bố — đến hạn là chỉ thẳng
+                        chỗ báo chậm, không để khách tự đoán phải làm gì. */}
+                    {waitHours !== null && waitHours > 0 && (
+                      <p className="mt-1 text-xs font-medium text-foreground">
+                        {translate("Còn khoảng {gio} giờ trước mốc cam kết 24 giờ.", {
+                          gio: Math.ceil(waitHours),
+                        })}
+                      </p>
+                    )}
+                    {waitHours !== null && waitHours <= 0 && (
+                      <p className="mt-1 text-xs font-medium text-danger">
+                        {translate(
+                          "Đã quá cam kết 24 giờ — báo ngay tại Discord kèm mã đơn để được xử lý.",
+                        )}{" "}
+                        <a
+                          href={discordInvite}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline underline-offset-4"
+                        >
+                          Discord
+                        </a>
+                      </p>
+                    )}
                     <p className="mt-1 leading-relaxed text-muted-foreground">
                       {translate("Quá 24 giờ chưa kích hoạt? Báo tại Discord kèm mã đơn {ma}.", {
                         ma: order.appTransId,
@@ -467,6 +546,148 @@ export default function PremiumPage() {
           </section>
         )}
 
+        {/* ── CHỌN SERVER (gói theo server) + HỘP XÁC NHẬN ĐIỀU KHOẢN ──────── */}
+        {token && (
+          <section className="mt-10 rounded-2xl border border-border bg-card p-5">
+            <label
+              htmlFor="buy-server"
+              className="flex items-center gap-1.5 font-display text-sm font-bold text-foreground"
+            >
+              <Server className="h-4 w-4" /> {translate("Server được mở gói")}
+            </label>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              {translate(
+                "Gói áp dụng theo TỪNG SERVER: hạn mức nâng lên chỉ có hiệu lực ở server bạn chọn tại đây.",
+              )}{" "}
+            </p>
+            {servers.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+                {translate(
+                  "Bạn chưa quản lý server nào có bot Protogon — hãy mời bot vào server trước.",
+                )}{" "}
+              </p>
+            ) : (
+              <>
+                <select
+                  id="buy-server"
+                  value={effectiveServer}
+                  onChange={(e) => setServer(e.target.value)}
+                  className="mt-3 w-full max-w-md rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  {servers.map((g) => (
+                    <option key={g.discordId} value={g.discordId}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {serverPlan && serverPlan.plan !== "free" && serverPlan.expiresAt
+                    ? translate("Server này đang dùng gói {goi} — hạn tới {ngay}.", {
+                        goi: planName(serverPlan.plan),
+                        ngay: formatDate(serverPlan.expiresAt),
+                      })
+                    : translate("Server này đang dùng gói Miễn phí.")}{" "}
+                </p>
+              </>
+            )}
+          </section>
+        )}
+
+        {confirmPlan && (
+          <section
+            role="dialog"
+            aria-label={translate("Xác nhận mua gói")}
+            className="mt-6 rounded-2xl border-2 border-foreground bg-card p-5 shadow-lg"
+          >
+            <h2 className="font-display text-lg font-bold text-foreground">
+              {translate("Xác nhận mua gói {goi}", { goi: planName(confirmPlan) })}
+            </h2>
+            <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <Terminal className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+                {translate(
+                  "Gói KHÔNG được cấp tự động — bạn chỉ nhận được sau khi admin kiểm tra và kích hoạt.",
+                )}{" "}
+              </li>
+              <li className="flex items-start gap-2">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+                {translate(
+                  "Thời gian kích hoạt chậm nhất 24 giờ kể từ khi xác nhận đã nhận tiền; nhanh hơn thì thường là ngay.",
+                )}{" "}
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+                {translate(
+                  'Sau khi chuyển khoản, bấm "Tôi đã chuyển khoản" để admin đối soát đúng đơn của bạn.',
+                )}{" "}
+              </li>
+              <li className="flex items-start gap-2">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+                {translate(
+                  "Quá 24 giờ chưa kích hoạt thì báo tại Discord chủ bot kèm mã đơn — hoàn 100% nếu lỗi từ phía dịch vụ.",
+                )}{" "}
+              </li>
+            </ul>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {translate("Server được mở:")}{" "}
+              <b className="text-foreground">
+                {servers.find((g) => g.discordId === effectiveServer)?.name ?? effectiveServer}
+              </b>
+            </p>
+            <label className="mt-4 flex items-start gap-2.5 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0"
+              />
+              <span>
+                {translate(
+                  "Tôi đã đọc và đồng ý Điều khoản dịch vụ cùng Chính sách mua bán — hiểu rằng gói không được cấp tự động và chỉ được kích hoạt sau khi admin xác nhận, chậm nhất 24 giờ.",
+                )}{" "}
+              </span>
+            </label>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button disabled={!agreed || busy !== null} onClick={() => void confirmBuy()}>
+                {busy !== null ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                {translate("Tôi đồng ý và tạo mã chuyển khoản")}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setConfirmPlan(null)}
+                className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {translate("Đóng")}
+              </button>
+            </div>
+            {payError && (
+              <p role="alert" className="mt-3 text-sm font-medium text-danger">
+                {payError}
+              </p>
+            )}
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+              {translate("Điều khoản phiên bản {v}.", { v: catalog?.termsVersion ?? 1 })}{" "}
+              <Link
+                to="/terms"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                {translate("Điều khoản dịch vụ")}
+              </Link>
+              {" · "}
+              <a
+                href="#chinh-sach-mua-ban"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                {translate("Chính sách mua bán")}
+              </a>
+            </p>
+          </section>
+        )}
+
         {/* 3 gói */}
         <section className="mt-14">
           <div className="grid gap-5 lg:grid-cols-3">
@@ -502,21 +723,10 @@ export default function PremiumPage() {
                 </div>
 
                 <ul className="mt-5 flex-1 space-y-2.5">
-                  {plan.features.map((f) => (
-                    <li
-                      key={f.label}
-                      className={
-                        f.included
-                          ? "flex items-start gap-2.5 text-sm text-foreground"
-                          : "flex items-start gap-2.5 text-sm text-muted-foreground/70"
-                      }
-                    >
-                      {f.included ? (
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-                      ) : (
-                        <Minus className="mt-0.5 h-4 w-4 shrink-0" />
-                      )}
-                      <span>{translate(f.label)}</span>
+                  {planBullets(plan.id).map((label) => (
+                    <li key={label} className="flex items-start gap-2.5 text-sm text-foreground">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+                      <span>{label}</span>
                     </li>
                   ))}
                 </ul>
@@ -525,7 +735,7 @@ export default function PremiumPage() {
                   className="mt-6 w-full"
                   variant={plan.featured ? "default" : "outline"}
                   disabled={buyState(plan.id).disabled || busy !== null}
-                  onClick={() => void go(plan.id)}
+                  onClick={() => openConfirm(plan.id)}
                 >
                   {busy === plan.id ? (
                     <>
@@ -536,6 +746,13 @@ export default function PremiumPage() {
                     buyState(plan.id).label
                   )}
                 </Button>
+                {plan.id !== "free" && (
+                  <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                    {translate(
+                      "Gói không được cấp tự động: sau khi chuyển khoản, admin đối soát rồi kích hoạt — chậm nhất 24 giờ.",
+                    )}{" "}
+                  </p>
+                )}
               </motion.div>
             ))}
           </div>
@@ -551,6 +768,7 @@ export default function PremiumPage() {
         <section
           id="chinh-sach-mua-ban"
           aria-label={translate("Chính sách mua bán & cam kết dịch vụ")}
+          style={{ scrollMarginTop: "5rem" }}
           className="mt-14 rounded-2xl border border-border bg-card p-6 sm:p-8"
         >
           <h2 className="flex items-center gap-2 font-display text-xl font-bold text-foreground">

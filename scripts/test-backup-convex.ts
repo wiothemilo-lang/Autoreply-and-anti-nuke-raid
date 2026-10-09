@@ -91,6 +91,8 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
   const userRows: Row[] = [];
   const statusRows: Row[] =
     opts.seed === null ? [] : [{ kind: "status", botKeySeed: computeBotKey(opts.seed ?? BOT_KEY) }];
+  // Quyền lợi theo GÓI của server (convex/plans.ts): rỗng = gói Miễn phí.
+  const entitlementRows: Row[] = [];
   let idCounter = 0;
   const nextId = () => `id${++idCounter}`;
   const now = opts.now ?? 1_700_000_000_000;
@@ -100,6 +102,7 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     users: userRows,
     botStatus: statusRows,
     backupChunks: chunkRows,
+    entitlements: entitlementRows,
   });
   const ctx = {
     now,
@@ -113,6 +116,7 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
         backupRows.find((r) => r._id === id) ??
         userRows.find((r) => r._id === id) ??
         guildRows.find((r) => r._id === id) ??
+        entitlementRows.find((r) => r._id === id) ??
         null,
       delete: async (id: string) => {
         const i = backupRows.findIndex((r) => r._id === id);
@@ -145,6 +149,13 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
           if (table === "sessions") {
             return {
               first: async () => sessionRows.find((s) => s.token === capture.token) ?? null,
+            };
+          }
+          // Gói của server: index by_guildId (planForGuild đọc bằng collect).
+          if (table === "entitlements") {
+            return {
+              first: async () => entitlementRows.find((r) => r.guildId === capture.guildId) ?? null,
+              collect: async () => entitlementRows.filter((r) => r.guildId === capture.guildId),
             };
           }
           if (table === "users") {
@@ -203,7 +214,17 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
       }),
     },
   };
-  return { ctx, backupRows, chunkRows, guildRows, nextId, statusRows, sessionRows, userRows };
+  return {
+    ctx,
+    backupRows,
+    chunkRows,
+    guildRows,
+    nextId,
+    statusRows,
+    sessionRows,
+    userRows,
+    entitlementRows,
+  };
 }
 
 (async () => {
@@ -980,7 +1001,16 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     }
     // 4) Số bậy từ dashboard/lệnh chat → bị chặn trong khoảng, không làm rỗng server.
     {
-      const { ctx, guildRows, sessionRows, userRows } = makeCtx({ seed: BOT_KEY });
+      const { ctx, guildRows, sessionRows, userRows, entitlementRows } = makeCtx({ seed: BOT_KEY });
+      // Block này kiểm CLAMP số bậy (999 → 50) — không kiểm trần theo gói, nên
+      // server được đặt gói Tiên phong (trần gói có test riêng:
+      // scripts/test-plans-gating.ts).
+      entitlementRows.push({
+        _id: "ent1",
+        guildId: "g1",
+        plan: "pioneer",
+        expiresAt: Date.now() + 30 * 86_400_000,
+      });
       guildRows.push({
         _id: "gk",
         discordId: "g1",
@@ -1032,6 +1062,43 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
         threw = e?.message ?? "";
       }
       check("setRetention chặn token sai", threw.length > 0);
+
+      // Gói Miễn phí: trần thấp hơn — phải NÓI RÕ lý do + đường nâng gói thay
+      // vì âm thầm hạ xuống (khách tưởng đã đặt 10 bản).
+      {
+        const free = makeCtx({ seed: BOT_KEY });
+        free.guildRows.push({
+          _id: "gf",
+          discordId: "g2",
+          name: "G2",
+          managers: ["u1"],
+          botInGuild: true,
+        });
+        free.userRows.push({ _id: "u2", discordId: "u2", manageableGuildIds: ["g2"] });
+        free.sessionRows.push({
+          _id: "s2",
+          token: "tok2",
+          userId: "u2",
+          createdAt: Date.now(),
+          authVersion: 1,
+        });
+        let planErr = "";
+        try {
+          await setRetentionWebHandler(free.ctx as any, {
+            token: "tok2",
+            guildId: "g2",
+            keepCount: 10,
+            keepDays: 30,
+          });
+        } catch (e: any) {
+          planErr = e?.message ?? "";
+        }
+        check(
+          "gói Miễn phí: xin 10 bản/30 ngày bị chặn kèm đường nâng gói",
+          /Gói Miễn phí cho tối đa 3 bản backup giữ lại/.test(planErr) && /Đồng hành/.test(planErr),
+          planErr || "(KHÔNG ném lỗi)",
+        );
+      }
     }
   }
 
