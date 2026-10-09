@@ -1157,6 +1157,12 @@ console.log("── #16 vòng lặp đăng nhập: mô phỏng điều hướng 
     resolveAuthPageState({ hasToken: false, me: null, returnTo: "/dashboard" }).kind === "login",
   );
   check(
+    "KHÔNG token + me=undefined (query bị skip) → vẫn hiện form, KHÔNG treo splash " +
+      "(bug kẹt vô hạn /auth 10/10/2026: khách chưa đăng nhập không thấy nút đăng nhập)",
+    resolveAuthPageState({ hasToken: false, me: undefined, returnTo: "/dashboard" }).kind ===
+      "login",
+  );
+  check(
     "đang tải phiên (me undefined) → splash, KHÔNG hiện form đăng nhập",
     resolveAuthPageState({ hasToken: true, me: undefined, returnTo: null }).kind === "splash",
   );

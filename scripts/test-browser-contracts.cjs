@@ -1800,6 +1800,11 @@ browserTest("J4. Mobile: avatar người dùng không bị bóp, header không t
 //  K2 — /monitor (và /admin cùng cấu trúc): hàng không wrap + LangSwitch
 //       shrink-0 ⇒ flex bóp nút back h-9 w-9 (36px) xuống 18px @≤390px — nút
 //       móp, vùng bấm hụt. Đo chính nút thật, không replica.
+//  K3 — /auth với KHÔNG token (khách mới/incognito): query sessions.me bị
+//       "skip" → me=undefined mãi mãi. authRoute từng trả splash cho mọi
+//       me=undefined bất kể hasToken → khách bị kẹt VÔ HẠN ở màn "Đang kiểm
+//       tra phiên đăng nhập", không thấy nút đăng nhập (bug 10/10/2026).
+//       Test này dựng đúng kịch bản: xoá storage, mở /auth, đòi form hiện.
 browserTest("K1. Mobile: nút trở lại ở header trang pháp lý nằm trọn trong màn", async (t) => {
   const ctx = await setup();
   const page = await ctx.openPage();
@@ -1892,6 +1897,41 @@ browserTest("K2. Mobile: nút back góc trái trang Giám sát không bị bóp"
       `K2 @${w}px: nút back phải nằm trong màn (right=${m.right} > vw=${m.vw})`,
     );
   }
+});
+
+// K3 — khách chưa đăng nhập mở /auth phải thấy NGAY form đăng nhập.
+browserTest("K3. /auth chưa đăng nhập hiện form, không treo splash vô hạn", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+  // Đúng kịch bản khách mới: KHÔNG có token trong storage.
+  await page.goto(ctx.base + "/");
+  await page.evaluate("localStorage.clear(); sessionStorage.clear();");
+  await page.goto(ctx.base + "/auth");
+  const ready = await waitForPage(page, `${OVERLAY_GONE} && !!document.querySelector("h1")`, 25000);
+  t.assert.ok(ready, "trang /auth phải render xong (có H1)");
+  // Splash = <main aria-busy="true"> bọc PageSplash; form = nút CTA Discord.
+  // Chờ có điều kiện (splash phải tự THOÁT) thay vì ngủ cứng: KQ sau splash
+  // phải là form — đúng thứ người dùng thật chờ đợi.
+  const deadline = Date.now() + 6000;
+  // Không khởi tạo sẵn: vòng for ghi đè trước lần đọc đầu tiên
+  // (ESLint no-useless-assignment bắt initializer vô nghĩa).
+  let state;
+  for (;;) {
+    state = await page.evaluate(`(() => ({
+      splash: !!document.querySelector('main[aria-busy="true"]'),
+      login: [...document.querySelectorAll("a,button")].some((b) => /discord/i.test(b.textContent || "")),
+    }))()`);
+    if ((!state.splash && state.login) || Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  t.diagnostic(`/auth (không token): ${JSON.stringify(state)}`);
+  t.assert.ok(
+    !state.splash,
+    "/auth KHÔNG được treo splash khi chưa có token — me=undefined do query bị skip " +
+      "không bao giờ đổi, splash vô hạn = khách không đăng nhập được (bug 10/10/2026)",
+  );
+  t.assert.ok(state.login, "/auth phải hiện nút đăng nhập Discord cho khách chưa đăng nhập");
 });
 
 // Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server + dừng breadcrumb
