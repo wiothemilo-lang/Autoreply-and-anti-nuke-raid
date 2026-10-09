@@ -201,6 +201,8 @@ export const EN: Record<string, string> = {
   "Rủi ro cao": "High risk",
   "Rủi ro": "Risk",
   "Bằng chứng": "Evidence",
+  "Bằng việc đăng nhập, bạn đồng ý với hai văn bản pháp lý sau:":
+    "By signing in, you agree to the following two legal documents:",
   "Xử lý": "Action",
   Tuổi: "Age",
   "Yếu tố": "Factor",

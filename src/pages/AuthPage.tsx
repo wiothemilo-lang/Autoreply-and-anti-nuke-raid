@@ -151,6 +151,25 @@ export default function AuthPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Đồng ý trước khi mở tài khoản (Điều 11.4 Luật TMĐT 122/2025/QH15):
+                  người dùng phải được nêu rõ điều khoản + chính sách quyền riêng
+                  tư TRƯỚC khi đăng nhập, không phải sau. */}
+              <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                {translate("Bằng việc đăng nhập, bạn đồng ý với hai văn bản pháp lý sau:")}{" "}
+                <Link
+                  to="/terms"
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  {translate("Điều khoản sử dụng")}
+                </Link>{" "}
+                ·{" "}
+                <Link
+                  to="/privacy"
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  {translate("Chính sách quyền riêng tư")}
+                </Link>
+              </p>
               {configLoading ? (
                 // Đang tải cấu hình — chỉ hiện spinner nhỏ, không hiện hộp cảnh báo vàng
                 <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-secondary/30 py-4 text-sm text-muted-foreground">

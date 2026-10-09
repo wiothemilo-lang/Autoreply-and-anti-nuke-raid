@@ -802,6 +802,12 @@ export default function PremiumPage() {
               )}
             </p>
             <p>
+              <b className="text-foreground">{translate("Quyền chấm dứt trong 30 ngày:")}</b>{" "}
+              {translate(
+                "nếu thông tin về gói, giá hoặc điều kiện giao dịch mà trang cung cấp không chính xác hoặc không đầy đủ, bạn có quyền đơn phương chấm dứt giao dịch trong 30 ngày kể từ ngày giao kết và được hoàn trả số tiền tương ứng với phần chưa sử dụng trong thời hạn 30 ngày (Điều 38 Luật Bảo vệ quyền lợi người tiêu dùng).",
+              )}
+            </p>
+            <p>
               <b className="text-foreground">{translate("Thanh toán an toàn:")}</b>{" "}
               {translate(
                 "chỉ quét mã QR do trang này hiển thị và kiểm tra đúng chủ ví NGUYEN DUY KHIEM trước khi chuyển. Chủ bot KHÔNG BAO GIỜ yêu cầu bạn cung cấp mật khẩu ví, mã OTP hay thông tin thẻ.",
@@ -810,7 +816,7 @@ export default function PremiumPage() {
             <p>
               <b className="text-foreground">{translate("Cơ sở pháp lý:")}</b>{" "}
               {translate(
-                "giao dịch được lập bằng hình thức điện tử theo Bộ luật Dân sự 2015 (Điều 119); quyền lợi người tiêu dùng theo Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15; mua bán qua trang mạng theo Luật Thương mại điện tử số 51/2005/QH11 (sửa đổi, bổ sung). Khiếu nại gửi qua Discord của chủ bot và được phản hồi trong 48 giờ.",
+                "giao dịch được lập bằng hình thức điện tử theo Bộ luật Dân sự 2015 (Điều 119); quyền lợi người tiêu dùng theo Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15 (hợp nhất tại Văn bản hợp nhất 47/VBHN-VPQH); mua bán qua trang mạng theo Luật Thương mại điện tử số 122/2025/QH15 (có hiệu lực từ 01/7/2026). Khiếu nại gửi qua Discord của chủ bot và được phản hồi trong 48 giờ.",
               )}
             </p>
             <p className="text-xs">
