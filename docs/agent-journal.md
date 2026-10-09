@@ -4,6 +4,16 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 09/10/2026 (1) — Gói Premium theo từng server + đồng ý minh bạch trước thanh toán (P1–P4)
+
+- 🎯 **Yêu cầu**: làm 4 việc nhẹ trước, phạm vi gói **theo server**, mức đồng ý **1 checkbox bắt buộc**, xong hết P1–P4 mới commit. Gốc vấn đề: mua gói áp cho MỌI server bot đang ở trong dashboard, mua xong không thấy gói ở đâu; Admin duyệt tay không có hạn mức.
+- 🧭 **P1**: `convex/plans.ts` mới (`planOverrides` theo guild, `planForGuild()` = nguồn sự thật duy nhất) + `payments.ts` ghi `guildIds` khi mua, consent timestamp/khoản tiền; **4 điểm chặn** (backup / autoreply / automod / updateSettings) tôn trọng plan từng server thay vì plan user toàn cục.
+- 🧭 **P2–P4**: `PremiumPage` — bắt buộc chọn server + 1 checkbox đồng ý trước khi mở link thanh toán, cảnh báo chờ duyệt ≤24h kèm mốc đếm ngược; `Admin` — đơn chờ >12h nổi bật + sort cũ lên đầu (giữ cam kết duyệt ≤24h); `PlanCard` mới trong Overview (quyền lợi theo server, i18n EN/DE).
+- 🧪 **Test mới**: `scripts/test-plans-gating.ts` (20 case gating) + vá 5 suite cũ (`test-payments`, `test-autoreplies-convex`, `test-backup-convex`) + 3 gate tĩnh hợp đồng vào `test-web-contracts.cjs`. Đồng bộ hợp đồng: `AGENTS.md` `test:ts` 25 → **26**; `CONTRACT_SUITES = 87` giữ nguyên (suite .ts không tính vào `bun run test`).
+- 🧪 **Kiểm chứng**: 87/87 CJS (`SKIP_BROWSER_TESTS=1` — sandbox không có Chromium) · **26/26 TS** · `tsc` · lint · `format:check` · coverage floor (Lines 95.65%) · mutation **20/20** · 8 guard scripts self-test · repo-map · i18n. CI run `37897450161` xanh cả 4 job, **Convex deploy success**.
+- 🚀 **Push**: `58c570e` → `origin/main` (fast-forward, CI xanh). PR mang phần đồng bộ tài liệu + nhật ký này.
+- 📁 File đụng: `convex/{plans.ts (mới),payments,autoreplies,backup,schema,guilds/updateSettings}.ts` · `src/pages/{PremiumPage,Admin}.tsx` · `src/components/dashboard/{PlanCard.tsx (mới),OverviewPanel}.tsx` · `src/lib/i18n.{en,de}.panels.ts` · `scripts/{test-plans-gating.ts (mới),test-payments,test-autoreplies-convex,test-backup-convex,test-web-contracts}` · `docs/repo-map.md` · `AGENTS.md`
+
 ## 07/10/2026 (5) — Browser test đi kiểm tra bundle 2 ngày trước (dist không bao giờ rebuild)
 
 - 🎯 **Yêu cầu**: `/deploy` — pull code mới nhất → 4 lớp kiểm chứng → deploy Convex → restart bot. Bước 3 **đỏ**: `test-browser-contracts` 86/87, 4 test cùng treo chờ render (G: "CDP `Runtime.evaluate` không trả lời 30000ms"; J1/J2/J3: "trang /monitor phải render xong").
