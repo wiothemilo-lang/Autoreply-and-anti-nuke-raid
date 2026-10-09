@@ -211,6 +211,41 @@ for (const slug of LEGAL_SLUGS) {
   check(`văn bản "${slug}" có đủ 3 bản ngôn ngữ`, hits === 3, `đang có ${hits}/3`);
 }
 
+// Rà soát pháp lý 09/10/2026 đối chiếu Luật TMĐT 122/2025/QH15 và VBHN
+// 47/VBHN-VPQH 2026 (Luật BVQLNTD) — khoá nội dung mới để không bị xoá quên.
+check(
+  "terms: nêu tuổi 18+ cho giao dịch mua Premium (3 bản)",
+  ["phải đủ 18 tuổi", "at least 18 years old", "mindestens 18 Jahre alt"].every((s) =>
+    legalContent.includes(s),
+  ),
+  "thiếu độ tuổi mua Premium",
+);
+check(
+  "terms: mục Luật áp dụng và giải quyết tranh chấp (3 bản)",
+  [
+    "9. Luật áp dụng và giải quyết tranh chấp",
+    "9. Governing law and dispute resolution",
+    "9. Anwendbares Recht und Streitbeilegung",
+  ].every((s) => legalContent.includes(s)),
+  "thiếu mục luật áp dụng / giải quyết tranh chấp",
+);
+check(
+  "privacy: thu thập đồng ý TRƯỚC + thông báo sự cố 24h (Điều 17/18/19.3 — 3 bản)",
+  ["TRƯỚC KHI chúng tôi thu thập", "BEFORE we collect", "Vor der Erhebung"].every((s) =>
+    legalContent.includes(s),
+  ) && ["24 giờ", "24 hours", "24 Stunden"].every((s) => legalContent.includes(s)),
+  "thiếu điều quyền riêng tư mới",
+);
+const authConsentSrc = files.get("pages/AuthPage.tsx") ?? "";
+check(
+  "AuthPage: nêu điều khoản + quyền riêng tư TRƯỚC nút đăng nhập (Điều 11.4 Luật TMĐT 122/2025)",
+  authConsentSrc.includes("Bằng việc đăng nhập") &&
+    authConsentSrc.includes('to="/terms"') &&
+    authConsentSrc.includes('to="/privacy"') &&
+    authConsentSrc.indexOf("Bằng việc đăng nhập") < authConsentSrc.indexOf("Đăng nhập với Discord"),
+  "thiếu dòng đồng ý trước khi đăng nhập",
+);
+
 // Sitemap: URL pháp lý phải công khai cho công cụ tìm kiếm + trình xác minh.
 const sitemap = fs.readFileSync(path.join(ROOT, "public/sitemap.xml"), "utf8");
 for (const slug of LEGAL_SLUGS) {
@@ -2643,12 +2678,23 @@ check(
   premiumSrc.includes("Thanh toán an toàn:") && premiumSrc.includes("mật khẩu ví"),
   "mất cảnh báo chống lừa đảo",
 );
+// Căn cứ pháp lý: Luật TMĐT 51/2005/QH11 đã bị thay thế bởi Luật TMĐT
+// 122/2025/QH15 (hiệu lực 01/7/2026 — rà soát 09/10/2026 theo văn bản tham khảo).
+// Gate yêu cầu số hiệu MỚI để không ai vô tình đưa bản trích dẫn cũ trở lại.
 check(
-  "chính sách nêu căn cứ pháp lý VN (BLDS 2015 Điều 119 · Luật BVNTD 19/2023/QH15 · TMĐT 51/2005/QH11)",
+  "chính sách nêu căn cứ pháp lý VN (BLDS 2015 Điều 119 · Luật BVNTD 19/2023/QH15 + VBHN 47 · TMĐT 122/2025/QH15)",
   premiumSrc.includes("Bộ luật Dân sự 2015 (Điều 119)") &&
     premiumSrc.includes("19/2023/QH15") &&
-    premiumSrc.includes("51/2005/QH11"),
-  "thiếu căn cứ pháp lý",
+    premiumSrc.includes("47/VBHN-VPQH") &&
+    premiumSrc.includes("122/2025/QH15") &&
+    !premiumSrc.includes("51/2005/QH11"),
+  "thiếu căn cứ pháp lý hoặc còn trích dẫn Luật TMĐT cũ 51/2005/QH11",
+);
+check(
+  "chính sách nêu quyền chấm dứt đơn phương 30 ngày khi thông tin sai/thiếu (Điều 38 VBHN 47)",
+  premiumSrc.includes("Quyền chấm dứt trong 30 ngày:") &&
+    premiumSrc.includes("đơn phương chấm dứt giao dịch trong 30 ngày"),
+  "mất quyền lợi người tiêu dùng trong giao dịch từ xa",
 );
 
 // ─── X. Admin: đơn chờ xác nhận + tổng doanh thu + quản trị viên nhóm ───────

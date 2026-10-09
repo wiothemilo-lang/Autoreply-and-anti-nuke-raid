@@ -27,7 +27,7 @@ export interface LegalDoc {
 }
 
 /** Ngày rà soát gần nhất — hiển thị ở đầu mỗi văn bản. */
-export const LEGAL_UPDATED = "22/09/2026";
+export const LEGAL_UPDATED = "09/10/2026";
 
 /**
  * Bố cục cố định: mọi ngôn ngữ phải có ĐÚNG các văn bản này, cùng số mục.
@@ -58,6 +58,7 @@ const VI: LegalDoc[] = [
         paragraphs: [
           "Bạn cần một tài khoản Discord hợp lệ và phải tuân theo Điều khoản dịch vụ cùng Nguyên tắc cộng đồng của Discord. Protogon không hướng tới người dùng dưới 13 tuổi hoặc dưới độ tuổi tối thiểu theo luật tại nơi bạn sinh sống.",
           "Để cấu hình bot cho một server, bạn phải có quyền quản trị server đó. Protogon không cấp quyền mà bạn chưa có trên Discord.",
+          "Để mua gói Premium trên dashboard, bạn phải đủ 18 tuổi và có đầy đủ năng lực hành vi dân sự theo quy định pháp luật; người chưa đủ 18 tuổi chỉ tham gia giao dịch khi có người giám hộ hợp pháp đứng tên.",
         ],
       },
       {
@@ -110,6 +111,13 @@ const VI: LegalDoc[] = [
         paragraphs: [
           "Điều khoản có thể được cập nhật; ngày rà soát gần nhất ghi ở đầu trang. Việc bạn tiếp tục dùng bot sau ngày đó nghĩa là bạn chấp nhận bản mới.",
           "Câu hỏi về điều khoản: gửi trong kênh hỗ trợ của cộng đồng Discord Protogon. Liên kết nằm ở phần chân trang của website.",
+        ],
+      },
+      {
+        heading: "9. Luật áp dụng và giải quyết tranh chấp",
+        paragraphs: [
+          "Điều khoản này chịu sự điều chỉnh của pháp luật Việt Nam. Tranh chấp phát sinh từ việc sử dụng Protogon được ưu tiên giải quyết bằng thương lượng, hòa giải tại kênh hỗ trợ của cộng đồng.",
+          "Nếu không đạt được thỏa thuận, một trong hai bên có quyền yêu cầu giải quyết tại trọng tài thương mại hoặc Tòa án có thẩm quyền tại Việt Nam.",
         ],
       },
     ],
@@ -187,6 +195,7 @@ const VI: LegalDoc[] = [
           "Xem và chỉnh sửa cấu hình, danh sách whitelist, câu trả lời và backup trong dashboard.",
           "Yêu cầu xuất hoặc xoá dữ liệu của server hoặc của cá nhân bạn.",
           "Phản đối việc tiếp tục lưu trữ: cách triệt để nhất là gỡ bot khỏi server, sau đó gửi yêu cầu xoá.",
+          "Được thông báo rõ mục đích, phạm vi và thời hạn lưu trữ TRƯỚC KHI chúng tôi thu thập thông tin, tự chọn phạm vi thông tin đồng ý cung cấp; khi thay đổi mục đích sử dụng, chúng tôi thông báo lại và xin đồng ý mới.",
         ],
       },
       {
@@ -195,6 +204,7 @@ const VI: LegalDoc[] = [
           "Quyền truy cập dashboard dựa trên đăng nhập Discord OAuth2 và được kiểm tra lại ở phía backend cho từng yêu cầu; không có backdoor hay đường tắt bỏ qua xác thực.",
           "Các thao tác quản trị cấp cao cần khoá bot riêng, khoá này được lưu ở dạng băm. File backup có thể được mã hoá AES-256-GCM và kiểm tra toàn vẹn bằng SHA-256 trước khi khôi phục.",
           "Phát hiện sự cố ảnh hưởng dữ liệu: chúng tôi thông báo cho chủ server bị ảnh hưởng qua kênh liên hệ đã đăng ký.",
+          "Khi hệ thống thông tin bị tấn công làm phát sinh nguy cơ mất an ninh mạng của người tiêu dùng, chúng tôi thông báo cho cơ quan quản lý nhà nước có thẩm quyền trong thời hạn 24 giờ kể từ thời điểm phát hiện và áp dụng các biện pháp khắc phục cần thiết.",
         ],
       },
       {
@@ -312,6 +322,7 @@ const EN: LegalDoc[] = [
         paragraphs: [
           "You need a valid Discord account and must comply with Discord's Terms of Service and Community Guidelines. Protogon is not intended for users under 13, or under the minimum age required by the law where you live.",
           "To configure the bot for a server you must hold administrative rights on that server. Protogon never grants you permissions you do not already have on Discord.",
+          "To buy a Premium plan on the dashboard you must be at least 18 years old and have full civil capacity under the law; anyone under 18 may only take part in a transaction when a legal guardian is the contracting party.",
         ],
       },
       {
@@ -362,6 +373,13 @@ const EN: LegalDoc[] = [
         paragraphs: [
           "These terms may be updated; the last review date is shown at the top of the page. Continuing to use the bot after that date means you accept the new version.",
           "Questions about these terms: post in the support channel of the Protogon Discord community. The link is in the website footer.",
+        ],
+      },
+      {
+        heading: "9. Governing law and dispute resolution",
+        paragraphs: [
+          "These terms are governed by Vietnamese law. Disputes arising from the use of Protogon are first settled through negotiation and conciliation in the community support channel.",
+          "If no agreement is reached, either party may request settlement by commercial arbitration or by a competent court in Vietnam.",
         ],
       },
     ],
@@ -441,6 +459,7 @@ const EN: LegalDoc[] = [
           "View and edit configuration, whitelist entries, auto-replies, and backups in the dashboard.",
           "Request an export or deletion of your server's data or your personal data.",
           "Object to continued storage: the most thorough route is to remove the bot from the server, then send a deletion request.",
+          "Be informed of the purpose, scope, and retention period BEFORE we collect your information, and choose which scope of information you consent to provide; if the purpose of use changes, we notify you again and ask for new consent.",
         ],
       },
       {
@@ -449,6 +468,7 @@ const EN: LegalDoc[] = [
           "Dashboard access relies on Discord OAuth2 sign-in and is re-checked on the backend for every request; there is no backdoor and no way to skip authentication.",
           "High-privilege administrative actions require a separate bot key, stored as a hash. Backup files can be encrypted with AES-256-GCM and verified with SHA-256 before a restore.",
           "If an incident affects data, we notify the affected server owners through their registered contact channel.",
+          "When an attack on an information system creates a risk to the cybersecurity of consumer information, we notify the competent state management authority within 24 hours of becoming aware of the attack and apply the necessary remedial measures.",
         ],
       },
       {
@@ -566,6 +586,7 @@ const DE: LegalDoc[] = [
         paragraphs: [
           "Du brauchst ein gültiges Discord-Konto und musst die Discord-Nutzungsbedingungen und Community-Richtlinien einhalten. Protogon richtet sich nicht an Personen unter 13 Jahren oder unter dem in deinem Land geltenden Mindestalter.",
           "Um den Bot für einen Server zu konfigurieren, brauchst du Verwaltungsrechte auf diesem Server. Protogon vergibt keine Rechte, die du auf Discord nicht schon hast.",
+          "Um einen Premium-Tarif im Dashboard zu kaufen, musst du mindestens 18 Jahre alt und voll geschäftsfähig sein; Personen unter 18 Jahren nehmen nur teil, wenn ein gesetzlicher Vertreter als Vertragspartner auftritt.",
         ],
       },
       {
@@ -618,6 +639,13 @@ const DE: LegalDoc[] = [
         paragraphs: [
           "Diese Bedingungen können aktualisiert werden; das Datum der letzten Prüfung steht oben auf der Seite. Wer den Bot danach weiter nutzt, akzeptiert die neue Fassung.",
           "Fragen zu diesen Bedingungen: im Support-Kanal der Protogon-Discord-Community. Der Link steht im Footer der Website.",
+        ],
+      },
+      {
+        heading: "9. Anwendbares Recht und Streitbeilegung",
+        paragraphs: [
+          "Diese Bedingungen unterliegen dem vietnamesischen Recht. Streitigkeiten aus der Nutzung von Protogon werden zuerst durch Verhandlung und Schlichtung im Support-Kanal der Community geklärt.",
+          "Kommt keine Einigung zustande, kann jede Partei die Entscheidung durch ein kommerzielles Schiedsgericht oder ein zuständiges Gericht in Vietnam beantragen.",
         ],
       },
     ],
@@ -698,6 +726,7 @@ const DE: LegalDoc[] = [
           "Konfiguration, Whitelist, Auto-Antworten und Backups im Dashboard ansehen und ändern.",
           "Export oder Löschung der Server- oder Personendaten verlangen.",
           "Der weiteren Speicherung widersprechen: am gründlichsten, indem du den Bot entfernst und dann eine Löschung beantragst.",
+          "Vor der Erhebung über Zweck, Umfang und Aufbewahrungsdauer deiner Informationen INFORMIERT zu werden und selbst zu wählen, welchem Umfang du zustimmst; ändert sich der Verwendungszweck, informieren wir erneut und holen eine neue Einwilligung ein.",
         ],
       },
       {
@@ -706,6 +735,7 @@ const DE: LegalDoc[] = [
           "Der Dashboard-Zugang beruht auf Discord-OAuth2 und wird bei jeder Anfrage im Backend erneut geprüft; es gibt keine Hintertür und keinen Weg an der Authentifizierung vorbei.",
           "Verwaltungsaktionen mit hohen Rechten benötigen einen separaten Bot-Schlüssel, der als Hash gespeichert wird. Backup-Dateien können mit AES-256-GCM verschlüsselt und vor dem Wiederherstellen per SHA-256 geprüft werden.",
           "Bei einem Vorfall mit Datenbezug informieren wir die betroffenen Serverbesitzer über ihren hinterlegten Kontaktweg.",
+          "Wird ein Informationssystem angegriffen und entsteht dadurch ein Risiko für die Cybersicherheit der Verbraucherdaten, informieren wir die zuständige staatliche Stelle innerhalb von 24 Stunden nach Kenntnis des Angriffs und ergreifen die erforderlichen Abhilfemaßnahmen.",
         ],
       },
       {

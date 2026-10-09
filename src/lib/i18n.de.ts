@@ -187,6 +187,8 @@ export const DE: Record<string, string> = {
   "Rủi ro cao": "Hohes Risiko",
   "Rủi ro": "Risiko",
   "Bằng chứng": "Belege",
+  "Bằng việc đăng nhập, bạn đồng ý với hai văn bản pháp lý sau:":
+    "Mit der Anmeldung stimmst du diesen beiden Rechtstexten zu:",
   "Xử lý": "Maßnahme",
   Tuổi: "Alter",
   "Yếu tố": "Faktor",
