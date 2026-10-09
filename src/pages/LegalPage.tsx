@@ -74,9 +74,15 @@ export default function LegalPage({ slug }: { slug: LegalSlug }) {
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <LangSwitch />
-            <Button asChild variant="outline" size="sm">
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" /> {translate("Về trang chủ")}{" "}
+            {/* Nút chỉ hiện MŨI TÊN dưới sm (bug 09/10/2026): hàng header này
+                không wrap, tổng tối thiểu (logo + wordmark + LangSwitch + nút
+                chữ) vượt màn 360px ⇒ phần tràn bị body overflow-x:clip CẮT mất
+                (nút "Về trang chủ" cụt 5px @360px — không cuộn xem lại được).
+                Giữ aria-label cho screen reader; hiện lại chữ từ sm (640px). */}
+            <Button asChild variant="outline" size="sm" className="shrink-0">
+              <Link to="/" aria-label={translate("Về trang chủ")}>
+                <ArrowLeft className="h-4 w-4" />{" "}
+                <span className="hidden sm:inline">{translate("Về trang chủ")}</span>
               </Link>
             </Button>
           </div>

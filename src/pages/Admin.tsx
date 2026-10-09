@@ -98,7 +98,9 @@ function AdminContent() {
             <Link
               to="/"
               aria-label={translate("← Về trang chủ")}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              // shrink-0 (bug 09/10/2026): hàng header KHÔNG wrap — cùng cấu trúc
+              // Monitor.tsx, khi chật flex bóp nút back từ 36px xuống 18px @≤390px.
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>

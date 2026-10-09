@@ -1790,6 +1790,110 @@ browserTest("J4. Mobile: avatar người dùng không bị bóp, header không t
   }
 });
 
+// ─── K. HEADER TRANG NỘI BỘ TRÊN MOBILE KHÔNG ĐƯỢC BỊ CẮT / BÓP ─────────────
+// Bug bắt được bằng audit thật 4 viewport × 11 route (09/10/2026):
+//  K1 — /terms (cùng /privacy, /data-deletion — chung component LegalPage): hàng
+//       header (logo + LangSwitch + nút "Về trang chủ") KHÔNG wrap; khi chật,
+//       phần tràn bị body overflow-x:clip CẮT mất — nút cụt 5px @360px và
+//       ~45px @320px, người dùng KHÔNG cuộn xem lại được (khác với tràn
+//       thông thường — ở đây lặng lẽ mất nội dung).
+//  K2 — /monitor (và /admin cùng cấu trúc): hàng không wrap + LangSwitch
+//       shrink-0 ⇒ flex bóp nút back h-9 w-9 (36px) xuống 18px @≤390px — nút
+//       móp, vùng bấm hụt. Đo chính nút thật, không replica.
+browserTest("K1. Mobile: nút trở lại ở header trang pháp lý nằm trọn trong màn", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+  for (const [w, h] of [
+    [360, 800],
+    [320, 700],
+  ]) {
+    await page.send("Emulation.setDeviceMetricsOverride", {
+      width: w,
+      height: h,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await page.goto(ctx.base + "/terms");
+    const ready = await waitForPage(
+      page,
+      `${OVERLAY_GONE} && !!document.querySelector("header .container.flex.h-16 > *:last-child a[href='/']")`,
+      25000,
+    );
+    t.assert.ok(ready, `trang /terms phải render xong @${w}px (header có nút trở lại)`);
+    const m = await page.evaluate(`(() => {
+      const row = document.querySelector("header .container.flex.h-16");
+      // Nút "Về trang chủ" nằm trong NHÓM PHẢI (child cuối) — child đầu là logo
+      // cũng href="/" nên querySelector đại khái sẽ đo nhầm logo (bài học khi
+      // viết test này: diagnostic lộ ngay đo nhầm w=125).
+      const btn = row && row.lastElementChild && row.lastElementChild.querySelector("a[href='/']");
+      if (!row || !btn) return null;
+      const r = btn.getBoundingClientRect();
+      return {
+        left: Math.round(r.left), right: Math.round(r.right), w: Math.round(r.width),
+        vw: innerWidth, rowScroll: row.scrollWidth, rowClient: row.clientWidth,
+      };
+    })()`);
+    t.assert.ok(m, `${w}px: phải tìm thấy nút trở lại trong header trang pháp lý`);
+    if (!m) continue;
+    t.diagnostic(`${w}px /terms header: ${JSON.stringify(m)}`);
+    t.assert.ok(
+      m.right <= m.vw && m.left >= 0,
+      `K1 @${w}px: nút trở lại phải nằm TRỌN trong màn — right=${m.right} > vw=${m.vw} ` +
+        "(tràn bị overflow-x:clip cắt mất, không cuộn xem lại được — bug 09/10)",
+    );
+    t.assert.ok(m.w >= 32, `K1 @${w}px: nút không bị bóp (đo được w=${m.w}px)`);
+    t.assert.ok(
+      m.rowScroll <= m.rowClient,
+      `K1 @${w}px: hàng header không được tràn (scroll=${m.rowScroll} > client=${m.rowClient})`,
+    );
+  }
+});
+
+browserTest("K2. Mobile: nút back góc trái trang Giám sát không bị bóp", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+  for (const [w, h] of [
+    [390, 844],
+    [360, 800],
+    [320, 700],
+  ]) {
+    await page.send("Emulation.setDeviceMetricsOverride", {
+      width: w,
+      height: h,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await page.goto(ctx.base + "/monitor");
+    const ready = await waitForPage(
+      page,
+      `${OVERLAY_GONE} && !!document.querySelector("header a[class*='h-9'][href='/']")`,
+      25000,
+    );
+    t.assert.ok(ready, `trang /monitor phải render xong @${w}px (có nút back h-9)`);
+    const m = await page.evaluate(`(() => {
+      const btn = document.querySelector("header a[class*='h-9'][href='/']");
+      if (!btn) return null;
+      const r = btn.getBoundingClientRect();
+      return { left: Math.round(r.left), right: Math.round(r.right),
+               w: Math.round(r.width), h: Math.round(r.height), vw: innerWidth };
+    })()`);
+    t.assert.ok(m, `${w}px: phải tìm thấy nút back góc trái trang Giám sát`);
+    if (!m) continue;
+    t.diagnostic(`${w}px /monitor back: ${JSON.stringify(m)}`);
+    t.assert.ok(
+      m.w >= 34 && m.h >= 34,
+      `K2 @${w}px: nút back phải giữ đủ 36×36 — đo được ${m.w}×${m.h} ` +
+        "(flex bóp nút khi hàng header chật là bug 09/10: 18×36 @390px)",
+    );
+    t.assert.ok(
+      m.right <= m.vw && m.left >= 0,
+      `K2 @${w}px: nút back phải nằm trong màn (right=${m.right} > vw=${m.vw})`,
+    );
+  }
+});
+
 // Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server + dừng breadcrumb
 test.after(() => {
   clearInterval(progressBreadcrumb);
