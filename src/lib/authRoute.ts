@@ -62,7 +62,12 @@ export function resolveAuthPageState({
   me: unknown;
   returnTo: string | null | undefined;
 }): AuthPageState {
-  if (me === undefined) return { kind: "splash" };
+  if (me === undefined && hasToken) return { kind: "splash" };
+  // ↑ Splash CHỈ khi ĐANG CÓ token cần kiểm tra. Không token thì query bị
+  // "skip" nên me = undefined MÃI MÃI — phải hiện form ngay. Bug thật
+  // 10/10/2026: nhánh trên từng bỏ qua hasToken → khách chưa đăng nhập mở
+  // /auth (hoặc bị RequireAuth đá sang) bị kẹt vô hạn ở màn "Đang kiểm tra
+  // phiên đăng nhập…", không thấy nút đăng nhập, không đăng nhập được.
   if (hasToken && me) {
     const to = safeRedirectPath(returnTo, "/dashboard");
     return { kind: "app", to: isAuthLoopTarget(to) ? "/dashboard" : to };
