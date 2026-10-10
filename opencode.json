@@ -6,6 +6,27 @@
     "AGENT_HISTORY_TTL_DAYS": "14",
     "OPENCODE_ENABLE_EXA": "1"
   },
+  "provider": {
+    "kiira": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Kiira",
+      "options": {
+        "baseURL": "http://127.0.0.1:8787",
+        "apiKey": "{file:~/.secrets/kiira-key}"
+      },
+      "models": {
+        "qwen3.8-flash": {
+          "name": "Qwen 3.8 Flash"
+        },
+        "deepseek-v4.1-flash": {
+          "name": "DeepSeek V4.1 Flash"
+        },
+        "glm-5.3-flash": {
+          "name": "GLM 5.3 Flash"
+        }
+      }
+    }
+  },
   "permission": {
     "*": "allow",
     "read": {
