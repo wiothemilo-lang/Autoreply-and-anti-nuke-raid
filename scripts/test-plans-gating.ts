@@ -24,6 +24,7 @@ import {
 } from "../convex/plans";
 import { add as autoReplyAdd } from "../convex/autoreplies";
 import { setRetention } from "../convex/backup";
+import { importGuildConfigHandler } from "../convex/guilds/configPortability";
 import { CURRENT_SESSION_AUTH_VERSION } from "../convex/auth";
 
 type Row = Record<string, any>;
@@ -319,6 +320,44 @@ async function run() {
     () => addH(makeCtx(seed({ rules: 5 })), { ...ruleArgs("x"), token: "tok-sai" }),
     /Không có quyền quản lý|Phiên đăng nhập/,
   );
+
+  console.log("── 7. Nhập file cấu hình không lọt hạn mức gói ──");
+  {
+    const words = (n: number) => Array.from({ length: n }, (_, i) => `từ ${i}`);
+    const importCfg = (tables: Record<string, Row[]>, badWords: string[]) =>
+      importGuildConfigHandler(makeCtx(tables) as any, {
+        token: "tok",
+        guildId: GUILD,
+        config: { badWords },
+      });
+
+    const tFree = seed();
+    await expectThrow(
+      "Miễn phí nhập 30 từ qua file cấu hình → chặn theo gói (từng lọt trần cứng 100)",
+      () => importCfg(tFree, words(30)),
+      /Gói Miễn phí cho tối đa 20 từ khoá cấm/,
+    );
+    check(
+      "chặn TRƯỚC khi ghi — badWords của guild không bị đụng",
+      tFree.guilds[0].badWords === undefined,
+    );
+
+    const tSup = seed({ entitlements: [activeEnt("supporter")] });
+    const ok = await importCfg(tSup, words(30));
+    check(
+      "Đồng hành nhập 30 từ (≤60) qua file cấu hình → ghi được",
+      ok.ok === true && tSup.guilds[0].badWords?.length === 30,
+      ok,
+    );
+
+    const tFreeOk = seed();
+    const ok2 = await importCfg(tFreeOk, words(15));
+    check(
+      "Miễn phí 15 từ (≤20) vẫn qua — không chặn oan",
+      ok2.ok === true && tFreeOk.guilds[0].badWords?.length === 15,
+      ok2,
+    );
+  }
 
   console.log(`\n${pass}/${pass + fail} assertion xanh`);
   if (fail > 0) process.exit(1);

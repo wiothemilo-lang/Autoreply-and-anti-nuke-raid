@@ -13,6 +13,7 @@ import type { ObjectType } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getUserByToken, canManageGuild } from "../auth";
 import { buildGuildConfigExport, sanitizeImportedConfig } from "../guildConfig";
+import { assertWithinLimit, planForGuild } from "../plans";
 
 /**
  * Xuất cấu hình server ra JSON (để lưu ở nơi khác / dán lại sau khi đổi host).
@@ -66,6 +67,15 @@ export async function importGuildConfigHandler(
   if (!guild || !canManageGuild(user, guild)) throw new Error("Không có quyền quản lý server này");
 
   const result = sanitizeImportedConfig(config, guild);
+  // Hạn mức gói PHẢI chặn Ở ĐÂY như mọi tầng ghi khác — file cấu hình là lối
+  // vào thẳng mutation, ẩn nút trên web không bảo vệ gì (điều khoản của
+  // convex/plans.ts). Trước đây nhánh badWords trong sanitize chỉ giữ trần cứng
+  // 100 từ → gói Miễn phí (trần 20) nhập file là có cả 100 — lọt hệt cảnh
+  // "gọi API trực tiếp phải bị chặn như nhau" mà file plans sinh ra để chấm dứt.
+  if (Array.isArray(result.patch.badWords)) {
+    const { plan } = await planForGuild(ctx, guildId);
+    assertWithinLimit(plan, "badWords", result.patch.badWords.length);
+  }
   // Không có gì để ghi — trả về số liệu để UI báo, đừng patch rỗng rồi báo
   // "thành công" là gây hiểu nhầm.
   if (result.applied.length === 0) {
