@@ -1095,6 +1095,14 @@ export default defineSchema({
     gauges: v.record(v.string(), v.number()),
     /** Histogram đã gộp: chỉ count + sum cho mỗi cặp nhãn. */
     histograms: v.record(v.string(), v.number()),
+    /**
+     * Số dòng lịch sử `sample` hiện có — đếm ngay trên row `latest` để dọn cũ
+     * O(1) (chỉ xoá phần vượt trần) thay vì collect() toàn ~576 dòng mỗi lượt
+     * đẩy như trước (botRecordMetrics từng chiếm 1.61GB Database I/O / 9 ngày).
+     */
+    sampleCount: v.optional(v.number()),
+    /** Thời điểm đếm lại toàn lịch sử gần nhất — tự chữa sai số định kỳ. */
+    sampleCountAt: v.optional(v.number()),
   })
     .index("by_kind_at", ["kind", "at"])
     .index("by_at", ["at"]),

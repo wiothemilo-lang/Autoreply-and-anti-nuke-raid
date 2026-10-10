@@ -492,7 +492,7 @@ function fireReaction(client, store, reaction, user, removed = false) {
       ),
     );
     check(
-      "DM bị chặn → KHÔNG clear cờ (giữ lại để thử lại)",
+      "DM bị chặn → KHÔNG đánh dấu đã gửi (không gọi botClearDm; server tự dọn cờ dmRequested khi ghi lỗi — test-db-io-balance chặn)",
       !s2._mutations.some((m) => m.name === "hidden:botClearDm"),
     );
 

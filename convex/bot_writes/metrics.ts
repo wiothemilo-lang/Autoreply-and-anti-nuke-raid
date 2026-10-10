@@ -17,6 +17,12 @@ import { requireBotKeyStrict } from "../botAuth";
  * Dọn khi ghi nên không cần một cron riêng (bot không đẩy = có gì cần dọn?).
  */
 const METRICS_HISTORY_CAP = 576;
+/**
+ * Đếm lại toàn lịch sử (≤ CAP+1 dòng) mỗi 24h để tự chữa sai số do push trùng
+ * lặp/giao tranh làm lệch ±1 mẫu. Bình quân chi phí rải ~2 dòng/lượt đẩy, so
+ * với việc collect() ~576 dòng MỖI lượt như trước (1.61GB I/O / 9 ngày).
+ */
+const METRICS_RECOUNT_INTERVAL_MS = 24 * 60 * 60_000;
 /** Trần số khoá trong mỗi nhóm số đo — bot tự giới hạn 500, đây là lưới an toàn
  *  phía server (bot bị sửa cấu hình/đẩy rác thì bảng không phình vô hạn). */
 const METRICS_KEY_CAP = 600;
@@ -43,7 +49,9 @@ function sanitizeRecord(input: Record<string, number>): Record<string, number> {
  *
  * Ghi HAI dòng: `latest` (upsert, dashboard đọc) và `sample` (lịch sử để vẽ
  * đường). Số đo là việc thừa theo định kỳ, nên mutation này phải rẻ: không
- * `await` tuần tự từng bản ghi, chỉ ghi 2 dòng rồi dọn cũ khi vượt trần.
+ * `await` tuần tự từng bản ghi, chỉ ghi 2 dòng rồi dọn cũ O(1) — số mẫu lịch
+ * sử được ĐẾM sẵn trên row `latest` (`sampleCount`) nên mỗi lượt đẩy chỉ đọc
+ * phần vượt trần (thường 1 dòng), không collect() toàn bảng như trước.
  */
 export const botRecordMetricsArgs = {
   at: v.number(),
@@ -64,30 +72,54 @@ export async function botRecordMetricsHandler(ctx: MutationCtx, args: BotRecordM
     histograms: sanitizeRecord(args.histograms),
   };
 
+  // 1 dòng `latest` — vừa upsert, vừa là nơi ĐẾM số mẫu lịch sử (không collect).
   const latest = await ctx.db
     .query("botMetrics")
     .withIndex("by_kind_at", (q) => q.eq("kind", "latest"))
     .first();
+
+  // Số mẫu: đọc từ count đã lưu; đếm lại toàn lịch sử mỗi 24h (hoặc khi chưa
+  // từng đếm — row cũ từ trước khi có field) để tự chữa sai số.
+  const storedCount = typeof latest?.sampleCount === "number" ? latest.sampleCount : -1;
+  const storedRecountAt = typeof latest?.sampleCountAt === "number" ? latest.sampleCountAt : 0;
+  const needRecount = storedCount < 0 || at - storedRecountAt >= METRICS_RECOUNT_INTERVAL_MS;
+  let sampleCount = needRecount
+    ? (
+        await ctx.db
+          .query("botMetrics")
+          .withIndex("by_kind_at", (q) => q.eq("kind", "sample"))
+          .order("desc")
+          .take(METRICS_HISTORY_CAP + 1)
+      ).length
+    : storedCount;
+
+  // Trần lịch sử TRƯỚC khi chèn: chỉ đọc đúng phần vượt (0 dòng khi chưa vượt)
+  // — mỗi lượt đẩy O(1) dòng thay vì quét toàn ~576 dòng như code cũ.
+  if (sampleCount + 1 > METRICS_HISTORY_CAP) {
+    const excess = sampleCount + 1 - METRICS_HISTORY_CAP;
+    const oldest = await ctx.db
+      .query("botMetrics")
+      .withIndex("by_kind_at", (q) => q.eq("kind", "sample"))
+      .order("asc")
+      .take(excess);
+    for (const row of oldest) await ctx.db.delete(row._id);
+    sampleCount -= oldest.length;
+  }
+  sampleCount += 1;
+
+  const countPatch = { sampleCount, ...(needRecount ? { sampleCountAt: at } : {}) };
   if (latest) {
-    await ctx.db.patch(latest._id, { at, ...payload });
+    await ctx.db.patch(latest._id, { at, ...payload, ...countPatch });
   } else {
-    await ctx.db.insert("botMetrics", { kind: "latest" as const, at, ...payload });
+    await ctx.db.insert("botMetrics", {
+      kind: "latest" as const,
+      at,
+      ...payload,
+      ...countPatch,
+    });
   }
 
   await ctx.db.insert("botMetrics", { kind: "sample" as const, at, ...payload });
-
-  // Dọn lịch sử cũ — chỉ khi vượt trần, và giới hạn số lần dọn mỗi lượt để
-  // không phình chính mutation này khi bot chạy lâu.
-  const samples = await ctx.db
-    .query("botMetrics")
-    .withIndex("by_kind_at", (q) => q.eq("kind", "sample"))
-    .collect();
-  if (samples.length > METRICS_HISTORY_CAP) {
-    const excess = samples
-      .sort((a, b) => a.at - b.at)
-      .slice(0, samples.length - METRICS_HISTORY_CAP);
-    await Promise.all(excess.slice(0, 200).map((row) => ctx.db.delete(row._id)));
-  }
 
   return { ok: true, at };
 }

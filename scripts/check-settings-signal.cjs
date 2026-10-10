@@ -73,7 +73,8 @@ const ALLOWLIST = {
     "yêu cầu DM đi qua batch tick đọc TƯƠI (buildHiddenJobs đọc g.dmRequested từ DB) → tới bot trong 1 tick, không phụ thuộc bundle cache",
   "hidden.ts::botClearDm":
     "bot xoá cờ sau khi gửi DM; cờ được batch tick đọc tươi, không qua cache",
-  "hidden.ts::botReportDmError": "bot báo lỗi gửi DM; web đọc — bot không đọc lại field này",
+  "hidden.ts::botReportDmError":
+    "bot báo lỗi gửi DM VÀ tắt cờ dmRequested (trạng thái kết thúc) — giữ cờ thì guild lỗi DM vĩnh viễn kẹt TTL 30s config cache + bot gửi lại mỗi tick; web đọc dmError, admin gửi lại qua requestDm",
   "guilds.ts::clearVerifySendPanel":
     "bot xoá cờ sau khi gửi panel; verifySendPanel được batch tick đọc TƯƠI (bot_tick.getPendingJobs.verifyPanels)",
   "guilds.ts::clearTicketPanel":

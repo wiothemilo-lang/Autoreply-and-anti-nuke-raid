@@ -1335,6 +1335,13 @@ export const botReportDmError = mutation({
       dmError: String(error || "Lỗi không xác định").slice(0, 300),
       dmErrorAt: Date.now(),
       updatedAt: Date.now(),
+      // Ghi lỗi = trạng thái KẾT THÚC, phải tắt luôn cờ dmRequested: nếu giữ
+      // cờ, guild bị lỗi DM vĩnh viễn (user tắt DM) kẹt nhánh TTL 30s trong
+      // getConfig mãi mãi + bot gửi lại mỗi tick — một trong 2 nguyên nhân
+      // thật gây 968MB Database I/O / 9 ngày ở getBotConfig. Admin gửi lại
+      // được qua requestDm (bật cờ + xoá lỗi cũ); giữ target/message để hiển
+      // thị bối cảnh lỗi.
+      dmRequested: false,
     });
     return { ok: true };
   },
