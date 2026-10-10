@@ -1613,12 +1613,26 @@ export const DE: Record<string, string> = {
   "danh sách quản trị viên nhóm": "Team-Admin-Liste",
   "(do chủ bot đặt). Người dùng khác không thấy nút này và không truy cập được trang này.":
     "(vom Bot-Inhaber festgelegt). Andere Nutzer sehen diesen Eintrag nicht und können die Seite nicht öffnen.",
-  "Thêm thành viên trong team để họ cũng vào được cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn hay chìa khoá bảo mật API.":
-    "Team-Mitglieder hinzufügen, damit sie das Admin-Fenster ebenfalls öffnen können (Fehler, Host-Zustand, KI, Threat Research). Sie können das versteckte Passwort und den API-Sicherheitsschlüssel NICHT ändern.",
+  /* ==== 10/10/2026 — Team-Admin nutzt das GANZE Admin-Fenster + Badge am
+     Logo + manuelles Plan-Vergeben (payments.grantPlan) ==== */
+  Owner: "Owner",
+  Admin: "Admin",
+  "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research, đối soát tiền, cấp gói). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.":
+    "Füge Personen zum Team hinzu, damit sie das GANZE Admin-Fenster nutzen (Fehlerüberwachung, Host-Zustand, KI, Threat Research, Zahlungsabgleich, Plan-Vergabe). Sie können das versteckte Passwort/den API-Sicherheitsschlüssel NICHT anfassen und selbst niemanden hinzufügen oder entfernen.",
+  "Chưa có ai trong team — hãy thêm thành viên bên dưới.":
+    "Noch niemand im Team – füge unten Mitglieder hinzu.",
+  "Cấp gói premium": "Premium-Plan vergeben",
+  "Cấp gói": "Plan vergeben",
+  "Gói cấp": "Vergebener Plan",
+  "Đã cấp gói.": "Plan vergeben.",
+  "Đã cấp gói {goi} — hạn tới {ngay}.": "{goi} vergeben – gültig bis {ngay}.",
+  "Cộng quyền lợi cho một người mà KHÔNG qua đơn thanh toán (bồi thường, đối tác, tài khoản thử). Nhập Discord ID người được cấp; nhập thêm Server ID nếu quyền lợi phải áp đúng cho server đó.":
+    "Berechtigungen vergeben ohne Zahlungsbestellung (Entschädigung, Partner, Testkonto). Gib die Discord-ID des Empfängers ein; füge eine Server-ID hinzu, wenn die Berechtigung nur für diesen Server gelten soll.",
+  "Discord ID người được cấp (15-21 chữ số)": "Discord-ID des Empfängers (15-21 Ziffern)",
+  "Server ID (tùy chọn — 15-21 chữ số)": "Server-ID (optional – 15-21 Ziffern)",
+  "Số ngày (1–365)": "Anzahl Tage (1–365)",
   "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.":
     "Du bist Team-Admin — diese Liste verwaltet der Bot-Inhaber. Bitte den Bot-Inhaber, Personen hinzuzufügen oder zu entfernen.",
-  "Chưa có ai — hiện chỉ chủ bot vào được cửa sổ này.":
-    "Noch niemand — derzeit kann nur der Bot-Inhaber dieses Fenster öffnen.",
   "Chưa từng đăng nhập web": "Noch nie im Web angemeldet",
   "Bỏ quyền quản trị viên nhóm": "Team-Admin-Rechte entziehen",
   "Discord ID (15-21 chữ số)": "Discord-ID (15-21 Ziffern)",

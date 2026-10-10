@@ -14,7 +14,8 @@
 // Mọi hạn mức đều được enforce ở TẦNG GHI (mutation) — ẩn nút trên web không
 // phải là bảo vệ: gọi API trực tiếp phải bị chặn như nhau.
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { query, type QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { canManageGuild, getUserByToken } from "./auth";
 
 /**
@@ -162,6 +163,42 @@ export function assertWithinLimit(
       ? ` Bạn đã ở gói cao nhất — hãy giảm xuống ${cap} ${LIMIT_LABELS[key]}.`
       : ` Nâng lên gói ${PLAN_LABELS[up]} để dùng ${PLAN_LIMITS[up][key]} ${LIMIT_LABELS[key]}.`;
   throw new Error(`Gói ${PLAN_LABELS[id]} cho tối đa ${cap} ${LIMIT_LABELS[key]}.${hint}`);
+}
+
+/**
+ * Quyền lợi CỦA MỘT NGƯỜI — entitlement đang hiệu lực và CAO NHẤT (null = chưa
+ * mua / đã hết hạn).
+ *
+ * Vì sao không lấy `.first()`: một người có thể có nhiều dòng (mua cho nhiều
+ * server, đơn cũ hết hạn) — tin dòng đầu là có thể gắn nhãn "gói Tiên phong"
+ * cho một đơn đã chết trong khi đơn còn hạn nằm ngay sau đó.
+ *
+ * Dòng có `plan` lạ/rác bị LOẠI (asPlanId → free → bỏ qua) — dữ liệu bẩn không
+ * bao giờ thành quyền lợi hiển thị.
+ */
+export async function bestEntitlementForUser(
+  ctx: QueryCtx,
+  userId: Id<"users"> | null | undefined,
+): Promise<{ plan: string; startsAt: number; expiresAt: number } | null> {
+  if (!userId) return null;
+  const rows = await ctx.db
+    .query("entitlements")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .collect();
+  const now = Date.now();
+  let best: { plan: string; startsAt: number; expiresAt: number } | null = null;
+  let bestRank = -1;
+  for (const r of rows) {
+    if (r.expiresAt <= now) continue;
+    const plan = asPlanId(r.plan);
+    if (plan === "free") continue;
+    const rank = PLAN_ORDER.indexOf(plan);
+    if (rank > bestRank) {
+      best = { plan, startsAt: r.startsAt, expiresAt: r.expiresAt };
+      bestRank = rank;
+    }
+  }
+  return best;
 }
 
 /** Kết quả tra gói của một server. */

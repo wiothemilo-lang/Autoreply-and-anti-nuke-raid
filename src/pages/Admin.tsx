@@ -17,6 +17,7 @@ import {
   Receipt,
   Server,
   ShieldCheck,
+  Sparkles,
   Trash2,
   UserPlus,
   X,
@@ -30,26 +31,55 @@ import { cn } from "../lib/utils";
 
 import LangSwitch from "../components/LangSwitch";
 import PageSplash from "../components/PageSplash";
+import UserTags from "../components/UserTags";
 
 import { dateLocale, translate } from "../lib/i18n";
 function AdminContent() {
   const token = getSessionToken();
-  // Hai vai trò KHÁC nhau, cố ý tách: `isAdmin` = vào được cửa sổ này (chủ bot
-  // hoặc quản trị viên nhóm do chủ bot thêm); `isOwner` = còn được đụng những
-  // thứ chỉ chủ bot (mật khẩu ẩn, tính năng ẩn, seed chìa khoá bot).
+  // Hai vai trò KHÁC nhau, cố ý tách: `isAdmin` = vào được cửa sổ này VÀ dùng
+  // được TOÀN BỘ tính năng trong nó (chủ bot hoặc quản trị viên nhóm do chủ bot
+  // thêm — 10/10/2026 mở toàn bộ cho team: danh sách, đối soát tiền, cấp gói);
+  // `isOwner` = còn được đụng thứ CHỈ chủ bot làm — mật khẩu ẩn, tính năng ẩn,
+  // seed chìa khoá bot và việc thêm/bớt quản trị viên (quyền tự nâng cấp quyền).
   const isOwner = useQuery(api.status.isOwner, token ? { token } : "skip");
   const isAdmin = useQuery(api.status.isAdmin, token ? { token } : "skip");
-  // Danh sách quản trị viên nhóm chỉ chủ bot đọc được (query tự guard).
-  const teamAdmins = useQuery(api.hidden.getTeamAdmins, isOwner ? { token } : "skip");
+  // Danh sách quản trị viên nhóm: cả chủ bot lẫn thành viên team đều xem được
+  // (query tự guard requireBotAdmin); SỬA vẫn chỉ chủ bot.
+  const teamAdmins = useQuery(api.hidden.getTeamAdmins, isAdmin === true ? { token } : "skip");
   const saveTeamAdmins = useMutation(api.hidden.setTeamAdmins);
 
   // Plan A — chuyển khoản thủ công: danh sách đơn chờ xác nhận + tổng doanh
-  // thu theo tháng/năm. Cả hai query đều SKIP khi chưa phải chủ sở hữu.
-  const reportedOrders = useQuery(api.payments.listReportedOrders, isOwner ? { token } : "skip");
-  const revenue = useQuery(api.payments.revenueStats, isOwner ? { token } : "skip");
+  // thu theo tháng/năm. Cả hai query đều SKIP khi người xem không phải Admin.
+  const reportedOrders = useQuery(
+    api.payments.listReportedOrders,
+    isAdmin === true ? { token } : "skip",
+  );
+  const revenue = useQuery(api.payments.revenueStats, isAdmin === true ? { token } : "skip");
   const confirmTransfer = useMutation(api.payments.confirmTransfer);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [transferMsg, setTransferMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // Cấp gói premium thủ công — cùng cổng requireBotAdmin với mọi tính năng ở
+  // đây; server kẹp 1..365 ngày + luật thứ bậc gói, UI không tự quyết quyền lợi.
+  const grantPlan = useMutation(api.payments.grantPlan);
+  const grantForAdmin = async (args: {
+    discordId: string;
+    guildId?: string;
+    plan: "supporter" | "pioneer";
+    days: number;
+  }): Promise<{ ok: boolean; error?: string; text?: string }> => {
+    try {
+      const res = await grantPlan({ token, ...args });
+      return {
+        ok: true,
+        text: translate("Đã cấp gói {goi} — hạn tới {ngay}.", {
+          goi: res.plan === "pioneer" ? translate("Tiên phong") : translate("Đồng hành"),
+          ngay: new Date(res.expiresAt).toLocaleDateString(dateLocale()),
+        }),
+      };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : translate("Lỗi kết nối") };
+    }
+  };
   const { status, latency, avg, incidents, lastUpdate, nextUpdate, refresh } = useBotMonitor(60000);
   const threat = useQuery(api.threatIntel.getSettings, { token });
   const researchHistory = useQuery(api.threatIntel.getResearchHistory, { token });
@@ -269,7 +299,7 @@ function AdminContent() {
                   }
                 }}
               />
-              {isOwner === true && (
+              {isAdmin === true && (
                 <>
                   <TransferOrdersCard
                     orders={reportedOrders}
@@ -296,6 +326,7 @@ function AdminContent() {
                   <RevenueCard revenue={revenue} />
                 </>
               )}
+              {isAdmin === true && <PremiumGrantCard onGrant={grantForAdmin} />}
               {isOwner === true && (
                 <div className="rounded-xl border border-border bg-card p-4">
                   <p className="flex items-center gap-1.5 font-display text-sm font-bold">
@@ -1277,14 +1308,70 @@ function ThreatIntelCard({
  * seed chìa khoá bot (những thứ đó = chiếm được bot). Vì vậy danh sách này CHỈ
  * chủ bot sửa được: người trong danh sách không tự thêm người khác.
  */
-/** Hồ sơ hiển thị của một quản trị viên nhóm (khớp `hidden.getTeamAdmins`). */
+/** Hồ sơ hiển thị trong thẻ danh sách (khớp `hidden.getTeamAdmins`). */
 type TeamAdminMember = {
   discordId: string;
   username: string | null;
   globalName: string | null;
   avatar: string | null;
   lastLoginAt: number | null;
+  /** Gói premium đang hiệu lực ("supporter" | "pioneer") — null nếu chưa có. */
+  plan: string | null;
 };
+
+/**
+ * Một hàng người dùng: logo + TÊN + ID và TAG vai trò/gói NGAY BÊN CẠNH logo.
+ * Dùng cho cả dòng CHỦ SỞ HỮU (tag Owner) lẫn thành viên team (tag Admin) để
+ * hai chỗ không thể vẽ khác nhau. Nút xoá chỉ hiện khi người xem là chủ bot —
+ * thành viên team xem read-only (`hidden.setTeamAdmins` vẫn owner-only).
+ */
+function teamMemberRow(
+  m: TeamAdminMember,
+  role: "owner" | "admin",
+  opts: { canRemove: boolean; busy: boolean; onRemove: (id: string) => void },
+) {
+  const name = m.globalName ?? m.username;
+  const avatar = discordAvatarUrl({ id: m.discordId, avatar: m.avatar });
+  return (
+    <li
+      key={m.discordId}
+      className="flex items-center gap-2.5 rounded-lg border border-border bg-secondary/30 px-2.5 py-2"
+    >
+      {avatar ? (
+        <img src={avatar} alt="" className="h-8 w-8 shrink-0 rounded-full" />
+      ) : (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold">
+          {(name ?? "?").slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      <UserTags
+        isOwner={role === "owner"}
+        isAdmin={role === "admin"}
+        plan={m.plan}
+        className="shrink-0"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">
+          {name ?? translate("Chưa từng đăng nhập web")}{" "}
+        </span>
+        <span className="block truncate font-mono text-[11px] text-muted-foreground">
+          {m.discordId}
+        </span>
+      </span>
+      {opts.canRemove && (
+        <button
+          type="button"
+          disabled={opts.busy}
+          onClick={() => opts.onRemove(m.discordId)}
+          aria-label={translate("Bỏ quyền quản trị viên nhóm")}
+          className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
+    </li>
+  );
+}
 
 function TeamAdminsCard({
   isOwner,
@@ -1292,7 +1379,7 @@ function TeamAdminsCard({
   onSave,
 }: {
   isOwner: boolean;
-  data: { max: number; members: TeamAdminMember[] } | undefined;
+  data: { max: number; members: TeamAdminMember[]; owner: TeamAdminMember | null } | undefined;
   onSave: (discordIds: string[]) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [input, setInput] = useState("");
@@ -1322,90 +1409,80 @@ function TeamAdminsCard({
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
         {translate(
-          "Thêm thành viên trong team để họ cũng vào được cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn hay chìa khoá bảo mật API.",
+          "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research, đối soát tiền, cấp gói). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.",
         )}{" "}
       </p>
 
-      {!isOwner ? (
-        <p className="mt-3 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
-          {translate(
-            "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.",
-          )}{" "}
-        </p>
-      ) : data === undefined ? (
+      {data === undefined ? (
         <p className="mt-3 text-xs text-muted-foreground">{translate("đang tải…")}</p>
       ) : (
         <>
-          {data.members.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-              {translate("Chưa có ai — hiện chỉ chủ bot vào được cửa sổ này.")}{" "}
-            </p>
-          ) : (
+          {/* Chủ bot LUÔN có quyền và KHÔNG nằm trong danh sách quản trị viên
+              nhóm — có dòng riêng thì mới có chỗ gắn tag Chủ sở hữu cạnh logo. */}
+          {data.owner && (
             <ul className="mt-3 space-y-1.5">
-              {data.members.map((m) => {
-                const name = m.globalName ?? m.username;
-                const avatar = discordAvatarUrl({ id: m.discordId, avatar: m.avatar });
-                return (
-                  <li
-                    key={m.discordId}
-                    className="flex items-center gap-2.5 rounded-lg border border-border bg-secondary/30 px-2.5 py-2"
-                  >
-                    {avatar ? (
-                      <img src={avatar} alt="" className="h-8 w-8 rounded-full" />
-                    ) : (
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold">
-                        {(name ?? "?").slice(0, 1).toUpperCase()}
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">
-                        {name ?? translate("Chưa từng đăng nhập web")}{" "}
-                      </span>
-                      <span className="block truncate font-mono text-[11px] text-muted-foreground">
-                        {m.discordId}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void save(ids.filter((id) => id !== m.discordId))}
-                      aria-label={translate("Bỏ quyền quản trị viên nhóm")}
-                      className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </li>
-                );
+              {teamMemberRow(data.owner, "owner", {
+                canRemove: false,
+                busy,
+                onRemove: (id) => void save(ids.filter((x) => x !== id)),
               })}
             </ul>
           )}
+          {data.members.length === 0 ? (
+            <p className="mt-3 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+              {translate("Chưa có ai trong team — hãy thêm thành viên bên dưới.")}{" "}
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-1.5">
+              {data.members.map((m) =>
+                teamMemberRow(m, "admin", {
+                  canRemove: isOwner,
+                  busy,
+                  onRemove: (id) => void save(ids.filter((x) => x !== id)),
+                }),
+              )}
+            </ul>
+          )}
 
-          <div className="mt-3 flex gap-2">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              inputMode="numeric"
-              placeholder={translate("Discord ID (15-21 chữ số)")}
-              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-            />
-            <button
-              type="button"
-              disabled={busy || input.trim().length === 0 || ids.length >= max}
-              onClick={async () => {
-                const added = input.trim();
-                if (await save([...ids, added])) setInput("");
-              }}
-              className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              {translate("Thêm")}{" "}
-            </button>
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            {translate("Tối đa")} {max} {translate("người.")}{" "}
-            {translate(
-              "Cách lấy ID: bật Chế độ nhà phát triển trong Discord → chuột phải vào người dùng → Sao chép ID.",
-            )}{" "}
-          </p>
+          {/* Sửa danh sách là QUYỀN TỰ NÂNG CẤP — chỉ chủ bot. Thành viên team
+              vẫn XEM được toàn bộ (và mọi tính năng khác trong Admin), chỉ không
+              tự thêm/bớt người. */}
+          {isOwner ? (
+            <>
+              <div className="mt-3 flex gap-2">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  inputMode="numeric"
+                  placeholder={translate("Discord ID (15-21 chữ số)")}
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                <button
+                  type="button"
+                  disabled={busy || input.trim().length === 0 || ids.length >= max}
+                  onClick={async () => {
+                    const added = input.trim();
+                    if (await save([...ids, added])) setInput("");
+                  }}
+                  className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  {translate("Thêm")}{" "}
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {translate("Tối đa")} {max} {translate("người.")}{" "}
+                {translate(
+                  "Cách lấy ID: bật Chế độ nhà phát triển trong Discord → chuột phải vào người dùng → Sao chép ID.",
+                )}{" "}
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+              {translate(
+                "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.",
+              )}{" "}
+            </p>
+          )}
         </>
       )}
 
@@ -1419,6 +1496,126 @@ function TeamAdminsCard({
           {msg.text}
         </p>
       )}
+    </div>
+  );
+}
+
+/* ── Cấp gói premium thủ công (không qua đơn thanh toán) ───────────── */
+
+/**
+ * Thẻ cấp quyền lợi TRỰC TIẾP cho một người: khách bồi thường, đối tác, tài
+ * khoản thử, hoặc tiền đã về mà đơn ZaloPay lỗi. Trước đây đường duy nhất ghi
+ * entitlement là markPaidInternal (đơn đã trả tiền) nên muốn cấp là phải giả
+ * tạo đơn — đúng cái sai mà payments.grantPlan sinh ra để chấm dứt.
+ *
+ * UI chỉ điền thông tin; server chốt lại (requireBotAdmin + kẹp 1..365 ngày +
+ * không hạ gói) nên bấm nhầm không tạo được quyền lợi vượt mức.
+ */
+function PremiumGrantCard({
+  onGrant,
+}: {
+  onGrant: (args: {
+    discordId: string;
+    guildId?: string;
+    plan: "supporter" | "pioneer";
+    days: number;
+  }) => Promise<{ ok: boolean; error?: string; text?: string }>;
+}) {
+  const [discordId, setDiscordId] = useState("");
+  const [guildId, setGuildId] = useState("");
+  const [plan, setPlan] = useState<"supporter" | "pioneer">("supporter");
+  const [days, setDays] = useState("30");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const run = async () => {
+    const who = discordId.trim();
+    if (busy || !who) return;
+    setBusy(true);
+    setMsg(null);
+    const res = await onGrant({
+      discordId: who,
+      ...(guildId.trim() ? { guildId: guildId.trim() } : {}),
+      plan,
+      days: Number(days) || 30,
+    });
+    setBusy(false);
+    if (res.ok) {
+      setMsg({ kind: "ok", text: res.text ?? translate("Đã cấp gói.") });
+      setDiscordId("");
+      setGuildId("");
+    } else {
+      setMsg({ kind: "err", text: res.error ?? translate("Lỗi kết nối") });
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
+        <Sparkles className="h-4 w-4" /> {translate("Cấp gói premium")}{" "}
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+        {translate(
+          "Cộng quyền lợi cho một người mà KHÔNG qua đơn thanh toán (bồi thường, đối tác, tài khoản thử). Nhập Discord ID người được cấp; nhập thêm Server ID nếu quyền lợi phải áp đúng cho server đó.",
+        )}{" "}
+      </p>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <input
+          value={discordId}
+          onChange={(e) => setDiscordId(e.target.value)}
+          inputMode="numeric"
+          placeholder={translate("Discord ID người được cấp (15-21 chữ số)")}
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <input
+          value={guildId}
+          onChange={(e) => setGuildId(e.target.value)}
+          inputMode="numeric"
+          placeholder={translate("Server ID (tùy chọn — 15-21 chữ số)")}
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <select
+          value={plan}
+          onChange={(e) => setPlan(e.target.value as "supporter" | "pioneer")}
+          aria-label={translate("Gói cấp")}
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+        >
+          <option value="supporter">{translate("Đồng hành")}</option>
+          <option value="pioneer">{translate("Tiên phong")}</option>
+        </select>
+        <input
+          value={days}
+          onChange={(e) => setDays(e.target.value)}
+          inputMode="numeric"
+          placeholder={translate("Số ngày (1–365)")}
+          aria-label={translate("Số ngày (1–365)")}
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy || discordId.trim().length === 0}
+          onClick={() => void run()}
+          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          {translate("Cấp gói")}{" "}
+        </button>
+        {msg && (
+          <p
+            role="status"
+            className={cn(
+              "text-xs font-medium",
+              msg.kind === "ok" ? "text-foreground" : "text-danger",
+            )}
+          >
+            {msg.text}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

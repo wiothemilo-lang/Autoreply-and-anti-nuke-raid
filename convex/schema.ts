@@ -1521,8 +1521,13 @@ export default defineSchema({
     startsAt: v.number(),
     /** Mốc hết hạn (mua lần sau gia hạn cộng thêm từ max(now, expiresAt cũ)). */
     expiresAt: v.number(),
-    /** Đơn paid cuối cùng cập nhật dòng này — đối soát tiền về. */
-    lastPaymentId: v.id("payments"),
+    /**
+     * Đơn paid cuối cùng cập nhật dòng này — đối soát tiền về.
+     * Optional: cấp gói thủ công ở cửa sổ Admin (`payments.grantPlan`) không đi
+     * kèm đơn thanh toán nên không có gì để đối soát — để bắt buộc là buộc mọi
+     * cấp gói phải giả tạo một đơn, đúng cái sai mà hàm đó sinh ra để chấm dứt.
+     */
+    lastPaymentId: v.optional(v.id("payments")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

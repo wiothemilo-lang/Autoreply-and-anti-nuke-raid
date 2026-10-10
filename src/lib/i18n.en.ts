@@ -1686,12 +1686,26 @@ export const EN: Record<string, string> = {
   "danh sách quản trị viên nhóm": "team admin list",
   "(do chủ bot đặt). Người dùng khác không thấy nút này và không truy cập được trang này.":
     "(set by the bot owner). Other users don't see this entry and can't open the page.",
-  "Thêm thành viên trong team để họ cũng vào được cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn hay chìa khoá bảo mật API.":
-    "Add team members so they can also open the Admin window (errors, host health, AI, threat research). They can NOT touch the hidden password or the API security key.",
+  /* ==== 10/10/2026 — team admin dùng TOÀN BỘ Admin + tag cạnh logo + cấp
+     gói premium thủ công (payments.grantPlan) ==== */
+  Owner: "Owner",
+  Admin: "Admin",
+  "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research, đối soát tiền, cấp gói). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.":
+    "Add people to the team so they can use the WHOLE Admin window (error monitoring, host health, AI, threat research, payment reconciliation, plan grants). They can NOT touch the hidden password/API security key and cannot add or remove people themselves.",
+  "Chưa có ai trong team — hãy thêm thành viên bên dưới.":
+    "No one in the team yet — add members below.",
+  "Cấp gói premium": "Grant premium plan",
+  "Cấp gói": "Grant",
+  "Gói cấp": "Plan to grant",
+  "Đã cấp gói.": "Plan granted.",
+  "Đã cấp gói {goi} — hạn tới {ngay}.": "Granted {goi} — valid until {ngay}.",
+  "Cộng quyền lợi cho một người mà KHÔNG qua đơn thanh toán (bồi thường, đối tác, tài khoản thử). Nhập Discord ID người được cấp; nhập thêm Server ID nếu quyền lợi phải áp đúng cho server đó.":
+    "Grant entitlements to someone with no payment order (compensation, partner, test account). Enter the recipient's Discord ID; add a Server ID if the entitlement must apply to that server only.",
+  "Discord ID người được cấp (15-21 chữ số)": "Recipient's Discord ID (15-21 digits)",
+  "Server ID (tùy chọn — 15-21 chữ số)": "Server ID (optional — 15-21 digits)",
+  "Số ngày (1–365)": "Number of days (1–365)",
   "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.":
     "You are a team admin — the bot owner manages this list. Ask the bot owner to add or remove people.",
-  "Chưa có ai — hiện chỉ chủ bot vào được cửa sổ này.":
-    "Nobody yet — currently only the bot owner can open this window.",
   "Chưa từng đăng nhập web": "Never signed in on the web",
   "Bỏ quyền quản trị viên nhóm": "Revoke team admin",
   "Discord ID (15-21 chữ số)": "Discord ID (15-21 digits)",

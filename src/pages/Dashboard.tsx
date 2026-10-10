@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import PageSplash from "../components/PageSplash";
 import { LogoMark } from "../components/BotLogo";
+import UserTags from "../components/UserTags";
 import { api } from "../../convex/_generated/api";
 import HaimiyaChat from "../components/HaimiyaChat";
 import { Button } from "../components/ui/button";
@@ -51,6 +52,12 @@ export default function Dashboard() {
   const me = useQuery(api.sessions.me, token ? ({ token } as { token: string }) : "skip") as
     MeData | null | undefined;
   const logout = useMutation(api.sessions.logout);
+  // Nhãn cạnh logo người dùng: Owner / Admin / gói premium (xem UserTags).
+  // Cả ba đều đọc index đơn ở server và Convex dedupe theo client — người chưa
+  // đăng nhập / không có vai trò nào thì trả false/null và không hiện gì.
+  const isOwner = useQuery(api.status.isOwner, token ? { token } : "skip");
+  const isAdmin = useQuery(api.status.isAdmin, token ? { token } : "skip");
+  const premium = useQuery(api.payments.premiumStatus, token ? { token } : "skip");
   const { clientId } = usePublicConfig();
   const [refreshing, setRefreshing] = useState(false);
   /**
@@ -210,6 +217,14 @@ export default function Dashboard() {
                   {me.user.username.slice(0, 1).toUpperCase()}
                 </span>
               )}
+              {/* Tag NGAY BÊN CẠNH logo: chủ bot → Owner, thành viên team → Admin,
+                  có gói trả phí → nhãn gói. Ẩn dưới sm để hàng header không chật. */}
+              <UserTags
+                isOwner={isOwner === true}
+                isAdmin={isAdmin === true}
+                plan={premium?.active ? premium.plan : null}
+                className="hidden sm:flex"
+              />
               <span className="hidden text-sm text-muted-foreground sm:block">
                 {me.user.globalName ?? me.user.username}
               </span>

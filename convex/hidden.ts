@@ -9,6 +9,7 @@ import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
 import { computeBotKey, requireBotKeyStrict } from "./botAuth";
 import { hashHiddenPassword, hashHiddenPasswordGlobal } from "./sha256";
+import { bestEntitlementForUser } from "./plans";
 
 async function requireGuild(ctx: QueryCtx | MutationCtx, token: string, guildId: string) {
   const user = await getUserByToken(ctx, token);
@@ -140,35 +141,64 @@ export async function requireBotAdmin(
   return status;
 }
 
+/** Đọc hồ sơ web của một người theo Discord ID (null nếu chưa từng đăng nhập). */
+async function findUserByDiscordId(ctx: QueryCtx, discordId: string) {
+  return await ctx.db
+    .query("users")
+    .withIndex("by_discordId", (q) => q.eq("discordId", discordId))
+    .first();
+}
+
 /**
- * Danh sách quản trị viên nhóm cho chủ bot quản lý (CHỈ chủ bot đọc được —
- * danh sách này nói ai đang có quyền vào cửa sổ Admin).
+ * Danh sách quản trị viên nhóm + hồ sơ CHỦ BOT cho cửa sổ Admin.
+ *
+ * Cả CHỦ BOT lẫn QUẢN TRỊ VIÊN NHÓM đều đọc được (requireBotAdmin): từ 10/10
+ * team admin có toàn quyền trong Admin panel nên danh sách không còn là bí mật
+ * của riêng chủ bot — nó là "ai đang có quyền ở đây" mà chính họ cần thấy.
+ * SỬA danh sách vẫn requireBotOwner (xem `setTeamAdmins`): không ai tự thêm
+ * được người khác, nên một tài khoản bị lộ không nuốt được cả team.
  *
  * Trả kèm hồ sơ từ bảng `users` khi người đó đã từng đăng nhập web; chưa
  * đăng nhập thì chỉ có ID — hiển thị "chưa từng đăng nhập" thay vì im lặng
- * (chủ bot cần biết ID đó có thật sự hoạt động không).
+ * (cần biết ID đó có thật sự hoạt động không). Kèm `plan` = gói premium đang
+ * hiệu lực cao nhất để gắn nhãn cạnh logo người dùng.
  */
 export const getTeamAdmins = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
     const user = await getUserByToken(ctx, token);
-    const status = await requireBotOwner(ctx, user);
+    const status = await requireBotAdmin(ctx, user);
+    const ownerDiscordId = canonicalBotOwnerId(status);
+    const ownerRow = ownerDiscordId ? await findUserByDiscordId(ctx, ownerDiscordId) : null;
     const ids = canonicalTeamAdminIds(status);
     const members = [];
     for (const discordId of ids) {
-      const row = await ctx.db
-        .query("users")
-        .withIndex("by_discordId", (q) => q.eq("discordId", discordId))
-        .first();
+      const row = await findUserByDiscordId(ctx, discordId);
       members.push({
         discordId,
         username: row?.username ?? null,
         globalName: row?.globalName ?? null,
         avatar: row?.avatar ?? null,
         lastLoginAt: row?.lastLoginAt ?? null,
+        plan: (await bestEntitlementForUser(ctx, row?._id))?.plan ?? null,
       });
     }
-    return { max: MAX_TEAM_ADMINS, members };
+    return {
+      max: MAX_TEAM_ADMINS,
+      members,
+      // Chủ bot LUÔN có quyền (không nằm trong danh sách quản trị viên nhóm) —
+      // nếu không trả riêng, giao diện không có chỗ để gắn nhãn Chủ sở hữu.
+      owner: ownerDiscordId
+        ? {
+            discordId: ownerDiscordId,
+            username: ownerRow?.username ?? null,
+            globalName: ownerRow?.globalName ?? null,
+            avatar: ownerRow?.avatar ?? null,
+            lastLoginAt: ownerRow?.lastLoginAt ?? null,
+            plan: (await bestEntitlementForUser(ctx, ownerRow?._id))?.plan ?? null,
+          }
+        : null,
+    };
   },
 });
 

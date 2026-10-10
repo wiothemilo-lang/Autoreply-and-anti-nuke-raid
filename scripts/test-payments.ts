@@ -32,11 +32,13 @@ import {
   createOrderMacInput,
   createTransferIntent,
   dashboardOrigin,
+  grantPlan,
   isEntitled,
   listReportedOrders,
   markPaidInternal,
   orderStatus,
   paymentDescription,
+  premiumStatus,
   queryOrderMacHex,
   reportTransfer,
   resolveAmount,
@@ -939,7 +941,7 @@ const run = async () => {
     check("đơn đã paid: báo lại vẫn ok, không hạ trạng thái", onPaid.status === "paid");
   }
 
-  // confirmTransfer: chỉ chủ bot, chỉ đơn đã reported, đi qua markPaidInternal
+  // confirmTransfer: CHỦ BOT + QUẢN TRỊ VIÊN NHÓM, chỉ đơn đã reported, đi qua markPaidInternal
   {
     const tables = seedTransfer();
     tables.payments.push(transferRow({ status: "reported", reportedAt: Date.now() }));
@@ -983,11 +985,34 @@ const run = async () => {
       authVersion: CURRENT_SESSION_AUTH_VERSION,
     });
     await expectThrows(
-      "người khác (không phải chủ bot) → không xác nhận được",
+      "người khác (không phải admin) → không xác nhận được",
       () => confirmH(makeCtxWithRun(stranger), { token: "tok-stranger", appTransId: "261008_ck1" }),
-      "Chỉ admin sở hữu bot",
+      "Chỉ chủ sở hữu bot hoặc quản trị viên nhóm",
     );
     check("người ngoài không đổi được trạng thái đơn", stranger.payments[0].status === "reported");
+
+    // 10/10/2026 — quản trị viên nhóm có TOÀN BỘ trong Admin panel: được xác
+    // nhận tiền như chủ bot (requireBotAdmin). Người lạ vẫn bị chặn ở trên.
+    const team = seedTransfer();
+    team.botStatus[0].teamAdminDiscordIds = ["555555555555555555"];
+    team.users.push({ _id: "u_team", discordId: "555555555555555555", username: "team" });
+    team.sessions.push({
+      _id: "s_team",
+      token: "tok-team",
+      userId: "u_team",
+      createdAt: Date.now(),
+      authVersion: CURRENT_SESSION_AUTH_VERSION,
+    });
+    team.payments.push(transferRow({ status: "reported", reportedAt: Date.now() }));
+    const teamRes = await confirmH(makeCtxWithRun(team), {
+      token: "tok-team",
+      appTransId: "261008_ck1",
+    });
+    check(
+      "quản trị viên nhóm xác nhận được đơn chuyển khoản (toàn quyền Admin)",
+      teamRes.ok === true && team.payments[0].status === "paid",
+      teamRes,
+    );
   }
 
   // listReportedOrders: chỉ chủ bot, chỉ đơn reported, không rò field nội bộ
@@ -1142,6 +1167,273 @@ const run = async () => {
       appTransId: "261008_ck1",
     });
     check("người khác đọc cùng mã đơn → null", notMine === null);
+  }
+
+  // ── 8. Cấp gói thủ công ở Admin (grantPlan) + nhãn premium (premiumStatus) ──
+  {
+    const grantH = (grantPlan as any)._handler;
+    const premH = (premiumStatus as any)._handler;
+    check(
+      "lấy được handler grantPlan / premiumStatus",
+      typeof grantH === "function" && typeof premH === "function",
+    );
+
+    // (a) chủ bot cấp cho người đã đăng nhập web → entitlement + nhãn bật
+    const tables = seedTransfer();
+    const res = await grantH(makeCtx(tables), {
+      token: "tok-good",
+      discordId: "123456789012345678",
+      plan: "supporter",
+      days: 30,
+    });
+    const ent = tables.entitlements[0];
+    check(
+      "chủ bot cấp gói → đúng gói + đúng kỳ 30 ngày",
+      res.ok === true &&
+        res.plan === "supporter" &&
+        res.days === 30 &&
+        ent?.plan === "supporter" &&
+        ent.expiresAt - ent.startsAt === 30 * 86_400_000,
+      res,
+    );
+    const st = await premH(makeCtx(tables), { token: "tok-good" });
+    check(
+      "premiumStatus bật nhãn sau khi cấp (active: true)",
+      st?.plan === "supporter" && st.active === true,
+      st,
+    );
+
+    // (b) quản trị viên nhóm cũng cấp được — toàn quyền Admin 10/10/2026
+    const team = seedTransfer();
+    team.botStatus[0].teamAdminDiscordIds = ["555555555555555555"];
+    team.users.push({
+      _id: "u_team",
+      discordId: "555555555555555555",
+      username: "team",
+      manageableGuildIds: [],
+      lastLoginAt: Date.now(),
+    });
+    team.sessions.push({
+      _id: "s_team",
+      token: "tok-team",
+      userId: "u_team",
+      createdAt: Date.now(),
+      authVersion: CURRENT_SESSION_AUTH_VERSION,
+    });
+    const teamRes = await grantH(makeCtx(team), {
+      token: "tok-team",
+      discordId: "123456789012345678",
+      plan: "pioneer",
+      days: 7,
+    });
+    check(
+      "quản trị viên nhóm cấp được gói như chủ bot",
+      teamRes.ok === true && teamRes.plan === "pioneer" && teamRes.days === 7,
+      teamRes,
+    );
+
+    // (c) người lạ → bị chặn, KHÔNG làm biến động dữ liệu
+    const stranger = seedTransfer();
+    stranger.users.push({
+      _id: "u_x",
+      discordId: "999999999999999999",
+      username: "x",
+      manageableGuildIds: [],
+      lastLoginAt: Date.now(),
+    });
+    stranger.sessions.push({
+      _id: "s_x",
+      token: "tok-x",
+      userId: "u_x",
+      createdAt: Date.now(),
+      authVersion: CURRENT_SESSION_AUTH_VERSION,
+    });
+    await expectThrows(
+      "người lạ không cấp được gói",
+      () =>
+        grantH(makeCtx(stranger), {
+          token: "tok-x",
+          discordId: "123456789012345678",
+          plan: "supporter",
+          days: 30,
+        }),
+      "Chỉ chủ sở hữu bot hoặc quản trị viên nhóm",
+    );
+    check("người lạ không để lại entitlement nào", stranger.entitlements.length === 0);
+
+    // (d) input rác bị chặn TRƯỚC khi chạm dữ liệu
+    await expectThrows(
+      "Discord ID không hợp lệ → chặn",
+      () =>
+        grantH(makeCtx(seedTransfer()), {
+          token: "tok-good",
+          discordId: "abc",
+          plan: "supporter",
+          days: 30,
+        }),
+      "Discord ID không hợp lệ",
+    );
+    await expectThrows(
+      "Server ID không hợp lệ → chặn",
+      () =>
+        grantH(makeCtx(seedTransfer()), {
+          token: "tok-good",
+          discordId: "123456789012345678",
+          guildId: "xyz",
+          plan: "supporter",
+          days: 30,
+        }),
+      "Server ID không hợp lệ",
+    );
+    await expectThrows(
+      "người CHƯA từng đăng nhập web → chặn rõ (không tạo tài khoản ngầm)",
+      () =>
+        grantH(makeCtx(seedTransfer()), {
+          token: "tok-good",
+          discordId: "111111111111111111",
+          plan: "supporter",
+          days: 30,
+        }),
+      "chưa từng đăng nhập web",
+    );
+
+    // (e) không bao giờ hạ gói / cộng dồn đúng chỗ
+    const downgrade = seedTransfer();
+    downgrade.entitlements.push({
+      _id: "e_h",
+      userId: "u1",
+      discordId: "123456789012345678",
+      guildId: TEST_GUILD,
+      plan: "pioneer",
+      startsAt: Date.now() - 86_400_000,
+      expiresAt: Date.now() + 20 * 86_400_000,
+      createdAt: Date.now() - 86_400_000,
+      updatedAt: Date.now() - 86_400_000,
+    });
+    await expectThrows(
+      "cấp gói thấp hơn gói đang chạy → chặn rõ",
+      () =>
+        grantH(makeCtx(downgrade), {
+          token: "tok-good",
+          discordId: "123456789012345678",
+          plan: "supporter",
+          days: 30,
+        }),
+      "không thể cấp gói thấp hơn",
+    );
+
+    const renew = seedTransfer();
+    renew.entitlements.push({
+      _id: "e_g",
+      userId: "u1",
+      discordId: "123456789012345678",
+      guildId: TEST_GUILD,
+      plan: "supporter",
+      startsAt: Date.now() - 20 * 86_400_000,
+      expiresAt: Date.now() + 10 * 86_400_000,
+      createdAt: Date.now() - 20 * 86_400_000,
+      updatedAt: Date.now() - 20 * 86_400_000,
+    });
+    const expBefore = renew.entitlements[0].expiresAt;
+    const renewRes = await grantH(makeCtx(renew), {
+      token: "tok-good",
+      discordId: "123456789012345678",
+      plan: "supporter",
+      days: 30,
+    });
+    check(
+      "gia hạn cộng thêm 30 ngày TỪ HẠN CŨ — không tính lại từ now, không tạo dòng song song",
+      renewRes.ok === true &&
+        renew.entitlements.length === 1 &&
+        renew.entitlements[0].expiresAt === expBefore + 30 * 86_400_000,
+      renew.entitlements[0],
+    );
+
+    // (f) truyền guildId → quyền lợi gắn theo SERVER (planForGuild đọc được ngay)
+    const withGuild = seedTransfer();
+    await grantH(makeCtx(withGuild), {
+      token: "tok-good",
+      discordId: "123456789012345678",
+      guildId: TEST_GUILD,
+      plan: "supporter",
+      days: 30,
+    });
+    check(
+      "truyền guildId → entitlement gắn đúng server đó",
+      withGuild.entitlements[0]?.guildId === TEST_GUILD,
+      withGuild.entitlements[0],
+    );
+
+    // (g)days bị kẹp trong [1, 365] — không ai cộng được nghìn năm một lệnh
+    const clamp = seedTransfer();
+    const big = await grantH(makeCtx(clamp), {
+      token: "tok-good",
+      discordId: "123456789012345678",
+      plan: "supporter",
+      days: 999,
+    });
+    check("days > 365 bị kẹp trần 365", big.days === 365, big);
+    const tiny = await grantH(makeCtx(seedTransfer()), {
+      token: "tok-good",
+      discordId: "123456789012345678",
+      plan: "supporter",
+      days: 0,
+    });
+    check("days < 1 bị kẹp sàn 1", tiny.days === 1, tiny);
+
+    // (h)premiumStatus: đơn đầu index HẾT HẠN nhưng đơn sau CÒN HẠN → lấy đơn sau
+    const multi = seedTransfer();
+    multi.entitlements.push(
+      {
+        _id: "e_x1",
+        userId: "u1",
+        discordId: "123456789012345678",
+        plan: "pioneer",
+        startsAt: Date.now() - 40 * 86_400_000,
+        expiresAt: Date.now() - 10 * 86_400_000,
+        createdAt: Date.now() - 40 * 86_400_000,
+        updatedAt: Date.now() - 40 * 86_400_000,
+      },
+      {
+        _id: "e_x2",
+        userId: "u1",
+        discordId: "123456789012345678",
+        guildId: TEST_GUILD,
+        plan: "supporter",
+        startsAt: Date.now() - 5 * 86_400_000,
+        expiresAt: Date.now() + 25 * 86_400_000,
+        createdAt: Date.now() - 5 * 86_400_000,
+        updatedAt: Date.now() - 5 * 86_400_000,
+      },
+    );
+    const best = await premH(makeCtx(multi), { token: "tok-good" });
+    check(
+      "premiumStatus chọn đơn ĐANG còn hạn, không phải đơn đầu index",
+      best?.plan === "supporter" && best.active === true,
+      best,
+    );
+
+    const dead = seedTransfer();
+    dead.entitlements.push({
+      _id: "e_d",
+      userId: "u1",
+      discordId: "123456789012345678",
+      plan: "pioneer",
+      startsAt: Date.now() - 40 * 86_400_000,
+      expiresAt: Date.now() - 10 * 86_400_000,
+      createdAt: Date.now() - 40 * 86_400_000,
+      updatedAt: Date.now() - 40 * 86_400_000,
+    });
+    const deadSt = await premH(makeCtx(dead), { token: "tok-good" });
+    check(
+      "từng mua nhưng hết hạn → active: false (UI nói rõ đã hết hạn)",
+      deadSt?.plan === "pioneer" && deadSt.active === false,
+      deadSt,
+    );
+
+    const freshUser = seed();
+    const none = await premH(makeCtx(freshUser), { token: "tok-good" });
+    check("chưa từng mua → null (trang giữ nguyên lời mời mua)", none === null, none);
   }
 
   console.log(`\n${pass}/${pass + fail} assertion xanh`);

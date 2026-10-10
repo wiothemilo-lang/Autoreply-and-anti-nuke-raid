@@ -24,8 +24,14 @@ import { internal } from "./_generated/api";
 import type { MutationCtx } from "./_generated/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { canManageGuild, getUserByToken } from "./auth";
-import { requireBotOwner } from "./hidden";
-import { PLAN_LABELS, TERMS_VERSION, asPlanId, planForGuild } from "./plans";
+import { requireBotAdmin } from "./hidden";
+import {
+  PLAN_LABELS,
+  TERMS_VERSION,
+  asPlanId,
+  bestEntitlementForUser,
+  planForGuild,
+} from "./plans";
 import { hmacSha256Hex } from "./sha256";
 
 // ── Bảng giá — SERVER chốt; client chỉ gửi plan, không gửi số tiền ──────────
@@ -173,16 +179,21 @@ export type EntitlementSnapshot = { plan: string; expiresAt: number; startsAt?: 
  *    gói cao hơn nên không có khe gian "mua rẻ gia hạn gói đắt").
  *  - Thấp hơn gói đang chạy → trả về null: KHÔNG đổi gì (bị chặn từ lúc tạo
  *    đơn; nếu đơn cũ vẫn kịp thanh toán thì quyền hiện tại không bị hạ).
+ *
+ * `addMs` = thời lượng cộng thêm (mặc định 30 ngày = một kỳ mua). Cấp gói thủ
+ * công ở cửa sổ Admin truyền số ngày tùy ý — mọi luật thứ bậc/hạn ở trên vẫn
+ * đúng, chỉ khác độ dài kỳ.
  */
 export function applyEntitlement(
   current: EntitlementSnapshot | null,
   plan: string,
   now: number,
+  addMs: number = PREMIUM_MONTH_MS,
 ): { plan: string; startsAt: number; expiresAt: number } | null {
   const rank = PLAN_RANK[plan];
   if (rank === undefined) return null;
   if (!current || current.expiresAt <= now) {
-    return { plan, startsAt: now, expiresAt: now + PREMIUM_MONTH_MS };
+    return { plan, startsAt: now, expiresAt: now + addMs };
   }
   const curRank = PLAN_RANK[current.plan] ?? 0;
   if (rank < curRank) return null;
@@ -190,7 +201,7 @@ export function applyEntitlement(
   return {
     plan: upgraded ? plan : current.plan,
     startsAt: upgraded ? now : (current.startsAt ?? now),
-    expiresAt: Math.max(now, current.expiresAt) + PREMIUM_MONTH_MS,
+    expiresAt: Math.max(now, current.expiresAt) + addMs,
   };
 }
 
@@ -476,17 +487,21 @@ export const premiumStatus = query({
   handler: async (ctx, { token }) => {
     const user = await getUserByToken(ctx, token);
     if (!user) return null;
-    const ent = await ctx.db
+    // Dòng ĐANG hiệu lực + cao nhất (không phải dòng đầu index): người mua nhiều
+    // lần / mua cho nhiều server có đơn cũ nằm trước đơn mới — tin `.first()` là
+    // gắn nhãn "gói X" cho đơn đã hết hạn.
+    const best = await bestEntitlementForUser(ctx, user._id);
+    if (best) {
+      return { plan: best.plan, startsAt: best.startsAt, expiresAt: best.expiresAt, active: true };
+    }
+    const any = await ctx.db
       .query("entitlements")
       .withIndex("by_userId", (q) => q.eq("userId", user._id))
       .first();
-    if (!ent) return null;
-    return {
-      plan: ent.plan,
-      startsAt: ent.startsAt,
-      expiresAt: ent.expiresAt,
-      active: isEntitled(ent, Date.now()),
-    };
+    // Chưa từng mua → null (trang giữ nguyên lời mời mua); từng mua mà hết hạn
+    // → trả đơn cuối với active: false để UI nói rõ "đã hết hạn" thay vì im lặng.
+    if (!any) return null;
+    return { plan: any.plan, startsAt: any.startsAt, expiresAt: any.expiresAt, active: false };
   },
 });
 
@@ -649,14 +664,15 @@ export const orderStatus = query({
 });
 
 /**
- * Danh sách đơn khách ĐÃ BÁO chuyển khoản, chờ chủ bot so sao kê — CHỈ chủ bot
- * đọc được (requireBotOwner): doanh thu + xác nhận tiền là việc của chủ ví.
+ * Danh sách đơn khách ĐÃ BÁO chuyển khoản, chờ chủ bot so sao kê — CHỦ BOT
+ * và QUẢN TRỊ VIÊN NHÓM đọc được (requireBotAdmin, 10/10/2026): cửa sổ Admin
+ * mở toàn bộ cho team nên đối soát + xác nhận tiền là việc chung của cả hai.
  */
 export const listReportedOrders = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
     const user = await getUserByToken(ctx, token);
-    await requireBotOwner(ctx, user);
+    await requireBotAdmin(ctx, user);
     const rows = await ctx.db
       .query("payments")
       .withIndex("by_status_createdAt", (q) => q.eq("status", "reported"))
@@ -675,15 +691,15 @@ export const listReportedOrders = query({
 });
 
 /**
- * Chủ bot xác nhận đã nhận tiền → gọi ĐÚNG markPaidInternal (gốc duy nhất ghi
- * entitlement, idempotent). Chỉ đơn đã `reported` mới confirm được — không
- * nhảy cóc từ pending, đúng quy trình khách phải báo trước.
+ * Chủ bot / quản trị viên nhóm xác nhận đã nhận tiền → gọi ĐÚNG markPaidInternal
+ * (gốc duy nhất ghi entitlement, idempotent). Chỉ đơn đã `reported` mới confirm
+ * được — không nhảy cóc từ pending, đúng quy trình khách phải báo trước.
  */
 export const confirmTransfer = mutation({
   args: { token: v.string(), appTransId: v.string() },
   handler: async (ctx, { token, appTransId }) => {
     const user = await getUserByToken(ctx, token);
-    await requireBotOwner(ctx, user);
+    await requireBotAdmin(ctx, user);
     const row = await ctx.db
       .query("payments")
       .withIndex("by_appTransId", (q) => q.eq("appTransId", appTransId))
@@ -705,15 +721,117 @@ export const confirmTransfer = mutation({
 });
 
 /**
- * Tổng doanh thu theo THÁNG (12 tháng gần nhất) và theo NĂM — chỉ chủ bot.
- * Đếm đơn ĐÃ xác nhận (status=paid) của cả donate lẫn premium. Mốc thời gian
- * quy về GMT+7 cho khớp ngày đối soát ngân hàng/ ví (xem buildAppTransId).
+ * CẤP GÓI PREMIUM THỦ CÔNG — cửa sổ Admin → thẻ "Cấp gói".
+ *
+ * Vì sao cần: trước đây đường DUY NHẤT ghi quyền lợi là đơn ZaloPay đã trả tiền
+ * (markPaidInternal) — không có cách nào cộng quyền cho khách bồi thường, đối
+ * tác hay tài khoản thử, nên Admin muốn cấp là phải "giả tạo đơn", mà làm thế
+ * là làm sai sổ sách.
+ *
+ * Quy tắc:
+ *  - Chủ bot HOẶC quản trị viên nhóm (requireBotAdmin — cùng cổng mọi tính năng
+ *    trong cửa sổ Admin); người thường gọi vào bị từ chối.
+ *  - Khoá quyền lợi vẫn là SERVER: truyền `guildId` thì dòng gắn đúng server đó
+ *    (planForGuild đọc được ngay) VÀ người được cấp vẫn có nhãn gói ở thẻ người
+ *    dùng; không truyền thì quyền lợi gắn theo người.
+ *  - Gia hạn cộng `days` ngày từ max(now, hạn cũ) — không bao giờ rút ngắn hạn
+ *    và không bao giờ hạ gói (luồng applyEntitlement giữ nguyên luật thứ bậc).
+ *  - Người CHƯA từng đăng nhập web → từ chối rõ ràng (không có dòng users để
+ *    gắn quyền lợi vào).
+ */
+export const grantPlan = mutation({
+  args: {
+    token: v.string(),
+    discordId: v.string(),
+    guildId: v.optional(v.string()),
+    plan: v.union(v.literal("supporter"), v.literal("pioneer")),
+    days: v.number(),
+  },
+  handler: async (ctx, { token, discordId, guildId, plan, days }) => {
+    const user = await getUserByToken(ctx, token);
+    await requireBotAdmin(ctx, user);
+
+    const SNOWFLAKE = /^\d{15,21}$/;
+    const target = discordId.trim();
+    if (!SNOWFLAKE.test(target)) {
+      throw new Error("Discord ID không hợp lệ (phải là 15-21 chữ số).");
+    }
+    const guild = guildId?.trim() || undefined;
+    if (guild && !SNOWFLAKE.test(guild)) {
+      throw new Error("Server ID không hợp lệ (phải là 15-21 chữ số).");
+    }
+    const row = await ctx.db
+      .query("users")
+      .withIndex("by_discordId", (q) => q.eq("discordId", target))
+      .first();
+    if (!row) {
+      throw new Error("Người này chưa từng đăng nhập web — chưa có tài khoản để gắn quyền lợi.");
+    }
+
+    const now = Date.now();
+    const addDays = Number.isFinite(days) ? Math.min(365, Math.max(1, Math.round(days))) : 30;
+
+    // Dòng sẽ ghi: PHẢI thuộc người được cấp (lọc theo userId) — không bao giờ
+    // đè lên dòng người khác đang sở hữu cho cùng server. Chọn dòng hạn xa nhất
+    // để gia hạn đúng chỗ, không tạo một entitlement song song không cần thiết.
+    const rows = await ctx.db
+      .query("entitlements")
+      .withIndex("by_userId", (q) => q.eq("userId", row._id))
+      .collect();
+    const ent =
+      rows
+        .filter((e) => (guild ? e.guildId === guild : true))
+        .sort((a, b) => b.expiresAt - a.expiresAt)[0] ?? null;
+    const active =
+      ent && ent.expiresAt > now
+        ? { plan: ent.plan, expiresAt: ent.expiresAt, startsAt: ent.startsAt }
+        : null;
+    const next = applyEntitlement(active, plan, now, addDays * 86_400_000);
+    if (!next) {
+      // applyEntitlement trả null khi (a) gói lạ hoặc (b) gói THẤP hơn gói đang
+      // chạy — cả hai phải nói rõ, nếu không người cấp tưởng mình đã cộng hạn
+      // mà thực tế không đổi gì.
+      throw new Error(
+        active && (PLAN_RANK[plan] ?? 0) < (PLAN_RANK[active.plan] ?? 0)
+          ? `Người/server này đang dùng gói ${PLAN_LABELS[asPlanId(active.plan)]} — không thể cấp gói thấp hơn.`
+          : "Gói không hợp lệ — chỉ cấp được Đồng hành hoặc Tiên phong.",
+      );
+    }
+
+    if (ent) {
+      await ctx.db.patch(ent._id, {
+        plan: next.plan,
+        startsAt: next.startsAt,
+        expiresAt: next.expiresAt,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("entitlements", {
+        userId: row._id,
+        discordId: target,
+        ...(guild ? { guildId: guild } : {}),
+        plan: next.plan,
+        startsAt: next.startsAt,
+        expiresAt: next.expiresAt,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    return { ok: true as const, plan: next.plan, expiresAt: next.expiresAt, days: addDays };
+  },
+});
+
+/**
+ * Tổng doanh thu theo THÁNG (12 tháng gần nhất) và theo NĂM — chủ bot + quản
+ * trị viên nhóm (requireBotAdmin). Đếm đơn ĐÃ xác nhận (status=paid) của cả
+ * donate lẫn premium. Mốc thời gian quy về GMT+7 cho khớp ngày đối soát ngân
+ * hàng/ ví (xem buildAppTransId).
  */
 export const revenueStats = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
     const user = await getUserByToken(ctx, token);
-    await requireBotOwner(ctx, user);
+    await requireBotAdmin(ctx, user);
     const rows = await ctx.db
       .query("payments")
       .withIndex("by_status_createdAt", (q) => q.eq("status", "paid"))

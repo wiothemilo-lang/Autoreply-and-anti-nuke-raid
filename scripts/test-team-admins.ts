@@ -58,7 +58,14 @@ const STRANGER = "444444444444444444";
  * Ctx giả: bảng trên mảng. `withIndex` chỉ cần `eq` (mọi truy vấn ở đây dùng
  * index phẳng `by_kind` / `by_token` / `by_discordId`).
  */
-function makeCtx(opts: { ownerId?: string | null; teamAdmins?: unknown; users?: Row[] } = {}) {
+function makeCtx(
+  opts: {
+    ownerId?: string | null;
+    teamAdmins?: unknown;
+    users?: Row[];
+    entitlements?: Row[];
+  } = {},
+) {
   // createdAt = hiện tại: getUserByToken loại phiên hết hạn (SESSION_TTL_MS),
   // dùng mốc cũ là mọi token rơi vào nhánh "không đăng nhập" và test sai chỗ.
   const now = Date.now();
@@ -96,7 +103,12 @@ function makeCtx(opts: { ownerId?: string | null; teamAdmins?: unknown; users?: 
             ...(opts.teamAdmins === undefined ? {} : { teamAdminDiscordIds: opts.teamAdmins }),
           },
         ];
-  const tables: Record<string, Row[]> = { sessions, users, botStatus };
+  const tables: Record<string, Row[]> = {
+    sessions,
+    users,
+    botStatus,
+    entitlements: opts.entitlements ?? [],
+  };
   const patches: { id: string; patch: Row }[] = [];
 
   const db = {
@@ -312,7 +324,7 @@ console.log("── 4. setTeamAdmins ──");
   );
 }
 
-// ── 5. getTeamAdmins: chỉ chủ bot, kèm hồ sơ nếu đã đăng nhập web ─────────────
+// ── 5. getTeamAdmins: CHỦ BOT + QUẢN TRỊ VIÊN NHÓM đọc được, kèm hồ sơ ────────
 console.log("── 5. getTeamAdmins ──");
 {
   const { ctx } = makeCtx({ teamAdmins: [ADMIN_A, ADMIN_B] });
@@ -326,11 +338,71 @@ console.log("── 5. getTeamAdmins ──");
     'người CHƯA từng đăng nhập → username null (UI hiện "chưa từng đăng nhập")',
     data.members[1].username === null && data.members[1].discordId === ADMIN_B,
   );
+  // Hồ sơ CHỦ BOT trả kèm để giao diện có chỗ gắn tag Chủ sở hữu cạnh logo
+  // (chủ bot cố ý KHÔNG nằm trong danh sách quản trị viên nhóm).
+  check(
+    "trả kèm hồ sơ CHỦ BOT, không lẫn vào danh sách thành viên",
+    data.owner?.discordId === OWNER && data.members.every((m) => m.discordId !== OWNER),
+    data.owner,
+  );
+  check(
+    "mỗi hồ sơ có trường plan (gói premium) — null khi chưa mua",
+    data.owner?.plan === null && data.members.every((m) => m.plan === null),
+    { owner: data.owner, members: data.members },
+  );
+  // 10/10/2026 — thành viên team có TOÀN BỘ trong Admin panel nên ĐỌC được danh
+  // sách (ai đang có quyền ở đây). Việc SỬA vẫn owner-only (xem mục 4).
   const asAdmin = makeCtx({ teamAdmins: [ADMIN_A] });
+  const adminView = await getTeamAdminsH(asAdmin.ctx, { token: "tok_admin" });
+  check(
+    "quản trị viên nhóm ĐỌC được danh sách + hồ sơ chủ bot",
+    adminView?.members.length === 1 && adminView.owner?.discordId === OWNER,
+    adminView,
+  );
+  const asStranger = makeCtx({ teamAdmins: [ADMIN_A] });
   await expectThrow(
-    "quản trị viên nhóm không đọc được danh sách",
-    () => getTeamAdminsH(asAdmin.ctx, { token: "tok_admin" }),
-    /Chỉ admin sở hữu bot/,
+    "người lạ vẫn KHÔNG đọc được danh sách",
+    () => getTeamAdminsH(asStranger.ctx, { token: "tok_stranger" }),
+    /Chỉ chủ sở hữu bot hoặc quản trị viên nhóm/,
+  );
+
+  // Nhãn GÓI gắn đúng người: chỉ dòng đang hiệu lực, gói cao thắng, dòng có
+  // plan rác bị loại (asPlanId → free) — dữ liệu bẩn không hiện thành nhãn.
+  const future = Date.now() + 86_400_000;
+  const planCtx = makeCtx({
+    teamAdmins: [ADMIN_A],
+    entitlements: [
+      {
+        _id: "e_junk",
+        userId: "u_admin",
+        discordId: ADMIN_A,
+        plan: "rác",
+        startsAt: Date.now(),
+        expiresAt: future,
+      },
+      {
+        _id: "e_sup",
+        userId: "u_admin",
+        discordId: ADMIN_A,
+        plan: "supporter",
+        startsAt: Date.now(),
+        expiresAt: future,
+      },
+      {
+        _id: "e_old",
+        userId: "u_owner",
+        discordId: OWNER,
+        plan: "pioneer",
+        startsAt: Date.now() - 200_000_000,
+        expiresAt: Date.now() - 1,
+      },
+    ],
+  });
+  const planView = await getTeamAdminsH(planCtx.ctx, { token: "tok_owner" });
+  check(
+    "member có đơn còn hạn → nhãn gói đúng; dòng hết hạn/rác → không nhãn",
+    planView.members[0].plan === "supporter" && planView.owner?.plan === null,
+    { members: planView.members, owner: planView.owner },
   );
 }
 

@@ -2713,9 +2713,9 @@ check(
   "Admin tự kích hoạt gói thay vì xác nhận qua backend",
 );
 check(
-  "đơn chờ + doanh thu chỉ truy vấn khi là chủ sở hữu (skip nếu không)",
-  (adminSrc.match(/isOwner \? \{ token \} : "skip"/g) ?? []).length >= 3,
-  "có query doanh thu/đơn chờ chạy cả khi không phải chủ bot",
+  "đơn chờ + doanh thu + danh sách team chỉ truy vấn khi ĐỦ QUYỀN Admin (skip nếu không)",
+  (adminSrc.match(/isAdmin === true \? \{ token \} : "skip"/g) ?? []).length >= 3,
+  "có query doanh thu/đơn chờ/danh sách chạy cả khi không phải chủ bot hoặc quản trị viên nhóm",
 );
 check(
   "card Quản trị viên nhóm lưu qua convex hidden.setTeamAdmins",
@@ -2723,16 +2723,67 @@ check(
   "card thêm thành viên team admin không còn nối vào backend",
 );
 check(
-  "danh sách team admin chỉ đọc khi là chủ bot (thành viên khác thấy thông báo, không lỗi)",
-  adminSrc.includes('useQuery(api.hidden.getTeamAdmins, isOwner ? { token } : "skip")') &&
+  "danh sách team admin: thành viên team XEM được (isAdmin), SỬA vẫn chỉ chủ bot",
+  adminSrc.includes('useQuery(api.hidden.getTeamAdmins, isAdmin === true ? { token } : "skip")') &&
     adminSrc.includes("Bạn là quản trị viên nhóm"),
-  "thành viên team admin có thể gặp bảng trắng/lỗi",
+  "thành viên team admin không xem được danh sách, hoặc ô sửa lọt cho người không phải chủ bot",
 );
 check(
   "thêm/xoá thành viên có trạng thái bận + hiện lỗi server (không im lặng)",
   adminSrc.includes("Không lưu được.") &&
     adminSrc.includes("const [busy, setBusy] = useState(false)"),
   "lỗi lưu im lặng — chủ bot tưởng đã cấp quyền",
+);
+
+// ─── X2. 10/10/2026 — team admin TOÀN QUYỀN + tag cạnh logo + cấp gói ──────
+// Bốn tầng phải cùng đi một chỗ: server (requireBotAdmin trong test-payments /
+// test-team-admins), query (getTeamAdmins cho cả team), UI (tag + thẻ cấp gói)
+// và i18n. Gate này khoá phần UI — lỡ ai gỡ thẻ Cấp gói hoặc đổi cổng query
+// về owner-only là test đỏ ngay, đúng như mong đợi của chủ bot.
+const userTagsSrc = files.get("components/UserTags.tsx") ?? "";
+check(
+  "UserTags có tag Owner + Admin + nhãn gói, và được gắn ở Dashboard (cạnh logo) lẫn Admin (danh sách team)",
+  userTagsSrc.includes('translate("Owner")') &&
+    userTagsSrc.includes('translate("Admin")') &&
+    userTagsSrc.includes('translate("Đồng hành")') &&
+    userTagsSrc.includes('translate("Tiên phong")') &&
+    adminSrc.includes("<UserTags") &&
+    dashboardSrc.includes("<UserTags"),
+  "thiếu component tag hoặc chưa gắn vào trang",
+);
+check(
+  "tag vai trò không chồng nhau: chủ bot → Owner, CHỈ khi không phải owner mới hiện Admin",
+  userTagsSrc.includes("{isOwner ? (") && /\)\s*:\s*\(\s*isAdmin\s*&&/.test(userTagsSrc),
+  "một người có thể bị gắn hai tag vai trò cùng lúc",
+);
+check(
+  "Dashboard nạp đủ 3 nguồn tag: isOwner + isAdmin + premiumStatus",
+  dashboardSrc.includes("api.status.isOwner") &&
+    dashboardSrc.includes("api.status.isAdmin") &&
+    dashboardSrc.includes("api.payments.premiumStatus") &&
+    dashboardSrc.includes("premium?.active"),
+  "người dùng không thấy tag vai trò/gói cạnh logo",
+);
+check(
+  "Admin có thẻ Cấp gói premium nối vào payments.grantPlan (cổng isAdmin)",
+  adminSrc.includes("api.payments.grantPlan") &&
+    adminSrc.includes("<PremiumGrantCard") &&
+    adminSrc.includes("{isAdmin === true && <PremiumGrantCard"),
+  "thiếu UI cấp gói hoặc không nối backend / sai cổng quyền",
+);
+check(
+  "Cấp gói gửi đủ đối số server cần (discordId + plan + days, guildId tùy chọn)",
+  adminSrc.includes('plan: "supporter" | "pioneer"') &&
+    adminSrc.includes("days:") &&
+    adminSrc.includes("discordId: who"),
+  "UI cấp gói gửi thiếu trường — server từ chối hoặc cấp nhầm",
+);
+check(
+  "cổng quyền của Admin thống nhất: mọi query/mutation Admin đều đứng sau isAdmin",
+  (adminSrc.match(/isAdmin === true \? \{ token \} : "skip"/g) ?? []).length >= 3 &&
+    adminSrc.includes("isAdmin === true && (") &&
+    adminSrc.includes("{isOwner ? ("),
+  "tính năng Admin bị gỡ cổng quyền hoặc mọi thứ đều dồn cho owner",
 );
 
 // ─── Y. Đồng ý điều khoản + hạn mức theo GÓI (08/10/2026) ───────────────────
