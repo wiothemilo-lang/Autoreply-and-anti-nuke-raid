@@ -58,7 +58,7 @@ const COPY: Record<Lang, Copy> = {
     donate: {
       title: "Ủng hộ nhà phát triển — Protogon",
       description:
-        "Giúp duy trì Protogon — bot Discord miễn phí do một người làm. Mọi tính năng luôn miễn phí, quyền góp giúp bot có thêm máy chủ và người sửa lỗi.",
+        "Giúp duy trì Protogon — bot Discord do nhóm RFTV vận hành. Gói Miễn phí dùng được cho mọi server; quyền góp trang trải máy chủ và thời gian bảo trì, không mở khoá tính năng.",
     },
     feedback: {
       title: "Góp ý — Protogon",
@@ -68,7 +68,7 @@ const COPY: Record<Lang, Copy> = {
     premium: {
       title: "Gói Premium — Protogon",
       description:
-        "Xem trước các gói Premium của Protogon: nhiều kênh riêng hơn, báo cáo nâng cao, tên bot riêng và hỗ trợ ưu tiên. Gói miễn phí luôn được giữ nguyên.",
+        "Các gói Premium của Protogon: nâng hạn mức rule tự trả lời, từ khoá cấm, bản backup giữ lại và số ngày lưu backup cho TỪNG server. Gói Miễn phí vẫn dùng được cho mọi server.",
     },
     auth: {
       title: "Đăng nhập — Protogon",
@@ -121,7 +121,7 @@ const COPY: Record<Lang, Copy> = {
     donate: {
       title: "Support the developer — Protogon",
       description:
-        "Help keep Protogon running — a free Discord bot maintained by one person. Every feature stays free; contributions pay for the server and the bug fixes.",
+        "Help keep Protogon running — a Discord bot operated by the RFTV team. The free plan still works for every server; contributions cover servers and maintenance time and unlock no features.",
     },
     feedback: {
       title: "Feedback — Protogon",
@@ -131,7 +131,7 @@ const COPY: Record<Lang, Copy> = {
     premium: {
       title: "Premium plans — Protogon",
       description:
-        "Preview Protogon premium tiers: more private channels, advanced reports, a custom bot name, and priority support. The free plan is never cut down.",
+        "Protogon premium plans raise the limits on auto-reply rules, banned keywords, backups kept, and backup retention days, chosen per server. The free plan still works for every server.",
     },
     auth: {
       title: "Sign in — Protogon",
@@ -185,7 +185,7 @@ const COPY: Record<Lang, Copy> = {
     donate: {
       title: "Entwickler unterstützen — Protogon",
       description:
-        "Protogon am Laufen halten — ein kostenloser Discord-Bot, gepflegt von einer Person. Alle Funktionen bleiben kostenlos; Spenden finanzieren Server und Fehlerbehebungen.",
+        "Hilf mit, Protogon am Laufen zu halten — ein Discord-Bot, betrieben vom RFTV-Team. Der kostenlose Tarif bleibt für jeden Server nutzbar; Spenden decken Server und Wartungszeit und schalten keine Funktionen frei.",
     },
     feedback: {
       title: "Feedback — Protogon",
@@ -195,7 +195,7 @@ const COPY: Record<Lang, Copy> = {
     premium: {
       title: "Premium-Tarife — Protogon",
       description:
-        "Protogon Premium-Tarife ansehen: mehr eigene Kanäle, erweiterte Berichte, eigener Bot-Name und priorisierter Support. Der kostenlose Tarif bleibt unverändert.",
+        "Protogon Premium-Tarife heben die Limits für Auto-Antwort-Regeln, gesperrte Wörter, aufbewahrte Backups und Aufbewahrungstage – pro Server gewählt. Der kostenlose Tarif bleibt für jeden Server nutzbar.",
     },
     auth: {
       title: "Anmelden — Protogon",

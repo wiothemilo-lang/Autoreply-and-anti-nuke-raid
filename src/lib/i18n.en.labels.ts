@@ -492,14 +492,14 @@ export const EN_LABELS: Record<string, string> = {
   "Chính sách quyền riêng tư — Protogon": "Privacy Policy — Protogon",
   "Lưu trữ & xoá dữ liệu — Protogon": "Retention & Data Deletion — Protogon",
   "Ủng hộ nhà phát triển — Protogon": "Support the developer — Protogon",
-  "Giúp duy trì Protogon — bot Discord miễn phí do một người làm. Mọi tính năng luôn miễn phí, quyền góp giúp bot có thêm máy chủ và người sửa lỗi.":
-    "Help keep Protogon running — a free Discord bot maintained by one person. Every feature stays free; contributions pay for the server and the bug fixes.",
+  "Giúp duy trì Protogon — bot Discord do nhóm RFTV vận hành. Gói Miễn phí dùng được cho mọi server; quyền góp trang trải máy chủ và thời gian bảo trì, không mở khoá tính năng.":
+    "Help keep Protogon running — a Discord bot operated by the RFTV team. The free plan still works for every server; contributions cover servers and maintenance time and unlock no features.",
   "Góp ý — Protogon": "Feedback — Protogon",
   "Gửi báo lỗi, đề xuất tính năng hoặc góp ý cho bot Protogon — không cần tài khoản Discord, góp ý đi thẳng tới người làm bot.":
     "Report a bug, suggest a feature, or send general feedback about the Protogon bot — no Discord account needed, it goes straight to the developer.",
   "Gói Premium — Protogon": "Premium plans — Protogon",
-  "Xem trước các gói Premium của Protogon: nhiều kênh riêng hơn, báo cáo nâng cao, tên bot riêng và hỗ trợ ưu tiên. Gói miễn phí luôn được giữ nguyên.":
-    "Preview Protogon premium tiers: more private channels, advanced reports, a custom bot name, and priority support. The free plan is never cut down.",
+  "Các gói Premium của Protogon: nâng hạn mức rule tự trả lời, từ khoá cấm, bản backup giữ lại và số ngày lưu backup cho TỪNG server. Gói Miễn phí vẫn dùng được cho mọi server.":
+    "Protogon premium plans raise the limits on auto-reply rules, banned keywords, backups kept, and backup retention days, chosen per server. The free plan still works for every server.",
 
   // ── Mức ủng hộ (tiền VND) ──
   "50.000đ": "VND 50,000",
@@ -510,12 +510,14 @@ export const EN_LABELS: Record<string, string> = {
   "Một đêm deploy mà không sập giữa chừng": "A deploy night that doesn't crash halfway",
 
   // ── Quyền lợi ủng hộ ──
-  "Bot luôn miễn phí, không giới hạn số server": "The bot stays free, with no server limit",
+  "Bot dùng được cho mọi server, không giới hạn số server":
+    "The bot works for every server, with no server limit",
   "Không bán dữ liệu, không bán lịch sử tin nhắn của bạn":
     "No selling your data, no selling your message history",
-  "Báo lỗi và yêu cầu tính năng được trả lời trong 24 giờ":
-    "Bug reports and feature requests answered within 24 hours",
-  "Ưu tiên hỗ trợ khi server của bạn gặp sự cố": "Priority help when your server breaks",
+  "Báo lỗi và góp ý đi thẳng tới người vận hành bot":
+    "Bug reports and suggestions go straight to the bot operator",
+  "Chi phí máy chủ, tên miền và thời gian bảo trì đều từ đây":
+    "Server costs, the domain, and maintenance time all come from here",
 
   // ── Tên + mức giá các gói Premium ──
   "Miễn phí": "Free",
@@ -527,8 +529,6 @@ export const EN_LABELS: Record<string, string> = {
   "vĩnh viễn": "forever",
   "mỗi tháng": "per month",
   "Đủ dùng cho hầu hết server cộng đồng.": "Enough for most community servers.",
-  "Dành cho server muốn nhiều kênh riêng và báo cáo đẹp hơn.":
-    "For servers that want more private channels and nicer reports.",
   "Cho người muốn bot bám sát server mình nhất.":
     "For people who want the bot to fit their server as closely as possible.",
 
@@ -537,16 +537,6 @@ export const EN_LABELS: Record<string, string> = {
     "Auto-reply, malicious link blocking, 32 anti-nuke modules",
   "Không giới hạn số server": "No limit on the number of servers",
   "Backup & khôi phục cấu trúc server": "Server backup & structure restore",
-  "Số kênh riêng của bot (ví dụ bảng điều khiển)":
-    "The bot's own private channels (dashboards, for example)",
-  "Báo cáo nâng cao & xuất dữ liệu": "Advanced reports & data export",
-  "Hỗ trợ ưu tiên": "Priority support",
   "Tất cả tính năng của gói Miễn phí": "Everything in the Free plan",
   "Tất cả tính năng của gói Đồng hành": "Everything in the Supporter plan",
-  "Tối đa 10 kênh riêng có thư mục riêng": "Up to 10 private channels, each with its own folder",
-  "Tên riêng cho bot (thay vì Protogon)": "A custom bot name instead of Protogon",
-  "Số kênh riêng không giới hạn": "Unlimited private channels",
-  "Hỗ trợ ưu tiên trong 24 giờ": "Priority support within 24 hours",
-  "Ý tưởng tính năng được xếp hạng đầu": "Feature ideas get top ranking",
-  "Avatar & biểu tượng riêng cho bot": "Custom avatar & icon for the bot",
 };

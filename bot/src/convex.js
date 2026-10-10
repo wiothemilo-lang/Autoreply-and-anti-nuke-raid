@@ -2,16 +2,28 @@ const { ConvexHttpClient } = require("convex/browser");
 const metrics = require("./metrics");
 const resilience = require("./resilience");
 
-// TTL mặc định 300s (tăng từ 180s): cấu hình hiếm khi đổi — giảm số query
-// getConfig thêm ~40% so với TTL 180s và ~10 lần so với TTL 30s ban đầu.
+// TTL dài (xem CONFIG_TTL_MS bên dưới): cấu hình hiếm khi đổi nên đọc lại theo
+// chu kỳ ngắn chỉ tốn I/O Convex mà không nhanh hơn cho người dùng.
 // Riêng guild có "cờ chờ xử lý" (lockdownRequested, heatResetRequested, DM chờ,
 // verify panel) dùng TTL ngắn 30s để nút bấm trên dashboard có tác dụng nhanh.
 // Ngoài ra getConfig(guildId, { force: true }) luôn đọc mới — dùng cho các chỗ
 // cần kết quả tức thì (mở khóa kênh, xóa nhiệt, gửi panel, backup ngay).
-// TỐI ƯU I/O: 600s (trước 300s) — getBotConfig đọc guild row + modules +
-// autoreplies + giveaways mỗi lần miss cache; guild có cờ chờ vẫn cache ngắn 30s
-// nên thao tác dashboard không chậm. Giảm 50% reads nhóm này.
-const CONFIG_TTL_MS = 1_800_000; // D1: 30 phút — preload + TTL dài cắt ~2/3 reads getConfig
+// TỐI ƯU I/O (10/10/2026): 90 phút (trước 30 phút) — `guilds.getBotConfig` là
+// nguồn đọc LỚN THỨ HAI trên Convex (968 MB/tháng trong bảng usage) vì mỗi lần
+// miss cache phải đọc cả guild row (hàng trăm field) + modules + autoReplies +
+// giveaways + heatStates.
+//
+// VÌ SAO DÀI ĐƯỢC MÀ KHÔNG LÀM CẤU HÌNH DASHBOARD CHẬM: đường tới bot không
+// dựa vào TTL nữa. `bot_tick:getPendingJobs` trả `settingsChanges` (mọi mutation
+// dashboard ghi field bot đọc PHẢI đặt `settingsChangedAt` — ép bởi
+// scripts/check-settings-signal.cjs), tick 180s gọi `applySettingsChanges` →
+// `store.invalidate(guildId)` + xoá cache webhook ⇒ thay đổi vẫn vào bot trong
+// ~1 tick. TTL chỉ còn là lưới an toàn cho nhánh tick bị lỗi và cho guild không
+// có mutation nào đụng tới.
+//
+// 30 phút → 90 phút = cắt ~2/3 reads getConfig, tức ~640 MB/tháng ở mức hiện tại.
+// Guild có "cờ chờ xử lý" vẫn cache ngắn 30s (CONFIG_TTL_PENDING_MS).
+const CONFIG_TTL_MS = 5_400_000; // D1: 90 phút — lưới an toàn; tín hiệu tick mới là đường chính
 const CONFIG_TTL_PENDING_MS = 30_000;
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 500;

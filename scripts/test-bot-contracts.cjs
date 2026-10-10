@@ -166,6 +166,38 @@ check(
   "panel AI phải nằm trong cửa sổ Admin (chỉ owner nhìn thấy)",
 );
 
+// ─── 6. TTL cache config: dài được CHỈ vì tín hiệu tick là đường chính ───────
+// 10/10/2026: `guilds.getBotConfig` là nguồn đọc lớn thứ hai trên Convex
+// (968 MB/tháng). TTL 30 phút → 90 phút cắt ~2/3 lượng đọc, NHƯNG chỉ an toàn
+// khi đường "dashboard sửa → bot thấy" không dựa vào TTL. Bộ ba dưới đây khoá
+// đúng bất biến đó: (a) TTL đủ dài, (b) tick xoá cache theo settingsChanges,
+// (c) Convex THẬT SỰ gửi settingsChanges trong batch (thiếu là hạ TTL về 0 cũng
+// không có tín hiệu nào để hạ nhiệt — cấu hình dashboard sẽ đứng im).
+const convexClientSrc = read("bot/src/convex.js");
+const ttlDecl = /const CONFIG_TTL_MS = ([\d_]+);/.exec(convexClientSrc)?.[1] ?? "";
+const ttlMs = Number(ttlDecl.replace(/_/g, ""));
+check(
+  `CONFIG_TTL_MS >= 90 phút (hiện ${ttlDecl || "không tìm thấy"})`,
+  Number.isFinite(ttlMs) && ttlMs >= 5_400_000,
+  "TTL ngắn ⇒ đọc getBotConfig thừa (968 MB/tháng); hạ xuống là quay lại bug I/O",
+);
+const tickSrc = read("bot/src/tick.js");
+const applyChangesBody = tickSrc.slice(
+  tickSrc.indexOf("function applySettingsChanges("),
+  tickSrc.indexOf("/**", tickSrc.indexOf("function applySettingsChanges(")),
+);
+check(
+  "tick xoá cache config theo settingsChanges (store.invalidate trong applySettingsChanges)",
+  /store\.invalidate\(guildId\)/.test(applyChangesBody),
+  "thiếu invalidate ⇒ TTL dài làm cấu hình dashboard vào bot chậm tới 90 phút",
+);
+const botTickSrc = read("convex/bot_tick.ts");
+check(
+  "bot_tick.getPendingJobs thật sự trả settingsChanges (nguồn tín hiệu của tick)",
+  /settingsChanges,/.test(botTickSrc) && /settingsChangedAt/.test(botTickSrc),
+  "Convex không gửi settingsChanges ⇒ bot không biết dashboard vừa đổi cấu hình",
+);
+
 const indexSrc = read("bot/src/index.js");
 const uncaughtBranch = indexSrc.slice(
   indexSrc.indexOf('process.on("uncaughtException"'),

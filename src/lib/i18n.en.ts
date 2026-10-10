@@ -1459,8 +1459,8 @@ export const EN: Record<string, string> = {
   "Gói Premium": "Premium plans",
   Mới: "New",
   "Giữ cho Protogon mở cửa miễn phí": "Keep Protogon free and open",
-  "Protogon được một người duy trì, chi phí máy chủ và thời gian đều tự bỏ ra. Mọi tính năng đều miễn phí và sẽ luôn miễn phí — quyền góp của bạn giúp bot có thêm tháng độ ổn định, không phải để mở khoá tính năng.":
-    "Protogon is maintained by one person, who pays for the server and the time out of pocket. Every feature is free and always will be — your support buys the bot more uptime, not a feature unlock.",
+  "Protogon do nhóm RFTV tự bỏ chi phí máy chủ và thời gian duy trì. Gói Miễn phí vẫn dùng được cho mọi server — quyền góp ở đây KHÔNG nằm trong luồng mua gói Premium, mà để bot có thêm tháng độ ổn định.":
+    "The RFTV team covers Protogon's server costs and maintenance time. The free plan still works for every server — donations here are NOT part of the Premium purchase flow; they buy the bot more uptime.",
   "Ủng hộ qua Discord": "Support via Discord",
   "Xem gói Premium": "See premium plans",
 

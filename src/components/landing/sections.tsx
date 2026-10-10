@@ -564,7 +564,7 @@ export function CtaBanner() {
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
               {translate(
-                "Đăng nhập bằng Discord, mời Protogon vào server để bật nhiệt độ, Join Gate, lọc nội dung và 32 module chống nuke ngay trên dashboard — cùng trợ lý ảo Haimiya đồng hành. Miễn phí cho mọi server.",
+                "Đăng nhập bằng Discord, mời Protogon vào server để bật nhiệt độ, Join Gate, lọc nội dung và 32 module chống nuke ngay trên dashboard — cùng trợ lý ảo Haimiya đồng hành. Gói Miễn phí dùng được cho mọi server.",
               )}{" "}
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">

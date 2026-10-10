@@ -2808,5 +2808,59 @@ check(
   "còn quảng cáo thứ code không enforce",
 );
 
+// ─── 10/10/2026 — bề mặt công khai KHÁC cũng không được hứa suông ────────────
+// /premium đã sạch từ 09/10, nhưng meta SEO (đúng thứ Google in ra cho khách)
+// và /donate vẫn giữ copy của bảng gói CŨ — “nhiều kênh riêng hơn, báo cáo nâng
+// cao, tên bot riêng, hỗ trợ ưu tiên” — và câu “mọi tính năng đều miễn phí”
+// trong khi gói Miễn phí bị trần thật (5 rule / 20 từ khoá / 3 bản backup /
+// 7 ngày) ở convex/plans.ts. Bốn cổng dưới đây khoá lại cả bốn bề mặt: meta SEO,
+// trang ủng hộ, từ điển EN/DE, và trang pháp lý.
+const donateCopySrc = files.get("pages/DonatePage.tsx") ?? "";
+const seoMetaAll = [
+  seo,
+  files.get("lib/i18n.en.labels.ts") ?? "",
+  files.get("lib/i18n.de.labels.ts") ?? "",
+].join("\n");
+check(
+  "meta SEO + từ điển EN/DE không còn quảng cáo gói Premium cũ (kênh riêng / tên bot riêng / hỗ trợ ưu tiên)",
+  !/kênh riêng hơn|private channels|eigene Kanäle|tên bot riêng|custom bot name|eigener Bot-Name|hỗ trợ ưu tiên"><|priority support|priorisierter Support/.test(
+    seoMetaAll,
+  ),
+  "còn copy gói cũ trong thẻ meta — không dòng nào trong plans.ts enforce",
+);
+check(
+  "meta SEO mô tả đúng hạn mức thật của gói Premium (rule tự trả lời / từ khoá cấm / backup)",
+  /nâng hạn mức rule tự trả lời/.test(seo) &&
+    /raise the limits on auto-reply rules/.test(seo) &&
+    /heben die Limits für Auto-Antwort-Regeln/.test(seo),
+  "mô tả gói phải nói đúng thứ code chặn",
+);
+check(
+  "không còn tuyên bố “mọi tính năng đều miễn phí” ở meta/ủng hộ (gói Miễn phí có trần thật)",
+  !/Mọi tính năng luôn miễn phí|Every feature stays free|Alle Funktionen bleiben kostenlos/.test(
+    seoMetaAll,
+  ) && !/Mọi tính năng đều miễn phí/.test(donateCopySrc),
+  "tuyên bố tuyệt đối trái với plans.ts là quảng cáo sai",
+);
+check(
+  "các mục ủng hộ không hứa hạn trả lời / ưu tiên hỗ trợ (pháp lý nói không phải nghĩa vụ)",
+  !/được trả lời trong 24 giờ/.test(donateCopySrc) && !/Ưu tiên hỗ trợ/.test(donateCopySrc),
+  "hứa SLA 24h cho quyền góp trong khi Điều khoản §6 phủ nhận nghĩa vụ đó",
+);
+const legalTruthSrc = files.get("lib/legalContent.ts") ?? "";
+check(
+  "Điều khoản §6 tách bạch gói Miễn phí (không SLA) với cam kết của gói trả phí",
+  /Gói Miễn phí được cung cấp miễn phí, không kèm cam kết mức dịch vụ/.test(legalTruthSrc) &&
+    /LÀ nghĩa vụ của chúng tôi/.test(legalTruthSrc) &&
+    /ARE our obligation/.test(legalTruthSrc) &&
+    /SIND die auf der Premium-Seite/.test(legalTruthSrc),
+  "Điều khoản nói “miễn phí, không SLA” trong khi đang bán gói kèm cam kết 24h — mâu thuẫn",
+);
+check(
+  "Điều khoản không còn khẳng định Protogon “cung cấp miễn phí cho cộng đồng”",
+  !/cung cấp miễn phí cho cộng đồng|provided free of charge to the community/.test(legalTruthSrc),
+  "câu đó trái với việc bán gói Premium",
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

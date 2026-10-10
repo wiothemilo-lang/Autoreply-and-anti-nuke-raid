@@ -60,19 +60,19 @@
        lastmod = ngày LEGAL_UPDATED trong src/lib/legalContent.ts. -->
   <url>
     <loc>https://protogon.freebuff.app/terms</loc>
-    <lastmod>2026-10-09</lastmod>
+    <lastmod>2026-10-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://protogon.freebuff.app/privacy</loc>
-    <lastmod>2026-10-09</lastmod>
+    <lastmod>2026-10-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://protogon.freebuff.app/data-deletion</loc>
-    <lastmod>2026-10-09</lastmod>
+    <lastmod>2026-10-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

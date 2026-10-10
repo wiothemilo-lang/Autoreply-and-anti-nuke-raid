@@ -5,7 +5,7 @@
 //   - A1: URLhaus 30 phút / 3000 dòng / cap 15000 domain
 //   - A2: OpenPhish feed hợp nhất vào cùng Set với URLhaus
 //   - C1: snapshot nén zlib + rotate 48 điểm + đọc lại nguyên vẹn
-//   - D1: prewarmConfigs làm ấm cache; TTL 1800s
+//   - D1: prewarmConfigs làm ấm cache; TTL 5400s (90 phút)
 
 const path = require("path");
 const Module = require("module");
@@ -247,7 +247,7 @@ const snap = require("../bot/src/localSnapshot.js");
     }
   }
 
-  /* ── D1 — prewarmConfigs làm ấm cache + TTL 1800s ──────────────────────── */
+  /* ── D1 — prewarmConfigs làm ấm cache + TTL 5400s/90' ─────────────────── */
   {
     // ConvexStore yêu cầu CONVEX_URL lúc khởi tạo — dùng URL giả của test.
     process.env.CONVEX_URL = process.env.CONVEX_URL || "https://test-boost.convex.cloud";
@@ -269,10 +269,10 @@ const snap = require("../bot/src/localSnapshot.js");
       real.client.queries.length === before,
     );
     check(
-      "D1: TTL 1800s trong source",
+      "D1: TTL 5400s/90' trong source",
       fs
         .readFileSync(path.join(root, "bot", "src", "convex.js"), "utf8")
-        .includes("CONFIG_TTL_MS = 1_800_000"),
+        .includes("CONFIG_TTL_MS = 5_400_000"),
     );
   }
   /* ── B1 — n-gram nhạy hơn + cửa sổ 7 ngày ─────────────────────────────── */

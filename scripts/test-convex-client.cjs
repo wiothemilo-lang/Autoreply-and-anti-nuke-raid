@@ -5,8 +5,8 @@
 // chưa từng được test:
 //   - withRetry: lỗi 5xx/429/mạng được retry exponential; 4xx fail NGAY;
 //     hết MAX_RETRIES thì ném lỗi.
-//   - getConfig: TTL cache 600s (pending 30s); opts.force bỏ cache; lỗi mạng
-//     trả cache cũ (stale) thay vì chết; không có cache thì ném.
+//   - getConfig: TTL cache đọc từ source (pending 30s); opts.force bỏ cache;
+//     lỗi mạng trả cache cũ (stale) thay vì chết; không có cache thì ném.
 //   - invalidate + pruneCache: dọn cache guild rời (memGuard).
 //   - ruleCooldowns: isCooledDown/recordReply + chống phình Map > 500.
 //   - sendHeartbeat: Convex chết → _heartbeatOk=false, không ném.
@@ -57,6 +57,21 @@ Module._load = function (request, ...rest) {
 };
 
 const ConvexStore = require("../bot/src/convex.js");
+
+/**
+ * TTL cache config đọc THẲNG từ source (bot/src/convex.js) thay vì viết cứng.
+ *
+ * Vì sao: nhánh "quá TTL → thử gọi lại, Convex chết → trả cache cũ" mô phỏng
+ * bằng cách đẩy Date.now() vượt TTL. Giá trị viết cứng 1_801_000 lặng lẽ KHÔNG
+ * còn vượt TTL mỗi lần nâng TTL (bug thật 10/10/2026: nâng 30' → 90' để cắt
+ * I/O, test đỏ ở nhánh stale trong khi code đúng — nguyên nhân nằm ở test).
+ * Đọc từ source thì phép đo luôn khớp TTL thật.
+ */
+const CONFIG_TTL_MS = Number(
+  /const CONFIG_TTL_MS = ([\d_]+);/
+    .exec(fs.readFileSync(path.join(__dirname, "..", "bot", "src", "convex.js"), "utf8"))?.[1]
+    ?.replace(/_/g, "") ?? 0,
+);
 
 let pass = 0;
 let fail = 0;
@@ -178,9 +193,9 @@ function freshStore() {
     let res = null;
     let threw = false;
     try {
-      // Vượt TTL bằng mock Date +601s (TTL config là 600s).
+      // Vượt TTL bằng mock Date (TTL thật đọc từ source ở đầu file).
       const realNow = Date.now;
-      Date.now = () => realNow() + 1_801_000;
+      Date.now = () => realNow() + CONFIG_TTL_MS + 1_000;
       try {
         res = await store.getConfig("g-stale");
       } finally {

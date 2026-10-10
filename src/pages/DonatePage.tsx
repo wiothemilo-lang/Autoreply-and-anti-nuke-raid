@@ -28,7 +28,8 @@ import { api } from "../../convex/_generated/api";
 /**
  * Trang /donate — ủng hộ nhà phát triển.
  *
- * Vì sao cần: Protogon do một người làm, miễn phí cho mọi server. Người dùng
+ * Vì sao cần: Protogon do nhóm RFTV vận hành, gói Miễn phí dùng được cho mọi
+ * server (gói Premium là tuỳ chọn trả phí, xem /premium). Người dùng
  * muốn giúp thì cần một chỗ rõ ràng; không có nó thì chỉ có người đã biết mới
  * ủng hộ. Nút thanh toán ZaloPay chạy THẬT (tạo đơn + ký MAC ở Convex —
  * convex/payments.ts): trang chỉ nhận paymentUrl rồi redirect, giá do server
@@ -49,10 +50,10 @@ const TIERS = [
 ];
 
 const PERKS = [
-  "Bot luôn miễn phí, không giới hạn số server",
+  "Bot dùng được cho mọi server, không giới hạn số server",
   "Không bán dữ liệu, không bán lịch sử tin nhắn của bạn",
-  "Báo lỗi và yêu cầu tính năng được trả lời trong 24 giờ",
-  "Ưu tiên hỗ trợ khi server của bạn gặp sự cố",
+  "Báo lỗi và góp ý đi thẳng tới người vận hành bot",
+  "Chi phí máy chủ, tên miền và thời gian bảo trì đều từ đây",
 ];
 
 export default function DonatePage() {
@@ -132,7 +133,7 @@ export default function DonatePage() {
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground">
             {translate(
-              "Protogon được một người duy trì, chi phí máy chủ và thời gian đều tự bỏ ra. Mọi tính năng đều miễn phí và sẽ luôn miễn phí — quyền góp của bạn giúp bot có thêm tháng độ ổn định, không phải để mở khoá tính năng.",
+              "Protogon do nhóm RFTV tự bỏ chi phí máy chủ và thời gian duy trì. Gói Miễn phí vẫn dùng được cho mọi server — quyền góp ở đây KHÔNG nằm trong luồng mua gói Premium, mà để bot có thêm tháng độ ổn định.",
             )}
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
