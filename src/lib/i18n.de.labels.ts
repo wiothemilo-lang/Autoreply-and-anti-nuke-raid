@@ -524,14 +524,4 @@ export const DE_LABELS: Record<string, string> = {
   "vĩnh viễn": "für immer",
   "mỗi tháng": "pro Monat",
   "Đủ dùng cho hầu hết server cộng đồng.": "Reicht für die meisten Community-Server.",
-  "Cho người muốn bot bám sát server mình nhất.":
-    "Für alle, die den Bot möglichst passend zum eigenen Server wollen.",
-
-  // ── Funktionen je Tarif ──
-  "Tự trả lời, chặn link độc hại, 32 module chống nuke":
-    "Auto-Antworten, Schadlinks-Blocker, 32 Anti-Nuke-Module",
-  "Không giới hạn số server": "Keine Obergrenze für die Anzahl der Server",
-  "Backup & khôi phục cấu trúc server": "Server-Backup & Wiederherstellung der Struktur",
-  "Tất cả tính năng của gói Miễn phí": "Alles im kostenlosen Tarif",
-  "Tất cả tính năng của gói Đồng hành": "Alles im Unterstützer-Tarif",
 };
