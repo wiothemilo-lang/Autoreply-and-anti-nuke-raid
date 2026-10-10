@@ -4,6 +4,14 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 10/10/2026 (4) — Deploy VPS: bot lên `de1735e` (pull không có commit mới)
+
+- 🎯 **Yêu cầu**: `/deploy` — pull code mới nhất → 4 lớp kiểm chứng → deploy Convex nếu cần → restart bot → xác minh sống.
+- 🔍 **Pull `de1735e` → `de1735e`** (`Already up to date`): HEAD đã mới nhất, 2 lockfile không đổi → bỏ `bun install`; không có gì để merge. Vẫn đáng làm vì bot đang chạy bản **07/10 `61eefdc`** (uptime 3,16 ngày, ↺11) trong khi `bot/src/convex.js` đã đổi sau đó (TTL 90' + nhận `errorData.code` botKey) → restart thật mới lấy code mới.
+- 🧪 **4 lớp XANH**: `bun run test` **87/87** (132,4s, gồm `test-browser-contracts` Chromium thật) · `bun tsc -b --noEmit` 0 · `bun run lint` 0 · `bun run format:check` sạch.
+- 🗄️ **Convex BỎ QUA**: `git diff HEAD@{1} HEAD -- convex/` rỗng (pull không mang file `convex/` nào); thay đổi backend từ 07/10 đã được CI `npx convex deploy` đẩy lúc push → không deploy thừa.
+- 🚀 **Restart + xác minh**: `pm2 restart protogon-bot` → ↺ 11→**12**, `online`, uptime tăng đều, restart count đứng yên; log boot sạch `✅ Protogon đã online: Protogon#8933 — 11 server` · `20 slash commands` · `prewarm 11/11` · thẻ chào `true` · **0 dòng lỗi** sau mốc 15:08:45 (lỗi `Server Error`/`Unknown interaction` trong log đều từ 07/10, trước restart).
+
 ## 10/10/2026 (3) — Team admin toàn quyền Admin + tag cạnh logo + cấp gói premium
 
 - 🎯 **Yêu cầu**: "cho phép ai được owner bot thêm vào team thì sẽ được quyền truy cập toàn tính năng trong admin panel, thêm tag Admin cho thành viên team admin và tag Owner ngay bên cạnh logo người dùng nếu đó là owner bot, kiểm tra admin panel đã có cơ chế cấp gói premium chưa — nếu chưa thì thêm vào, người dùng gói premium sẽ có tag đặc biệt bên cạnh logo user."
