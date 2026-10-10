@@ -1627,11 +1627,8 @@ export const EN: Record<string, string> = {
   "Miễn phí vĩnh viễn": "Free forever",
   "Bạn đang có gói cao hơn": "You already have a higher plan",
   "Gia hạn thêm 30 ngày": "Extend by 30 days",
-  "Mua bằng ZaloPay": "Buy with ZaloPay",
   "Gói {goi} đang hoạt động — dùng tới {ngay}": "Plan {goi} active until {ngay}",
   "Gói {goi} đã hết hạn {ngay}": "Plan {goi} expired on {ngay}",
-  "Thanh toán một lần qua ZaloPay — không tự động gia hạn":
-    "One-time payment via ZaloPay — no auto-renewal",
   "Một lần thanh toán cho 30 ngày Premium — không tự động trừ tiền, hết hạn thì mua lại nếu muốn.":
     "One payment covers 30 days of Premium — no automatic charges; buy again after expiry if you want.",
   "Cần giúp trước khi mua?": "Need help before buying?",
