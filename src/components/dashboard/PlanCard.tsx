@@ -38,6 +38,12 @@ export default function PlanCard({ guildId }: { guildId: string }) {
     { label: "Từ khoá cấm", value: String(plan.limits.badWords) },
     { label: "Bản backup giữ", value: String(plan.limits.backupKeepCount) },
     { label: "Ngày giữ backup", value: String(plan.limits.backupKeepDays) },
+    // Nhóm ĐẶC QUYỀN DỮ LIỆU (P1–P4) — bốn con số này là thứ gói trả phí mua
+    // thêm; hiện cùng chỗ với hạn mức cũ để khách thấy ngay mình được gì.
+    { label: "Dòng mỗi lượt xuất CSV", value: String(plan.limits.exportRows) },
+    { label: "Ngày lịch sử xuất", value: String(plan.limits.exportDays) },
+    { label: "Dòng bảng nhiệt", value: String(plan.limits.heatTopRows) },
+    { label: "Dòng log hành động", value: String(plan.limits.historyRows) },
   ];
 
   return (

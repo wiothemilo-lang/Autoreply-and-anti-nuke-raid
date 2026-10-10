@@ -37,7 +37,14 @@ export const PLAN_LABELS: Record<PlanId, string> = {
   pioneer: "Tiên phong",
 };
 
-/** Hạn mức tính bằng SỐ (càng lớn càng rộng) — khớp trần cứng của hệ thống. */
+/**
+ * Hạn mức tính bằng SỐ (càng lớn càng rộng) — khớp trần cứng của hệ thống.
+ *
+ * Nhóm ĐẶC QUYỀN DỮ LIỆU (P1–P4, 10/10/2026): bốn hạn mức cuối là thứ gói trả
+ * phí mua thêm — xuất dữ liệu nhiều hơn, xuất được lịch sử xa hơn, xem nhiều
+ * dòng hơn ở hai chỗ đọc nặng nhất. Tất cả đều là số ĐO ĐƯỢC và chặn ở tầng
+ * đọc (`.take(min(..., limit))`), không phải ẩn nút trên web.
+ */
 export type PlanLimits = {
   /** Số rule auto reply mỗi server. */
   autoReplyRules: number;
@@ -47,6 +54,14 @@ export type PlanLimits = {
   backupKeepCount: number;
   /** Số ngày giữ backup (0 = tắt dọn theo ngày). */
   backupKeepDays: number;
+  /** Số dòng tối đa MỘT lượt xuất CSV (báo cáo/lịch sử) — 0 = không cho xuất. */
+  exportRows: number;
+  /** Cửa sổ ngày lịch sử mà lượt xuất CSV đọc tới. */
+  exportDays: number;
+  /** Số dòng bảng nhiệt trả về cho /stats (top thành viên nhiệt cao nhất). */
+  heatTopRows: number;
+  /** Số dòng log hành động mod hiện trên dashboard (panel Log hành động). */
+  historyRows: number;
 };
 
 /**
@@ -55,9 +70,38 @@ export type PlanLimits = {
  * nơi khác là kiểu hứa suông mà file này sinh ra để chấm dứt.
  */
 export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
-  free: { autoReplyRules: 5, badWords: 20, backupKeepCount: 3, backupKeepDays: 7 },
-  supporter: { autoReplyRules: 30, badWords: 60, backupKeepCount: 10, backupKeepDays: 30 },
-  pioneer: { autoReplyRules: 50, badWords: 100, backupKeepCount: 50, backupKeepDays: 365 },
+  free: {
+    autoReplyRules: 5,
+    badWords: 20,
+    backupKeepCount: 3,
+    backupKeepDays: 7,
+    // Miễn phí VẪN xuất được dữ liệu (không phải tính năng khoá sau tường):
+    // 100 dòng và 90 ngày là đủ cho một server cộng đồng soi lại sự cố.
+    exportRows: 100,
+    exportDays: 90,
+    heatTopRows: 10,
+    historyRows: 30,
+  },
+  supporter: {
+    autoReplyRules: 30,
+    badWords: 60,
+    backupKeepCount: 10,
+    backupKeepDays: 30,
+    exportRows: 1_000,
+    exportDays: 365,
+    heatTopRows: 30,
+    historyRows: 100,
+  },
+  pioneer: {
+    autoReplyRules: 50,
+    badWords: 100,
+    backupKeepCount: 50,
+    backupKeepDays: 365,
+    exportRows: 2_000,
+    exportDays: 1_095,
+    heatTopRows: 50,
+    historyRows: 200,
+  },
 };
 
 /** Trần cứng toàn hệ thống — không gói nào (kể cả tương lai) vượt được. */
@@ -66,6 +110,10 @@ export const HARD_CAPS: Record<keyof PlanLimits, number> = {
   badWords: 100,
   backupKeepCount: 50,
   backupKeepDays: 365,
+  exportRows: 2_000,
+  exportDays: 1_095,
+  heatTopRows: 50,
+  historyRows: 200,
 };
 
 /** Nhãn tiếng Việt của từng hạn mức — dùng trong thông báo lỗi. */
@@ -74,6 +122,10 @@ export const LIMIT_LABELS: Record<keyof PlanLimits, string> = {
   badWords: "từ khoá cấm",
   backupKeepCount: "bản backup giữ lại",
   backupKeepDays: "ngày giữ backup",
+  exportRows: "dòng mỗi lượt xuất dữ liệu",
+  exportDays: "ngày lịch sử xuất được",
+  heatTopRows: "dòng bảng nhiệt",
+  historyRows: "dòng log hành động",
 };
 
 /** Chuẩn hoá chuỗi gói bất kỳ về PlanId (dữ liệu bẩn trong DB không thành quyền). */

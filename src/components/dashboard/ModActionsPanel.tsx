@@ -1,6 +1,7 @@
 import { Gavel, ShieldCheck } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardContent } from "../ui/card";
+import ExportCsvButton from "./ExportCsvButton";
 import type { GuildData } from "../../lib/types";
 
 import { dateLocale, translate } from "../../lib/i18n";
@@ -55,6 +56,12 @@ export default function ModActionsPanel({ data }: { data: GuildData }) {
           <Badge variant="secondary">
             {actions.length} {translate("hành động gần nhất")}
           </Badge>
+        </div>
+        {/* Xuất CSV: gói Miễn phí đã xuất được (100 dòng / 90 ngày), gói trả phí
+            xuất nhiều hơn — con số trên nút lấy từ plans.guildPlan, cùng bảng mà
+            query xuất dùng để cắt, nên nút không thể hứa quá file thật. */}
+        <div className="mt-3">
+          <ExportCsvButton guildId={data.guild.discordId} kind="modActions" />
         </div>
 
         {actions.length === 0 ? (

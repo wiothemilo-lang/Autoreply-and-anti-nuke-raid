@@ -4,6 +4,18 @@
  * vẫn thiếu nữa mới rơi về VI. Giữ nguyên placeholder {p0}, {p1}…
  */
 export const DE: Record<string, string> = {
+  /* ==== ĐẶC QUYỀN DỮ LIỆU — P1–P4 (10/10/2026) ==== Xem i18n.en.ts. */
+  "Bảng nhiệt hiện top {n} thành viên": "Die Hitze-Rangliste zeigt die Top {n} Mitglieder",
+  "Log hành động hiện {n} dòng gần nhất": "Das Aktionsprotokoll zeigt die letzten {n} Einträge",
+  "Top {n} thành viên bị cảnh báo nhiệt độ vi phạm":
+    "Top {n} Mitglieder mit der höchsten Verstoß-Heat",
+  "Xuất CSV tới {n} dòng mỗi lượt": "Exportiert bis zu {n} Zeilen pro Durchlauf",
+  "Xuất được lịch sử trong {n} ngày": "Exportiert den Verlauf der letzten {n} Tage",
+  "Không xuất được dữ liệu của server này.":
+    "Die Daten dieses Servers konnten nicht exportiert werden.",
+  "Không xuất được dữ liệu — thử lại sau ít phút.":
+    "Datenexport fehlgeschlagen — bitte in ein paar Minuten erneut versuchen.",
+  "{ten} — tối đa {n} dòng · {d} ngày": "{ten} — max. {n} Zeilen · {d} Tage",
   /* ==== Khả năng truy cập (28/09/2026) ==== Xem i18n.en.ts. */
   "Bỏ qua tới nội dung": "Zum Inhalt springen",
   /* ==== Gom menu server thành nhóm (27/09/2026) ==== Xem i18n.en.ts. */
@@ -765,7 +777,6 @@ export const DE: Record<string, string> = {
     "Timeout · Kick · Ban · Warn · Purge — protokolliert mit",
   "Tin nhắn trực tiếp từ Protogon": "Direktnachricht von Protogon",
   "Tiêu đề embed": "Embed-Titel",
-  "Top 10 thành viên bị cảnh báo nhiệt độ vi phạm": "Top 10 Mitglieder mit höchster Verstoß-Heat",
   "Trang trước": "Vorherige Seite",
   "Trung bình": "Durchschnitt",
   "Trò chuyện với Haimiya": "Mit Haimiya chatten",

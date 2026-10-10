@@ -144,6 +144,13 @@ export default function PremiumPage() {
       translate("Tối đa {n} từ khoá cấm cho automod", { n: lim.badWords }),
       translate("Giữ {n} bản backup gần nhất", { n: lim.backupKeepCount }),
       translate("Giữ backup trong {n} ngày", { n: lim.backupKeepDays }),
+      // ĐẶC QUYỀN DỮ LIỆU (P1–P4): bốn dòng dưới đây đọc từ CÙNG bảng hạn mức mà
+      // query xuất dữ liệu dùng để cắt — nên câu trên trang bán và số dòng trong
+      // file CSV không thể lệch nhau.
+      translate("Xuất CSV tới {n} dòng mỗi lượt", { n: lim.exportRows }),
+      translate("Xuất được lịch sử trong {n} ngày", { n: lim.exportDays }),
+      translate("Bảng nhiệt hiện top {n} thành viên", { n: lim.heatTopRows }),
+      translate("Log hành động hiện {n} dòng gần nhất", { n: lim.historyRows }),
     ];
     if (planId !== "free") {
       bullets.unshift(translate("Giữ nguyên toàn bộ tính năng bảo vệ của gói Miễn phí"));

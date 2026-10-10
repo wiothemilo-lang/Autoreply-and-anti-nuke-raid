@@ -4,6 +4,14 @@
  * qua translate(item.label), mảnh câu ghép, toast dựng trong callback).
  */
 export const DE_LABELS: Record<string, string> = {
+  /* ==== ĐẶC QUYỀN DỮ LIỆU — P1–P4 (10/10/2026) ==== Xem i18n.en.labels.ts. */
+  "Dòng mỗi lượt xuất CSV": "Zeilen pro CSV-Export",
+  "Ngày lịch sử xuất": "Tage des exportierbaren Verlaufs",
+  "Dòng bảng nhiệt": "Zeilen der Hitze-Rangliste",
+  "Dòng log hành động": "Zeilen im Aktionsprotokoll",
+  "Xuất log hành động (CSV)": "Aktionsprotokoll exportieren (CSV)",
+  "Xuất sự kiện chống nuke (CSV)": "Anti-Nuke-Ereignisse exportieren (CSV)",
+  "Xuất bảng nhiệt (CSV)": "Hitze-Rangliste exportieren (CSV)",
   "(tất cả)": "(alle)",
   "1 giờ": "1 Stunde",
   "24 module": "24 Module",

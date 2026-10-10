@@ -33,6 +33,7 @@ import { timeAgo } from "../lib/utils";
 import type { MeData } from "../lib/types";
 
 import LangSwitch from "../components/LangSwitch";
+import ExportCsvButton from "../components/dashboard/ExportCsvButton";
 
 import { dateLocale, translate } from "../lib/i18n";
 /** 1 dòng bảng xếp hạng trả về từ convex/reports.ts heatLeaderboard. */
@@ -157,10 +158,18 @@ export default function StatsPage() {
     if (!guildId && managed.length > 0) setGuildId(managed[0].discordId);
   }, [guildId, managed]);
 
+  // TRẦN theo gói (P4): `heatTopRows` = 10 (Miễn phí) / 30 / 50. Hỏi đúng bằng
+  // hạn mức của gói đang áp cho server này — server cũng cắt đúng trần đó.
+  const plan = useQuery(
+    api.plans.guildPlan,
+    token && guildId ? ({ token, guildId } as { token: string; guildId: string }) : "skip",
+  ) as { limits: { heatTopRows: number } } | null | undefined;
+  const topN = plan?.limits?.heatTopRows ?? 10;
+
   const rows = useQuery(
     api.reports.heatLeaderboard,
     token && guildId
-      ? ({ token, guildId, limit: 10 } as { token: string; guildId: string; limit: number })
+      ? ({ token, guildId, limit: topN } as { token: string; guildId: string; limit: number })
       : "skip",
   ) as HeatRow[] | null | undefined;
 
@@ -180,8 +189,8 @@ export default function StatsPage() {
       }))
       .filter((r) => r.heat > 0)
       .sort((a, b) => b.heat - a.heat)
-      .slice(0, 10);
-  }, [rows]);
+      .slice(0, topN);
+  }, [rows, topN]);
 
   if (me === undefined) {
     return (
@@ -210,7 +219,7 @@ export default function StatsPage() {
                   {translate("Thống kê nhiệt độ 🔥")}{" "}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  {translate("Top 10 thành viên bị cảnh báo nhiệt độ vi phạm")}{" "}
+                  {translate("Top {n} thành viên bị cảnh báo nhiệt độ vi phạm", { n: topN })}{" "}
                 </p>
               </div>
               <LangSwitch className="ml-auto" />
@@ -391,6 +400,10 @@ export default function StatsPage() {
                     )}
                     <Badge variant="secondary">{selected?.name ?? "—"}</Badge>
                   </div>
+                </div>
+
+                <div className="mb-4">
+                  <ExportCsvButton guildId={guildId} kind="heat" />
                 </div>
 
                 <p className="mb-4 text-xs text-muted-foreground">
