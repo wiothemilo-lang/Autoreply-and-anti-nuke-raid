@@ -61,6 +61,28 @@ export function isGuildHeartbeatFresh(ts: number | null | undefined, now = Date.
   return isHeartbeatFresh(ts, now, GUILD_HEARTBEAT_FRESH_MS);
 }
 
+/**
+ * Tải một chuỗi về máy dưới dạng file (dùng cho xuất CSV).
+ *
+ * Vì sao ghép `\uFEFF` (BOM) vào trước: Excel trên Windows đọc CSV không BOM
+ * theo bảng mã hệ thống, nên tên tiếng Việt ("Nguyễn Văn A") hiện thành "Nguyá»…".
+ * BOM báo cho Excel biết file là UTF-8. Google Sheets không cần nhưng không hại.
+ *
+ * Dùng Blob + `URL.createObjectURL` rồi `revokeObjectURL` ngay sau khi bấm: giữ
+ * URL sống trong RAM tới hết phiên là rò bộ nhớ với file vài trăm KB.
+ */
+export function downloadTextFile(filename: string, text: string): void {
+  const blob = new Blob([`\uFEFF${text}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function timeAgo(ts: number | null | undefined): string {
   if (!ts) return translate("chưa rõ");
   const diff = Date.now() - ts;

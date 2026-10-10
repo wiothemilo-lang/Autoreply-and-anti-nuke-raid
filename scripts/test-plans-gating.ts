@@ -10,7 +10,11 @@
 //      gói Đồng hành để dùng 30". Lỗi mơ hồ khiến khách tưởng bot hỏng.
 //   3. ENFORCE Ở TẦNG GHI — gọi thẳng mutation phải bị chặn y như UI, và mua
 //      gói xong (entitlement còn hạn của ĐÚNG server) là mở được ngay.
+//   4. ĐẶC QUYỀN DỮ LIỆU (P1–P4, 10/10/2026) — xuất CSV (số dòng + cửa sổ ngày),
+//      trần bảng nhiệt và trần log hành động đều đọc CÙNG bảng hạn mức và chặn
+//      ở tầng ĐỌC (không phải ẩn nút), kèm cổng TĨNH chống revert 4 điểm chặn.
 // Hermetic: không mạng, không DB thật — ctx giả trong bộ nhớ.
+import { readFileSync } from "node:fs";
 import {
   HARD_CAPS,
   PLAN_LIMITS,
@@ -23,6 +27,9 @@ import {
   planLimits,
 } from "../convex/plans";
 import { add as autoReplyAdd } from "../convex/autoreplies";
+import { exportGuildCsv } from "../convex/dataExport";
+import { heatLeaderboard } from "../convex/reports";
+import { getGuild } from "../convex/guilds";
 import { setRetention } from "../convex/backup";
 import { importGuildConfigHandler } from "../convex/guilds/configPortability";
 import { CURRENT_SESSION_AUTH_VERSION } from "../convex/auth";
@@ -53,29 +60,71 @@ const GUILD = "111111111111111111";
 const OWNER = "222222222222222222";
 const DAY = 24 * 60 * 60 * 1000;
 
-/** Ctx giả: bảng trên mảng, `withIndex` lọc theo các điều kiện eq được gọi. */
+/**
+ * Field SỐ cuối cùng của index — Convex `.order("desc")` trên index sắp theo
+ * field cuối đó (by_guildId_createdAt → createdAt). Suy từ TÊN index để ctx giả
+ * trả đúng thứ tự code thật mong đợi; không có field số → giữ nguyên thứ tự chèn
+ * (các assertion cũ ở đây dựa vào đó).
+ */
+function indexSortField(indexName: string, rows: Row[]): string | null {
+  for (const field of indexName.replace(/^by_/, "").split("_").reverse()) {
+    if (rows.some((r) => typeof r[field] === "number")) return field;
+  }
+  return null;
+}
+
+/** Ctx giả: bảng trên mảng, `withIndex` lọc theo eq/gte/lte được gọi. */
 function makeCtx(tables: Record<string, Row[]>) {
   let idSeq = 0;
   const db = {
     query(table: string) {
       const rows = tables[table] ?? [];
-      const view = (out: Row[]): any => ({
-        first: async () => out[0] ?? null,
-        collect: async () => out,
-        take: async (n: number) => out.slice(0, n),
-        order: () => view(out),
-      });
+      const view = (start: Row[], sortField: string | null = null): any => {
+        let out = start;
+        const api: any = {
+          first: async () => out[0] ?? null,
+          collect: async () => out,
+          take: async (n: number) => out.slice(0, n),
+          order: (dir: string = "asc") => {
+            const sf = sortField;
+            if (sf) {
+              out = [...out].sort((a, b) =>
+                dir === "desc" ? Number(b[sf]) - Number(a[sf]) : Number(a[sf]) - Number(b[sf]),
+              );
+            }
+            return api;
+          },
+        };
+        return api;
+      };
       return {
-        withIndex(_name: string, build: (q: any) => any) {
+        withIndex(indexName: string, build: (q: any) => any) {
           const conds: [string, unknown][] = [];
+          const ranges: [string, "gte" | "lte", number][] = [];
           const q: any = {
             eq: (field: string, value: unknown) => {
               conds.push([field, value]);
               return q;
             },
+            // Range theo createdAt (xuất dữ liệu lọc theo cửa sổ ngày của gói).
+            gte: (field: string, value: number) => {
+              ranges.push([field, "gte", value]);
+              return q;
+            },
+            lte: (field: string, value: number) => {
+              ranges.push([field, "lte", value]);
+              return q;
+            },
           };
           build(q);
-          return view(rows.filter((r) => conds.every(([f, v]) => r[f] === v)));
+          const matched = rows
+            .filter((r) => conds.every(([f, v]) => r[f] === v))
+            .filter((r) =>
+              ranges.every(([f, op, v]) =>
+                op === "gte" ? Number(r[f] ?? 0) >= v : Number(r[f] ?? 0) <= v,
+              ),
+            );
+          return view(matched, indexSortField(indexName, rows));
         },
         ...view(rows),
       };
@@ -358,6 +407,201 @@ async function run() {
       ok2,
     );
   }
+
+  console.log("── 8. Đặc quyền dữ liệu (P1–P4): trần + đường nâng gói ──");
+  const DATA_KEYS = ["exportRows", "exportDays", "heatTopRows", "historyRows"] as const;
+  check(
+    "4 hạn mức dữ liệu đều tăng dần theo gói và gói cao nhất chạm trần cứng",
+    DATA_KEYS.every(
+      (k) =>
+        PLAN_LIMITS.free[k] < PLAN_LIMITS.supporter[k] &&
+        PLAN_LIMITS.supporter[k] <= PLAN_LIMITS.pioneer[k] &&
+        PLAN_LIMITS.pioneer[k] === HARD_CAPS[k],
+    ),
+    DATA_KEYS.map((k) => [k, PLAN_LIMITS.free[k], PLAN_LIMITS.pioneer[k]]),
+  );
+  check(
+    "gói Miễn phí VẪN xuất được dữ liệu (không khoá sau tường trả phí)",
+    PLAN_LIMITS.free.exportRows > 0 && PLAN_LIMITS.free.exportDays > 0,
+    PLAN_LIMITS.free,
+  );
+  check(
+    "catalog() niêm yết đủ 4 hạn mức mới (trang bán không tự đặt số)",
+    (() => {
+      const c = catalogH({});
+      return (
+        c.limits.free.exportRows === PLAN_LIMITS.free.exportRows &&
+        c.limits.supporter.exportDays === PLAN_LIMITS.supporter.exportDays &&
+        c.limits.pioneer.heatTopRows === HARD_CAPS.heatTopRows &&
+        c.limits.pioneer.historyRows === HARD_CAPS.historyRows
+      );
+    })(),
+  );
+  await expectThrow(
+    "Miễn phí xin xuất 5.000 dòng → nêu trần 100 + gói kế tiếp cho 1000",
+    async () => assertWithinLimit("free", "exportRows", 5_000),
+    /Gói Miễn phí cho tối đa 100 dòng mỗi lượt xuất dữ liệu.*Đồng hành để dùng 1000 dòng mỗi lượt xuất dữ liệu/,
+  );
+  await expectThrow(
+    "xuất lịch sử 2.000 ngày ở gói cao nhất → chỉ cách giảm xuống 1095",
+    async () => assertWithinLimit("pioneer", "exportDays", 2_000),
+    /đã ở gói cao nhất.*giảm xuống 1095 ngày lịch sử xuất được/,
+  );
+
+  console.log("── 9. Xuất CSV: chặn ở TẦNG ĐỌC theo gói (không phải ẩn nút) ──");
+  const exportH = (exportGuildCsv as any)._handler;
+  const exportVia = (t: Record<string, Row[]>, kind: string) =>
+    exportH(makeCtx(t), { token: "tok", guildId: GUILD, kind }) as Promise<any>;
+  const modActionRows = (n: number, createdAt = Date.now()): Row[] =>
+    Array.from({ length: n }, (_, i) => ({
+      _id: `ma${i}`,
+      guildId: GUILD,
+      action: "🛠️ Ban",
+      caseNumber: i + 1,
+      targetName: `Nguyễn Văn ${i}`,
+      targetId: `900000000000000${i}`,
+      executorName: "mod",
+      executorId: "123456789012345678",
+      reason: "spam",
+      details: "",
+      createdAt,
+    }));
+  const heatRows = (n: number): Row[] =>
+    Array.from({ length: n }, (_, i) => ({
+      _id: `h${i}`,
+      guildId: GUILD,
+      userId: `800000000000000${i}`,
+      username: `user-${i}`,
+      heat: n - i,
+      warnStrikes: 0,
+      updatedAt: Date.now(),
+    }));
+  {
+    const tFree = seed();
+    tFree.modActions = modActionRows(150);
+    const res = await exportVia(tFree, "modActions");
+    check(
+      "Miễn phí: 150 hành động → file đúng 100 dòng + cờ 'còn nữa' (không im lặng trả thiếu)",
+      res?.rows === 100 && res?.truncated === true && res?.exportRows === 100,
+      res && { rows: res.rows, truncated: res.truncated, exportRows: res.exportRows },
+    );
+
+    // Bản ghi cũ hơn cửa sổ 90 ngày của gói Miễn phí phải KHÔNG lọt file.
+    tFree.modActions.push({
+      ...modActionRows(1, Date.now() - 200 * DAY)[0],
+      _id: "ma-cu",
+      reason: "RẤT-CŨ-KHÔNG-LỌT",
+    });
+    const resOld = await exportVia(tFree, "modActions");
+    check(
+      "Miễn phí: cửa sổ 90 ngày → bản ghi 200 ngày trước bị loại (exportDays chặn thật)",
+      !resOld.csv.includes("RẤT-CŨ-KHÔNG-LỌT"),
+    );
+
+    const tSup = seed({ entitlements: [activeEnt("supporter")] });
+    tSup.modActions = modActionRows(150);
+    const resSup = await exportVia(tSup, "modActions");
+    check(
+      "Đồng hành: cùng 150 hành động → lấy đủ 150 (trần 1000), không cắt oan",
+      resSup?.rows === 150 && resSup?.truncated === false && resSup?.exportRows === 1_000,
+      resSup && { rows: resSup.rows, truncated: resSup.truncated },
+    );
+
+    const tHeat = seed();
+    tHeat.heatStates = heatRows(15);
+    const resHeat = await exportVia(tHeat, "heat");
+    check(
+      "bảng nhiệt: Miễn phí cắt ở top 10 dù có 15 người (trần riêng heatTopRows)",
+      resHeat?.rows === 10 && resHeat?.truncated === true,
+      resHeat && { rows: resHeat.rows, truncated: resHeat.truncated },
+    );
+
+    const tEvil = seed();
+    tEvil.modActions = [{ ...modActionRows(1)[0], reason: '=HYPERLINK("http://x","bấm")' }];
+    const resEvil = await exportVia(tEvil, "modActions");
+    check(
+      "CSV injection: lý do bắt đầu bằng '=' bị vô hiệu (Excel không thi hành công thức)",
+      resEvil.csv.includes("'=HYPERLINK"),
+      resEvil.csv.split("\r\n")[1],
+    );
+
+    const tStranger = seed();
+    tStranger.users[0].manageableGuildIds = ["999999999999999999"];
+    check(
+      "người không quản lý được server → null (không lộ dữ liệu server khác)",
+      (await exportVia(tStranger, "modActions")) === null,
+    );
+  }
+
+  console.log("── 10. /stats: trần bảng nhiệt theo gói ──");
+  const heatH = (heatLeaderboard as any)._handler;
+  {
+    const mk = (plan?: string) => {
+      const t = seed(plan ? { entitlements: [activeEnt(plan)] } : {});
+      t.heatStates = heatRows(40);
+      return t;
+    };
+    const ask = (t: Record<string, Row[]>) =>
+      heatH(makeCtx(t), { token: "tok", guildId: GUILD, limit: 50 });
+    const freeTop = await ask(mk());
+    check(
+      "Miễn phí: xin limit=50 nhưng server trả 10 (gọi thẳng API cũng không vượt trần)",
+      freeTop?.length === 10,
+      freeTop?.length,
+    );
+    const supTop = await ask(mk("supporter"));
+    check("Đồng hành: nhận 30 dòng", supTop?.length === 30, supTop?.length);
+    const pioTop = await ask(mk("pioneer"));
+    check(
+      "Tiên phong: 40 người → 40 dòng, nhiệt cao nhất đứng đầu (sort thật)",
+      pioTop?.length === 40 && pioTop?.[0]?.heat === 40 && pioTop?.[39]?.heat === 1,
+      pioTop?.slice(0, 3).map((r: Row) => r.heat),
+    );
+  }
+
+  console.log("── 11. Dashboard: log hành động cắt theo gói ──");
+  const getGuildH = (getGuild as any)._handler;
+  {
+    const mk = (plan?: string) => {
+      const t = seed(plan ? { entitlements: [activeEnt(plan)] } : {});
+      t.modActions = modActionRows(40);
+      return t;
+    };
+    const freeData = await getGuildH(makeCtx(mk()), { token: "tok", guildId: GUILD });
+    check(
+      "Miễn phí: 30 dòng log hành động (đúng mức cũ, không đổi hành vi cũ)",
+      freeData?.modActions?.length === 30,
+      freeData?.modActions?.length,
+    );
+    const supData = await getGuildH(makeCtx(mk("supporter")), {
+      token: "tok",
+      guildId: GUILD,
+    });
+    check(
+      "Đồng hành: 40 dòng có sẵn → nhận đủ 40 (trần 100)",
+      supData?.modActions?.length === 40,
+      supData?.modActions?.length,
+    );
+  }
+
+  console.log("── 12. Cổng tĩnh: 4 điểm chặn mới không revert lặng lẽ ──");
+  const readSrc = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url), "utf8");
+  const gates: [string, string, RegExp][] = [
+    ["convex/dataExport.ts", "exportRows", /limits\.exportRows/],
+    ["convex/dataExport.ts", "exportDays", /limits\.exportDays/],
+    ["convex/dataExport.ts", "heatTopRows", /limits\.heatTopRows/],
+    ["convex/reports.ts", "heatTopRows", /planLimits\(plan\)\.heatTopRows/],
+    ["convex/guilds.ts", "historyRows", /planLimits\(guildPlanId\)\.historyRows/],
+  ];
+  for (const [file, name, pattern] of gates) {
+    check(`cổng tĩnh: ${file} còn chặn bằng ${name}`, pattern.test(readSrc(file)));
+  }
+  const plansSrc = readSrc("convex/plans.ts");
+  check(
+    "cổng tĩnh: 4 hạn mức vẫn nằm trong bảng nguồn sự thật PLAN_LIMITS",
+    /export const PLAN_LIMITS: Record<PlanId, PlanLimits>/.test(plansSrc) &&
+      DATA_KEYS.every((k) => plansSrc.includes(k)),
+  );
 
   console.log(`\n${pass}/${pass + fail} assertion xanh`);
   if (fail > 0) process.exit(1);

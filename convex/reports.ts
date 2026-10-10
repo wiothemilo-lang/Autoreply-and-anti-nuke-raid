@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { HEAT_DEFAULTS } from "./modules";
+import { planForGuild, planLimits } from "./plans";
 
 const EVENT_FIELDS = (e: {
   module: string;
@@ -116,11 +117,15 @@ export const heatLeaderboard = query({
       .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
       .first();
     if (!canManageGuild(user, guild)) return null;
+    // TRẦN theo gói (P4): `heatTopRows` là đặc quyền dữ liệu của gói trả phí —
+    // Miễn phí top 10, Đồng hành 30, Tiên phong 50 (trần cứng cũ). Chặn ở ĐÂY
+    // chứ không chỉ ở UI: gọi API trực tiếp với limit lớn cũng bị cắt.
+    const { plan } = await planForGuild(ctx, guildId);
     const rows = await ctx.db
       .query("heatStates")
       .withIndex("by_guildId_heat", (q) => q.eq("guildId", guildId))
       .order("desc")
-      .take(Math.min(limit ?? 10, 50));
+      .take(Math.min(limit ?? 10, planLimits(plan).heatTopRows));
     // Trả kèm decay THẬT của guild: client trừ decay từ `updatedAt` và không được
     // đoán bằng mặc định (guild đặt decay 0 sẽ bị hiện nhiệt thấp hơn thực tế).
     const decayPerMin = guild?.heatDecayPerMin ?? HEAT_DEFAULTS.decayPerMin;

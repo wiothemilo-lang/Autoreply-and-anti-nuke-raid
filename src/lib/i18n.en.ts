@@ -7,6 +7,19 @@
  * (src/lib/i18n.tsx import "./i18n.en").
  */
 export const EN: Record<string, string> = {
+  /* ==== ĐẶC QUYỀN DỮ LIỆU — P1–P4 (10/10/2026) ==== Xuất CSV + trần đọc theo
+     gói. Số trong câu lấy TỪ bảng hạn mức convex/plans.ts (CÙNG bảng mà query
+     xuất dữ liệu dùng để cắt) nên trang bán không hứa được nhiều hơn server cho. */
+  "Bảng nhiệt hiện top {n} thành viên": "The heat leaderboard shows the top {n} members",
+  "Log hành động hiện {n} dòng gần nhất": "The action log shows the latest {n} entries",
+  "Top {n} thành viên bị cảnh báo nhiệt độ vi phạm":
+    "Top {n} members with the highest violation heat",
+  "Xuất CSV tới {n} dòng mỗi lượt": "Export up to {n} rows per run",
+  "Xuất được lịch sử trong {n} ngày": "Export history covering the last {n} days",
+  "Không xuất được dữ liệu của server này.": "Couldn't export this server's data.",
+  "Không xuất được dữ liệu — thử lại sau ít phút.":
+    "Couldn't export the data — try again in a few minutes.",
+  "{ten} — tối đa {n} dòng · {d} ngày": "{ten} — up to {n} rows · {d} days",
   /* ==== Khả năng truy cập (28/09/2026) ==== Skip-to-content trên mọi trang
      công khai — lối tắt bàn phìm bỏ qua điều hướng (WCAG 2.4.1). */
   "Bỏ qua tới nội dung": "Skip to content",
@@ -786,8 +799,6 @@ export const EN: Record<string, string> = {
     "Timeout · kick · ban · warn · purge — recorded with",
   "Tin nhắn trực tiếp từ Protogon": "Direct message from Protogon",
   "Tiêu đề embed": "Embed title",
-  "Top 10 thành viên bị cảnh báo nhiệt độ vi phạm":
-    "Top 10 members with the highest violation heat",
   "Trang trước": "Previous page",
   "Trung bình": "Average",
   "Trò chuyện với Haimiya": "Chat with Haimiya",

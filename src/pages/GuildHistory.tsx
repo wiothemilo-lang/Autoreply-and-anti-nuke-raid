@@ -31,6 +31,7 @@ import { ANTINUKE_MODULE_META, ANTINUKE_ORDER, PUNISH_LABEL } from "../lib/const
 import type { GuildData } from "../lib/types";
 
 import LangSwitch from "../components/LangSwitch";
+import ExportCsvButton from "../components/dashboard/ExportCsvButton";
 
 import { dateLocale, translate } from "../lib/i18n";
 function formatDateTime(ts: number): string {
@@ -152,6 +153,11 @@ export default function GuildHistory() {
               </span>
             </div>
             <LangSwitch />
+          </div>
+          {/* Xuất sự kiện chống nuke ra CSV — cùng trần dòng/ngày với gói đang áp
+              cho server (P3). Nguồn số trên nút: plans.guildPlan. */}
+          <div className="mt-3">
+            <ExportCsvButton guildId={guild.guild.discordId} kind="events" />
           </div>
         </div>
       </header>

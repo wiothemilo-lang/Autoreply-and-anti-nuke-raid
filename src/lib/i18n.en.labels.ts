@@ -11,6 +11,15 @@
  * lại thành câu dài; bản EN giữ đúng vị trí mảnh để câu ghép không bị đảo.
  */
 export const EN_LABELS: Record<string, string> = {
+  /* ==== ĐẶC QUYỀN DỮ LIỆU — P1–P4 (10/10/2026) ==== Nhãn hạn mức trên thẻ Gói
+     + 3 nút xuất CSV (dịch lúc render qua translate). */
+  "Dòng mỗi lượt xuất CSV": "Rows per CSV export",
+  "Ngày lịch sử xuất": "Days of exportable history",
+  "Dòng bảng nhiệt": "Heat leaderboard rows",
+  "Dòng log hành động": "Action log rows",
+  "Xuất log hành động (CSV)": "Export action log (CSV)",
+  "Xuất sự kiện chống nuke (CSV)": "Export anti-nuke events (CSV)",
+  "Xuất bảng nhiệt (CSV)": "Export heat leaderboard (CSV)",
   "(tất cả)": "(all)",
   "1 giờ": "1 hour",
   "24 module": "24 modules",

@@ -4,6 +4,19 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 10/10/2026 (2) — Đặc quyền dữ liệu (P1–P4): xuất CSV + trần đọc theo gói
+
+- 🎯 **Yêu cầu**: "P1–P4 Premium: nhóm ĐẶC QUYỀN DỮ LIỆU" — 4 bước gói trả phí xoay quanh DỮ LIỆU (không phải tính năng bot), chung một nguyên tắc: mọi con số lấy từ MỘT bảng `PLAN_LIMITS` và chặn ở tầng SERVER — ẩn nút trên web không phải là bảo vệ.
+- 🧭 **P1 — `convex/plans.ts`**: +4 hạn mức: `exportRows` 100/1.000/2.000 · `exportDays` 90/365/1.095 · `heatTopRows` 10/30/50 · `historyRows` 30/100/200 (tăng dần, Tiên phong chạm trần cứng). Nhúng vào `HARD_CAPS` + `LIMIT_LABELS` nên `assertWithinLimit` tự nói rõ "gói Miễn phí cho tối đa N … — nâng Đồng hành để dùng M" cho nhóm mới. `/premium` (4 bullet) + `PlanCard` đọc từ `catalog()` → marketing không tự đặt số được.
+- 🧭 **P2 — `convex/dataExport.ts` (mới)**: `exportGuildCsv` xuất 3 loại (log hành động · sự kiện chống nuke · bảng nhiệt), chặn theo gói TẠI NƠY ĐỌC (`.take(cap + 1)` để biết mình bị cắt — không im lặng trả file thiếu). Chống CSV injection (ô bắt đầu `= + - @` → ghép `'`, ô có dấu phẩy/nháy/xuống dòng được bọc + nhân đôi nháy), cắt ô theo trần ký tự. `ExportCsvButton.tsx` (mới) dùng chung ở 3 chỗ: Bảng hình phạt · Lịch sử chống nuke · /stats — con số in trên nút lấy từ `plans.guildPlan`, CÙNG bảng query dùng để cắt nên nút không thể hứa quá file thật. `src/lib/utils.ts` thêm `downloadTextFile` (BOM UTF-8 để Excel đọc đúng tiếng Việt, `revokeObjectURL` ngay).
+- 🧭 **P3** — cửa sổ ngày theo gói (`exportDays`) áp cho cả 3 loại xuất; **P4** — trần dòng ở 2 chỗ đọc nặng nhất: `reports.heatLeaderboard` (`heatTopRows`, gọi thẳng API với `limit=50` vẫn bị cắt) và `guilds.getGuild` (payload `modActions` theo `historyRows` — Miễn phí 30 = mức cũ, không đổi hành vi cũ).
+- 🧪 **Test**: `test-plans-gating.ts` **24 → 46 assertion** — ctx giả được nâng cấp (range `gte/lte` + sắp theo field số cuối index) để test ĐƯỢC tầng đọc: cắt đúng trần từng gói, bản ghi ngoài cửa sổ 90 ngày bị loại, bảng nhiệt sort thật (40 → 10/30/40), `getGuild` 30/40 dòng, quyền quản lý vẫn là chốt đầu, CSV injection bị vô hiệu; kèm 6 **cổng tĩnh** đọc source chặn revert lặng lẽ 4 điểm chặn.
+- 🌍 **i18n**: +15 key EN/DE (`i18n.{en,de}.ts` cho chuỗi `translate()`, `i18n.{en,de}.labels.ts` cho nhãn thẻ Gói + 3 nút xuất), xoá 1 key chết "Top 10 thành viên…" (đã đổi thành `Top {n}…`) → EN/DE đều 2.295. `check-i18n --self-test` 0 thiếu · `check-repo-map` thêm `dataExport.ts`.
+- 🧪 **Kiểm chứng**: 87/87 CJS (`SKIP_BROWSER_TESTS=1` — sandbox không có Chromium) · **27/27 TS** · `tsc` · lint · `format:check` · 10 guard script self-test (repo-map, convex-contract, i18n, settings-signal, cron, timer, bot-payload, retention-clamp, log-lang, ai-status) · preview ready + 9 file frontend đã đổi transform **HTTP 200** qua Vite (không có lỗi transform).
+- ⚠️ **Codegen**: `bun convex dev --once` KHÔNG chạy được ở sandbox (binary backend Convex cục bộ cần GLIBC 2.38/2.39 — máy này thiếu) → thay bằng `bunx convex codegen --typecheck try` (biến thể CI, không cần backend cục bộ): `_generated/api.d.ts` chỉ thêm mapping `dataExport`. Chưa click thử được 3 nút xuất vì preview không có phiên đăng nhập thật — cần kiểm tay sau khi đăng nhập.
+- 📁 File đụng: `convex/{plans,dataExport (mới),reports,guilds}.ts` · `convex/_generated/api.d.ts` (codegen) · `src/components/dashboard/{ExportCsvButton (mới),ModActionsPanel,PlanCard}.tsx` · `src/pages/{PremiumPage,StatsPage,GuildHistory}.tsx` · `src/lib/utils.ts` · `src/lib/i18n.{en,de}.ts` · `src/lib/i18n.{en,de}.labels.ts` · `scripts/test-plans-gating.ts` · `docs/repo-map.md`
+- ▶️ Tiếp theo: không có — chờ yêu cầu mới
+
 ## 10/10/2026 (1) — Xoá thông tin sai sự thật trên web + cắt I/O getBotConfig 2/3
 
 - 🎯 **Yêu cầu**: "cập nhật lại thông tin trên web, xóa mấy cái thông tin giả mạo, thông tin sai sự thật" — 4 phạm vi: quảng cáo web, trang pháp lý, số liệu dashboard, tối ưu DB I/O Convex.
