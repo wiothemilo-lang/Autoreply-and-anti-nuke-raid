@@ -1952,7 +1952,13 @@ function AnnounceCard({
           {notices.map((n) => (
             <li key={n.id} className="rounded-lg border border-border bg-secondary/30 px-2.5 py-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 truncate text-sm font-medium">{translate(n.title)}</span>
+                {/* Tiêu đề là NỘI DUNG admin viết, KHÔNG phải khoá i18n — bọc
+                    translate() sẽ đổi chữ khách thấy khi tiêu đề tình cờ trùng
+                    một khoá UI (vd "Lưu", "Đang bật" → visitor EN thấy
+                    "Save"/"On"). Body chưa từng qua translate — làm tương tự. */}
+                <span className="min-w-0 truncate text-sm font-medium" title={n.title}>
+                  {n.title /* i18n-ok: nội dung admin viết, không phải khoá UI */}
+                </span>
                 {n.version && (
                   <span className="rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-bold">
                     v{n.version}
@@ -2103,7 +2109,11 @@ function TransferOrdersCard({
                 </div>
                 <button
                   type="button"
-                  disabled={confirming !== null}
+                  // Bận theo TỪNG DÒNG đúng như chú thích đầu component: xác
+                  // nhận đơn này KHÔNG khoá nút các đơn còn lại (server xử lý
+                  // từng appTransId độc lập). Nút dòng đang xác nhận vẫn khoá
+                  // để không bấm nhây gửi 2 lần.
+                  disabled={confirming !== null && confirming !== o.appTransId}
                   onClick={() => void onConfirm(o.appTransId)}
                   className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                 >

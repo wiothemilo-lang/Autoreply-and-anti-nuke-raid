@@ -4,6 +4,18 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 11/10/2026 (2) — Audit Admin panel: 2 bug thật (i18n nội dung admin + nút xác nhận đơn)
+
+- 🎯 **Yêu cầu**: "kiểm tra lại toàn bộ tính năng, chức năng trong vùng admin panel xem có bug, lỗi nào không rồi fix và verify đầy đủ + commit + push".
+- 🔍 **Audit**: đọc hết 2.219 dòng `Admin.tsx` (10 thẻ + 3 form) + `UpdateWindow`/`UserTags`/`announcements.ts`, đối chiếu backend: `setTeamAdmins` validate snowflake/dedup/max + lọc owner, `grantPlan`/`confirmTransfer`/`announcements.*` đều `requireBotAdmin` + clamp server-side, `save` trim + chặn trống — phần lớn nghi vấn client đều đã có server làm chốt cuối → **2 bug thật**.
+- 🧭 **Bug 1 — nội dung admin bị tra từ điển i18n**: `{translate(n.title)}` (danh sách bài trong Admin) + `{translate(notice.title)}` (thanh UpdateNotice) — tiêu đề bài do admin VIẾT là nội dung người dùng; `translate()` tra key→bản dịch nên tiêu đề tình cờ trùng một khoá UI ("Lưu", "Đang bật") là khách EN/DE thấy "Save"/"On" thay chữ admin muốn nói. Body chưa từng qua translate = chứng cứ vô tình, không phải chủ đích. Sửa: hiển thị **nguyên văn** cả hai chỗ; ghi chú `i18n-ok` phải nằm TRONG biểu thức `{n.title /* i18n-ok: … */}` vì rule 3d của `check-i18n` kiểm theo DÒNG còn prettier luôn tách JSX-comment sang dòng riêng.
+- 🧭 **Bug 2 — nút xác nhận đơn khoá cả bảng**: `TransferOrdersCard` chú thích cam kết "mỗi dòng có nút bận riêng, không khoá cả bảng" nhưng code `disabled={confirming !== null}` tắt mọi nút khi một đơn đang xác nhận → sửa per-row `confirming !== null && confirming !== o.appTransId` (server xử lý từng `appTransId` độc lập; nút dòng đang xác nhận vẫn khoá chống bấm nhây).
+- 🧪 **Gate chặn tái diễn**: section X4 mới trong `test-web-contracts` — 2 check tĩnh: tiêu đề không được qua `translate()` ở cả 2 file, và nút xác nhận phải per-row → **425 PASS/0** (423+2).
+- 🧪 **Kiểm chứng**: `tsc` · lint · `format:check` · web-contracts 425/0 · bot-contracts 17/0 · i18n 48/0 + `check-i18n` 0 thiếu · security-hardening 68/0 · web-ux-upgrades 242/0 · browser suite **22/22 console errors []** (UpdateNotice đổi code → chạy lại Chromium thật).
+- ⚠️ **Ghi chú công cụ**: Vly `str_replace`/`read_files` báo sai "file does not exist" (read được, ghi không) → chuyển sang python patch từng chuỗi với assert đúng 1 occurrence — không một thay đổi nào lọt ngoài dự kiến.
+- 📁 **File đụng**: `src/pages/Admin.tsx` · `src/components/UpdateNotice.tsx` · `scripts/test-web-contracts.cjs`
+- ▶️ **Tiếp theo**: không có — chờ yêu cầu mới.
+
 ## 11/10/2026 — Cân bằng bố cục Cửa sổ Admin (hết "chỗ trống chỗ dày")
 
 - 🎯 **Yêu cầu**: "cấu trúc lại bố cục admin panel — nhìn bố cục không sắp xếp hợp lý, chỗ trống chỗ dày" (kèm ảnh: cột trái trống cả nghìn px, cột phải xếp dày đặc thẻ).

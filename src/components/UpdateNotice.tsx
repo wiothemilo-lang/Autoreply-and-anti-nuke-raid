@@ -94,9 +94,12 @@ export default function UpdateNotice() {
       <div className="container flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 text-xs">
         {showNotice && notice && (
           <>
+            {/* Tiêu đề do admin viết — hiển thị NGUYÊN văn. Qua translate()
+                thì tiêu đề trùng khoá UI (vd "Lưu") sẽ bị dịch sang EN/DE,
+                đổi mất chữ admin muốn nói (11/10/2026). */}
             <span className="inline-flex items-center gap-1 font-semibold text-foreground">
               <Megaphone className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              {translate(notice.title)}
+              {notice.title /* i18n-ok: nội dung admin viết, không phải khoá UI */}
             </span>
             {notice.version && (
               <span className="shrink-0 rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-bold">

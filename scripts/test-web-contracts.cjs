@@ -2831,6 +2831,23 @@ check(
   "một mutation ghi thông báo thoát được cổng quyền, hoặc bài ẩn lọt ra web",
 );
 
+// ─── X4. Nội dung NGƯỜI DÙNG viết không được tra qua từ điển i18n (11/10/2026) ──
+// Tiêu đề thông báo do admin viết — bọc translate() thì tiêu đề tình cờ trùng
+// một khoá UI (vd "Lưu", "Đang bật") sẽ bị DỊCH sang EN/DE cho khách, đổi mất
+// chữ admin muốn nói. Body chưa từng qua translate (chứng cứ: vô tình, không
+// phải chủ đích) — khoá chặt cả hai chỗ hiển thị + nút xác nhận đơn per-row.
+check(
+  "tiêu đề thông báo (nội dung admin) hiển thị NGUYÊN văn — không qua translate()",
+  !adminSrc.includes("translate(n.title)") && !updateNoticeSrc.includes("translate(notice.title)"),
+  "nội dung người dùng bị tra trong từ điển i18n — trùng khoá UI là đổi chữ khách thấy",
+);
+
+check(
+  "nút xác nhận đơn chuyển khoản bận theo TỪNG DÒNG — không khoá cả bảng",
+  adminSrc.includes("confirming !== null && confirming !== o.appTransId"),
+  "một đơn đang xác nhận khoá luôn nút các đơn khác (chú thích trong code cam kết per-row)",
+);
+
 // ─── Y. Đồng ý điều khoản + hạn mức theo GÓI (08/10/2026) ───────────────────
 // Khách phải TỰ TAY tick đồng ý (không tick sẵn), và cảnh báo "không nhận ngay"
 // phải xuất hiện trước khi trả tiền. Server vẫn là chốt cuối (xem
