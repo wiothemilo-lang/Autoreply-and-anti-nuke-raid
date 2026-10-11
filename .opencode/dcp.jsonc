@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+
+  // Cấu hình BẢO THỦ cho repo Protogon — mục tiêu: giảm token hao hụt mà
+  // KHÔNG làm mất chính xác (chỉ dẫn AGENTS.md, tin nhắn người dùng, tool quan trọng).
+  // File này override config global ~/.config/opencode/dcp.jsonc.
+  "compress": {
+    // range = model tự nén từng dãy hội thoại đã đóng thành summary kỹ thuật;
+    // summary cũ được lồng trong summary mới khi nén chồng → không mất thông tin theo lớp.
+    "mode": "range",
+    // Giữ nguyên text bọc trong <protect>…</protect> khi nén — dùng để ghim quyết định quan trọng.
+    "protectTags": true,
+    // Tin nhắn người dùng không bao giờ bị nén mất — lời chỉ đạo không bị tóm tắt sai.
+    "protectUserMessages": true,
+    // Nhắc nén nhẹ nhàng: model tự quyết định, không ép giữa chừng khi đang làm việc.
+    "nudgeForce": "soft",
+    // Chỉ nhắc mỗi 5 lần fetch context (mặc định 5) — tránh spam nhắc nén.
+    "nudgeFrequency": 5,
+  },
+
+  "strategies": {
+    // Gỡ output tool gọi trùng args (giữ lần gần nhất) — thuần lợi, không đổi hành vi.
+    "deduplication": {
+      "enabled": true,
+    },
+    // Dọn INPUT của tool báo lỗi sau 4 turn — giữ nguyên thông báo lỗi, chỉ bỏ phần input nặng.
+    "purgeErrors": {
+      "enabled": true,
+      "turns": 4,
+    },
+  },
+}
