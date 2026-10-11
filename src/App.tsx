@@ -8,6 +8,7 @@ import RequireAuth from "./components/RequireAuth";
 import SiteNav, { PagesDock } from "./components/SiteNav";
 import RouteLoader from "./components/RouteLoader";
 import SkipLink from "./components/SkipLink";
+import UpdateNotice from "./components/UpdateNotice";
 
 import { useT } from "./lib/i18n";
 import { finishBootOverlay } from "./lib/bootOverlay";
@@ -132,6 +133,10 @@ export default function App() {
           trong Suspense thì mỗi lần tải chunk nó bị gỡ ra lắp lại — header
           nháy trắng đúng lúc người dùng đang chờ trang mới. */}
       {!transient && !isLanding && <SiteNav />}
+      {/* Thanh thông báo cập nhật + nhãn "bản cập nhật hiện tại" — mount Ở ĐÂY
+          (ngoài Suspense, cùng chỗ header) nên hiện trên MỌI trang kể cả landing,
+          không phụ thuộc chunk route nào. Tắt trên /auth + /callback (màn tạm). */}
+      {!transient && <UpdateNotice />}
       <MotionConfig reducedMotion="user">
         <Suspense fallback={<RouteFallback />}>
           <BootSignal />

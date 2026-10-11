@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import PageReveal from "../components/PageReveal";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -9,10 +9,14 @@ import {
   Banknote,
   BrainCircuit,
   Bug,
+  Eye,
+  EyeOff,
   Gauge,
   GraduationCap,
   ListChecks,
   Loader2,
+  Megaphone,
+  Pencil,
   Play,
   Receipt,
   Server,
@@ -23,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import RequireAuth from "../components/RequireAuth";
 import UpdateWindow from "../components/UpdateWindow";
 import { discordAvatarUrl, getSessionToken } from "../lib/discord";
@@ -78,6 +83,49 @@ function AdminContent() {
       };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : translate("Lỗi kết nối") };
+    }
+  };
+  // Thông báo cập nhật + nhãn "bản cập nhật hiện tại" — feed CÔNG KHÔNG (cùng
+  // query mà UpdateNotice dùng cho mọi khách) để admin sửa đúng bài người dùng
+  // đang thấy; danh sách đầy đủ (kể cả bài đã ẩn) lấy qua adminList.
+  const feed = useQuery(api.announcements.publicFeed);
+  const notices = useQuery(api.announcements.adminList, isAdmin === true ? { token } : "skip");
+  const saveNotice = useMutation(api.announcements.save);
+  const removeNotice = useMutation(api.announcements.remove);
+  const setSiteInfo = useMutation(api.announcements.setSiteInfo);
+  const noticeErr = (e: unknown) => (e instanceof Error ? e.message : translate("Lỗi kết nối"));
+  const saveNoticeForAdmin = async (args: {
+    id?: Id<"announcements">;
+    title: string;
+    body: string;
+    version?: string;
+    active: boolean;
+  }): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await saveNotice({ token, ...args });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: noticeErr(e) };
+    }
+  };
+  const removeNoticeForAdmin = async (
+    id: Id<"announcements">,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await removeNotice({ token, id });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: noticeErr(e) };
+    }
+  };
+  const setVersionForAdmin = async (
+    currentVersion: string,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await setSiteInfo({ token, currentVersion });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: noticeErr(e) };
     }
   };
   const { status, latency, avg, incidents, lastUpdate, nextUpdate, refresh } = useBotMonitor(60000);
@@ -327,6 +375,15 @@ function AdminContent() {
                 </>
               )}
               {isAdmin === true && <PremiumGrantCard onGrant={grantForAdmin} />}
+              {isAdmin === true && (
+                <AnnounceCard
+                  notices={notices}
+                  currentVersion={feed?.currentVersion ?? null}
+                  onSave={saveNoticeForAdmin}
+                  onRemove={removeNoticeForAdmin}
+                  onSetVersion={setVersionForAdmin}
+                />
+              )}
               {isOwner === true && (
                 <div className="rounded-xl border border-border bg-card p-4">
                   <p className="flex items-center gap-1.5 font-display text-sm font-bold">
@@ -1616,6 +1673,330 @@ function PremiumGrantCard({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── Thông báo cập nhật + bản cập nhật hiện tại ───────────────────── */
+
+/** Một dòng danh sách (khớp `announcements.adminList`). */
+type NoticeRow = {
+  id: Id<"announcements">;
+  title: string;
+  body: string;
+  version: string | null;
+  active: boolean;
+  createdAt: number;
+  updatedAt: number;
+  authorName: string | null;
+};
+
+/**
+ * Thẻ soạn THÔNG BÁO CẬP NHẬT công khai (mọi khách trên web đều thấy qua
+ * thanh thông báo toàn trang) + đặt NHÃN BẢN CẬP NHẬT HIỆN TẠI.
+ *
+ * Cả ba mutation đều đi qua `requireBotAdmin` ở server (chủ bot + quản trị
+ * viên nhóm) — form này chỉ gom dữ liệu; gọi thẳng API mà thiếu quyền vẫn bị
+ * từ chối. Server còn tự kẹp độ dài (120/4000/32 ký tự) nên ô nhập dài quá bị
+ * từ chối bằng lỗi đọc được thay vì lưu âm thầm.
+ */
+function AnnounceCard({
+  notices,
+  currentVersion,
+  onSave,
+  onRemove,
+  onSetVersion,
+}: {
+  notices: NoticeRow[] | undefined;
+  currentVersion: string | null;
+  onSave: (args: {
+    id?: Id<"announcements">;
+    title: string;
+    body: string;
+    version?: string;
+    active: boolean;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  onRemove: (id: Id<"announcements">) => Promise<{ ok: boolean; error?: string }>;
+  onSetVersion: (currentVersion: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [version, setVersion] = useState("");
+  const [editingId, setEditingId] = useState<Id<"announcements"> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [verInput, setVerInput] = useState("");
+  const [verBusy, setVerBusy] = useState(false);
+  const [verMsg, setVerMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  // Đồng bộ ô bản cập nhật với server khi feed vừa tải / admin khác vừa đổi.
+  useEffect(() => {
+    setVerInput(currentVersion ?? "");
+  }, [currentVersion]);
+
+  const resetForm = () => {
+    setEditingId(null);
+    setTitle("");
+    setBody("");
+    setVersion("");
+  };
+
+  const submit = async () => {
+    const editing = editingId;
+    if (busy || !title.trim() || !body.trim()) return;
+    // Đang sửa bài ẨN mà bấm Lưu không được phép "tự đăng lại" — giữ nguyên
+    // trạng thái ẩn, đổi trạng thái phải bấm nút Ẩn/Hiện tường minh.
+    const existing = editing ? notices?.find((n) => n.id === editing) : undefined;
+    setBusy(true);
+    setMsg(null);
+    const res = await onSave({
+      ...(editing ? { id: editing } : {}),
+      title,
+      body,
+      version,
+      active: existing ? existing.active : true,
+    });
+    setBusy(false);
+    if (res.ok) {
+      setMsg({
+        kind: "ok",
+        text: translate(editing ? "Đã lưu thay đổi." : "Đã đăng thông báo."),
+      });
+      resetForm();
+    } else {
+      setMsg({ kind: "err", text: res.error ?? translate("Lỗi kết nối") });
+    }
+  };
+
+  const toggle = async (n: NoticeRow) => {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    const res = await onSave({
+      id: n.id,
+      title: n.title,
+      body: n.body,
+      ...(n.version ? { version: n.version } : {}),
+      active: !n.active,
+    });
+    setBusy(false);
+    setMsg(
+      res.ok
+        ? { kind: "ok", text: translate(!n.active ? "Đã hiện thông báo." : "Đã ẩn thông báo.") }
+        : { kind: "err", text: res.error ?? translate("Lỗi kết nối") },
+    );
+  };
+
+  const del = async (n: NoticeRow) => {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    const res = await onRemove(n.id);
+    setBusy(false);
+    if (res.ok) {
+      if (editingId === n.id) resetForm();
+      setMsg({ kind: "ok", text: translate("Đã xoá thông báo.") });
+    } else {
+      setMsg({ kind: "err", text: res.error ?? translate("Lỗi kết nối") });
+    }
+  };
+
+  const saveVersion = async () => {
+    if (verBusy) return;
+    setVerBusy(true);
+    setVerMsg(null);
+    const res = await onSetVersion(verInput.trim());
+    setVerBusy(false);
+    setVerMsg(
+      res.ok
+        ? { kind: "ok", text: translate("Đã lưu bản cập nhật hiện tại.") }
+        : { kind: "err", text: res.error ?? translate("Lỗi kết nối") },
+    );
+  };
+
+  const statusChip = (active: boolean) =>
+    active ? (
+      <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-primary">
+        {translate("Đang hiển thị")}
+      </span>
+    ) : (
+      <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">
+        {translate("Đã ẩn")}
+      </span>
+    );
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
+        <Megaphone className="h-4 w-4" /> {translate("Thông báo cập nhật")}{" "}
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+        {translate(
+          "Viết thông báo hiển thị cho MỌI người trên web (thanh thông báo toàn trang — kể cả khách chưa đăng nhập). Dùng cho bản cập nhật, bảo trì, sự cố.",
+        )}{" "}
+      </p>
+
+      {/* Bản cập nhật hiện tại — nhãn này hiển thị cả khi không có thông báo nào */}
+      <div className="mt-3 rounded-lg border border-border bg-secondary/30 p-3">
+        <p className="text-xs font-semibold">{translate("Bản cập nhật hiện tại")}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <input
+            value={verInput}
+            onChange={(e) => setVerInput(e.target.value)}
+            maxLength={32}
+            placeholder={translate("vd 1.4.0 — để trống để ẩn nhãn")}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          <button
+            type="button"
+            disabled={verBusy}
+            onClick={() => void saveVersion()}
+            className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            {translate("Lưu")}{" "}
+          </button>
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          {translate("Nhãn hiện ở thanh thông báo cho mọi khách truy cập.")}{" "}
+        </p>
+        {verMsg && (
+          <p
+            role="status"
+            className={cn(
+              "mt-1 text-xs font-medium",
+              verMsg.kind === "ok" ? "text-foreground" : "text-danger",
+            )}
+          >
+            {verMsg.text}
+          </p>
+        )}
+      </div>
+
+      {/* Soạn / sửa bài */}
+      <div className="mt-3 grid gap-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={120}
+          placeholder={translate("Tiêu đề thông báo")}
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <div className="flex gap-2">
+          <input
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            maxLength={32}
+            placeholder={translate("Phiên bản (tuỳ chọn — vd 1.4.0)")}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={3}
+          maxLength={4000}
+          placeholder={translate("Nội dung thông báo — điều người dùng cần biết")}
+          className="min-h-0 resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={busy || title.trim().length === 0 || body.trim().length === 0}
+            onClick={() => void submit()}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Megaphone className="h-4 w-4" />
+            )}
+            {editingId ? translate("Lưu thay đổi") : translate("Đăng thông báo")}{" "}
+          </button>
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-semibold transition-colors hover:bg-secondary/70"
+            >
+              {translate("Huỷ")}{" "}
+            </button>
+          )}
+          {msg && (
+            <p
+              role="status"
+              className={cn(
+                "text-xs font-medium",
+                msg.kind === "ok" ? "text-foreground" : "text-danger",
+              )}
+            >
+              {msg.text}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Danh sách bài đã đăng (kể cả bài ẩn) */}
+      {notices === undefined ? (
+        <p className="mt-3 text-xs text-muted-foreground">{translate("đang tải…")}</p>
+      ) : notices.length === 0 ? (
+        <p className="mt-3 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+          {translate("Chưa có thông báo nào.")}{" "}
+        </p>
+      ) : (
+        <ul className="mt-3 space-y-1.5">
+          {notices.map((n) => (
+            <li key={n.id} className="rounded-lg border border-border bg-secondary/30 px-2.5 py-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="min-w-0 truncate text-sm font-medium">{translate(n.title)}</span>
+                {n.version && (
+                  <span className="rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-bold">
+                    v{n.version}
+                  </span>
+                )}
+                {statusChip(n.active)}
+                <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                  {new Date(n.createdAt).toLocaleDateString(dateLocale())}
+                  {n.authorName ? ` · ${n.authorName}` : ""}
+                </span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setEditingId(n.id);
+                    setTitle(n.title);
+                    setBody(n.body);
+                    setVersion(n.version ?? "");
+                    setMsg(null);
+                  }}
+                  className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium transition-colors hover:bg-secondary disabled:opacity-40"
+                >
+                  <Pencil className="h-3 w-3" /> {translate("Sửa")}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void toggle(n)}
+                  className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium transition-colors hover:bg-secondary disabled:opacity-40"
+                >
+                  {n.active ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  {n.active ? translate("Ẩn") : translate("Hiện")}{" "}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void del(n)}
+                  className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40"
+                >
+                  <Trash2 className="h-3 w-3" /> {translate("Xoá")}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

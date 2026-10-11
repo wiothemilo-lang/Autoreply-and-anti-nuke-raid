@@ -2786,6 +2786,51 @@ check(
   "tính năng Admin bị gỡ cổng quyền hoặc mọi thứ đều dồn cho owner",
 );
 
+// ─── X3. Thông báo cập nhật + bản cập nhật hiện tại (10/10/2026) ─────────
+// Admin viết thông báo trong Admin panel → MỌI khách thấy qua thanh toàn trang;
+// server (requireBotAdmin + lọc active theo index) là chốt cuối, gate này khoá
+// phần UI: gỡ mount, đổi cổng quyền hay bỏ nhãn bản cập nhật là test đỏ.
+const updateNoticeSrc = files.get("components/UpdateNotice.tsx") ?? "";
+// appSrc đã được khai báo ở đầu file (đọc App.tsx) — dùng chung, không khai lại.
+const annSrc = fs.readFileSync(path.join(ROOT, "convex", "announcements.ts"), "utf8");
+check(
+  "UpdateNotice mount trong App.tsx TRƯỚC Suspense/Routes — hiện trên mọi trang, không phụ thuộc chunk",
+  appSrc.includes('import UpdateNotice from "./components/UpdateNotice"') &&
+    appSrc.includes("<UpdateNotice />") &&
+    appSrc.indexOf("<UpdateNotice") < appSrc.indexOf("<Suspense ") &&
+    appSrc.indexOf("<UpdateNotice") < appSrc.indexOf("<Routes>"),
+  "thanh thông báo không hiện trên mọi trang (chỉ một chunk hoặc trễ sau Suspense)",
+);
+check(
+  "Admin có thẻ Thông báo nối đủ 3 mutation (save/remove/setSiteInfo) + danh sách adminList",
+  adminSrc.includes("api.announcements.save") &&
+    adminSrc.includes("api.announcements.remove") &&
+    adminSrc.includes("api.announcements.setSiteInfo") &&
+    adminSrc.includes("api.announcements.adminList") &&
+    adminSrc.includes("<AnnounceCard"),
+  "thẻ Thông báo không nối backend hoặc chưa render trong Admin",
+);
+check(
+  "Admin sửa bài qua CÙNG feed công khai người dùng đang thấy (publicFeed)",
+  adminSrc.includes("api.announcements.publicFeed") &&
+    updateNoticeSrc.includes("api.announcements.publicFeed"),
+  "Admin không đọc đúng bài publicFeed mà web đang hiện",
+);
+check(
+  "nhãn bản cập nhật hiện tại hiển thị + đóng thông báo lưu theo TỪNG BÀI (sửa bài → hiện lại)",
+  updateNoticeSrc.includes('translate("Bản cập nhật hiện tại: {ver}"') &&
+    updateNoticeSrc.includes("protogon:update-notice") &&
+    updateNoticeSrc.includes("notice.updatedAt"),
+  "thiếu nhãn bản cập nhật hoặc dismiss không theo từng bài",
+);
+check(
+  "server dùng requireBotAdmin cho mọi mutation ghi/danh sách; publicFeed không cần đăng nhập",
+  (annSrc.match(/requireBotAdmin/g) ?? []).length >= 4 &&
+    annSrc.includes("export const publicFeed") &&
+    annSrc.includes('eq("active", true)'),
+  "một mutation ghi thông báo thoát được cổng quyền, hoặc bài ẩn lọt ra web",
+);
+
 // ─── Y. Đồng ý điều khoản + hạn mức theo GÓI (08/10/2026) ───────────────────
 // Khách phải TỰ TAY tick đồng ý (không tick sẵn), và cảnh báo "không nhận ngay"
 // phải xuất hiện trước khi trả tiền. Server vẫn là chốt cuối (xem

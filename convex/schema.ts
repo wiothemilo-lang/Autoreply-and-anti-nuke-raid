@@ -1556,4 +1556,45 @@ export default defineSchema({
     page: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_createdAt", ["createdAt"]),
+
+  /**
+   * THÔNG BÁO CẬP NHẬT do admin viết trong cửa sổ Admin (10/10/2026) — hiển
+   * thị công khai cho mọi khách qua thanh thông báo toàn site
+   * (`src/components/UpdateNotice.tsx`, mount trong App.tsx).
+   *
+   * Quyền: GHI/đọc danh sách = requireBotAdmin (chủ bot + quản trị viên nhóm,
+   * cùng cổng mọi tính năng trong Admin); đọc bài PUBLIC = publicFeed (không
+   * đăng nhập — nội dung là thông tin công khai, cùng pattern plans.catalog).
+   *
+   * `active=false` = ẩn khỏi web nhưng GIỮ dữ liệu (hết hạn sự kiện thì tắt,
+   * không phải xoá). `version` = nhãn bản cập nhật (vd "1.4.0") — bài active
+   * mới nhất có version là "bản cập nhật hiện tại" mà web hiển thị.
+   */
+  announcements: defineTable({
+    /** Tiêu đề — 1..TITLE_MAX ký tự (clamp ở server, không tin client). */
+    title: v.string(),
+    /** Nội dung — tối đa BODY_MAX ký tự. */
+    body: v.string(),
+    /** Nhãn phiên bản tuỳ chọn (vd "1.4.0") — bỏ trống nếu không phải bản cập nhật. */
+    version: v.optional(v.string()),
+    /** Bài còn hiển thị trên web hay đã ẩn (giữ dữ liệu khi tắt). */
+    active: v.boolean(),
+    /** Admin nào viết — đối chiếu khi cần hỏi lại. */
+    authorDiscordId: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_createdAt", ["createdAt"])
+    .index("by_active_createdAt", ["active", "createdAt"]),
+
+  /**
+   * BẢN CẬP NHẬT HIỆN TẠI hiển thị trên web — đúng 1 dòng (kind khoá).
+   * Admin sửa trong cùng thẻ Thông báo; trống = ẩn nhãn (không hứa sai bản).
+   */
+  siteInfo: defineTable({
+    kind: v.literal("siteInfo"),
+    /** Chuỗi bản admin tự đặt, vd "1.4.0" — cho phép xoá trắng để ẩn nhãn. */
+    currentVersion: v.string(),
+    updatedAt: v.number(),
+  }).index("by_kind", ["kind"]),
 });

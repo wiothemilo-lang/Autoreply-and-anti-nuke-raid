@@ -1654,4 +1654,34 @@ export const DE: Record<string, string> = {
     "Dein Browser kann dieses Bild nicht darstellen – probiere einen anderen Browser.",
   "Không nén được ảnh — hãy chọn file ảnh khác.":
     "Bild konnte nicht komprimiert werden – bitte ein anderes Bild wählen.",
+  /* ==== Update-Ankündigungen + aktuelle Version (10/10/2026) ==== Admin
+     schreibt im Admin-Panel; Web zeigt es seitenweit (UpdateNotice). */
+  "Thông báo cập nhật": "Update-Ankündigungen",
+  "Viết thông báo hiển thị cho MỌI người trên web (thanh thông báo toàn trang — kể cả khách chưa đăng nhập). Dùng cho bản cập nhật, bảo trì, sự cố.":
+    "Schreibe eine Ankündigung, die ALLEN auf dem Web angezeigt wird (seitenweite Hinweisleiste – auch Gästen ohne Anmeldung). Für Updates, Wartung, Störungen.",
+  "Bản cập nhật hiện tại": "Aktuelle Version",
+  "Bản cập nhật hiện tại: {ver}": "Aktuelle Version: {ver}",
+  "vd 1.4.0 — để trống để ẩn nhãn": "z. B. 1.4.0 – leer lassen, um das Label auszublenden",
+  "Nhãn hiện ở thanh thông báo cho mọi khách truy cập.":
+    "Das Label erscheint in der Hinweisleiste für alle Besucher.",
+  "Tiêu đề thông báo": "Titel der Ankündigung",
+  "Nội dung thông báo — điều người dùng cần biết": "Ankündigungstext – was Nutzer wissen müssen",
+  "Phiên bản (tuỳ chọn — vd 1.4.0)": "Version (optional – z. B. 1.4.0)",
+  "Đăng thông báo": "Veröffentlichen",
+  "Đã lưu thay đổi.": "Änderungen gespeichert.",
+  "Đã đăng thông báo.": "Ankündigung veröffentlicht.",
+  "Đã hiện thông báo.": "Ankündigung ist jetzt sichtbar.",
+  "Đã ẩn thông báo.": "Ankündigung ausgeblendet.",
+  "Đã xoá thông báo.": "Ankündigung gelöscht.",
+  "Đã lưu bản cập nhật hiện tại.": "Aktuelle Version gespeichert.",
+  "Đang hiển thị": "Sichtbar",
+  "Đã ẩn": "Ausgeblendet",
+  "Chưa có thông báo nào.": "Noch keine Ankündigungen.",
+  "Đóng thông báo": "Hinweis schließen",
+  Lưu: "Speichern",
+  Huỷ: "Abbrechen",
+  Sửa: "Bearbeiten",
+  Ẩn: "Ausblenden",
+  Hiện: "Anzeigen",
+  Xoá: "Löschen",
 };

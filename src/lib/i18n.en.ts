@@ -1727,4 +1727,34 @@ export const EN: Record<string, string> = {
     "Your browser can't render this image — try a different browser.",
   "Không nén được ảnh — hãy chọn file ảnh khác.":
     "Couldn't compress the image — please pick another image.",
+  /* ==== Thông báo cập nhật + bản cập nhật hiện tại (10/10/2026) ==== Admin
+     viết trong Admin panel; web hiện qua thanh toàn trang (UpdateNotice). */
+  "Thông báo cập nhật": "Update announcements",
+  "Viết thông báo hiển thị cho MỌI người trên web (thanh thông báo toàn trang — kể cả khách chưa đăng nhập). Dùng cho bản cập nhật, bảo trì, sự cố.":
+    "Write an announcement shown to EVERYONE on the web (site-wide notice bar — including guests who haven't signed in). Use it for releases, maintenance, incidents.",
+  "Bản cập nhật hiện tại": "Current release",
+  "Bản cập nhật hiện tại: {ver}": "Current release: {ver}",
+  "vd 1.4.0 — để trống để ẩn nhãn": "e.g. 1.4.0 — leave empty to hide the label",
+  "Nhãn hiện ở thanh thông báo cho mọi khách truy cập.":
+    "The label shows in the notice bar for every visitor.",
+  "Tiêu đề thông báo": "Announcement title",
+  "Nội dung thông báo — điều người dùng cần biết": "Announcement body — what users need to know",
+  "Phiên bản (tuỳ chọn — vd 1.4.0)": "Version (optional — e.g. 1.4.0)",
+  "Đăng thông báo": "Publish",
+  "Đã lưu thay đổi.": "Changes saved.",
+  "Đã đăng thông báo.": "Announcement published.",
+  "Đã hiện thông báo.": "Announcement is now visible.",
+  "Đã ẩn thông báo.": "Announcement hidden.",
+  "Đã xoá thông báo.": "Announcement deleted.",
+  "Đã lưu bản cập nhật hiện tại.": "Current release saved.",
+  "Đang hiển thị": "Visible",
+  "Đã ẩn": "Hidden",
+  "Chưa có thông báo nào.": "No announcements yet.",
+  "Đóng thông báo": "Dismiss notice",
+  Lưu: "Save",
+  Huỷ: "Cancel",
+  Sửa: "Edit",
+  Ẩn: "Hide",
+  Hiện: "Show",
+  Xoá: "Delete",
 };
