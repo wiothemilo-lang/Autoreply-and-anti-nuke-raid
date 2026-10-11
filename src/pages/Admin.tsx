@@ -249,218 +249,223 @@ function AdminContent() {
             </div>
           </div>
 
-          {/* min-w-0 trên con grid: nếu thiếu, nội dung rộng (log dài, ID mono)
-              kéo cả track rộng hơn màn hình → #root overflow-x:clip cắt mất
-              mép phải mà người dùng không cuộn xem được. */}
-          <div className="grid min-w-0 gap-4 lg:grid-cols-[1fr_20rem]">
-            <div className="min-w-0 rounded-xl border border-border bg-card p-4">
-              <h2 className="flex items-center gap-2 font-display text-base font-bold">
-                <Activity className="h-4 w-4 text-primary" />
-                {translate("Nhật ký sự cố chi tiết")}{" "}
-              </h2>
-              {incidents.length === 0 ? (
-                <p className="mt-2 text-sm text-foreground">
-                  {translate("Không phát hiện lỗi nào — bot hoạt động bình thường ✅")}{" "}
-                </p>
-              ) : (
-                <ul className="mt-2 space-y-1.5">
-                  {incidents.map((inc, i) => (
-                    <li
-                      key={`${inc.time}-${i}`}
-                      className="flex items-start gap-2 rounded-lg bg-danger/5 px-3 py-2 text-sm text-danger"
-                    >
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger" />
-                      <span>
-                        {inc.text}{" "}
-                        <span className="text-muted-foreground">
-                          ·{" "}
-                          {new Date(inc.time).toLocaleTimeString(dateLocale(), {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-                {translate(
-                  "Lưu ý: bản ghi sự cố được ghi nhận trong phiên xem này (mất kết nối máy chủ, độ trễ quá cao). Để theo dõi xuyên suốt, hãy giữ trang này mở hoặc kiểm tra kênh log trong Discord.",
-                )}{" "}
+          {/* Nhật ký sự cố FULL-WIDTH (tái cấu trúc bố cục Admin 11/10/2026):
+              trước đây nó nằm MỘT MÌNH trong cột trái (1fr) còn cột phải 20rem
+              xếp xấp xỉ 14 thẻ → cột trái trống cả nghìn px, cột phải dày đặc
+              (đúng phản ánh "chỗ trống chỗ dày"). Log cần bề ngang nên nay chiếm
+              nguyên hàng; danh sách có trần cuộn (max-h) để bùng sự cố không
+              đẩy lệch toàn trang.
+              min-w-0 giữ nguyên: thiếu nó, nội dung rộng (log dài, ID mono) kéo
+              cả track rộng hơn màn hình → #root overflow-x:clip cắt mất mép phải
+              mà người dùng không cuộn xem được. */}
+          <div className="min-w-0 rounded-xl border border-border bg-card p-4">
+            <h2 className="flex items-center gap-2 font-display text-base font-bold">
+              <Activity className="h-4 w-4 text-primary" />
+              {translate("Nhật ký sự cố chi tiết")}{" "}
+            </h2>
+            {incidents.length === 0 ? (
+              <p className="mt-2 text-sm text-foreground">
+                {translate("Không phát hiện lỗi nào — bot hoạt động bình thường ✅")}{" "}
               </p>
-            </div>
+            ) : (
+              <ul className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1">
+                {incidents.map((inc, i) => (
+                  <li
+                    key={`${inc.time}-${i}`}
+                    className="flex items-start gap-2 rounded-lg bg-danger/5 px-3 py-2 text-sm text-danger"
+                  >
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger" />
+                    <span>
+                      {inc.text}{" "}
+                      <span className="text-muted-foreground">
+                        ·{" "}
+                        {new Date(inc.time).toLocaleTimeString(dateLocale(), {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+              {translate(
+                "Lưu ý: bản ghi sự cố được ghi nhận trong phiên xem này (mất kết nối máy chủ, độ trễ quá cao). Để theo dõi xuyên suốt, hãy giữ trang này mở hoặc kiểm tra kênh log trong Discord.",
+              )}{" "}
+            </p>
+          </div>
 
-            <div className="space-y-4">
-              <UpdateWindow
-                lastUpdate={lastUpdate}
-                nextUpdate={nextUpdate}
-                onRefresh={refresh}
-                showRefresh
-              />
-              <SelfDiagnoseCard
-                diag={diag}
-                onToggle={(enabled) => setDiag({ token, enabled }).catch(() => {})}
-              />
-              <HostHealthCard />
-              <JobBacklogCard />
-              <AiHealthCard />
-              <MetricsCard />
-              <ThreatIntelCard
-                threat={threat}
-                history={researchHistory}
-                onToggle={(enabled) => setThreat({ token, enabled }).catch(() => {})}
-                onToggleAi={(aiWeeklyEnabled) =>
-                  setThreat({ token, aiWeeklyEnabled }).catch(() => {})
+          {/* Masonry 2–3 cột (CSS columns): các thẻ TỰ CÂN CHIỀU CAO theo nội
+              dung thật thay vì 14 thẻ xếp thành một cột dày đặc cạnh cột trái
+              trống. Mỗi thẻ con là một column item — break-inside-avoid chặn
+              thẻ bị cắt giữa hai cột, mb tạo khoảng cách (space-y không áp
+              được cho column children). */}
+          <div className="min-w-0 columns-1 gap-4 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
+            <UpdateWindow
+              lastUpdate={lastUpdate}
+              nextUpdate={nextUpdate}
+              onRefresh={refresh}
+              showRefresh
+            />
+            <SelfDiagnoseCard
+              diag={diag}
+              onToggle={(enabled) => setDiag({ token, enabled }).catch(() => {})}
+            />
+            <HostHealthCard />
+            <JobBacklogCard />
+            <AiHealthCard />
+            <MetricsCard />
+            <ThreatIntelCard
+              threat={threat}
+              history={researchHistory}
+              onToggle={(enabled) => setThreat({ token, enabled }).catch(() => {})}
+              onToggleAi={(aiWeeklyEnabled) =>
+                setThreat({ token, aiWeeklyEnabled }).catch(() => {})
+              }
+              onToggleNotify={(notifyEnabled) =>
+                setThreat({ token, notifyEnabled }).catch(() => {})
+              }
+              onRemove={(keyword, kind) => removeThreatKw({ token, keyword, kind }).catch(() => {})}
+              onLearnNow={async () => {
+                try {
+                  const res = await requestLearn({ token, requestedBy: "web-admin" });
+                  return res;
+                } catch (e) {
+                  return {
+                    ok: false,
+                    error: e instanceof Error ? e.message : translate("Lỗi kết nối"),
+                  };
                 }
-                onToggleNotify={(notifyEnabled) =>
-                  setThreat({ token, notifyEnabled }).catch(() => {})
+              }}
+            />
+            <TeamAdminsCard
+              isOwner={isOwner === true}
+              data={teamAdmins}
+              onSave={async (discordIds) => {
+                try {
+                  await saveTeamAdmins({ token, discordIds });
+                  return { ok: true };
+                } catch (e) {
+                  return {
+                    ok: false,
+                    error: e instanceof Error ? e.message : translate("Lỗi kết nối"),
+                  };
                 }
-                onRemove={(keyword, kind) =>
-                  removeThreatKw({ token, keyword, kind }).catch(() => {})
-                }
-                onLearnNow={async () => {
-                  try {
-                    const res = await requestLearn({ token, requestedBy: "web-admin" });
-                    return res;
-                  } catch (e) {
-                    return {
-                      ok: false,
-                      error: e instanceof Error ? e.message : translate("Lỗi kết nối"),
-                    };
-                  }
-                }}
-              />
-              <TeamAdminsCard
-                isOwner={isOwner === true}
-                data={teamAdmins}
-                onSave={async (discordIds) => {
-                  try {
-                    await saveTeamAdmins({ token, discordIds });
-                    return { ok: true };
-                  } catch (e) {
-                    return {
-                      ok: false,
-                      error: e instanceof Error ? e.message : translate("Lỗi kết nối"),
-                    };
-                  }
-                }}
-              />
-              {isAdmin === true && (
-                <>
-                  <TransferOrdersCard
-                    orders={reportedOrders}
-                    confirming={confirming}
-                    msg={transferMsg}
-                    onConfirm={async (appTransId) => {
-                      setTransferMsg(null);
-                      setConfirming(appTransId);
-                      try {
-                        await confirmTransfer({ token, appTransId });
-                        setTransferMsg({
-                          kind: "ok",
-                          text: translate("Đã nhận tiền và kích hoạt gói."),
-                        });
-                      } catch (e) {
-                        setTransferMsg({
-                          kind: "err",
-                          text: e instanceof Error ? e.message : translate("Lỗi kết nối"),
-                        });
-                      }
-                      setConfirming(null);
-                    }}
-                  />
-                  <RevenueCard revenue={revenue} />
-                </>
-              )}
-              {isAdmin === true && <PremiumGrantCard onGrant={grantForAdmin} />}
-              {isAdmin === true && (
-                <AnnounceCard
-                  notices={notices}
-                  currentVersion={feed?.currentVersion ?? null}
-                  onSave={saveNoticeForAdmin}
-                  onRemove={removeNoticeForAdmin}
-                  onSetVersion={setVersionForAdmin}
+              }}
+            />
+            {isAdmin === true && (
+              <>
+                <TransferOrdersCard
+                  orders={reportedOrders}
+                  confirming={confirming}
+                  msg={transferMsg}
+                  onConfirm={async (appTransId) => {
+                    setTransferMsg(null);
+                    setConfirming(appTransId);
+                    try {
+                      await confirmTransfer({ token, appTransId });
+                      setTransferMsg({
+                        kind: "ok",
+                        text: translate("Đã nhận tiền và kích hoạt gói."),
+                      });
+                    } catch (e) {
+                      setTransferMsg({
+                        kind: "err",
+                        text: e instanceof Error ? e.message : translate("Lỗi kết nối"),
+                      });
+                    }
+                    setConfirming(null);
+                  }}
                 />
-              )}
-              {isOwner === true && (
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="flex items-center gap-1.5 font-display text-sm font-bold">
-                    <ShieldCheck className="h-4 w-4" /> {translate("Chìa khóa bảo mật API")}{" "}
-                  </p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                    {translate(
-                      "Khi đã đặt seed, MỌI lệnh của bot yêu cầu chìa khóa khớp — kẻ ngoài không thể giả mạo heartbeat/backup/lockdown. Trên VPS dán giá trị seed VỪA NHẬP vào biến",
-                    )}{" "}
-                    <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px]">BOT_KEY</code>{" "}
-                    {translate("trong bot/.env rồi")}{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
-                      pm2 restart protogon-bot
-                    </code>
-                    {translate(". Bot chưa có BOT_KEY sẽ")}{" "}
-                    <b>{translate("tự cấp phát chìa khóa an toàn")}</b>{" "}
-                    {translate(
-                      "khi khởi động (xác minh token Discord thật) — không cần thao tác gì thêm.",
-                    )}{" "}
-                  </p>
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      type="password"
-                      value={ownerSeedInput}
-                      onChange={(e) => setOwnerSeedInput(e.target.value)}
-                      placeholder={translate("Seed bí mật (dòng bất kỳ, ví dụ: chuỗi ngẫu nhiên)")}
-                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                    <button
-                      type="button"
-                      disabled={ownerSeedInput.trim().length < 8}
-                      onClick={async () => {
-                        setSecretMsg(null);
-                        try {
-                          // Server tự băm seed và lưu bản băm — client không tính gì cả,
-                          // và chính seed vừa nhập chính là giá trị BOT_KEY cần dán ở VPS.
-                          await setSecrets({
-                            token,
-                            guildId: "__admin__",
-                            ownerSeed: ownerSeedInput.trim(),
-                          });
-                          setSecretMsg(
-                            translate(
-                              "Đã bật bảo vệ ✅ — dán giá trị seed VỪA NHẬP vào BOT_KEY trên VPS (không hiện lại ở đây).",
-                            ),
-                          );
-                          setOwnerSeedInput("");
-                        } catch {
-                          setSecretMsg(translate("Lỗi khi đặt seed — thử lại."));
-                        }
-                      }}
-                      className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                    >
-                      {translate("Bật bảo vệ")}{" "}
-                    </button>
-                  </div>
-                  {secretMsg && (
-                    <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-muted/60 p-2 text-[11px] text-foreground">
-                      {secretMsg}
-                    </pre>
-                  )}
-                </div>
-              )}
-              <div className="rounded-xl border border-border bg-secondary/30 p-4 text-xs leading-relaxed text-muted-foreground">
-                <p className="mb-1 font-semibold text-foreground">
-                  {translate("🔒 Quyền riêng tư")}
+                <RevenueCard revenue={revenue} />
+              </>
+            )}
+            {isAdmin === true && <PremiumGrantCard onGrant={grantForAdmin} />}
+            {isAdmin === true && (
+              <AnnounceCard
+                notices={notices}
+                currentVersion={feed?.currentVersion ?? null}
+                onSave={saveNoticeForAdmin}
+                onRemove={removeNoticeForAdmin}
+                onSetVersion={setVersionForAdmin}
+              />
+            )}
+            {isOwner === true && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="flex items-center gap-1.5 font-display text-sm font-bold">
+                  <ShieldCheck className="h-4 w-4" /> {translate("Chìa khóa bảo mật API")}{" "}
                 </p>
-                <p>
-                  {translate("Cửa sổ Admin chỉ hiển thị với")}{" "}
-                  <b className="text-foreground">{translate("chủ sở hữu bot")}</b>{" "}
-                  {translate("và những người trong")}{" "}
-                  <b className="text-foreground">{translate("danh sách quản trị viên nhóm")}</b>{" "}
+                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                   {translate(
-                    "(do chủ bot đặt). Người dùng khác không thấy nút này và không truy cập được trang này.",
+                    "Khi đã đặt seed, MỌI lệnh của bot yêu cầu chìa khóa khớp — kẻ ngoài không thể giả mạo heartbeat/backup/lockdown. Trên VPS dán giá trị seed VỪA NHẬP vào biến",
+                  )}{" "}
+                  <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px]">BOT_KEY</code>{" "}
+                  {translate("trong bot/.env rồi")}{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                    pm2 restart protogon-bot
+                  </code>
+                  {translate(". Bot chưa có BOT_KEY sẽ")}{" "}
+                  <b>{translate("tự cấp phát chìa khóa an toàn")}</b>{" "}
+                  {translate(
+                    "khi khởi động (xác minh token Discord thật) — không cần thao tác gì thêm.",
                   )}{" "}
                 </p>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="password"
+                    value={ownerSeedInput}
+                    onChange={(e) => setOwnerSeedInput(e.target.value)}
+                    placeholder={translate("Seed bí mật (dòng bất kỳ, ví dụ: chuỗi ngẫu nhiên)")}
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  <button
+                    type="button"
+                    disabled={ownerSeedInput.trim().length < 8}
+                    onClick={async () => {
+                      setSecretMsg(null);
+                      try {
+                        // Server tự băm seed và lưu bản băm — client không tính gì cả,
+                        // và chính seed vừa nhập chính là giá trị BOT_KEY cần dán ở VPS.
+                        await setSecrets({
+                          token,
+                          guildId: "__admin__",
+                          ownerSeed: ownerSeedInput.trim(),
+                        });
+                        setSecretMsg(
+                          translate(
+                            "Đã bật bảo vệ ✅ — dán giá trị seed VỪA NHẬP vào BOT_KEY trên VPS (không hiện lại ở đây).",
+                          ),
+                        );
+                        setOwnerSeedInput("");
+                      } catch {
+                        setSecretMsg(translate("Lỗi khi đặt seed — thử lại."));
+                      }
+                    }}
+                    className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                  >
+                    {translate("Bật bảo vệ")}{" "}
+                  </button>
+                </div>
+                {secretMsg && (
+                  <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-muted/60 p-2 text-[11px] text-foreground">
+                    {secretMsg}
+                  </pre>
+                )}
               </div>
+            )}
+            <div className="rounded-xl border border-border bg-secondary/30 p-4 text-xs leading-relaxed text-muted-foreground">
+              <p className="mb-1 font-semibold text-foreground">{translate("🔒 Quyền riêng tư")}</p>
+              <p>
+                {translate("Cửa sổ Admin chỉ hiển thị với")}{" "}
+                <b className="text-foreground">{translate("chủ sở hữu bot")}</b>{" "}
+                {translate("và những người trong")}{" "}
+                <b className="text-foreground">{translate("danh sách quản trị viên nhóm")}</b>{" "}
+                {translate(
+                  "(do chủ bot đặt). Người dùng khác không thấy nút này và không truy cập được trang này.",
+                )}{" "}
+              </p>
             </div>
           </div>
         </PageReveal>

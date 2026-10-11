@@ -4,6 +4,15 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 11/10/2026 — Cân bằng bố cục Cửa sổ Admin (hết "chỗ trống chỗ dày")
+
+- 🎯 **Yêu cầu**: "cấu trúc lại bố cục admin panel — nhìn bố cục không sắp xếp hợp lý, chỗ trống chỗ dày" (kèm ảnh: cột trái trống cả nghìn px, cột phải xếp dày đặc thẻ).
+- 🔍 **Gốc rễ**: `Admin.tsx` dùng `lg:grid-cols-[1fr_20rem]` — cột trái (1fr) chỉ có MỘT thẻ "Nhật ký sự cố" (~150px), cột phải (20rem) là `space-y-4` xếp xấp xỉ 14 thẻ (cập nhật khung giờ, self-diagnose, host health, job backlog, AI health, metrics, threat intel, team, chuyển khoản, doanh thu, cấp gói, thông báo, seed, riêng tư) → trái trống, phải dày đúng như ảnh.
+- 🧭 **Bố cục mới**: (1) nhật ký sự cố full-width (log cần bề ngang) + `max-h-72 overflow-y-auto` để bùng sự cố không đẩy lệch trang; (2) toàn bộ ~14 thẻ còn lại vào masonry `columns-1 lg:columns-2 xl:columns-3` — CSS columns tự CÂN chiều cao theo nội dung thật, `[&>*]:break-inside-avoid` chặn thẻ bị cắt giữa cột, `[&>*]:mb-4` thay `space-y` (space-y không áp cho column children); giữ `min-w-0` chống tràn ngang do ID mono/log dài. Thuần layout — không đổi component/API/chuỗi i18n.
+- 🧪 **Kiểm chứng**: `tsc -b --noEmit` · lint · `format:check` · web-contracts **423 PASS/0** · bot-contracts 17/0 · i18n suite 48/0 + `check-i18n` 0 thiếu · security-hardening 68/0 · web-ux-upgrades 242/0 (đủ 5 suite đọc Admin.tsx đều xanh).
+- 📁 **File đụng**: `src/pages/Admin.tsx` (+206/−201, phần lớn reindent do bỏ một cấp nesting).
+- ▶️ **Tiếp theo**: F5 /admin trên preview thật để xem mắt thường — masonry tự cân, số cột đổi theo bề ngang màn hình (1 → 2 → 3).
+
 ## 10/10/2026 (5) — Thanh thông báo toàn site + nhãn bản cập nhật hiện tại
 
 - 🎯 **Yêu cầu**: admin cần kênh nói với người dùng NGAY trên web (bản cập nhật, bảo trì, sự cố) mà không phải sửa code rồi deploy; web cũng phải hiển thị "bản cập nhật hiện tại" đang chạy.
