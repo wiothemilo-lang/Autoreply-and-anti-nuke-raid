@@ -4,6 +4,15 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
+## 11/10/2026 (3) — Sửa "plugin failed": port 2 plugin OpenCode sang API V2
+
+- 🎯 **Yêu cầu**: "fix plugin failed" + "update opencode".
+- 🔍 **Gốc rễ**: log OpenCode — cả 2 plugin báo `PluginModule.LoadError: Plugin must export a default definition with an id and an effect or setup function (Missing key ["default"])` → bản V2 không còn nạp plugin kiểu V1 (export hàm trả object hook) → guardrail chặn đọc secret/restart bot + hộp lịch sử `/history` chết IM LẶNG từ lúc upgrade.
+- 🧭 **Sửa**: port sang `export default { id, setup(ctx) }` — guardrails dùng `ctx.tool.hook("execute.before"/"execute.after")` + `ctx.session.hook("compaction")` (bản V2 của `experimental.session.compacting`); session-history dùng `ctx.event.subscribe()` với `session.created`/`session.idle`/`session.execution.failed` (V2 bỏ `session.error`). KHÔNG import `@opencode/plugin` — plugin local không resolve được gói đó (đã thử thật). Guardrail khớp CẢ `shell` lẫn `bash` vì V2 đổi tên tool; `execute.after` chỉ mở cổng deploy khi `status=completed` (bản V1 fail-open: lệnh thoát mã khác 0 vẫn mở cổng).
+- 🧪 **Kiểm chứng**: `opencode plugin list` hiện 2 ID thật (trước là `-`) + hộp lịch sử tự ghi dòng mới trở lại; `test-deploy-gate` 28/0 · `test-agent-history` 24/0 (nạp plugin THẬT với ctx giả + HOME tạm, đối chiếu hộp JSONL thật) · `bun run test` **87/87** · tsc · lint · format:check · `check-repo-map` OK. OpenCode nâng 2.0.24 → 2.0.26.
+- 📁 **File đụng**: `.opencode/plugins/guardrails.js` · `.opencode/plugins/session-history.js` · `scripts/test-deploy-gate.cjs` · `scripts/test-agent-history.cjs` · `docs/decision-log.md`
+- ▶️ **Tiếp theo**: không có — 2 plugin đã sống lại trong server đang chạy.
+
 ## 11/10/2026 (2) — Audit Admin panel: 2 bug thật (i18n nội dung admin + nút xác nhận đơn)
 
 - 🎯 **Yêu cầu**: "kiểm tra lại toàn bộ tính năng, chức năng trong vùng admin panel xem có bug, lỗi nào không rồi fix và verify đầy đủ + commit + push".
