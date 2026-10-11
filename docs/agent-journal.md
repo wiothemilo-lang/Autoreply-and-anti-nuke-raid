@@ -4,7 +4,7 @@
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
 
-## 10/10/2026 (4) — Thanh thông báo toàn site + nhãn bản cập nhật hiện tại
+## 10/10/2026 (5) — Thanh thông báo toàn site + nhãn bản cập nhật hiện tại
 
 - 🎯 **Yêu cầu**: admin cần kênh nói với người dùng NGAY trên web (bản cập nhật, bảo trì, sự cố) mà không phải sửa code rồi deploy; web cũng phải hiển thị "bản cập nhật hiện tại" đang chạy.
 - 🧭 **Backend `convex/announcements.ts` (mới)**: 5 function — `save`/`remove`/`setSiteInfo`/`adminList` gated `requireBotAdmin` (cùng cổng mọi tính năng Admin: chủ bot + quản trị viên nhóm), `publicFeed` KHÔNG đăng nhập (bài `active` MỚI NHẤT + `currentVersion` từ `siteInfo`, cùng pattern `plans.catalog`). Trần clamp SERVER-SIDE: title 120 / body 4000 / version 32 / list 50 bài — client chỉ là form. `schema.ts` +2 bảng: `announcements` (index `by_createdAt`, `by_active_createdAt`) + `siteInfo` đúng 1 dòng (`kind` literal — để trống = ẩn nhãn, không hứa sai bản). `active=false` ẩn khỏi web nhưng GIỮ dữ liệu (hết hạn sự kiện thì tắt, không xoá lịch sử thông báo).
@@ -15,6 +15,14 @@
 - 🧪 **Kiểm chứng**: 87/87 CJS (sandbox 2 lõi, `bun run test` trọn bị timeout 180s → chia 3 batch `--dir` + 2 suite exclusive, mỗi batch xanh) · 28/28 TS (kể cả `test-announcements`) · `tsc -b --noEmit` · lint · `format:check` · coverage **95,66% dòng / 80,86% nhánh / 97,78% hàm** (gom `NODE_V8_COVERAGE` qua các batch rồi `c8 report` gộp 147 file — cũng vì trần 180s) + sàn theo file OK · 10 guard script self-test OK (repo-map, convex-contract, i18n, settings-signal, cron, timer, bot-payload, retention-clamp, log-lang, ai-status) · codegen `bunx convex codegen --typecheck try` exit 0 idempotent (`api.d.ts` +2 dòng; `bun convex dev --once` vẫn không chạy được — GLIBC sandbox).
 - 📁 **File đụng**: `convex/announcements.ts` (mới) · `convex/schema.ts` · `convex/_generated/api.d.ts` (codegen) · `src/components/UpdateNotice.tsx` (mới) · `src/App.tsx` · `src/pages/Admin.tsx` · `src/lib/i18n.{en,de}.ts` · `scripts/test-announcements.ts` (mới) · `scripts/test-web-contracts.cjs` · `docs/repo-map.md` · `AGENTS.md` (số TS suite 27→28) · `README.md`
 - ▶️ **Tiếp theo**: push → CI tự lint + test + deploy Convex (bảng `announcements`/`siteInfo` + `publicFeed` lên production); kiểm tay sau deploy: viết bài trong Admin → mở trang khách thấy thanh, sửa bài → hiện lại, đóng → mất.
+
+## 10/10/2026 (4) — Deploy VPS: bot lên `de1735e` (pull không có commit mới)
+
+- 🎯 **Yêu cầu**: `/deploy` — pull code mới nhất → 4 lớp kiểm chứng → deploy Convex nếu cần → restart bot → xác minh sống.
+- 🔍 **Pull `de1735e` → `de1735e`** (`Already up to date`): HEAD đã mới nhất, 2 lockfile không đổi → bỏ `bun install`; không có gì để merge. Vẫn đáng làm vì bot đang chạy bản **07/10 `61eefdc`** (uptime 3,16 ngày, ↺11) trong khi `bot/src/convex.js` đã đổi sau đó (TTL 90' + nhận `errorData.code` botKey) → restart thật mới lấy code mới.
+- 🧪 **4 lớp XANH**: `bun run test` **87/87** (132,4s, gồm `test-browser-contracts` Chromium thật) · `bun tsc -b --noEmit` 0 · `bun run lint` 0 · `bun run format:check` sạch.
+- 🗄️ **Convex BỎ QUA**: `git diff HEAD@{1} HEAD -- convex/` rỗng (pull không mang file `convex/` nào); thay đổi backend từ 07/10 đã được CI `npx convex deploy` đẩy lúc push → không deploy thừa.
+- 🚀 **Restart + xác minh**: `pm2 restart protogon-bot` → ↺ 11→**12**, `online`, uptime tăng đều, restart count đứng yên; log boot sạch `✅ Protogon đã online: Protogon#8933 — 11 server` · `20 slash commands` · `prewarm 11/11` · thẻ chào `true` · **0 dòng lỗi** sau mốc 15:08:45 (lỗi `Server Error`/`Unknown interaction` trong log đều từ 07/10, trước restart).
 
 ## 10/10/2026 (3) — Team admin toàn quyền Admin + tag cạnh logo + cấp gói premium
 
