@@ -239,6 +239,14 @@ async function capture(fn) {
       timers.length === 1 && timers[0].ms === rb.GRACE_MS,
       timers.length,
     );
+    // Snapshot mới hơn được tạo trong grace window (có thể đã chứa trạng thái
+    // bị phá) không được thay thế mốc đã ghim ở thời điểm phát hiện.
+    const postDetection = {
+      ...PRE_NUKE,
+      roles: [{ id: "r-member", name: "Member" }],
+      channels: [{ id: "c-chat", name: "chat", type: 0 }],
+    };
+    writeSnap(gid, postDetection, 9_999_999_999_999);
 
     const s2 = rb.scheduleRollback(guild, "massChannelDelete", "atk2");
     const s3 = rb.scheduleRollback(guild, "massBan", "atk3");
@@ -272,6 +280,218 @@ async function capture(fn) {
       ),
       calls.logs[0]?.embed.description,
     );
+  }
+
+  // ══ A11. Khôi phục từng phần phải báo lỗi, không tự tạo trùng ══
+  {
+    const gid = "g-retry";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(gid, PRE_NUKE, Date.now());
+    const guild = mkGuild(gid, { roles: ["Member"], channels: [{ name: "chat" }] });
+    resetCalls();
+    ctl.createRoles = async (_guild, partial) => {
+      calls.createRoles.push({ guildId: gid, partial });
+      return new Map([[partial.roles[0].id, `new-${partial.roles[0].id}`]]);
+    };
+    ctl.createChannels = async (_guild, partial) => {
+      calls.createChannels.push({ guildId: gid, partial });
+      return new Map();
+    };
+    const rb = newRb();
+    rb.scheduleRollback(guild, "massRoleDelete", "atk");
+    await fireTimer(timers.length - 1);
+    check("A11 partial restore không tự tạo lần hai", calls.createRoles.length === 1);
+    check(
+      "A12 partial restore ghi trạng thái partial",
+      localSnapshot.tailLog().includes("status=partial"),
+    );
+    check(
+      "A13 partial restore ghi cảnh báo cần xử lý tiếp",
+      localSnapshot.tailLog().includes("status=partial") &&
+        localSnapshot.tailLog().includes("khôi phục chưa đầy đủ"),
+    );
+    const blocked = await rb.runRollback(guild, ["massRoleDelete"], "atk");
+    check(
+      "A14 partial attempt cũng ăn cooldown để chống lặp API",
+      blocked.reason === "trong cooldown",
+    );
+  }
+
+  // ══ A15. Overwrite không được mất khi role còn tồn tại/khôi phục thất bại ══
+  {
+    const gid = "g-overwrite-map";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(
+      gid,
+      {
+        roles: [
+          { id: "r-admin", name: "Admin", permissions: "8" },
+          { id: "r-member", name: "Member", permissions: "0" },
+        ],
+        channels: [
+          {
+            id: "c-private",
+            name: "private",
+            type: 0,
+            overwrites: [{ id: "r-member", type: 0, allow: "0", deny: "1" }],
+          },
+        ],
+      },
+      Date.now(),
+    );
+    const guild = mkGuild(gid, { roles: ["Member"], channels: [] });
+    resetCalls();
+    const rb = newRb();
+    const result = await rb.runRollback(guild, ["massChannelDelete"], "atk", { force: true });
+    const roleMap = calls.createChannels[0]?.createdRoles;
+    check("A15 còn role được nối lại bằng ID hiện tại", roleMap?.get("r-member") === "r-0");
+    check("A16 channel tạo với overwrite role còn sống", result.restoredChannels === 1);
+  }
+  {
+    const gid = "g-overwrite-block";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(
+      gid,
+      {
+        roles: [{ id: "r-admin", name: "Admin", permissions: "8" }],
+        channels: [
+          {
+            id: "c-private",
+            name: "private",
+            type: 0,
+            overwrites: [{ id: "r-admin", type: 0, allow: "0", deny: "1" }],
+          },
+        ],
+      },
+      Date.now(),
+    );
+    const guild = mkGuild(gid, { roles: [], channels: [] });
+    resetCalls();
+    ctl.createRoles = async () => new Map();
+    const result = await newRb().runRollback(guild, ["massChannelDelete"], "atk", { force: true });
+    check("A17 không tạo channel khi overwrite role bị mất", calls.createChannels.length === 0);
+    check("A18 không mất overwrite mà vẫn đánh dấu partial", result.partialFailure === true);
+  }
+  {
+    const gid = "g-overwrite-malformed";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(
+      gid,
+      {
+        roles: [],
+        channels: [
+          { id: "c-private", name: "private", type: 0, overwrites: [{ type: 0, id: 12 }] },
+          { id: "c-staff", name: "staff", type: 0, overwrites: [{ type: 0, id: 12 }] },
+        ],
+      },
+      Date.now(),
+    );
+    const guild = mkGuild(gid, { roles: [], channels: [] });
+    resetCalls();
+    const result = await newRb().runRollback(guild, ["massChannelDelete"], "atk", { force: true });
+    check("A19 overwrite sai cấu trúc thì bỏ qua channel", calls.createChannels.length === 0);
+    check("A20 overwrite sai cấu trúc được báo partial", result.partialFailure === true);
+  }
+  {
+    const gid = "g-overwrite-permission-bits";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(
+      gid,
+      {
+        roles: [],
+        channels: [
+          {
+            id: "c-private",
+            name: "private",
+            type: 0,
+            overwrites: [
+              { id: "g-overwrite-permission-bits", type: 0, allow: "not-bits", deny: "0" },
+            ],
+          },
+          {
+            id: "c-staff",
+            name: "staff",
+            type: 0,
+            overwrites: [{ id: "g-overwrite-permission-bits", type: 0, allow: "0", deny: "0" }],
+          },
+        ],
+      },
+      Date.now(),
+    );
+    const guild = mkGuild(gid, { roles: [], channels: [] });
+    resetCalls();
+    const result = await newRb().runRollback(guild, ["massChannelDelete"], "atk", {
+      force: true,
+    });
+    check(
+      "A21 permission overwrite không phải bitfield bị từ chối",
+      calls.createChannels.length === 0,
+    );
+    check(
+      "A22 permission overwrite sai định dạng được báo partial",
+      result.partialFailure === true,
+    );
+  }
+  {
+    const gid = "g-member-overwrite-role-collision";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(
+      gid,
+      {
+        roles: [{ id: "r-old", name: "Old", permissions: "0" }],
+        channels: [
+          {
+            id: "c-private",
+            name: "private",
+            type: 0,
+            overwrites: [{ id: "u-1", type: 1, allow: "0", deny: "1" }],
+          },
+          {
+            id: "c-staff",
+            name: "staff",
+            type: 0,
+            overwrites: [{ id: "r-old", type: 1, allow: "0", deny: "1" }],
+          },
+        ],
+      },
+      Date.now(),
+    );
+    const guild = mkGuild(gid, { roles: ["Old"], channels: [] });
+    resetCalls();
+    const result = await newRb().runRollback(guild, ["massChannelDelete"], "atk", {
+      force: true,
+    });
+    check(
+      "A23 giữ overwrite member hợp lệ nhưng chặn user ID trùng role cũ",
+      calls.createChannels[0]?.partial.channels.map((channel) => channel.name).join() === "private",
+    );
+    check("A24 overwrite member hợp lệ vẫn restore channel", result.restoredChannels === 1);
+  }
+  {
+    const gid = "g-role-bits-malformed";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(
+      gid,
+      {
+        roles: [
+          { id: "r-a", name: "A", permissions: "8" },
+          { id: "r-b", name: "B", permissions: "Administrator" },
+          { id: "r-c", name: "C", permissions: "4" },
+        ],
+        channels: [],
+      },
+      Date.now(),
+    );
+    const guild = mkGuild(gid, { roles: [], channels: [] });
+    resetCalls();
+    const result = await newRb().runRollback(guild, ["massRoleDelete"], "atk", {
+      force: true,
+    });
+    check(
+      "A25 role có permission hỏng bị loại khỏi snapshot",
+      calls.createRoles[0]?.partial.roles.map((role) => role.id).join() === "r-a,r-c",
+    );
+    check("A26 role snapshot sai bị báo partial", result.partialFailure === true);
   }
 
   // ══ B. Chặn sai: KHÔNG mất mát thì không được đụng server ══
@@ -487,14 +707,18 @@ async function capture(fn) {
       r6,
     );
 
-    // D7 — mục không có tên (snapshot hỏng) → bỏ qua, không tạo role rỗng.
+    // D7 — snapshot lỗi không được hạ ngưỡng MIN_MISSING.
     const gid7 = "g-rong-ten";
     configs.set(gid7, { rollbackEnabled: true });
     writeSnap(
       gid7,
       {
         roles: [{ id: "x1" }, { id: "x2", name: "" }, { id: "r-a", name: "A" }],
-        channels: [{ id: "y1" }, { id: "y2", name: "kenh" }],
+        channels: [
+          { id: "y1" },
+          { id: "y2", name: "kenh" },
+          { id: "c-2", name: "thong-bao", type: 0, overwrites: [] },
+        ],
       },
       1_700_000_800_000,
     );
@@ -502,11 +726,12 @@ async function capture(fn) {
     resetCalls();
     const r7 = await rb.runRollback(g7, ["massRoleDelete"], "atk", { force: true });
     check(
-      "D7 mục thiếu tên bị bỏ qua, chỉ hồi mục có tên",
-      r7.ran === true &&
-        r7.missingRoles === 1 &&
-        calls.createRoles[0]?.partial.roles[0].name === "A" &&
-        calls.createChannels[0]?.partial.channels[0].name === "kenh",
+      "D7 snapshot lỗi vẫn fail-closed dưới ngưỡng MIN_MISSING",
+      r7.ran === false &&
+        r7.missingRoles === 0 &&
+        calls.createRoles.length === 0 &&
+        calls.createChannels.length === 0 &&
+        r7.partialFailure === true,
       r7,
     );
   }
@@ -528,7 +753,8 @@ async function capture(fn) {
       r1.ran === true &&
         r1.restoredRoles === 0 &&
         calls.createRoles.length === 0 &&
-        r1.restoredChannels === 2,
+        r1.restoredChannels === 2 &&
+        r1.partialFailure === true,
       r1,
     );
 
@@ -543,15 +769,20 @@ async function capture(fn) {
       r2.ran === true &&
         r2.restoredChannels === 0 &&
         calls.createChannels.length === 0 &&
-        r2.restoredRoles === 2,
+        r2.restoredRoles === 2 &&
+        r2.partialFailure === true,
       r2,
     );
 
-    // E3 — createRoles ném (mất Manage Roles / rate limit): KHÔNG được ném ra
-    // ngoài, và createChannels vẫn phải chạy (với map rỗng) để hồi kênh.
+    // E3 — createRoles ném: channel không có role overwrite vẫn hồi được.
     resetCalls();
     configs.set(gid, { rollbackEnabled: true });
     const rb3 = createNukeRollback({ store });
+    const snapshotWithoutOverwrites = {
+      ...PRE_NUKE,
+      channels: PRE_NUKE.channels.map((channel) => ({ ...channel, overwrites: [] })),
+    };
+    writeSnap(gid, snapshotWithoutOverwrites, 1_700_001_000_001);
     ctl.createRoles = async () => {
       throw new Error("Missing Permissions");
     };
@@ -564,18 +795,20 @@ async function capture(fn) {
       r3 = { err: e.message };
     }
     check(
-      "E3 createRoles ném → nuốt lỗi, kênh vẫn được hồi",
+      "E3 createRoles ném → kênh không có overwrite vẫn hồi được",
       nemRaNgoai === false &&
         r3.ran === true &&
         r3.restoredRoles === 0 &&
-        r3.restoredChannels === 2,
+        r3.restoredChannels === 2 &&
+        r3.partialFailure === true,
       r3,
     );
     check(
-      "E4 createChannels nhận Map rỗng khi role tạo hỏng (không undefined)",
-      calls.createChannels[0]?.createdRoles instanceof Map &&
-        calls.createChannels[0].createdRoles.size === 0,
-      calls.createChannels[0]?.createdRoles,
+      "E4 createChannels vẫn nhận Map rỗng và 2 channel không cần role",
+      calls.createChannels[0]?.partial.channels.length === 2 &&
+        calls.createChannels[0]?.createdRoles instanceof Map &&
+        calls.createChannels[0].createdRoles.get("r-member") === "r-0",
+      calls.createChannels[0],
     );
 
     // E5 — createChannels ném.
@@ -643,12 +876,13 @@ async function capture(fn) {
       embed,
     );
     check(
-      "G2 embed liệt kê đủ 3 trường số liệu",
-      embed?.fields?.length === 3 &&
+      "G2 embed liệt kê đủ trường số liệu",
+      embed?.fields?.length === 4 &&
         embed.fields[0].name === "Role thiếu" &&
         embed.fields[0].value === "2" &&
         embed.fields[1].name === "Kênh thiếu" &&
-        embed.fields[1].value === "2",
+        embed.fields[1].value === "2" &&
+        embed.fields[2].name === "Kết quả",
       embed?.fields,
     );
     check(
@@ -703,21 +937,21 @@ async function capture(fn) {
     );
   }
 
-  // ══ H. Timer bắn mà runRollback nổ → bot KHÔNG chết, có log lỗi ══
+  // ══ H. Timer vẫn dọn job sau khi cache Discord chưa nạp ══
   {
     const gid = "g-timer-no";
     configs.set(gid, { rollbackEnabled: true });
     writeSnap(gid, PRE_NUKE, 1_700_004_000_000);
-    // Guild hỏng (cache chưa sẵn sàng) → runRollback ném TypeError.
-    const badGuild = { id: gid, available: true, roles: undefined, channels: { cache: new Map() } };
+    // Cache chưa có roles vẫn không làm scheduler throw; xử lý phần có thể phục hồi.
+    const badGuild = { id: gid, available: true, roles: undefined, channels: undefined };
     const rb = createNukeRollback({ store });
+    resetCalls();
     rb.scheduleRollback(badGuild, "massRoleDelete", "atk");
     const idx = timers.length - 1;
-    const { error } = await capture(() => fireTimer(idx));
+    await capture(() => fireTimer(idx));
     check(
-      "H1 timer bắn lỗi → bắt được, in log, KHÔNG unhandled rejection",
-      error.some((l) => l.startsWith(`[nukeRollback] ${gid}:`)),
-      error,
+      "H1 thiếu cache roles/channels thì fail-closed, không gọi engine",
+      calls.createRoles.length === 0 && calls.createChannels.length === 0,
     );
     check(
       "H2 sau lỗi, lịch đã được xoá (không kẹt ở pending)",
@@ -726,10 +960,7 @@ async function capture(fn) {
     );
   }
 
-  // ══ I. Ghi chú hành vi: cooldown bị ăn CẢ khi lần chạy không đủ điều kiện ══
-  // lastRun được set TRƯỚC khi kiểm tra snapshot → lần gọi "không có snapshot"
-  // vẫn ăn 10 phút cooldown của guild. Cố ý chốt lại ở đây: nếu sau này đổi
-  // thứ tự này (set lastRun sau các nhánh "bỏ qua") thì test phải đổi theo.
+  // ══ I. Lần bỏ qua không được ăn cooldown của vụ nuke hợp lệ sau đó ══
   {
     const gid = "i-cooldown-an";
     configs.set(gid, { rollbackEnabled: true });
@@ -739,17 +970,21 @@ async function capture(fn) {
     // Chưa có snapshot nào trên VPS (mới cài, vòng chụp chưa chạy tới).
     const r1 = await rb.runRollback(g, ["massRoleDelete"], "atk");
     check(
-      "I1 chưa có snapshot → bỏ qua",
+      "I1 chưa có snapshot → bỏ qua và ghi trạng thái",
       r1.ran === false && r1.reason === "không có snapshot",
       r1,
     );
 
-    // Vụ nuke thật xảy ra ngay sau đó: snapshot đã có, nhưng vẫn bị cooldown.
+    // Vụ nuke thật xảy ra ngay sau đó: snapshot đã có nên được xử lý ngay.
     writeSnap(gid, PRE_NUKE, 1_700_005_000_000);
     const r2 = await rb.runRollback(g, ["massRoleDelete"], "atk");
-    check("I2 lần gọi vô tình đã ăn cooldown của lần hợp lệ ngay sau", r2.ran === false, r2);
-    const r3 = await rb.runRollback(g, ["massRoleDelete"], "atk", { force: true });
-    check("I3 force vẫn hồi phục được (lệnh thủ công không bị kẹt)", r3.ran === true, r3);
+    check("I2 lần gọi chưa đủ điều kiện không ăn cooldown của lần hợp lệ", r2.ran === true, r2);
+    const r3 = await rb.runRollback(g, ["massRoleDelete"], "atk");
+    check(
+      "I3 rollback thành công áp dụng cooldown chống lặp",
+      r3.ran === false && r3.reason === "trong cooldown",
+      r3,
+    );
 
     // Ngược lại: config chưa có thì KHÔNG ăn cooldown (guard chạy trước).
     const gid2 = "i-chua-config";

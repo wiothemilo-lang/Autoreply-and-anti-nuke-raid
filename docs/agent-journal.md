@@ -1,5 +1,14 @@
 # Nhật ký tiến trình agent
 
+## 2026-10-11 — Làm chắc rollback anti-nuke từ snapshot VPS
+
+- ✅ Xong: ghim snapshot tại lúc phát hiện; bỏ qua overwrite không an toàn; log rõ partial/skipped.
+- ✅ Không tự full-restore qua Convex hoặc retry blind có nguy cơ tạo trùng.
+- 📁 File đụng: `bot/src/handlers/antinuke/nukeRollback.js`, test, decision log.
+- 🧪 Kiểm chứng: CJS **87/87** · TS **28/28** · tsc/lint/format + focused **66/66**, budget **40/40**.
+- 🔎 Scan độ trễ anti-nuke (mô phỏng code thật, REST 250ms): raid chậm ~2.5–3.5s bị ban, bot thù địch ~0.6s; burst 30ms/action gây hỏng trước khi ban — S4: audit-lookup trễ > fetch thì attribution hỏng vĩnh viễn (không retry) → đề xuất retry 1 lần như path kick.
+- ▶️ Tiếp theo: giữ pending điều tra botKeySeed bên dưới; chờ yêu cầu (có thể làm tiếp retry attribution).
+
 > Agent ghi vào đây qua skill **progress-journal**. Entry mới nhất trên cùng,
 > tối đa ~30 entry. Mục "Đang dở" là danh sách việc chưa xong — đọc đầu tiên
 > mỗi phiên.
