@@ -36,7 +36,7 @@ function validClientId(value: string | undefined | null): string {
 export const publicConfig = action({
   args: {},
   handler: async (ctx) => {
-    const guard = rateLimitPublicAction(ctx, {
+    const guard = await rateLimitPublicAction(ctx, {
       name: "publicConfig",
       maxPerMin: 30,
       globalMaxPerMin: 600,

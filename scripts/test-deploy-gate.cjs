@@ -164,6 +164,37 @@ async function gateAfterRun(command, output, { status = "completed", tool = "she
     }
   }
 
+  // ── 0d. Convex MCP envGet/envList đọc secret production, KHÔNG qua shell —
+  // permission theo tên lệnh trong opencode.json không phủ. Guardrail phải
+  // chặn theo TÊN TOOL trong execute.before (chặn hồi quy lỗ hổng MCP). ──
+  {
+    const { hooks } = await freshHooks();
+    for (const tool of [
+      "mcp__convex__envGet",
+      "mcp__convex__envList",
+      "convex.envGet",
+      "convex.envList",
+      "envGet",
+      "envList",
+    ]) {
+      let blocked = false;
+      try {
+        await hooks.tool["execute.before"]({ tool, input: {} });
+      } catch {
+        blocked = true;
+      }
+      check(`chặn Convex MCP tool "${tool}" (đọc secret production)`, blocked === true);
+    }
+    // Tool KHÔNG chứa envGet/envList phải KHÔNG bị chặn (không chặn nhầm).
+    let wronglyBlocked = false;
+    try {
+      await hooks.tool["execute.before"]({ tool: "mcp__convex__tables", input: {} });
+    } catch {
+      wronglyBlocked = true;
+    }
+    check("không chặn nhầm Convex MCP tool khác (tables)", wronglyBlocked === false);
+  }
+
   // ── 1. Chưa chạy gì → cổng đóng ──
   check("cổng đóng khi chưa kiểm chứng", (await gateAfterRun(null, "")) === false);
 

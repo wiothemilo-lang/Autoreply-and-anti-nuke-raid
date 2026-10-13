@@ -52,7 +52,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
       console.error(`[antinuke:hooks:${module}]`, e.message);
     }
   }
-  const { recordEvent, record, markHandled, wasHandled, auditExecutor } = state;
+  const { recordEvent, record, markHandled, wasHandled, auditLookup } = state;
   // Báo owner khi thủ phạm bị miễn (owner/whitelist/admin) — helper dùng chung
   // với các lớp khác để không lệch nhau. Xem ownerAlert.createPrivilegedAlert.
   const alertPrivilegedExecutor = createPrivilegedAlert({ client, store, state });
@@ -136,7 +136,22 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     const moduleCfg = config.modules.find((m) => m.module === module);
     if (!moduleCfg || !moduleCfg.enabled) return;
 
-    const executor = await auditExecutor(guild, eventType, targetId);
+    // `auditExecutor` = `auditLookup` + trả executor. Audit log Discord có thể
+    // đến trễ vài trăm ms sau sự kiện (giống đường kick ở index.js). Thử lại
+    // MỘT lần khi lần đầu chưa truy được thủ phạm nhưng cửa sổ chưa đầy — nếu
+    // không, attribution hỏng vĩnh viễn cho sự kiện này và kẻ nuke thoát. Không
+    // retry khi ambiguous (cửa sổ 50 entry đã đầy, retry không cải thiện).
+    let auditRes = await auditLookup(guild, eventType, targetId);
+    if (!auditRes.found && !auditRes.ambiguous) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      auditRes = await auditLookup(guild, eventType, targetId).catch(() => ({
+        ok: false,
+        found: false,
+        ambiguous: true,
+        executor: null,
+      }));
+    }
+    const executor = auditRes.executor;
     // `entry.executor` từ audit log là User THÔ — không có roles/permissions,
     // nên isExempt(User) luôn false và admin/mod bị phạt oan ở đường này (đường
     // handleAuditEntry đã fetch member trước nên không dính lỗi tương tự).

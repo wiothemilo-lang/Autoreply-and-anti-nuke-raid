@@ -34,10 +34,18 @@ console.log("── rateGuard: sliding window per-identity ──");
 
 // 1. Trong trần → ok.
 __resetRateGuardForTest();
-let ctx: any = { auth: { getIdentity: () => "user-A" } };
+let ctx: any = { auth: { getUserIdentity: async () => "user-A" } };
 let allOk = true;
 for (let i = 0; i < 30; i++) {
-  if (!rateLimitPublicAction(ctx, { name: "publicConfig", maxPerMin: 30, globalMaxPerMin: 600 }).ok)
+  if (
+    !(
+      await rateLimitPublicAction(ctx, {
+        name: "publicConfig",
+        maxPerMin: 30,
+        globalMaxPerMin: 600,
+      })
+    ).ok
+  )
     allOk = false;
 }
 check("30 lần trong trần → tất cả ok", allOk);
@@ -45,24 +53,34 @@ check("30 lần trong trần → tất cả ok", allOk);
 // 2. Vượt trần per-identity → chặn.
 check(
   "lần thứ 31 trong 1 phút → bị chặn",
-  !rateLimitPublicAction(ctx, { name: "publicConfig", maxPerMin: 30, globalMaxPerMin: 600 }).ok,
+  !(await rateLimitPublicAction(ctx, { name: "publicConfig", maxPerMin: 30, globalMaxPerMin: 600 }))
+    .ok,
 );
 
 // 3. Identity khác không bị ảnh hưởng (bucket tách riêng).
 __resetRateGuardForTest();
-ctx = { auth: { getIdentity: () => "user-B" } };
+ctx = { auth: { getUserIdentity: async () => "user-B" } };
 allOk = true;
 for (let i = 0; i < 40; i++) {
-  if (!rateLimitPublicAction(ctx, { name: "aiStatus", maxPerMin: 30, globalMaxPerMin: 600 }).ok)
+  if (
+    !(await rateLimitPublicAction(ctx, { name: "aiStatus", maxPerMin: 30, globalMaxPerMin: 600 }))
+      .ok
+  )
     allOk = false;
 }
 check("user-B gọi 40 lần chỉ bị chặn từ lần 31", allOk === false); // 31..40 bị chặn
 __resetRateGuardForTest();
-const userC = { auth: { getIdentity: () => "user-C" } };
+const userC = { auth: { getUserIdentity: async () => "user-C" } };
 allOk = true;
 for (let i = 0; i < 30; i++) {
   if (
-    !rateLimitPublicAction(userC, { name: "publicConfig", maxPerMin: 30, globalMaxPerMin: 600 }).ok
+    !(
+      await rateLimitPublicAction(userC, {
+        name: "publicConfig",
+        maxPerMin: 30,
+        globalMaxPerMin: 600,
+      })
+    ).ok
   )
     allOk = false;
 }
@@ -70,49 +88,61 @@ check("user-C (identity khác) vẫn đủ 30 lượt đầu", allOk);
 
 // 3b. Convex thực tế trả identity object; guard phải dùng subject, không bỏ qua bucket.
 __resetRateGuardForTest();
-const objectCtx: any = { auth: { getIdentity: () => ({ subject: "user-object" }) } };
-const objectFirst = rateLimitPublicAction(objectCtx, {
-  name: "publicConfig",
-  maxPerMin: 1,
-  globalMaxPerMin: 10,
-}).ok;
-const objectSecond = rateLimitPublicAction(objectCtx, {
-  name: "publicConfig",
-  maxPerMin: 1,
-  globalMaxPerMin: 10,
-}).ok;
+const objectCtx: any = { auth: { getUserIdentity: async () => ({ subject: "user-object" }) } };
+const objectFirst = (
+  await rateLimitPublicAction(objectCtx, {
+    name: "publicConfig",
+    maxPerMin: 1,
+    globalMaxPerMin: 10,
+  })
+).ok;
+const objectSecond = (
+  await rateLimitPublicAction(objectCtx, {
+    name: "publicConfig",
+    maxPerMin: 1,
+    globalMaxPerMin: 10,
+  })
+).ok;
 check("identity object dùng subject và vẫn bị giới hạn", objectFirst && !objectSecond);
 
 __resetRateGuardForTest();
 const tokenCtx: any = {
-  auth: { getIdentity: () => ({ tokenIdentifier: "token-identity" }) },
+  auth: { getUserIdentity: async () => ({ tokenIdentifier: "token-identity" }) },
 };
-const tokenFirst = rateLimitPublicAction(tokenCtx, {
-  name: "publicConfig",
-  maxPerMin: 1,
-  globalMaxPerMin: 10,
-}).ok;
-const tokenSecond = rateLimitPublicAction(tokenCtx, {
-  name: "publicConfig",
-  maxPerMin: 1,
-  globalMaxPerMin: 10,
-}).ok;
-check("identity object fallback tokenIdentifier vẫn bị giới hạn", tokenFirst && !tokenSecond);
-
-__resetRateGuardForTest();
-const anonymousObjectCtx: any = { auth: { getIdentity: () => ({ opaque: true }) } };
-check(
-  "identity object không có subject/tokenIdentifier vẫn dùng anonymous/global",
-  rateLimitPublicAction(anonymousObjectCtx, {
+const tokenFirst = (
+  await rateLimitPublicAction(tokenCtx, {
     name: "publicConfig",
     maxPerMin: 1,
     globalMaxPerMin: 10,
-  }).ok &&
-    rateLimitPublicAction(anonymousObjectCtx, {
+  })
+).ok;
+const tokenSecond = (
+  await rateLimitPublicAction(tokenCtx, {
+    name: "publicConfig",
+    maxPerMin: 1,
+    globalMaxPerMin: 10,
+  })
+).ok;
+check("identity object fallback tokenIdentifier vẫn bị giới hạn", tokenFirst && !tokenSecond);
+
+__resetRateGuardForTest();
+const anonymousObjectCtx: any = { auth: { getUserIdentity: async () => ({ opaque: true }) } };
+check(
+  "identity object không có subject/tokenIdentifier vẫn dùng anonymous/global",
+  (
+    await rateLimitPublicAction(anonymousObjectCtx, {
       name: "publicConfig",
       maxPerMin: 1,
       globalMaxPerMin: 10,
-    }).ok,
+    })
+  ).ok &&
+    (
+      await rateLimitPublicAction(anonymousObjectCtx, {
+        name: "publicConfig",
+        maxPerMin: 1,
+        globalMaxPerMin: 10,
+      })
+    ).ok,
 );
 
 // 4. Trần toàn cục chặn cả identity mới (botnet).
@@ -121,8 +151,8 @@ allOk = true;
 const users: string[] = [];
 for (let i = 0; i < 700; i++) users.push(`botnet-${i}`);
 for (const u of users) {
-  const r = rateLimitPublicAction(
-    { auth: { getIdentity: () => u } },
+  const r = await rateLimitPublicAction(
+    { auth: { getUserIdentity: async () => u } },
     { name: "publicConfig", maxPerMin: 30, globalMaxPerMin: 600 },
   );
   if (!r.ok) {
@@ -137,21 +167,28 @@ __resetRateGuardForTest();
 allOk = true;
 for (let i = 0; i < 30; i++) {
   if (
-    !rateLimitPublicAction(userC, { name: "publicConfig", maxPerMin: 30, globalMaxPerMin: 600 }).ok
+    !(
+      await rateLimitPublicAction(userC, {
+        name: "publicConfig",
+        maxPerMin: 30,
+        globalMaxPerMin: 600,
+      })
+    ).ok
   )
     allOk = false;
 }
 check(
   "hết trần publicConfig nhưng aiStatus vẫn ok",
   allOk &&
-    rateLimitPublicAction(userC, { name: "aiStatus", maxPerMin: 60, globalMaxPerMin: 1200 }).ok,
+    (await rateLimitPublicAction(userC, { name: "aiStatus", maxPerMin: 60, globalMaxPerMin: 1200 }))
+      .ok,
 );
 
 console.log("── handler thật: hợp đồng no-throw khi bị rate-limit ──");
 
 // 6. publicConfig handler khi guard chặn: phải TRẢ object (không throw) + cờ rateLimited.
 __resetRateGuardForTest();
-const anonCtx: any = { auth: { getIdentity: async () => null } };
+const anonCtx: any = { auth: { getUserIdentity: async () => null } };
 allOk = true;
 let last: any = null;
 for (let i = 0; i < 700; i++) {

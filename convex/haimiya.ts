@@ -722,9 +722,9 @@ import { rateLimitPublicAction } from "./rateGuard";
 
 export const aiStatus = action({
   args: {},
-  handler: (ctx) => {
+  handler: async (ctx) => {
     // Endpoint public KHÔNG auth — guard chống đốt usage (rẻ nên trần thoải mái).
-    const guard = rateLimitPublicAction(ctx, {
+    const guard = await rateLimitPublicAction(ctx, {
       name: "aiStatus",
       maxPerMin: 60,
       globalMaxPerMin: 1200,

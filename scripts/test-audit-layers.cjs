@@ -1227,6 +1227,120 @@ module.exports = {
     check("tickUnlocks: guild chưa có config → bỏ qua, không vỡ", ok);
   }
 
+  // ── 22. handleAttributeEvent: audit log trễ → retry 1 lần, không mất attribution ──
+  // Chặn hồi quy bug S4: audit-lookup trễ hơn fetch → attribution hỏng vĩnh viễn,
+  // kẻ nuke thoát. Khi lần đầu chưa truy được executor NHƯNG cửa sổ chưa đầy
+  // (không ambiguous), bot phải retry 1 lần (giống đường kick ở index.js).
+  {
+    clear();
+    const gid = "g-retry-attr";
+    const perp = makeMember("raider-retry", { bot: false });
+    const guild = makeGuild(gid, [perp], []);
+    configs.set(
+      gid,
+      baseConfig({
+        modules: [
+          {
+            module: "massChannelDelete",
+            enabled: true,
+            threshold: 1,
+            windowSeconds: 10,
+            punish: "ban",
+            timeoutSeconds: 600,
+            actions: ["ban"],
+            whitelistRoles: [],
+          },
+        ],
+      }),
+    );
+    client.guilds.cache.set(gid, guild);
+    // Ghi đè fetchAuditLogs: lần 1 TRẢ RỖNG (audit chưa đến, không ambiguous vì
+    // entries.length=0 < limit 50), lần 2 TRẢ ĐÚNG entry (audit đã đến).
+    let fetchCalls = 0;
+    const entry = {
+      executor: makeExecutorUser("raider-retry"),
+      target: { id: "ch-x" },
+      changes: [],
+    };
+    guild.fetchAuditLogs = async () => {
+      fetchCalls += 1;
+      const list = fetchCalls === 1 ? [] : [entry];
+      list.first = () => list[0] ?? null;
+      return { entries: list };
+    };
+    await audit.handleAttributeEvent({
+      guild,
+      module: "massChannelDelete",
+      eventType: "GuildChannelDelete",
+      targetId: "ch-x",
+      describeTarget: "#ch-x",
+    });
+    await new Promise((r) => setImmediate(r));
+    check(
+      "retry: lần 1 miss (không ambiguous) → retry, lần 2 trúng → vẫn phạt được",
+      calls.memberBans.includes("raider-retry"),
+      `memberBans=${JSON.stringify(calls.memberBans)} fetchCalls=${fetchCalls}`,
+    );
+    check("retry: chỉ gọi fetchAuditLogs đúng 2 lần", fetchCalls === 2, `fetchCalls=${fetchCalls}`);
+  }
+
+  // ── 23. handleAttributeEvent: audit miss nhưng AMBIGUOUS (cửa sổ đầy) → KHÔNG retry ──
+  {
+    clear();
+    const gid = "g-retry-ambiguous";
+    const perp = makeMember("raider-amb", { bot: false });
+    const guild = makeGuild(gid, [perp], []);
+    configs.set(
+      gid,
+      baseConfig({
+        modules: [
+          {
+            module: "massChannelDelete",
+            enabled: true,
+            threshold: 1,
+            windowSeconds: 10,
+            punish: "ban",
+            timeoutSeconds: 600,
+            actions: ["ban"],
+            whitelistRoles: [],
+          },
+        ],
+      }),
+    );
+    client.guilds.cache.set(gid, guild);
+    // Mỗi lần fetch đều trả 50 entry KHÔNG chứa target → ambiguous=true → không
+    // retry (cửa sổ đã đầy, retry không cải thiện). Không được phạt oan.
+    let fetchCalls = 0;
+    guild.fetchAuditLogs = async () => {
+      fetchCalls += 1;
+      const list = Array.from({ length: 50 }, (_, i) => ({
+        executor: makeExecutorUser("other-" + i),
+        target: { id: "unrelated-" + i },
+        changes: [],
+      }));
+      list.first = () => list[0] ?? null;
+      return { entries: list };
+    };
+    await audit.handleAttributeEvent({
+      guild,
+      module: "massChannelDelete",
+      eventType: "GuildChannelDelete",
+      targetId: "ch-x",
+      describeTarget: "#ch-x",
+    });
+    await new Promise((r) => setImmediate(r));
+    check(
+      "retry: miss + ambiguous (cửa sổ đầy) → không retry, không phạt oan",
+      !calls.memberBans.includes("raider-amb"),
+      `memberBans=${JSON.stringify(calls.memberBans)}`,
+    );
+    check(
+      "retry: ambiguous → chỉ fetch 1 lần, không retry",
+      fetchCalls === 1,
+      `fetchCalls=${fetchCalls}`,
+    );
+  }
+
   fs.unlinkSync(DJS_MOCK);
   console.log(`\nKết quả audit layers: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);

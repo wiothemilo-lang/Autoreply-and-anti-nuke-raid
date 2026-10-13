@@ -64,10 +64,10 @@ export interface PublicActionGuardResult {
  * Kiểm tra rate-limit cho 1 action public. Gọi ĐẦU handler; khi `ok === false`
  * handler phải trả fallback nhẹ ngay (không chạm DB).
  */
-export function rateLimitPublicAction(
+export async function rateLimitPublicAction(
   ctx: any,
   { name, maxPerMin, globalMaxPerMin }: PublicActionGuardOptions,
-): PublicActionGuardResult {
+): Promise<PublicActionGuardResult> {
   const now = Date.now();
   const windowMs = 60_000;
 
@@ -78,7 +78,15 @@ export function rateLimitPublicAction(
   if (!record(`__global__:${name}`, now, windowMs, globalMaxPerMin)) return { ok: false };
 
   // Identity: chỉ per-identity khi ĐÃ đăng nhập. Ẩn danh dùng chung trần toàn cục.
-  const identity = (ctx as any)?.auth?.getIdentity?.() ?? null;
+  // Convex Auth interface CHỈ có getUserIdentity() (trả Promise<UserIdentity|null>)
+  // — KHÔNG có getIdentity(). Bản cũ gọi getIdentity (undefined) nên per-identity
+  // bucket là CODE CHẾT, chỉ còn bucket toàn cục (bug thật, subagent audit bắt).
+  let identity: any = null;
+  try {
+    identity = (await ctx?.auth?.getUserIdentity?.()) ?? null;
+  } catch {
+    identity = null;
+  }
   const raw =
     typeof identity === "string"
       ? identity

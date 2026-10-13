@@ -18,6 +18,14 @@
 
 const SHELL_TOOLS = new Set(["shell", "bash"]);
 
+// Convex MCP envGet/envList đọc TRỰC TIẾP env secret của deployment production
+// (KIRA_API_KEY, CONVEX_DEPLOY_KEY…) mà KHÔNG qua shell — permission theo tên
+// lệnh trong opencode.json không phủ, SHELL_TOOLS cũng không khớp. Đây là lỗ
+// hổng thực sự (đọc được secret production nếu agent gọi MCP tool). Chặn theo
+// tên tool trong hook execute.before — tool name của Convex MCP chứa "envGet"
+// hoặc "envList" (kiểu mcp__convex__envGet / convex.envGet).
+const CONVEX_ENV_TOOLS = /env(get|list)/i;
+
 const SECRET_HINTS = [".env", ".bot-key", "auth.json", "id_rsa", "credentials.json"];
 
 function looksLikeSecretAccess(command) {
@@ -161,6 +169,14 @@ export default {
   async setup(ctx) {
     // 1) Chặn lệnh bash đọc secret trước khi nó chạy (V2: throw = chặn)
     await ctx.tool.hook("execute.before", async (event) => {
+      // Chặn Convex MCP envGet/envList — đọc secret production, không qua shell.
+      if (CONVEX_ENV_TOOLS.test(event.tool ?? "")) {
+        throw new Error(
+          "GUARDRAIL: Convex MCP envGet/envList đọc trực tiếp env secret của deployment " +
+            "production (KIRA_API_KEY, CONVEX_DEPLOY_KEY…). Theo AGENTS.md điều khoản 1: " +
+            "KHÔNG đọc secret — cần giá trị env cụ thể thì hỏi người dùng cung cấp.",
+        );
+      }
       if (!SHELL_TOOLS.has(event.tool)) return;
       const command = commandOf(event);
       if (looksLikeSecretAccess(command)) {
