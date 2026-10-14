@@ -2975,5 +2975,107 @@ check(
   "câu đó trái với việc bán gói Premium",
 );
 
+// ─── 14/10/2026 — Cửa DevTools + analytics tự host ──────────────────────────
+// Ai mở DevTools cũng đọc được toàn bộ JS client — "giấu code" là bất khả thi,
+// mẹo chặn F12/obfuscate chỉ là rào cản giả (tự đánh lừa mình). Thứ PHẢI đúng
+// và KIỂM ĐƯỢC: (1) không secret nào lọt vào source frontend — kẻ đọc bundle
+// không nhặt được gì; (2) không sourcemap production kèm source gốc; (3)
+// endpoint công khai mới (đếm lượt xem) không nhận khu vực riêng tư và không
+// thiếu trần. Không đụng gì tới trải nghiệm dev bình thường.
+const SECRET_LITERALS = [
+  /\bsk-[A-Za-z0-9_-]{20,}/, // OpenAI/Stripe kiểu sk-…
+  /\bghp_[A-Za-z0-9]{36}/, // GitHub PAT
+  /\bAKIA[0-9A-Z]{16}/, // AWS access key id
+  /\bxox[baprs]-[A-Za-z0-9-]{10,}/, // Slack token
+  /(?:BOT_TOKEN|DISCORD_TOKEN|KIRA_API_KEY|CONVEX_DEPLOY_KEY|TURNSTILE_SECRET_KEY)\s*[:=]\s*["'][^"']{8,}["']/,
+];
+const secretHits = [];
+for (const [rel, src] of files) {
+  if (SECRET_LITERALS.some((re) => re.test(src))) secretHits.push(rel);
+}
+check(
+  "không file src/ nào nhúng literal giống secret (DevTools mở là thấy hết — secret chỉ được ở backend)",
+  secretHits.length === 0,
+  secretHits.join(", "),
+);
+const publicDir = path.join(ROOT, "public");
+const extraStatic = [path.join(ROOT, "index.html")];
+if (fs.existsSync(publicDir)) {
+  for (const f of fs.readdirSync(publicDir)) {
+    if (/\.(js|json)$/.test(f)) extraStatic.push(path.join(publicDir, f));
+  }
+}
+const staticHits = extraStatic.filter((f) => {
+  if (!fs.existsSync(f)) return false;
+  const src = fs.readFileSync(f, "utf8");
+  return SECRET_LITERALS.some((re) => re.test(src));
+});
+check(
+  "index.html + public/ không nhúng secret nào",
+  staticHits.length === 0,
+  staticHits.map((f) => path.basename(f)).join(", "),
+);
+const viteCfg = fs.readFileSync(path.join(ROOT, "vite.config.ts"), "utf8");
+check(
+  "vite.config không bật sourcemap production (DevTools không tải được source gốc kèm chú thích)",
+  !/sourcemap\s*:\s*(?:true|["'](?:hidden|inline|local)["'])/.test(viteCfg),
+  "build.sourcemap bật = phát source gốc cho mọi khách",
+);
+
+const trackerSrc = files.get("lib/trackPageView.ts") ?? "";
+check("tracker lượt xem nằm ở lib/trackPageView.ts", trackerSrc.length > 0);
+check(
+  "tracker lấy danh sách đường dẫn từ routes.ts (nguồn duy nhất), chỉ route công khai",
+  /import\s*\{[^}]*\bROUTES\b[^}]*\}\s*from\s*["']\.\/routes["']/.test(trackerSrc) &&
+    /visibility\s*===\s*["']public["']/.test(trackerSrc),
+  "bảng route thứ hai là bảng sẽ lệch",
+);
+check(
+  "tracker bỏ qua trình duyệt tự động (navigator.webdriver) — test/CI không bơm số liệu",
+  /navigator\.webdriver/.test(trackerSrc),
+);
+check(
+  "tracker nuốt lỗi (backend chưa deploy function không được làm vỡ trang)",
+  /\.catch\(/.test(trackerSrc) && /\}\s*catch\s*\{/.test(trackerSrc),
+);
+const appTrackerSrc = files.get("App.tsx") ?? "";
+check(
+  "App.tsx mount <PageViewTracker /> NGOÀI <Suspense> (tracker chạy cả khi chunk đang tải)",
+  // So với JSX THẬT (`<Suspense fallback=…`) chứ không phải chữ "<Suspense>"
+  // trong comment — comment nhắc Suspense nằm rải rác phía trên.
+  appTrackerSrc.includes("<PageViewTracker />") &&
+    appTrackerSrc.indexOf("<PageViewTracker />") < appTrackerSrc.indexOf("<Suspense fallback"),
+);
+
+const analyticsSrc = fs.readFileSync(path.join(ROOT, "convex", "analytics.ts"), "utf8");
+check(
+  "server analytics chặn /dashboard + /admin (đường dẫn chứa ID server không bao giờ được đếm)",
+  /startsWith\("\/dashboard"\)/.test(analyticsSrc) && /startsWith\("\/admin"\)/.test(analyticsSrc),
+);
+check(
+  "server analytics có trần chống đốt + trần lưu trữ ngày (script không thiêu hết chỗ)",
+  /RATE_MAX_IN_WINDOW\s*=\s*\d+/.test(analyticsSrc) && /KEEP_DAYS\s*=\s*\d+/.test(analyticsSrc),
+);
+check(
+  "stats đọc số liệu đi qua requireBotAdmin (khách thường không thấy lưu lượng)",
+  /requireBotAdmin/.test(analyticsSrc),
+);
+check(
+  "pageView công khai KHÔNG nhận token (không có cổng quyền giả cho endpoint đếm)",
+  /export const pageView = mutation\(\{\s*args:\s*\{\s*path: v\.string\(\)\s*\}/.test(analyticsSrc),
+);
+const adminTrafficSrc = files.get("pages/Admin.tsx") ?? "";
+check(
+  "Admin.tsx SKIP query lưu lượng khi không phải Admin + nói rõ không cookie/không dữ liệu cá nhân",
+  /api\.analytics\.stats, isAdmin === true/.test(adminTrafficSrc) &&
+    /Không cookie, không dữ liệu cá nhân/.test(adminTrafficSrc),
+);
+check(
+  "form Feedback gửi kèm elapsedMs (time-trap chống bot submit-tức-thì, cùng honeypot)",
+  /elapsedMs:\s*Date\.now\(\)\s*-\s*mountedAt\.current/.test(
+    files.get("pages/FeedbackPage.tsx") ?? "",
+  ),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

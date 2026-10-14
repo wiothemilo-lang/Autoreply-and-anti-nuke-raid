@@ -19,6 +19,7 @@ import {
   FEEDBACK_TRIM_BATCH,
   MESSAGE_MAX,
   MESSAGE_MIN,
+  MIN_FILL_MS,
   SPAM_MAX_IN_WINDOW,
   SPAM_WINDOW_MS,
   list,
@@ -264,6 +265,39 @@ console.log("\n── #3 submit: chống spam + bẫy bot ──");
   check(
     "bẫy bot có giá trị → trả ok nhưng KHÔNG ghi gì (đừng dạy script biết đã bị phát hiện)",
     r.ok === true && r.stored === false && ctx.writes.insert.length === 0,
+  );
+}
+{
+  // Time-trap: form vừa hiện đã gửi xong = bot. Im lặng như honeypot.
+  const ctx = makeCtx();
+  const r = await submitHandler(ctx, {
+    kind: "bug",
+    message: "x".repeat(MESSAGE_MIN),
+    elapsedMs: 10,
+  });
+  check(
+    "time-trap: gửi trong 10ms → trả ok nhưng KHÔNG ghi (cùng kiểu im lặng với honeypot)",
+    r.ok === true && r.stored === false && ctx.writes.insert.length === 0,
+  );
+}
+{
+  const ctx = makeCtx();
+  const r = await submitHandler(ctx, {
+    kind: "bug",
+    message: "x".repeat(MESSAGE_MIN),
+    elapsedMs: MIN_FILL_MS,
+  });
+  check(
+    "time-trap: đúng ngưỡng MIN_FILL_MS là hợp lệ (biên mở về phía nhanh)",
+    r.ok === true && r.stored === true && ctx.writes.insert.length === 1,
+  );
+}
+{
+  const ctx = makeCtx();
+  const r = await submitHandler(ctx, { kind: "bug", message: "x".repeat(MESSAGE_MIN) });
+  check(
+    "time-trap: thiếu elapsedMs (client cũ / gọi bằng curl) → không chặn oan",
+    r.ok === true && ctx.writes.insert.length === 1,
   );
 }
 {

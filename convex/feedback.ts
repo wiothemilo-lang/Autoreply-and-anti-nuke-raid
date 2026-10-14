@@ -29,6 +29,18 @@ export const SPAM_WINDOW_MS = 10 * 60_000;
 export const SPAM_MAX_IN_WINDOW = 30;
 
 /**
+ * TIME-TRAP: thời gian tối thiểu từ lúc form hiện tới lúc bấm gửi. Bot điền +
+ * submit trong vài chục ms; người thật cần ≥1,5s (đọc form, gõ ≥10 ký tự, bấm).
+ *
+ * Trung thực về giới hạn của nó: đây là lưới bắt bot VỤNG, KHÔNG phải CAPTCHA
+ * thật — script đọc payload sẽ gửi kèm số giả và qua được. Nó bổ sung cho
+ * honeypot (rẻ, im lặng, không thêm dependency/keys); khi cần chặn bot nghiêm
+ * túc thì thứ đúng là CAPTCHA (Turnstile/WAF) chứ không phải siết tool này.
+ * Thiếu `elapsedMs` (client cũ, gọi bằng curl) → bỏ qua, KHÔNG chặn oan.
+ */
+export const MIN_FILL_MS = 1500;
+
+/**
  * ── Trần lưu trữ: số góp ý GIỮ LẠI + cách dọn ─────────────────────────────
  *
  * Vì sao cần: `submit` là endpoint CÔNG KHAI. Trần chống spam (30 góp ý/10
@@ -142,9 +154,17 @@ export const submit = mutation({
     page: v.optional(v.string()),
     /** Bẫy bot: input ẩn, người thật không bao giờ điền. */
     honeypot: v.optional(v.string()),
+    /** Thời gian (ms) từ lúc form hiện tới lúc bấm gửi — xem MIN_FILL_MS. */
+    elapsedMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     if (String(args.honeypot ?? "").trim()) return { ok: true as const, stored: false as const };
+
+    // Time-trap (xem MIN_FILL_MS): gửi nhanh bất khả thi với người thật → im
+    // lặng giống honeypot (hiện "đã gửi", không ghi gì cho bot).
+    if (typeof args.elapsedMs === "number" && args.elapsedMs < MIN_FILL_MS) {
+      return { ok: true as const, stored: false as const };
+    }
 
     const check = validateFeedback(args);
     if (!check.ok) throw new Error(check.error);

@@ -1661,6 +1661,15 @@ export const DE: Record<string, string> = {
     "Schreibe eine Ankündigung, die ALLEN auf dem Web angezeigt wird (seitenweite Hinweisleiste – auch Gästen ohne Anmeldung). Für Updates, Wartung, Störungen.",
   "Bản cập nhật hiện tại": "Aktuelle Version",
   "Bản cập nhật hiện tại: {ver}": "Aktuelle Version: {ver}",
+  /* ==== Seitenaufrufe, selbst gehostet (14/10/2026) ==== zählt nur
+     öffentliche Pfade — keine Cookies, keine personenbezogenen Daten. */
+  "Lưu lượng truy cập": "Zugriffe",
+  "Chỉ đếm trang công khai — khu vực đăng nhập không được ghi. Không cookie, không dữ liệu cá nhân.":
+    "Nur öffentliche Seiten — angemeldete Bereiche werden nie erfasst. Keine Cookies, keine personenbezogenen Daten.",
+  "lượt xem · 7 ngày qua": "Aufrufe · letzte 7 Tage",
+  "lượt xem · 30 ngày qua": "Aufrufe · letzte 30 Tage",
+  "Trang xem nhiều nhất (30 ngày)": "Meistgesehene Seiten (30 Tage)",
+  "Chưa có lượt xem nào.": "Noch keine Aufrufe.",
   "vd 1.4.0 — để trống để ẩn nhãn": "z. B. 1.4.0 – leer lassen, um das Label auszublenden",
   "Nhãn hiện ở thanh thông báo cho mọi khách truy cập.":
     "Das Label erscheint in der Hinweisleiste für alle Besucher.",

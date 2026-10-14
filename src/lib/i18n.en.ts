@@ -1734,6 +1734,15 @@ export const EN: Record<string, string> = {
     "Write an announcement shown to EVERYONE on the web (site-wide notice bar — including guests who haven't signed in). Use it for releases, maintenance, incidents.",
   "Bản cập nhật hiện tại": "Current release",
   "Bản cập nhật hiện tại: {ver}": "Current release: {ver}",
+  /* ==== Lưu lượng trang tự host (14/10/2026) ==== chỉ ĐẾM đường dẫn công
+     khai — không cookie, không dữ liệu cá nhân (xem convex/analytics.ts). */
+  "Lưu lượng truy cập": "Traffic",
+  "Chỉ đếm trang công khai — khu vực đăng nhập không được ghi. Không cookie, không dữ liệu cá nhân.":
+    "Public pages only — signed-in areas are never recorded. No cookies, no personal data.",
+  "lượt xem · 7 ngày qua": "views · last 7 days",
+  "lượt xem · 30 ngày qua": "views · last 30 days",
+  "Trang xem nhiều nhất (30 ngày)": "Most viewed pages (30 days)",
+  "Chưa có lượt xem nào.": "No page views yet.",
   "vd 1.4.0 — để trống để ẩn nhãn": "e.g. 1.4.0 — leave empty to hide the label",
   "Nhãn hiện ở thanh thông báo cho mọi khách truy cập.":
     "The label shows in the notice bar for every visitor.",

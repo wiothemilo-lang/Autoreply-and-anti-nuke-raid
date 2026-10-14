@@ -1597,4 +1597,37 @@ export default defineSchema({
     currentVersion: v.string(),
     updatedAt: v.number(),
   }).index("by_kind", ["kind"]),
+
+  /**
+   * LƯU LƯỢNG TRANG tự host (14/10/2026) — xem `convex/analytics.ts` để hiểu
+   * vì sao không dùng GA/Plausible.
+   *
+   * Ghi theo NGÀY, không phải từng lượt: 1 dòng = (ngày VN, đường dẫn, số
+   * lượt). ~15 đường dẫn công khai × trần 90 ngày ≈ 1.350 dòng — không bao
+   * giờ phình, và "7 ngày / 30 ngày" đọc rẻ qua index `by_day`.
+   *
+   * KHÔNG có field nhận dạng người xem (không IP, không user, không
+   * user-agent) — không có gì để rò nếu bảng bị đọc nhầm.
+   */
+  pageViews: defineTable({
+    /** "YYYY-MM-DD" theo giờ VN (mốc ngày của bảng — index chính). */
+    day: v.string(),
+    /** Đường dẫn công khai đã chuẩn hoá (chặn /dashboard, /admin ở server). */
+    path: v.string(),
+    /** Số lượt trong ngày. */
+    count: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_day", ["day"])
+    .index("by_day_path", ["day", "path"]),
+
+  /**
+   * CỬA SỔ CHỐNG ĐỐT cho pageView — đúng 1 dòng (kind khoá). Mutation Convex
+   * xử lý tuần tự theo document nên tăng đồng thời không mất lượt đếm.
+   */
+  analyticsRate: defineTable({
+    kind: v.literal("analyticsRate"),
+    windowStart: v.number(),
+    count: v.number(),
+  }).index("by_kind", ["kind"]),
 });

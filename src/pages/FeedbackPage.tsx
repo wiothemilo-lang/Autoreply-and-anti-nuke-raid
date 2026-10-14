@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useMutation } from "convex/react";
@@ -65,6 +65,10 @@ export default function FeedbackPage() {
   // Bẫy bot: input ẩn, người thật không bao giờ thấy/điền. Có giá trị thì
   // server coi như bot và không ghi gì vào DB (convex/feedback.ts).
   const [honeypot, setHoneypot] = useState("");
+  // Time-trap: mốc form hiện ra — server từ chối lượt gửi nhanh bất khả thi
+  // với người thật (MIN_FILL_MS trong convex/feedback.ts). Lưới bổ sung cho
+  // honeypot, không thay CAPTCHA thật.
+  const mountedAt = useRef(Date.now());
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +90,7 @@ export default function FeedbackPage() {
         lang: currentLanguage(),
         page: typeof window === "undefined" ? undefined : window.location.pathname,
         honeypot: honeypot || undefined,
+        elapsedMs: Date.now() - mountedAt.current,
       });
       setSent(true);
     } catch (e) {

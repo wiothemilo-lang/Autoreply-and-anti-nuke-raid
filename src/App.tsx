@@ -13,6 +13,7 @@ import UpdateNotice from "./components/UpdateNotice";
 import { useT } from "./lib/i18n";
 import { finishBootOverlay } from "./lib/bootOverlay";
 import { syncRouteMetadata } from "./lib/seo";
+import { trackPageView } from "./lib/trackPageView";
 
 /**
  * Chốt an toàn của BootSignal: app hiện ra chậm nhất sau bao lâu kể từ khi
@@ -47,6 +48,20 @@ function RouteMetadataSync({ lang }: { lang: "vi" | "en" | "de" }) {
   useEffect(() => {
     syncRouteMetadata(pathname, lang);
   }, [pathname, lang]);
+  return null;
+}
+
+/**
+ * Đếm lượt xem trang CÔNG KHAI — analytics tự host (convex/analytics.ts).
+ * Tách khỏi RouteMetadataSync (SEO) là cố ý: việc đếm là lớp phụ, không được
+ * chạm gì tới SEO/metadata. Không state, không render, không log — xem
+ * `src/lib/trackPageView.ts` cho toàn bộ chốt an toàn.
+ */
+function PageViewTracker() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    trackPageView(pathname);
+  }, [pathname]);
   return null;
 }
 
@@ -129,6 +144,7 @@ export default function App() {
           trong mọi trang phải dừng ở liên kết "Bỏ qua tới nội dung". */}
       <SkipLink />
       <RouteMetadataSync lang={lang} />
+      <PageViewTracker />
       {/* NGOÀI <Suspense> là cố ý: header không phụ thuộc chunk route nào, để
           trong Suspense thì mỗi lần tải chunk nó bị gỡ ra lắp lại — header
           nháy trắng đúng lúc người dùng đang chờ trang mới. */}

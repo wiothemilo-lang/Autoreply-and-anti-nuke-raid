@@ -9,6 +9,7 @@
  */
 
 import type * as altDetection from "../altDetection.js";
+import type * as analytics from "../analytics.js";
 import type * as announcements from "../announcements.js";
 import type * as antinuke from "../antinuke.js";
 import type * as audit from "../audit.js";
@@ -79,6 +80,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   altDetection: typeof altDetection;
+  analytics: typeof analytics;
   announcements: typeof announcements;
   antinuke: typeof antinuke;
   audit: typeof audit;

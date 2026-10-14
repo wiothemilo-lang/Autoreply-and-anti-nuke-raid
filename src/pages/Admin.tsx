@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Banknote,
+  BarChart3,
   BrainCircuit,
   Bug,
   Eye,
@@ -93,6 +94,9 @@ function AdminContent() {
   const saveNotice = useMutation(api.announcements.save);
   const removeNotice = useMutation(api.announcements.remove);
   const setSiteInfo = useMutation(api.announcements.setSiteInfo);
+  // LƯU LƯỢNG TRANG (analytics tự host): query `stats` tự guard requireBotAdmin
+  // — SKIP trước khi gọi khi người xem không phải Admin, không tốn lượt nào.
+  const traffic = useQuery(api.analytics.stats, isAdmin === true ? { token } : "skip");
   const noticeErr = (e: unknown) => (e instanceof Error ? e.message : translate("Lỗi kết nối"));
   const saveNoticeForAdmin = async (args: {
     id?: Id<"announcements">;
@@ -392,6 +396,7 @@ function AdminContent() {
                 onSetVersion={setVersionForAdmin}
               />
             )}
+            {isAdmin === true && <AnalyticsCard stats={traffic} />}
             {isOwner === true && (
               <div className="rounded-xl border border-border bg-card p-4">
                 <p className="flex items-center gap-1.5 font-display text-sm font-bold">
@@ -1683,6 +1688,82 @@ function PremiumGrantCard({
 }
 
 /* ── Thông báo cập nhật + bản cập nhật hiện tại ───────────────────── */
+
+/* ── Lưu lượng trang (analytics tự host) ─────────────────────────── */
+
+/**
+ * Khớp `analytics.stats` — tổng 7/30 ngày + top đường dẫn 30 ngày.
+ * Giữ kiểu cục bộ (3 field) — lệch field sẽ lộ ngay ở `stats={traffic}` qua tsc.
+ */
+type TrafficStats = {
+  total7d: number;
+  total30d: number;
+  topPaths: { path: string; count: number }[];
+};
+
+/**
+ * Thẻ LƯU LƯỢNG TRANG — analytics TỰ HOST (convex/analytics.ts): chỉ đếm
+ * đường dẫn công khai, không cookie, không dữ liệu cá nhân. Chỉ đọc — không
+ * có nút nào; câu chữ nói rõ giới hạn để không ai tưởng đây là theo dõi sâu.
+ */
+function AnalyticsCard({ stats }: { stats: TrafficStats | undefined }) {
+  const max = stats && stats.topPaths.length > 0 ? stats.topPaths[0].count : 1;
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
+        <BarChart3 className="h-4 w-4" /> {translate("Lưu lượng truy cập")}{" "}
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+        {translate(
+          "Chỉ đếm trang công khai — khu vực đăng nhập không được ghi. Không cookie, không dữ liệu cá nhân.",
+        )}
+      </p>
+      {stats === undefined ? (
+        <p className="mt-3 text-xs text-muted-foreground">{translate("Đang tải…")}</p>
+      ) : (
+        <>
+          <div className="mt-3 flex gap-8">
+            <div>
+              <p className="font-display text-2xl font-bold tabular-nums">{stats.total7d}</p>
+              <p className="text-xs text-muted-foreground">{translate("lượt xem · 7 ngày qua")}</p>
+            </div>
+            <div>
+              <p className="font-display text-2xl font-bold tabular-nums">{stats.total30d}</p>
+              <p className="text-xs text-muted-foreground">{translate("lượt xem · 30 ngày qua")}</p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs font-semibold">
+            {translate("Trang xem nhiều nhất (30 ngày)")}
+          </p>
+          {stats.topPaths.length === 0 ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {translate("Chưa có lượt xem nào.")}
+            </p>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {stats.topPaths.map((row) => (
+                <li key={row.path} className="flex items-center gap-2 text-xs">
+                  <code className="w-36 shrink-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                    {row.path}
+                  </code>
+                  <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-secondary">
+                    <span
+                      className="block h-full rounded-full bg-foreground/70"
+                      style={{ width: `${Math.max(4, Math.round((row.count / max) * 100))}%` }}
+                    />
+                  </span>
+                  <span className="w-10 shrink-0 text-right font-semibold tabular-nums">
+                    {row.count}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 /** Một dòng danh sách (khớp `announcements.adminList`). */
 type NoticeRow = {
