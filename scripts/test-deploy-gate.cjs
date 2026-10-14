@@ -10,9 +10,15 @@
  *   2) Dò lỗi bằng substring "fail " → output XANH hợp lệ ("0 FAIL",
  *      "PASS case3: all fail →") khớp nhầm → kể cả đọc đúng field vẫn chặn.
  *
- * Test nạp CHÍNH plugin thật và gọi đúng hook theo API (không copy logic —
- * copy sẽ lệch khi API đổi). Mỗi kịch bản dùng module instance MỚI để cổng
- * (biến verifiedAt cấp module) bắt đầu ở trạng thái đóng.
+ * Bug thật thứ 3 (11/10/2026 — nâng OpenCode V1 → V2): plugin viết theo API V1
+ * (export hàm `GuardrailsPlugin()` trả object hook "tool.execute.before") KHÔNG
+ * còn được V2 nạp — log: "Plugin must export a default definition with an id
+ * and an effect or setup function" → guardrail chết IM LẶNG, không chặn gì cả.
+ *
+ * Test nạp CHÍNH plugin thật và gọi đúng hook theo API V2 (default export
+ * `{ id, setup }`, hook đăng ký qua ctx.tool.hook) — không copy logic vì copy
+ * sẽ lệch khi API đổi. Mỗi kịch bản dùng module instance MỚI để cổng (biến
+ * verifiedAt cấp module) bắt đầu ở trạng thái đóng.
  */
 const path = require("path");
 const { pathToFileURL } = require("url");
@@ -53,26 +59,41 @@ const RED_OUT = [
 
 /** Module instance mới mỗi lần → verifiedAt = 0 (cổng đóng). */
 let instance = 0;
+
+/**
+ * Nạp plugin thật + dựng ctx giả đúng shape V2: hook() chỉ ghi lại callback
+ * để test gọi tay như Core sẽ gọi. Lấy mod kèm hooks để kiểm chứng đăng ký.
+ */
 async function freshHooks() {
   instance++;
   const mod = await import(`${PLUGIN_URL}?v=${instance}`);
-  return mod.GuardrailsPlugin();
+  const hooks = { tool: {}, session: {} };
+  await mod.default.setup({
+    tool: { hook: async (name, cb) => void (hooks.tool[name] = cb) },
+    session: { hook: async (name, cb) => void (hooks.session[name] = cb) },
+  });
+  return { mod, hooks };
 }
 
-/** Chạy hook after đúng API rồi thử mở cổng — trả true nếu cổng cho qua. */
-async function gateAfterRun(command, output) {
-  const hooks = await freshHooks();
+/** Gọi hook execute.before đúng event V2 (tool shell, input.command). */
+async function beforeCommand(hooks, command, tool = "shell") {
+  await hooks.tool["execute.before"]({ tool, input: { command } });
+}
+
+/** Chạy hook after đúng event V2 rồi thử mở cổng — trả true nếu cổng cho qua. */
+async function gateAfterRun(command, output, { status = "completed", tool = "shell" } = {}) {
+  const { hooks } = await freshHooks();
   if (command !== null) {
-    await hooks["tool.execute.after"](
-      { tool: "bash", args: { command } },
-      { title: "bash", output, metadata: {} },
-    );
+    await hooks.tool["execute.after"]({
+      tool,
+      input: { command },
+      status,
+      result: status === "completed" ? { content: output } : undefined,
+      error: status === "completed" ? undefined : { message: output },
+    });
   }
   try {
-    await hooks["tool.execute.before"](
-      { tool: "bash" },
-      { args: { command: "pm2 restart protogon-bot" } },
-    );
+    await beforeCommand(hooks, "pm2 restart protogon-bot");
     return true;
   } catch {
     return false;
@@ -80,23 +101,98 @@ async function gateAfterRun(command, output) {
 }
 
 (async () => {
-  // ── 0. Guardrail phải chặn CẢ "protogon" lẫn "protogon-bot" khi cổng đóng
+  // ── 0. Plugin phải theo đúng API V2 — đây là cổng chặn "plugin chết im lặng". ──
+  {
+    const { mod, hooks } = await freshHooks();
+    check(
+      "plugin V2: default export có id + setup (bản V1 từng làm plugin KHÔNG nạp)",
+      mod.default && typeof mod.default.id === "string" && typeof mod.default.setup === "function",
+    );
+    check(
+      "plugin không import @opencode/plugin (plugin local không resolve được gói đó)",
+      !/from\s+["']@opencode\/plugin["']/.test(
+        require("fs").readFileSync(
+          path.join(__dirname, "..", ".opencode", "plugins", "guardrails.js"),
+          "utf8",
+        ),
+      ),
+    );
+    check(
+      "setup đăng ký đủ 3 hook: execute.before/after + compaction",
+      typeof hooks.tool["execute.before"] === "function" &&
+        typeof hooks.tool["execute.after"] === "function" &&
+        typeof hooks.session["compaction"] === "function",
+    );
+    // Hook compaction là bản V2 của experimental.session.compacting — nhắc hợp
+    // đồng AGENTS.md khi session bị nén. Thiếu nó là mất mục 2 của plugin.
+    const probe = { system: [] };
+    await hooks.session["compaction"](probe);
+    check(
+      "hook compaction đẩy hợp đồng AGENTS.md vào system",
+      probe.system.length > 0 && probe.system[0].text.includes("AGENTS.md"),
+    );
+  }
+
+  // ── 0b. Guardrail phải chặn CẢ "protogon" lẫn "protogon-bot" khi cổng đóng
   // (tài liệu từng ghi sai tên "protogon"; nếu regex chỉ khớp 1 tên thì lệnh
   // dùng tên kia sẽ lọt cổng — test này khóa cả hai). ──
   {
-    const hooks = await freshHooks();
+    const { hooks } = await freshHooks();
     for (const name of ["protogon", "protogon-bot"]) {
       let blocked = false;
       try {
-        await hooks["tool.execute.before"](
-          { tool: "bash" },
-          { args: { command: `pm2 restart ${name}` } },
-        );
+        await beforeCommand(hooks, `pm2 restart ${name}`);
       } catch {
         blocked = true;
       }
       check(`chặn restart "${name}" khi chưa kiểm chứng`, blocked === true);
     }
+  }
+
+  // ── 0c. Tên tool đổi giữa bản: V1 "bash" → V2 "shell". Plugin phải khớp cả
+  // hai, nếu không upgraded Core là lớp chặn biến mất. ──
+  {
+    const { hooks } = await freshHooks();
+    for (const tool of ["shell", "bash"]) {
+      let blocked = false;
+      try {
+        await beforeCommand(hooks, "pm2 restart protogon-bot", tool);
+      } catch {
+        blocked = true;
+      }
+      check(`chặn restart khi tool tên "${tool}"`, blocked === true);
+    }
+  }
+
+  // ── 0d. Convex MCP envGet/envList đọc secret production, KHÔNG qua shell —
+  // permission theo tên lệnh trong opencode.json không phủ. Guardrail phải
+  // chặn theo TÊN TOOL trong execute.before (chặn hồi quy lỗ hổng MCP). ──
+  {
+    const { hooks } = await freshHooks();
+    for (const tool of [
+      "mcp__convex__envGet",
+      "mcp__convex__envList",
+      "convex.envGet",
+      "convex.envList",
+      "envGet",
+      "envList",
+    ]) {
+      let blocked = false;
+      try {
+        await hooks.tool["execute.before"]({ tool, input: {} });
+      } catch {
+        blocked = true;
+      }
+      check(`chặn Convex MCP tool "${tool}" (đọc secret production)`, blocked === true);
+    }
+    // Tool KHÔNG chứa envGet/envList phải KHÔNG bị chặn (không chặn nhầm).
+    let wronglyBlocked = false;
+    try {
+      await hooks.tool["execute.before"]({ tool: "mcp__convex__tables", input: {} });
+    } catch {
+      wronglyBlocked = true;
+    }
+    check("không chặn nhầm Convex MCP tool khác (tables)", wronglyBlocked === false);
   }
 
   // ── 1. Chưa chạy gì → cổng đóng ──
@@ -114,10 +210,26 @@ async function gateAfterRun(command, output) {
     (await gateAfterRun(FULL_CMD, RED_OUT)) === false,
   );
 
+  // ── 3b. Đủ 4 lớp, output xanh nhưng lệnh THOÁT LỖI (status error) → không mở.
+  // Bản V1 đọc output bất kể lỗi → cổng mở dù verify chết giữa chừng. ──
+  check(
+    "status error (exit khác 0) dù output xanh → không mở cổng",
+    (await gateAfterRun(FULL_CMD, GREEN_OUT, { status: "error" })) === false,
+  );
+
   // ── 4. Đủ 4 lớp, output XANH (chứa "0 FAIL"/"all fail") → MỞ ──
   check(
     "đủ 4 lớp + output xanh → MỞ cổng restart",
     (await gateAfterRun(FULL_CMD, GREEN_OUT)) === true,
+  );
+
+  // ── 4b. Output dạng mảng content (Core đổi cách bọc output) vẫn soi được ──
+  check(
+    "output dạng mảng {type:text} → vẫn mở cổng khi xanh",
+    (await gateAfterRun(FULL_CMD, [
+      { type: "text", text: GREEN_OUT },
+      { type: "text", text: "All matched files use Prettier code style!" },
+    ])) === true,
   );
 
   // ── 5. Output đỏ của từng tool riêng vẫn bị chặn ──
@@ -131,17 +243,16 @@ async function gateAfterRun(command, output) {
 
   // ── 6. Cổng mở cũng cho qua npx convex deploy ──
   {
-    const hooks = await freshHooks();
-    await hooks["tool.execute.after"](
-      { tool: "bash", args: { command: FULL_CMD } },
-      { title: "bash", output: GREEN_OUT, metadata: {} },
-    );
+    const { hooks } = await freshHooks();
+    await hooks.tool["execute.after"]({
+      tool: "shell",
+      input: { command: FULL_CMD },
+      status: "completed",
+      result: { content: GREEN_OUT },
+    });
     let convexOk = true;
     try {
-      await hooks["tool.execute.before"](
-        { tool: "bash" },
-        { args: { command: "npx convex deploy" } },
-      );
+      await beforeCommand(hooks, "npx convex deploy");
     } catch {
       convexOk = false;
     }
@@ -150,7 +261,7 @@ async function gateAfterRun(command, output) {
 
   // ── 7. Vá cổng KHÔNG nới lỏng denylist secret/infra ──
   {
-    const hooks = await freshHooks();
+    const { hooks } = await freshHooks();
     for (const [label, cmd] of [
       ["đọc .env", "cat bot/.env"],
       ["printenv", "printenv"],
@@ -159,7 +270,7 @@ async function gateAfterRun(command, output) {
     ]) {
       let blocked = false;
       try {
-        await hooks["tool.execute.before"]({ tool: "bash" }, { args: { command: cmd } });
+        await beforeCommand(hooks, cmd);
       } catch {
         blocked = true;
       }

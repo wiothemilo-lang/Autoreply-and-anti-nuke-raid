@@ -5,7 +5,26 @@
 // redirect từ file env…), kể cả khi agent tự tạo file mới rồi dùng lệnh đọc nó.
 // Kèm theo: giữ "hợp đồng" AGENTS.md không bị mai một khi session dài bị nén.
 //
-// Lấy cảm hứng từ cơ chế Keys/Environment của Freebuff: agent không bao giờ tự// đọc được giá trị secret — cần thì phải hỏi người dùng.
+// ⚠️ Dạng plugin V2 (OpenCode 2.x): default export `{ id, setup(ctx) }` — hook
+// đăng ký qua ctx.tool.hook / ctx.session.hook. Bản V1 (export hàm trả về object
+// hook "tool.execute.before") KHÔNG được nạp nữa: log báo
+// "Plugin must export a default definition with an id and an effect or setup
+// function" và plugin chết ÂM THẦM (03/10/2026). KHÔNG import "@opencode/plugin"
+// — plugin local không resolve được gói đó (đã xác minh: ResolveMessage), chỉ
+// cần object thường là đủ.
+//
+// Tên tool đổi giữa 2 bản: V1 "bash" → V2 "shell" (permission map cũ vẫn được
+// V2 tự chuẩn hoá). Plugin khớp CẢ HAI tên để không mất lớp chặn nếu đổi bản.
+
+const SHELL_TOOLS = new Set(["shell", "bash"]);
+
+// Convex MCP envGet/envList đọc TRỰC TIẾP env secret của deployment production
+// (KIRA_API_KEY, CONVEX_DEPLOY_KEY…) mà KHÔNG qua shell — permission theo tên
+// lệnh trong opencode.json không phủ, SHELL_TOOLS cũng không khớp. Đây là lỗ
+// hổng thực sự (đọc được secret production nếu agent gọi MCP tool). Chặn theo
+// tên tool trong hook execute.before — tool name của Convex MCP chứa "envGet"
+// hoặc "envList" (kiểu mcp__convex__envGet / convex.envGet).
+const CONVEX_ENV_TOOLS = /env(get|list)/i;
 
 const SECRET_HINTS = [".env", ".bot-key", "auth.json", "id_rsa", "credentials.json"];
 
@@ -71,7 +90,7 @@ function verifyGateActive() {
   return verifiedAt > 0 && Date.now() - verifiedAt < VERIFY_WINDOW_MS;
 }
 
-// Dấu hiệu LỖI THẬT do các runner in ra khi đỏ. TUYỆT ĐỐI không dùng substring
+// Dấu hiệu LỖI THẬT do các runners in ra khi đỏ. TUYỆT ĐỐI không dùng substring
 // thô kiểu "fail " — output XANH hợp lệ chứa "0 FAIL" và
 // "PASS case3: all fail →" sẽ khớp nhầm, khiến cổng deploy KHÔNG BAO GIỜ mở
 // (bug thật 19/09/2026: 4 lớp xanh nhưng guardrail vẫn chặn restart vô hạn).
@@ -99,19 +118,75 @@ function isFullVerifyRun(command, output) {
   return !FAIL_PATTERNS.some((re) => re.test(text));
 }
 
-export const GuardrailsPlugin = async () => {
-  return {
-    // 1) Chặn lệnh bash đọc secret trước khi nó chạy
-    "tool.execute.before": async (input, output) => {
-      const command = output.args.command || "";
-      if (input.tool === "bash" && looksLikeSecretAccess(command)) {
+// Lệnh của tool shell/bash nằm ở event.input.command (V2: input là object tool
+// input; V1: nằm ở output.args.command). Thiếu trường này → coi như rỗng, tức
+// không bao giờ mở cổng (fail-closed).
+function commandOf(event) {
+  const input = event?.input;
+  const raw = input?.command ?? input?.args?.command;
+  return typeof raw === "string" ? raw : "";
+}
+
+// Trích text output của tool shell để soi dấu hiệu lỗi. Tool.Result của V2 có
+// `content` (string | mảng {type:"text",text}) hoặc `output` (chuỗi/obj stdout)
+// — đọc cả hai để không vỡ khi Core đổi cách bọc output.
+function resultText(result) {
+  if (!result || typeof result !== "object") return "";
+  const { content, output } = result;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (part && typeof part.text === "string" ? part.text : ""))
+      .join("\n");
+  }
+  if (typeof output === "string") return output;
+  if (output && typeof output === "object") {
+    return [output.stdout, output.stderr, output.output]
+      .filter((s) => typeof s === "string")
+      .join("\n");
+  }
+  return "";
+}
+
+// Hợp đồng nhắc lại khi session bị nén — y hệt nội dung bản V1 push vào
+// output.context của experimental.session.compacting (V2: system của yêu cầu
+// tóm tắt, hook "compaction").
+const CONTRACT_REMINDER = [
+  "## Hợp đồng cần nhớ (từ AGENTS.md)",
+  "- Workflow 5 pha: Hiểu → Kế hoạch (todo) → Thực hiện → Xác minh → Báo cáo+commit",
+  "- Bị gián đoạn rồi được bảo continue/tiếp đi → TIẾP TỤC ĐÚNG CHỖ DỪNG (xem git diff + todo), không làm lại từ đầu; đi đến khi đủ kiểm chứng xanh + báo cáo mới dừng",
+  `- Xong việc = test xanh toàn bộ (hiện ${CONTRACT_SUITES} suites — khớp AGENTS.md; thêm/xoá suite phải sửa CẢ HAI) + typecheck + lint XANH, chưa chạy thật thì không claim xanh`,
+  "- Không đọc secret (.env/.bot-key/key) — cần thì hỏi người dùng; kể cả qua hạ tầng: systemctl cat/show, docker inspect/exec, /proc/*/environ, printenv đều cấm",
+  "- Hạ tầng VPS 3 vùng: 🟢 TỰ LÀM — chẩn đoán (systemctl status, journalctl, docker ps/logs, df, free) + sửa rồi tự restart kiira-retry-proxy + curl /__health thấy ok:true; restart bot `pm2 restart protogon-bot` và deploy `npx convex deploy` CHỈ sau khi pull + kiểm chứng đủ 4 lớp xanh (guardrail tự mở cổng 15 phút) — sau restart bot phải pm2 status online + logs không crash; thiếu CONVEX_DEPLOY_KEY → nhờ người dùng export, không in key; 🟡 IN LỆNH nhờ người dùng — docker restart, dịch vụ khác; 🔴 CẤM — ufw/iptables, reboot, prune",
+  "- Được git add + commit + push origin main (tiếng Việt, footer 🤖 Generated with OpenCode) — push CHỈ sau khi cả 3 kiểm chứng XANH trong phiên",
+  "- Bug thuộc engine đã có test → bắt buộc thêm test chặn tái diễn",
+  "- Đổi tên/di chuyển function Convex (bot gọi bằng tên chuỗi) → grep sửa cả 2 phía + chạy scripts/check-convex-contract.cjs; đụng convex/schema.ts → skill schema-migration-safety (2 client lệch pha ~1 phút)",
+].join("\n");
+
+export default {
+  id: "guardrails",
+
+  async setup(ctx) {
+    // 1) Chặn lệnh bash đọc secret trước khi nó chạy (V2: throw = chặn)
+    await ctx.tool.hook("execute.before", async (event) => {
+      // Chặn Convex MCP envGet/envList — đọc secret production, không qua shell.
+      if (CONVEX_ENV_TOOLS.test(event.tool ?? "")) {
+        throw new Error(
+          "GUARDRAIL: Convex MCP envGet/envList đọc trực tiếp env secret của deployment " +
+            "production (KIRA_API_KEY, CONVEX_DEPLOY_KEY…). Theo AGENTS.md điều khoản 1: " +
+            "KHÔNG đọc secret — cần giá trị env cụ thể thì hỏi người dùng cung cấp.",
+        );
+      }
+      if (!SHELL_TOOLS.has(event.tool)) return;
+      const command = commandOf(event);
+      if (looksLikeSecretAccess(command)) {
         throw new Error(
           "GUARDRAIL: Lệnh này có dấu hiệu đọc nội dung file secret (.env/.bot-key/key). " +
             "Theo AGENTS.md điều khoản 1: DỪNG và hỏi người dùng cung cấp giá trị nếu cần. " +
             "Không tìm lối tắt khác để đọc secret.",
         );
       }
-      if (input.tool === "bash" && looksLikeInfraLeak(command)) {
+      if (looksLikeInfraLeak(command)) {
         throw new Error(
           "GUARDRAIL: Lệnh này chạm vào chỗ chứa secret của hạ tầng (unit file systemd " +
             "có Environment=, env của container/process, env của shell). Chẩn đoán bằng " +
@@ -122,7 +197,7 @@ export const GuardrailsPlugin = async () => {
       // Chặn restart bot khi chưa đủ điều kiện — bot là production thật.
       // Tên process thật là "protogon-bot"; vẫn khớp "protogon" để chặn cả
       // lệnh gõ thiếu (trước đây tài liệu ghi sai tên nên agent gõ nhầm).
-      if (input.tool === "bash" && /^\s*pm2\s+restart\s+protogon(-bot)?\b/.test(command)) {
+      if (/^\s*pm2\s+restart\s+protogon(-bot)?\b/.test(command)) {
         if (!verifyGateActive()) {
           throw new Error(
             "GUARDRAIL: Chưa đủ điều kiện restart bot. Quy trình bắt buộc (AGENTS.md " +
@@ -135,7 +210,7 @@ export const GuardrailsPlugin = async () => {
         }
       }
       // Deploy Convex cũng là hành động production — cùng cổng kiểm chứng.
-      if (input.tool === "bash" && /(^|\s|&&)(npx|bunx|bun)\s+convex\s+deploy\b/.test(command)) {
+      if (/(^|\s|&&)(npx|bunx|bun)\s+convex\s+deploy\b/.test(command)) {
         if (!verifyGateActive()) {
           throw new Error(
             "GUARDRAIL: Chưa đủ điều kiện deploy Convex. Quy trình bắt buộc: chạy " +
@@ -147,36 +222,29 @@ export const GuardrailsPlugin = async () => {
           );
         }
       }
-    },
+    });
 
-    // 1.5) Quan sát kết quả bash — phiên chạy đủ bộ kiểm chứng xanh thì mở
-    //      cổng deploy-bot trong 15 phút (xem VERIFY_WINDOW_MS).
-    //      API v1.18.31: lệnh nằm ở input.args.command, output ở output.output
-    //      (trước đây đọc nhầm output.args/output.result → luôn undefined →
-    //      cổng không bao giờ mở dù 4 lớp xanh).
-    "tool.execute.after": async (input, output) => {
-      const cmd = input?.args?.command;
-      if (input.tool === "bash" && isFullVerifyRun(cmd, output?.output)) {
+    // 1.5) Quan sát kết quả shell — phiên chạy đủ bộ kiểm chứng XANH TRỌN VẸN
+    //      thì mở cổng deploy-bot trong 15 phút (xem VERIFY_WINDOW_MS).
+    //      V2: command ở event.input.command, output ở event.result (chỉ khi
+    //      status === "completed"). LỆCH BẢN V1: trước đây đọc output.output
+    //      bất kể lỗi → lệnh chết giữa chừng (exit khác 0) mà output vẫn còn
+    //      khớp 4 lớp là cổng mở; bản này FAIL-CLOSED: status lỗi → không mở.
+    await ctx.tool.hook("execute.after", async (event) => {
+      if (!SHELL_TOOLS.has(event.tool)) return;
+      if (event.status !== "completed") return;
+      if (isFullVerifyRun(commandOf(event), resultText(event.result))) {
         verifiedAt = Date.now();
       }
-    },
+    });
 
     // 2) Khi session dài bị nén (compaction), nhắc lại hợp đồng làm việc để
     //    agent không "quên" quy trình 5 pha sau nhiều lượt hội thoại.
-    "experimental.session.compacting": async (input, output) => {
-      output.context.push(
-        [
-          "## Hợp đồng cần nhớ (từ AGENTS.md)",
-          "- Workflow 5 pha: Hiểu → Kế hoạch (todo) → Thực hiện → Xác minh → Báo cáo+commit",
-          "- Bị gián đoạn rồi được bảo continue/tiếp đi → TIẾP TỤC ĐÚNG CHỖ DỪNG (xem git diff + todo), không làm lại từ đầu; đi đến khi đủ kiểm chứng xanh + báo cáo mới dừng",
-          `- Xong việc = test xanh toàn bộ (hiện ${CONTRACT_SUITES} suites — khớp AGENTS.md; thêm/xoá suite phải sửa CẢ HAI) + typecheck + lint XANH, chưa chạy thật thì không claim xanh`,
-          "- Không đọc secret (.env/.bot-key/key) — cần thì hỏi người dùng; kể cả qua hạ tầng: systemctl cat/show, docker inspect/exec, /proc/*/environ, printenv đều cấm",
-          "- Hạ tầng VPS 3 vùng: 🟢 TỰ LÀM — chẩn đoán (systemctl status, journalctl, docker ps/logs, df, free) + sửa rồi tự restart kiira-retry-proxy + curl /__health thấy ok:true; restart bot `pm2 restart protogon-bot` và deploy `npx convex deploy` CHỈ sau khi pull + kiểm chứng đủ 4 lớp xanh (guardrail tự mở cổng 15 phút) — sau restart bot phải pm2 status online + logs không crash; thiếu CONVEX_DEPLOY_KEY → nhờ người dùng export, không in key; 🟡 IN LỆNH nhờ người dùng — docker restart, dịch vụ khác; 🔴 CẤM — ufw/iptables, reboot, prune",
-          "- Được git add + commit + push origin main (tiếng Việt, footer 🤖 Generated with OpenCode) — push CHỈ sau khi cả 3 kiểm chứng XANH trong phiên",
-          "- Bug thuộc engine đã có test → bắt buộc thêm test chặn tái diễn",
-          "- Đổi tên/di chuyển function Convex (bot gọi bằng tên chuỗi) → grep sửa cả 2 phía + chạy scripts/check-convex-contract.cjs; đụng convex/schema.ts → skill schema-migration-safety (2 client lệch pha ~1 phút)",
-        ].join("\n"),
-      );
-    },
-  };
+    //    V1: experimental.session.compacting push vào output.context (ngữ cảnh
+    //    gắn vào prompt tóm tắt). V2: hook "compaction" — system của yêu cầu
+    //    tóm tắt (tóm tắt sinh ra chính là ngữ cảnh agent thấy sau khi nén).
+    await ctx.session.hook("compaction", async (event) => {
+      event.system.push({ type: "text", text: CONTRACT_REMINDER });
+    });
+  },
 };

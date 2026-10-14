@@ -6,7 +6,69 @@
     "AGENT_HISTORY_TTL_DAYS": "14",
     "OPENCODE_ENABLE_EXA": "1"
   },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true
+    },
+    "gh_grep": {
+      "type": "remote",
+      "url": "https://mcp.grep.app",
+      "enabled": true
+    },
+    "convex": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "convex@latest",
+        "mcp",
+        "start",
+        "--project-dir",
+        "/opt/Autoreply-and-anti-nuke-raid"
+      ],
+      "enabled": true
+    }
+  },
   "provider": {
+    "revidapi": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "RevidAPI",
+      "options": {
+        "baseURL": "https://revidapi.com/v1",
+        "apiKey": "{file:~/.secrets/revidapi-key}"
+      },
+      "models": {
+        "claude-sonnet-5": {
+          "name": "Claude Sonnet 5"
+        },
+        "claude-opus-5-5": {
+          "name": "Claude Opus 5.5"
+        },
+        "claude-haiku-4-5": {
+          "name": "Claude Haiku 4.5"
+        },
+        "gpt-6.1-sol": {
+          "name": "GPT 6.1 Sol"
+        },
+        "gpt-6-sol": {
+          "name": "GPT 6 Sol"
+        },
+        "gemini-3.8-flash": {
+          "name": "Gemini 3.8 Flash"
+        },
+        "deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash"
+        },
+        "kimi-k3": {
+          "name": "Kimi K3"
+        },
+        "google/gemini-flash": {
+          "name": "Gemini Flash (miễn phí)"
+        }
+      }
+    },
     "kiira": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Kiira",
@@ -29,6 +91,9 @@
         },
         "gpt-5.6-luna": {
           "name": "GPT 5.6 Luna"
+        },
+        "gpt-6-luna": {
+          "name": "GPT 6 Luna"
         }
       }
     }
