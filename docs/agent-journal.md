@@ -1,5 +1,13 @@
 # Nhật ký tiến trình agent
 
+## 2026-10-16 — Deploy VPS: pull `1f8afc1` + deploy Convex thủ công
+
+- ✅ Xong: pull `6e065c1`→`1f8afc1` (16 file, **không đụng `bot/`**), lockfile không đổi; cổng 4 lớp xanh 2 lần; `npx convex deploy` thủ công lên prod `accomplished-chipmunk-74` (EXIT=0, thêm 3 index `analyticsRate.by_kind`, `pageViews.by_day`, `pageViews.by_day_path`); `pm2 restart` → bot online pid mới, log `✅ Protogon đã online — 11 server` + 20 slash commands + prewarm 11/11, không lỗi mới.
+- 🛠 Sự cố chặn: key Convex không bao giờ tồn tại vì dòng export trong `/root/.bashrc` thiếu nháy quanh `|` (bash hiểu thành pipe → subshell mất biến + "command not found" mỗi lần mở shell). User sửa lại bằng `printf "export CONVEX_DEPLOY_KEY='%s'\n"` → probe `DEPLOY_KEY_OK`.
+- 📁 File đụng: `docs/agent-journal.md` (ngoài repo: `/root/.bashrc` — user tự sửa).
+- 🧪 Kiểm chứng: `87/87` · `29/29 TS` · tsc/lint/format sạch (2 lần) · deploy EXIT=0 · pm2 online ↺1 không tăng · error.log không có dòng mới sau restart.
+- ▶️ Tiếp theo: CI đỏ từ 12/10 — run #409 (đúng `1f8afc1`): test ✗ (exit 1, 2m55s), deploy 0s; xanh cuối #404 (11/10). Nghi cổng chỉ có trên CI (`test:coverage` / `coverage:floor` / `test:mutation`); web prod cần build Dokploy mới thấy analytics/feedback.
+
 ## 2026-10-11 — Làm chắc rollback anti-nuke từ snapshot VPS
 
 - ✅ Xong: ghim snapshot tại lúc phát hiện; bỏ qua overwrite không an toàn; log rõ partial/skipped.
