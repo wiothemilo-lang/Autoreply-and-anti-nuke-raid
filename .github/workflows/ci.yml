@@ -176,7 +176,7 @@ jobs:
       # playwright về cache nếu chưa có. Thiếu Chromium = test FAIL kèm hướng
       # dẫn (không im lặng xanh).
       - name: Cache Chromium của playwright
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-1.63.0-${{ runner.os }}
