@@ -1003,6 +1003,243 @@ async function capture(fn) {
     );
   }
 
+  // ══ J. Các nhánh phòng thủ của scheduler + snapshot ghim ══
+  // Những nhánh này từng không có test nên coverage của nukeRollback rơi
+  // dưới sàn 95% (CI đỏ từ 12/10). Mỗi ca dưới đây đi đúng đường production:
+  // scheduleRollback → timer → runRollback, hoặc gọi runRollback với opts ghim.
+  {
+    // J1 — module rỗng/không phải chuỗi: không được hẹn lịch.
+    const rb = newRb();
+    const g = mkGuild("g-sched-invalid-module", { roles: [], channels: [] });
+    const s = rb.scheduleRollback(g, null, "atk");
+    check(
+      "J1 module không hợp lệ → không hẹn lịch",
+      s.scheduled === false && s.reason === "module không hợp lệ",
+      s,
+    );
+  }
+
+  {
+    // J2 — có job đang chạy: gộp module vào job active, không hẹn timer thứ hai.
+    const gid = "g-sched-active";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(gid, PRE_NUKE, 1_700_006_000_000);
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const slowStore = { getConfig: () => gate.then(() => ({ rollbackEnabled: true })) };
+    const rb = createNukeRollback({ store: slowStore });
+    const g = mkGuild(gid, { roles: ["Member"], channels: [{ name: "chat" }] });
+    resetCalls();
+    const s1 = rb.scheduleRollback(g, "massRoleDelete", "atk1");
+    const timerCount = timers.length;
+    const running = timers[timerCount - 1].cb(); // không await: runRollback đang chờ gate
+    await Promise.resolve(); // để callback kịp set active
+    const s2 = rb.scheduleRollback(g, "massChannelDelete", "atk2");
+    check(
+      "J2 rollback đang chạy → gộp vào job active, không hẹn timer mới",
+      s1.scheduled === true &&
+        s2.scheduled === false &&
+        s2.reason === "đang xử lý rollback" &&
+        timers.length === timerCount,
+      { s1, s2, timers: timers.length },
+    );
+    release();
+    await running;
+    check(
+      "J3 job active vẫn hồi phục xong sau khi gộp module",
+      calls.createRoles.length === 1 && calls.createChannels.length === 1,
+      { roles: calls.createRoles.length, channels: calls.createChannels.length },
+    );
+  }
+
+  {
+    // J4 — không đọc được snapshot lúc ghim: vẫn hẹn lịch nhưng fail-closed,
+    // tuyệt đối không đọc snapshot mới hơn (có thể đã chứa trạng thái bị phá).
+    const gid = "g-sched-pin-fail";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(gid, PRE_NUKE, 1_700_006_100_000);
+    const rb = newRb();
+    const g = mkGuild(gid, { roles: [], channels: [] });
+    const origList = localSnapshot.listLocalSnapshots;
+    localSnapshot.listLocalSnapshots = () => {
+      throw new Error("thư mục snapshot hỏng");
+    };
+    let s;
+    try {
+      s = rb.scheduleRollback(g, "massRoleDelete", "atk");
+    } finally {
+      localSnapshot.listLocalSnapshots = origList;
+    }
+    check(
+      "J4 ghim snapshot lỗi → vẫn hẹn lịch nhưng snapshot rỗng",
+      s.scheduled === true && s.graceMs === rb.GRACE_MS,
+      s,
+    );
+    await capture(() => fireTimer(timers.length - 1));
+    check(
+      "J5 ghim snapshot lỗi → rollback fail-closed, không đọc snapshot sau đó",
+      localSnapshot.tailLog().includes("status=skipped") &&
+        localSnapshot.tailLog().includes("chưa có snapshot tại thời điểm phát hiện"),
+      localSnapshot.tailLog(),
+    );
+  }
+
+  {
+    // J6 — runRollback ném trong timer: phải bắt, ghi status=error, không
+    // unhandled rejection (nếu không bot chết đúng lúc đang bị nuke).
+    const gid = "g-timer-throw";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(gid, PRE_NUKE, 1_700_006_200_000);
+    const rb = newRb();
+    const g = mkGuild(gid, { roles: ["Member"], channels: [{ name: "chat" }] });
+    g.roles.cache.values = () => {
+      throw new Error("Discord cache hỏng");
+    };
+    const { error } = await capture(async () => {
+      rb.scheduleRollback(g, "massRoleDelete", "atk");
+      await fireTimer(timers.length - 1);
+    });
+    check(
+      "J6 runRollback ném trong timer → bắt được, ghi status=error",
+      error.some((line) => line.includes("status=error")),
+      error,
+    );
+    check(
+      "J7 reportFailure ghi cả log cục bộ lẫn stderr",
+      localSnapshot.tailLog().includes("status=error") &&
+        localSnapshot.tailLog().includes("Discord cache hỏng"),
+      localSnapshot.tailLog(),
+    );
+  }
+
+  {
+    // J8 — appendLog lỗi (đĩa đầy) ở cả lúc lên lịch lẫn lúc báo kết quả:
+    // rollback vẫn phải chạy, lỗi log chỉ là phụ.
+    const gid = "g-append-log-fail";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(gid, PRE_NUKE, 1_700_006_300_000);
+    const rb = newRb();
+    const g = mkGuild(gid, { roles: ["Member"], channels: [{ name: "chat" }] });
+    const origAppend = localSnapshot.appendLog;
+    localSnapshot.appendLog = () => {
+      throw new Error("đĩa đầy");
+    };
+    resetCalls();
+    let s;
+    let captured;
+    try {
+      captured = await capture(async () => {
+        s = rb.scheduleRollback(g, "massRoleDelete", "atk");
+        await fireTimer(timers.length - 1);
+      });
+    } finally {
+      localSnapshot.appendLog = origAppend;
+    }
+    check("J8 appendLog lỗi khi lên lịch → vẫn hẹn lịch", s?.scheduled === true, s);
+    check(
+      "J9 appendLog lỗi khi báo kết quả → rollback vẫn hoàn tất",
+      calls.createRoles.length === 1 && calls.createChannels.length === 1,
+      { roles: calls.createRoles.length, channels: calls.createChannels.length },
+    );
+    check(
+      "J10 cả hai chỗ lỗi log đều được báo ra stderr",
+      captured.error.some((line) => line.includes("không ghi được log lịch rollback")) &&
+        captured.error.some((line) => line.includes("không ghi được log cục bộ")),
+      captured.error,
+    );
+  }
+
+  {
+    // J11 — snapshotPinned nhưng không force: chỉ scheduler nội bộ mới được
+    // chạy chế độ này; gọi trực tiếp phải bị từ chối.
+    const gid = "g-auto-guard";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(gid, PRE_NUKE, 1_700_006_400_000);
+    const rb = newRb();
+    const g = mkGuild(gid, { roles: ["Member"], channels: [{ name: "chat" }] });
+    const r = await rb.runRollback(g, ["massRoleDelete"], "atk", { snapshotPinned: true });
+    check(
+      "J11 snapshotPinned không force → từ chối chế độ thực thi nội bộ",
+      r.ran === false && r.reason === "rollback tự động cần chế độ thực thi nội bộ",
+      r,
+    );
+  }
+
+  {
+    // J12 — mốc snapshot không phải số: fail-closed, không đoán.
+    const gid = "g-bad-snapshot-ts";
+    configs.set(gid, { rollbackEnabled: true });
+    const pinned = {
+      snapshotAt: 1_700_006_500_000,
+      guild: { ...PRE_NUKE, guildId: gid, guildName: `Server ${gid}` },
+    };
+    const r = await newRb().runRollback(
+      mkGuild(gid, { roles: [], channels: [] }),
+      ["massRoleDelete"],
+      "atk",
+      { force: true, snapshotPinned: true, pinnedSnapshot: pinned, snapshotTs: "không-phải-số" },
+    );
+    check(
+      "J12 snapshotPinned với mốc không hợp lệ → fail-closed",
+      r.ran === false && r.reason === "mốc snapshot không hợp lệ",
+      r,
+    );
+  }
+
+  {
+    // J13 — snapshot ghim mới hơn mốc rollback: từ chối (tránh hồi trạng thái sau nuke).
+    const gid = "g-newer-snapshot";
+    configs.set(gid, { rollbackEnabled: true });
+    const pinned = {
+      snapshotAt: 2_000,
+      guild: { ...PRE_NUKE, guildId: gid, guildName: `Server ${gid}` },
+    };
+    const r = await newRb().runRollback(
+      mkGuild(gid, { roles: [], channels: [] }),
+      ["massRoleDelete"],
+      "atk",
+      { force: true, snapshotPinned: true, pinnedSnapshot: pinned, snapshotTs: 1_000 },
+    );
+    check(
+      "J13 snapshot mới hơn mốc rollback → fail-closed",
+      r.ran === false && r.reason === "snapshot mới hơn thời điểm rollback",
+      r,
+    );
+  }
+
+  {
+    // J14 — runRollback ném VÀ appendLog cũng ném (đĩa đầy): reportFailure
+    // vẫn phải nuốt lỗi log, không để unhandled rejection giết bot.
+    const gid = "g-timer-throw-log-fail";
+    configs.set(gid, { rollbackEnabled: true });
+    writeSnap(gid, PRE_NUKE, 1_700_006_600_000);
+    const rb = newRb();
+    const g = mkGuild(gid, { roles: ["Member"], channels: [{ name: "chat" }] });
+    g.roles.cache.values = () => {
+      throw new Error("Discord cache hỏng");
+    };
+    const origAppend = localSnapshot.appendLog;
+    localSnapshot.appendLog = () => {
+      throw new Error("đĩa đầy");
+    };
+    let captured;
+    try {
+      captured = await capture(async () => {
+        rb.scheduleRollback(g, "massRoleDelete", "atk");
+        await fireTimer(timers.length - 1);
+      });
+    } finally {
+      localSnapshot.appendLog = origAppend;
+    }
+    check(
+      "J14 runRollback ném + appendLog ném → vẫn báo lỗi log ra stderr, không ném",
+      captured.error.some((line) => line.includes("không ghi được log cục bộ")),
+      captured.error,
+    );
+  }
+
   global.setTimeout = realSetTimeout;
   console.log(`\n${pass}/${pass + fail} ✅`);
   fs.rmSync(tmp, { recursive: true, force: true });
