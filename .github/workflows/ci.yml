@@ -39,22 +39,44 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # gitleaks quét toàn bộ lịch sử commit
-      - uses: oven-sh/setup-bun@v2
+      # GitHub Releases hay trả 504 khi tải Bun (đã đỏ 2 lượt liên tiếp 08/11).
+      # Cài từ npm registry + retry, không phụ thuộc setup-bun/GitHub Releases.
+      - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
+        run: |
+          for i in 1 2 3; do
+            npm install -g bun@1.3.3 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            echo "npm install bun thất bại lần $i — thử lại sau 5s"
+            sleep 5
+          done
+          echo "$HOME/.bun-npm/bin" >> "$GITHUB_PATH"
+          "$HOME/.bun-npm/bin/bun" --version
       - name: Gitleaks — quét secret/token trong lịch sử git
-        # PR từ Dependabot dùng GITHUB_TOKEN bị giới hạn quyền (chỉ read) —
-        # API của gitleaks-action bị từ chối "Resource not accessible by
-        # integration" và làm đỏ cả PRdeps không liên quan. Nhánh CLI chạy
-        # gitleaks trực tiếp (không gọi GitHub API): vẫn quét full lịch sử,
-        # thiếu hẳn phần affiliate/check-for-leaks của action.
-        if: github.actor != 'dependabot[bot]'
+        id: gitleaks
+        # Action tải binary từ GitHub Releases; 08/11 GitHub trả 504 liên tiếp.
+        # continue-on-error + bước CLI bên dưới: action lỗi vì mạng thì vẫn quét
+        # được; action lỗi vì phát hiện secret thật thì CLI cũng fail theo.
+        # (PR Dependabot từng bị action từ chối API — CLI fallback xử lý luôn.)
+        continue-on-error: true
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Gitleaks (CLI) — quét secret cho PR Dependabot
-        if: github.actor == 'dependabot[bot]'
+      - name: Gitleaks (CLI fallback) — quét khi action không tải được
+        if: steps.gitleaks.outcome == 'failure'
         run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar -xz -C /usr/local/bin gitleaks
-          gitleaks git --redact -v --exit-code 1 .
+          set -euo pipefail
+          GITLEAKS_VERSION=8.24.3
+          mkdir -p "$HOME/.local/bin"
+          install_from_github() {
+            curl -sSfL --retry 3 --retry-delay 5 \
+              "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+              | tar -xz -C "$HOME/.local/bin" gitleaks
+          }
+          if ! install_from_github; then
+            echo "::warning::GitHub Releases vẫn lỗi — cài gitleaks qua Go proxy"
+            GOBIN="$HOME/.local/bin" go install "github.com/gitleaks/gitleaks/v8@v${GITLEAKS_VERSION}"
+          fi
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/gitleaks" git --redact -v --exit-code 1 .
       - name: Bun audit — chặn CVE mức critical (high/moderate chỉ cảnh báo)
         run: |
           bun install --frozen-lockfile
@@ -90,7 +112,17 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      # GitHub Releases hay trả 504 khi tải Bun (đã đỏ 2 lượt liên tiếp 08/11).
+      # Cài từ npm registry + retry, không phụ thuộc setup-bun/GitHub Releases.
+      - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
+        run: |
+          for i in 1 2 3; do
+            npm install -g bun@1.3.3 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            echo "npm install bun thất bại lần $i — thử lại sau 5s"
+            sleep 5
+          done
+          echo "$HOME/.bun-npm/bin" >> "$GITHUB_PATH"
+          "$HOME/.bun-npm/bin/bun" --version
       - run: bun install --frozen-lockfile
       - name: ESLint (no-undef chặn bug thiếu import trước cả khi chạy test)
         run: bun run lint
@@ -164,7 +196,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      # GitHub Releases hay trả 504 khi tải Bun (đã đỏ 2 lượt liên tiếp 08/11).
+      # Cài từ npm registry + retry, không phụ thuộc setup-bun/GitHub Releases.
+      - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
+        run: |
+          for i in 1 2 3; do
+            npm install -g bun@1.3.3 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            echo "npm install bun thất bại lần $i — thử lại sau 5s"
+            sleep 5
+          done
+          echo "$HOME/.bun-npm/bin" >> "$GITHUB_PATH"
+          "$HOME/.bun-npm/bin/bun" --version
       - name: Cài dependencies (root + bot — 4 suites cần discord.js thật)
         run: |
           bun install --frozen-lockfile
@@ -261,7 +303,17 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      # GitHub Releases hay trả 504 khi tải Bun (đã đỏ 2 lượt liên tiếp 08/11).
+      # Cài từ npm registry + retry, không phụ thuộc setup-bun/GitHub Releases.
+      - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
+        run: |
+          for i in 1 2 3; do
+            npm install -g bun@1.3.3 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            echo "npm install bun thất bại lần $i — thử lại sau 5s"
+            sleep 5
+          done
+          echo "$HOME/.bun-npm/bin" >> "$GITHUB_PATH"
+          "$HOME/.bun-npm/bin/bun" --version
       - run: bun install --frozen-lockfile
       - name: Deploy to Convex production
         env:
