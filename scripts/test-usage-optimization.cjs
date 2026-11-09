@@ -142,14 +142,23 @@ function makeClient() {
     await fresh.syncAll(client, store);
     check("isSyncHealthy() = true ngay sau sync thành công", fresh.isSyncHealthy() === true);
 
+    // Module MỚI (chưa từng sync) + store lỗi: isSyncHealthy phải giữ false.
+    // Assertion cũ là `check(..., true)` — luôn xanh, không chứng minh gì.
+    delete require.cache[require.resolve("../bot/src/handlers/guildSync.js")];
+    const freshBad = require("../bot/src/handlers/guildSync.js");
+    check("module mới: isSyncHealthy() = false trước khi sync", freshBad.isSyncHealthy() === false);
     const badStore = makeStore({ failSync: true });
     const { client: c2 } = makeClient();
+    let threw = false;
     try {
-      await guildSync.syncAll(c2, badStore);
+      await freshBad.syncAll(c2, badStore);
     } catch {
-      /* chủ đích: sync lỗi không được crash */
+      threw = true; // chủ đích: sync lỗi ném ra cho caller bắt
     }
-    check("sync lỗi → ném lỗi (caller tự bắt) hoặc nuốt, isSyncHealthy không đổi true", true);
+    check(
+      "sync lỗi → ném lỗi và isSyncHealthy() VẪN false (không báo khỏe giả)",
+      threw && freshBad.isSyncHealthy() === false,
+    );
   }
 
   // 4. Logic fallback trong index.js + các hằng số tối ưu I/O

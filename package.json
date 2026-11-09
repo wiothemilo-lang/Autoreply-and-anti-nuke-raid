@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/build.mjs",
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "tsc -b --noEmit && tsc -p convex/tsconfig.json",
     "convex:dev": "convex dev",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -185,6 +185,14 @@ const PASS = `console.log("Kết quả: 3 pass, 0 fail");`;
   );
 
   reset();
+  const strictFlaky = run(["--dir", dir, "--jobs", "2"], { TEST_FLAKY_STRICT: "1" });
+  check(
+    "TEST_FLAKY_STRICT=1: flaky bị coi là đỏ (exit 1), nêu tên suite",
+    strictFlaky.status === 1 && /test-a-flaky/.test(out(strictFlaky)),
+    out(strictFlaky),
+  );
+
+  reset();
   const strict = run(["--dir", dir, "--jobs", "2", "--no-retry"]);
   check(
     "--no-retry: suite đỏ lần đầu là đỏ thật (exit 1), không chạy lại",

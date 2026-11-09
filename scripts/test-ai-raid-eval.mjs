@@ -181,6 +181,8 @@ if (skipped) console.log(`Bỏ qua: ${skipped}`);
  * đo được, kèm comment nói vì sao tăng — đừng nới hạn mức để xanh.
  */
 const BASELINE = { correct: 6, total: 6, maxMs: 12_000 };
+// Cổng CHẶT chỉ khi bật tường minh — độ chính xác phụ thuộc provider bên ngoài.
+const hard = process.env.AI_EVAL_GATE === "1";
 if (!ai.aiAvailable()) {
   console.log("\nCổng độ chính xác: KHÔNG bật (không có key provider) — coi như skip.");
 } else {
@@ -202,7 +204,6 @@ if (!ai.aiAvailable()) {
   // Cổng CHẶT chỉ khi được bật tường minh: độ chính xác phụ thuộc cả chuỗi
   // provider bên ngoài, nên bắt CI đỏ theo nó là bắt đỏ oan. Mặc định chỉ CẢNH
   // BÁO — người đọc log mới quyết định có chặn merge hay không.
-  const hard = process.env.AI_EVAL_GATE === "1";
   if (accuracy < baseAccuracy) {
     const msg = `ĐỘ CHÍNH XÁC TỤT so với đường cơ sở (${(accuracy * 100).toFixed(1)}% < ${(baseAccuracy * 100).toFixed(1)}%)`;
     if (hard) {
@@ -220,4 +221,14 @@ if (!ai.aiAvailable()) {
     console.log(`⚠️ ${msg}.`);
   }
 }
-process.exit(fail === 0 ? 0 : 1);
+// Exit code phải theo cổng, KHÔNG theo fail thô: trước đây fail>0 luôn exit 1
+// kể cả khi AI_EVAL_GATE chưa bật (CI đỏ oan vì một timeout mạng), còn nhánh
+// "chỉ cảnh báo" là dead code.
+if (fail > 0 && !hard) {
+  const msg = `${fail} ca đánh giá AI thất bại (timeout/lỗi provider) — chỉ cảnh báo vì AI_EVAL_GATE chưa bật`;
+  console.log(`⚠️ ${msg}.`);
+  if (process.env.GITHUB_ACTIONS === "true") {
+    console.log(`::warning title=AI eval::${msg}`);
+  }
+}
+process.exit(hard && fail > 0 ? 1 : 0);
