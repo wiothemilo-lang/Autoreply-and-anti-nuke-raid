@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Facebook, MessageCircle, User } from "lucide-react";
+import { MessageCircle, User } from "lucide-react";
+import { FacebookMark } from "../BrandIcons";
 import { Button } from "../ui/button";
 import { SafeHaimiyaAvatar } from "./shared";
 import { useBotStatus } from "../../lib/useBotStatus";
@@ -64,7 +65,7 @@ export default function Footer({
             </Button>
             <Button asChild variant="outline" size="sm">
               <a href={facebookUrl} target="_blank" rel="noreferrer">
-                <Facebook className="h-4 w-4" />
+                <FacebookMark className="h-4 w-4" />
                 Fanpage Facebook
               </a>
             </Button>

@@ -5,7 +5,6 @@ import {
   Bot,
   Bug,
   Crown,
-  Facebook,
   Flame,
   Gavel,
   Heart,
@@ -587,4 +586,3 @@ export function CtaBanner() {
 }
 
 export { HeatBar };
-export { Facebook as FacebookIcon };
