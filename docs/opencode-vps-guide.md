@@ -386,8 +386,9 @@ t3 pair
 2. Tạo task mới, gõ: `bun run test` → agent chạy test trên VPS, bạn xem kết
    quả trực tiếp trên điện thoại
 3. Thử một việc thật: `Sửa lỗi X trong panel Y, chạy test rồi commit + push` —
-   agent sửa, kiểm chứng xanh rồi tự commit + push (push tự do đã được bật;
-   vẫn cấm reset/clean/rebase và đọc secret)
+   agent sửa, kiểm chứng xanh rồi tự commit + push **nhánh riêng** + mở PR;
+   chỉ merge khi CI xanh (vẫn cấm push thẳng `main`, reset/clean/rebase `main`
+   và đọc secret)
 
 ### 3.4. Ai cần gì?
 
@@ -415,14 +416,20 @@ xanh + báo cáo xong mới dừng hẳn.
 
 ### Xử lý 2 ca git trên VPS hay gặp
 
-**1. `git pull` báo "divergent branches"** — local có commit riêng (agent vừa
-commit trên VPS) mà GitHub cũng có commit mới (đẩy từ Freebuff). Trình tự chuẩn:
+**1. `git pull` báo "divergent branches"** — có commit đi thẳng trên `main`
+(không còn được phép; mọi thay đổi phải đi nhánh → PR → merge). Cách xử lý an
+toàn: **giữ commit local vào một nhánh rồi mở PR**, không reset/rebase `main`:
 
 ```bash
-git push origin main          # đẩy commit local lên trước (nếu key có quyền write)
-git pull --no-rebase          # hợp nhất commit mới từ GitHub vào local
-git config pull.rebase false  # đặt 1 lần — pull sau này tự merge, hết hỏi
+git branch fix/<việc>         # giữ các commit local vào nhánh mới
+git checkout fix/<việc>
+git push -u origin fix/<việc>
+gh pr create --base main --head fix/<việc>
 ```
+
+Sau khi PR merge, đồng bộ `main` bằng `git fetch origin && git checkout main &&
+git pull --ff-only`. Nếu `main` local vẫn lệch (còn commit cũ chưa vào PR) →
+dừng, nhờ người dùng xử lý — **không** `reset --hard`/rebase `main`.
 
 Nếu push bị chặn vì lý do số 2 dưới đây → xử lý số 2 trước rồi quay lại.
 
@@ -693,7 +700,8 @@ phải restart vì Convex).
 ## Checklist nhanh
 
 - [ ] `sh ./scripts/setup-vps-agent.sh` chạy xong không lỗi
-- [ ] OpenCode cho phép `git commit` + `git push` (vẫn chặn reset/rebase)
+- [ ] OpenCode cho phép `git commit` + `git push` nhánh + `gh pr create/merge`
+      (vẫn chặn push thẳng `main`, reset/rebase `main`)
 - [ ] `/models` trong OpenCode thấy DeepSeek v4.1 Flash (Kiira)
 - [ ] Agent trả lời được câu hỏi về code (key hoạt động)
 - [ ] `bot/.env` có `KIRA_API_KEY` nếu muốn bot dùng chung

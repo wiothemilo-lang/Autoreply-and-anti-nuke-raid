@@ -268,7 +268,7 @@ gật "ok").
 | Bot gọi Convex lỗi tên hàm                  | Đổi tên function mà quên 1 phía                                           | `node scripts/check-convex-contract.cjs`                                                                       |
 | `df -h` gần đầy                             | Log pm2 / backup phình                                                    | `pm2 flush`; dọn backup cũ; xem `du -sh`                                                                       |
 | Port `8787` bận                             | 2 proxy chạy song song                                                    | `tmux kill-session -t kiira 2>/dev/null \|\| true` rồi `systemctl restart kiira-retry-proxy` → kiểm `__health` |
-| `git pull` "divergent branches"             | VPS có commit riêng, GitHub cũng có commit mới                            | `git push origin main` → `git pull --no-rebase` → `git config pull.rebase false`                               |
+| `git pull` "divergent branches"             | Có commit đi thẳng `main` (không còn được phép)                           | Giữ commit vào nhánh `fix/…` → push nhánh → mở PR; đồng bộ `main` sau merge — không reset/rebase `main`        |
 | `git push` "key marked as read only"        | Deploy key chưa bật ghi                                                   | GitHub → repo → Settings → Deploy keys → tick **Allow write access**                                           |
 
 ---

@@ -158,7 +158,7 @@ const CONTRACT_REMINDER = [
   `- Xong việc = test xanh toàn bộ (hiện ${CONTRACT_SUITES} suites — khớp AGENTS.md; thêm/xoá suite phải sửa CẢ HAI) + typecheck + lint XANH, chưa chạy thật thì không claim xanh`,
   "- Không đọc secret (.env/.bot-key/key) — cần thì hỏi người dùng; kể cả qua hạ tầng: systemctl cat/show, docker inspect/exec, /proc/*/environ, printenv đều cấm",
   "- Hạ tầng VPS 3 vùng: 🟢 TỰ LÀM — chẩn đoán (systemctl status, journalctl, docker ps/logs, df, free) + sửa rồi tự restart kiira-retry-proxy + curl /__health thấy ok:true; restart bot `pm2 restart protogon-bot` và deploy `npx convex deploy` CHỈ sau khi pull + kiểm chứng đủ 4 lớp xanh (guardrail tự mở cổng 15 phút) — sau restart bot phải pm2 status online + logs không crash; thiếu CONVEX_DEPLOY_KEY → nhờ người dùng export, không in key; 🟡 IN LỆNH nhờ người dùng — docker restart, dịch vụ khác; 🔴 CẤM — ufw/iptables, reboot, prune",
-  "- Được git add + commit + push origin main (tiếng Việt, footer 🤖 Generated with OpenCode) — push CHỈ sau khi cả 3 kiểm chứng XANH trong phiên",
+  "- Được git add + commit + push NHÁNH RIÊNG + mở PR (tiếng Việt, footer 🤖 Generated with OpenCode) — push CHỈ sau khi cả 3 kiểm chứng XANH trong phiên; merge `--rebase` khi CI xanh + MERGEABLE/CLEAN; KHÔNG push thẳng `main`",
   "- Bug thuộc engine đã có test → bắt buộc thêm test chặn tái diễn",
   "- Đổi tên/di chuyển function Convex (bot gọi bằng tên chuỗi) → grep sửa cả 2 phía + chạy scripts/check-convex-contract.cjs; đụng convex/schema.ts → skill schema-migration-safety (2 client lệch pha ~1 phút)",
 ].join("\n");

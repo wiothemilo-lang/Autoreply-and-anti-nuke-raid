@@ -98,19 +98,23 @@ thôi. Khi nghi file có thể sửa dở: xem `git diff` trước khi sửa ti�
 
 Các lệnh kiểm chứng đã được allow sẵn trong `opencode.json` — chạy thẳng, không cần hỏi.
 
-### Pha 5 — BÁO CÁO + COMMIT
+### Pha 5 — BÁO CÁO + COMMIT + PR
 
 1. Báo cáo ngắn gọn, cấu trúc: **đã làm gì → kiểm chứng gì, kết quả số → việc còn lại
    (nếu có)**. Không viết văn dài; bảng khi so sánh nhiều mục.
 2. `git add` **chọn lọc đúng file thuộc việc này** + `git commit`:
    - Message **tiếng Việt**, dòng đầu ≤72 ký tự, nói rõ _vì sao_ thay vì liệt kê máy móc
    - Footer bắt buộc: `🤖 Generated with OpenCode`
-3. **Push sau khi báo cáo** — kiểm chứng xanh rồi mới đẩy. Trước push chạy
-   `git pull --no-rebase --no-edit` để lấy commit mới từ Freebuff (sandbox đẩy
-   thường xuyên; VPS không pull trước thì push bị "fetch first" — đã xảy ra 2
-   lần 19/09/2026). Rồi `git push origin main`. Lỗi xác thực/thiếu quyền → in
-   lệnh, nhờ người dùng tự chạy (Freebuff quản lý credential git, agent không
-   tự cấu hình).
+3. **Không push thẳng `main`** — mọi thay đổi đi qua PR, merge bằng rebase:
+   - Tạo nhánh từ `main`: `git checkout -b fix/…` (hoặc `feat/…`, `chore/…`)
+   - Push nhánh: `git push -u origin <nhánh>`
+   - Mở PR: `gh pr create --base main --head <nhánh>` — body ghi **vì sao** +
+     kiểm chứng. Môi trường không có `gh` → in link tạo PR cho người dùng.
+   - Chờ CI xanh + `MERGEABLE/CLEAN` → `gh pr merge <số> --rebase --delete-branch`
+   - Về `main`: `git checkout main && git pull --ff-only`
+   - Dependabot PR: merge trực tiếp khi xanh, không cần nhánh riêng.
+   - Lỗi xác thực/thiếu quyền → in lệnh, nhờ người dùng tự chạy (Freebuff quản
+     lý credential git, agent không tự cấu hình).
 
 ## 2. Điều khoản cứng — TUYỆT ĐỐI KHÔNG
 
@@ -118,12 +122,14 @@ Các lệnh kiểm chứng đã được allow sẵn trong `opencode.json` — c
    Permission trong `opencode.json` đã chặn. Nếu thấy cần nội dung env để trả lời →
    **dừng, hỏi người dùng**, không tìm lối tắt khác. Không bao giờ "giúp" bỏ qua
    `requireBotKeyStrict` hay cơ chế `botKey` (`convex/botAuth.ts`) — không có backdoor.
-2. **Không `reset` / `clean` / `rebase` / sửa lịch sử.** `git add` + `git commit`
-   được phép (điều khoản 5 phía trên). `git push` ĐƯỢC PHÉP **với điều kiện**:
-   đã chạy đủ bộ kiểm chứng (test + typecheck + lint) XANH trong phiên và chỉ
-   đẩy lên `main` sau khi đã báo cáo kết quả cho người dùng. Chưa kiểm chứng →
-   chưa push. Gặp lỗi xác thực khi push → in lệnh cho người dùng tự chạy,
-   không tìm lối tắt quanh credentials.
+2. **Không `reset` / `clean` / sửa lịch sử `main`.** `git add` + `git commit`
+   được phép. `git push` ĐƯỢC PHÉP **với điều kiện**: đã chạy đủ bộ kiểm chứng
+   (test + typecheck + lint) XANH trong phiên, đẩy lên **nhánh làm việc** và mở
+   PR — **KHÔNG push thẳng `main`**. Rebase **nhánh của chính mình** để cập nhật
+   `main` là được (không rebase nhánh người khác, không force-push `main`).
+   Merge vào `main` chỉ qua PR khi CI xanh + `MERGEABLE/CLEAN`. Gặp lỗi xác
+   thực khi push → in lệnh cho người dùng tự chạy, không tìm lối tắt quanh
+   credentials.
 3. **Hạ tầng VPS — 3 vùng quyền** (permission + guardrails trong repo chặn nghiêm):
 
    | Vùng             | Bao gồm                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Agent được gì                                                                                                  |

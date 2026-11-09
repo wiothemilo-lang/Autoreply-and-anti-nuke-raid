@@ -1,5 +1,15 @@
 # Nhật ký tiến trình agent
 
+## 2026-11-09 (2) — Dọn Dependabot + chốt quy trình PR + thu hẹp vụ botKeySeed
+
+- ✅ **Dependabot**: merge 12 PR (#53, #1, #9, #67, #8, #68, #70, #71, #72, #73, #75, #76); đóng #2 (nhánh không chung gốc), #14 (@types/node 26 lệch runtime 22), #4/#74 (plugin-react 6 cần Vite 7). Sửa kèm: three `outputColorSpace`, lucide 1.x bỏ brand icon → `BrandIcons` SVG nội bộ, React 19 + react-dom 19, lockfile `v1` khớp Bun 1.3.3 của CI, `ignore` major `@types/node`.
+- 🧭 **Quy trình**: chốt **nhánh → PR → merge rebase** (AGENTS.md Pha 5 + điều khoản 2 + guardrail reminder + opencode-vps-guide); cấm push thẳng `main`; rebase nhánh của chính mình thì được.
+- 🔎 **botKeySeed 06/10**: xác nhận xoay qua `botBootstrapAction:requestBotKey` (chỉ đường này ghi `lastBootstrapAt`; `setBotSecrets` không ghi) ⇒ caller có DISCORD_TOKEN + Application ID khớp. Bot thật không gọi (out.log không có bootstrap, cache vẫn 05/10). Máy dev này không phải VPS, không SSH/log tháng 10 → chưa chốt danh tính; xem mục "Đang dở" để biết log cần lấy.
+- 🛡 **Đề xuất chặn tái diễn**: `requestBotKey` từ chối xoay khi `lastHeartbeat` < 3 phút (bot thật còn sống); self-heal hợp lệ xảy ra khi heartbeat đã cũ vì bị từ chối. Chờ duyệt trước khi sửa Convex production.
+- 📁 File đụng: `AGENTS.md`, `.opencode/plugins/guardrails.js`, `docs/opencode-vps-guide.md`, `docs/vps-security-hardening.md`, `docs/agent-journal.md`.
+- 🧪 Kiểm chứng: docs-only — `format:check` + lint + CI.
+- ▶️ Tiếp theo: chờ duyệt guard heartbeat; lấy log VPS để chốt attribution; VPS cần `bun install` trong `bot/` + `pm2 restart protogon-bot`.
+
 ## 2026-11-09 — Vá 4 lỗ hổng sau review: quyền metrics, lockdown mất state, docs lệch, panel lỗi trùng
 
 - ✅ Xong: `status:getMetrics`/`getMetricsHistory` nay đòi `isBotAdminUser` (trước đó user đăng nhập bất kỳ đọc được RAM/chi phí AI) + 10 test quyền; `lockdown.js` ghi `lockPrev` xuống `bot/data/lockdown-state.json` (tmp+rename) → restart giữa lúc khoá vẫn trả đúng quyền, mất state thì GIỮ NGUYÊN overwrite thay vì set null; runner test cô lập state qua `PROTOGON_LOCKDOWN_STATE`; `test-kiira-proxy` lấy cổng động (hết đỏ giả do proxy cũ giữ 8791); bỏ câu lỗi trùng trong PanelErrorBoundary + gate X5; docs 28→29 TS suites, 6→10 CI gates, ~1→~3 phút.
@@ -1089,14 +1099,15 @@ dashboard/{AutoModPanel,WelcomePanel,WhitelistPanel,OnboardingChecklist}.tsx}`,
 
 ## Đang dở
 
-- 🔎 **Chưa tìm ra AI đã xoay `botStatus.botKeySeed` lúc 06/10 08:49:33 UTC** (gây
-  22h bot bị từ chối). `out.log` không có lượt bootstrap nào của bot hôm đó, và
-  không script nào trong repo gọi `botBootstrapAction:requestBotKey` (test đều
-  mock). Cần soát: phiên agent/sandbox nào đã chạy `bun run start` ngoài `bot/`
-  (`.bot-key` ghi theo `process.cwd()` nên chạy sai thư mục là **ghi ra chỗ khác**),
-  hoặc ai gọi thẳng action production. Nếu không tìm ra, sự cố **sẽ tái diễn** mỗi
-  lần có tác nhân xoay seed ngoài luồng — vá `isBotKeyRejection` (07/10) đã làm
-  bot **tự hồi phục** được, nhưng chưa chặn được nguyên nhân sinh ra.
+- 🔎 **botKeySeed 06/10 08:49:33 — đã thu hẹp, chưa chốt danh tính.** Xác nhận
+  xoay qua `botBootstrapAction:requestBotKey` (chỉ đường này ghi
+  `lastBootstrapAt`; `setBotSecrets` không ghi) ⇒ caller có DISCORD_TOKEN +
+  Application ID khớp. Bot thật không gọi (out.log không có bootstrap, cache
+  `bot/.bot-key` vẫn 05/10). Máy dev hiện tại không phải VPS, không SSH/log
+  tháng 10 ⇒ cần lấy từ VPS: shell history quanh 08:49, pm2/out.log xoay vòng,
+  OpenCode session storage, `.bot-key` lạ ngoài `bot/`, Convex logs (nếu còn).
+  Đề xuất chặn tái diễn: `requestBotKey` từ chối khi `lastHeartbeat` < 3 phút
+  (bot thật còn sống) — chờ duyệt trước khi sửa Convex production.
 
 - ✅ **Backlog rà soát 30/09: đã sửa xong phần bug kỹ thuật** (entry "01/10/2026 (1)").
   Còn lại các mục cần **người quyết định chính sách** trên đường raid — xem mục "Backlog"
