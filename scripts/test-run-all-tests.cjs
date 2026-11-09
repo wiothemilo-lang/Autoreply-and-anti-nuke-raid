@@ -34,7 +34,11 @@ function fixture(name, files) {
 const run = (args, env = {}) =>
   spawnSync(process.execPath, [RUNNER, ...args], {
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    // CI đặt TEST_FLAKY_STRICT=1 cho TOÀN BỘ bước test, nên fixture con cũng
+    // kế thừa nếu không chặn. Các ca "retry xanh → exit 0" sẽ đỏ oan trên CI
+    // (đã xảy ra ở PR #84). Mặc định TẮT cho fixture; ca kiểm cổng strict
+    // truyền "1" tường minh.
+    env: { ...process.env, TEST_FLAKY_STRICT: "0", ...env },
     timeout: 60_000,
   });
 const out = (r) => `${r.stdout}\n${r.stderr}`;
