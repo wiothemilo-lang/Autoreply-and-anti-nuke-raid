@@ -29,6 +29,69 @@ const MAX_CELL_CHARS = 300;
 /** Loại dữ liệu xuất được. Thêm loại mới = thêm nhánh ở `buildRows`. */
 export const EXPORT_KINDS = ["modActions", "events", "heat"] as const;
 export type ExportKind = (typeof EXPORT_KINDS)[number];
+export type ExportLang = "vi" | "en" | "de";
+
+/**
+ * Tiêu đề CSV theo ngôn ngữ dashboard. Trước đây server hardcode VI nên người
+ * dùng EN/DE nhận file tiếng Việt; ngay cả bản VI cũng lẫn "Case"/"Module".
+ * `lang` là optional ở args để web cũ (chưa cập nhật) vẫn gọi được — mặc định VI.
+ */
+const HEADERS: Record<ExportKind, Record<ExportLang, string[]>> = {
+  modActions: {
+    vi: [
+      "Thời gian (UTC+0)",
+      "Mã case",
+      "Hành động",
+      "Đối tượng",
+      "ID đối tượng",
+      "Người thực hiện",
+      "Lý do",
+      "Chi tiết",
+    ],
+    en: ["Time (UTC+0)", "Case", "Action", "Target", "Target ID", "Executor", "Reason", "Details"],
+    de: ["Zeit (UTC+0)", "Fall", "Aktion", "Ziel", "Ziel-ID", "Ausführender", "Grund", "Details"],
+  },
+  events: {
+    vi: [
+      "Thời gian (UTC+0)",
+      "Mô-đun",
+      "Hành động phát hiện",
+      "Người thực hiện",
+      "ID người thực hiện",
+      "Số lần",
+      "Ngưỡng",
+      "Cửa sổ (giây)",
+      "Hình phạt",
+    ],
+    en: [
+      "Time (UTC+0)",
+      "Module",
+      "Detected action",
+      "Executor",
+      "Executor ID",
+      "Count",
+      "Threshold",
+      "Window (seconds)",
+      "Punishment",
+    ],
+    de: [
+      "Zeit (UTC+0)",
+      "Modul",
+      "Erkannte Aktion",
+      "Ausführender",
+      "Ausführender-ID",
+      "Anzahl",
+      "Schwelle",
+      "Fenster (Sekunden)",
+      "Strafe",
+    ],
+  },
+  heat: {
+    vi: ["Thành viên", "ID", "Điểm nhiệt", "Số lần cảnh báo", "Cập nhật cuối (UTC+0)", "Ghi chú"],
+    en: ["Member", "ID", "Heat", "Warn count", "Last update (UTC+0)", "Note"],
+    de: ["Mitglied", "ID", "Hitze", "Warnungen", "Letzte Aktualisierung (UTC+0)", "Notiz"],
+  },
+};
 
 /**
  * Một ô CSV an toàn: chuẩn hoá kiểu → chuỗi, cắt độ dài, vô hiệu công thức, và
@@ -55,6 +118,7 @@ async function buildRows(
   kind: ExportKind,
   since: number,
   cap: number,
+  lang: ExportLang,
 ): Promise<{ header: string[]; rows: unknown[][]; truncated: boolean }> {
   // take(cap + 1): thêm 1 dòng chỉ để biết "còn nữa" — thiếu nó thì người dùng
   // nhận file 100 dòng và tưởng đó là toàn bộ lịch sử.
@@ -65,16 +129,7 @@ async function buildRows(
       .order("desc")
       .take(cap + 1);
     return {
-      header: [
-        "Thời gian (UTC+0)",
-        "Case",
-        "Hành động",
-        "Đối tượng",
-        "ID đối tượng",
-        "Người thực hiện",
-        "Lý do",
-        "Chi tiết",
-      ],
+      header: HEADERS.modActions[lang],
       rows: docs.map((a) => [
         new Date(a.createdAt).toISOString(),
         a.caseNumber ?? "",
@@ -96,17 +151,7 @@ async function buildRows(
       .order("desc")
       .take(cap + 1);
     return {
-      header: [
-        "Thời gian (UTC+0)",
-        "Module",
-        "Hành động phát hiện",
-        "Người thực hiện",
-        "ID người thực hiện",
-        "Số lần",
-        "Ngưỡng",
-        "Cửa sổ (giây)",
-        "Hình phạt",
-      ],
+      header: HEADERS.events[lang],
       rows: docs.map((e) => [
         new Date(e.createdAt).toISOString(),
         e.module,
@@ -129,14 +174,7 @@ async function buildRows(
     .take(cap + 1);
   const alive = docs.filter((h) => h.heat > 0 || (h.warnStrikes ?? 0) > 0);
   return {
-    header: [
-      "Thành viên",
-      "ID",
-      "Điểm nhiệt",
-      "Số lần cảnh báo",
-      "Cập nhật cuối (UTC+0)",
-      "Ghi chú",
-    ],
+    header: HEADERS.heat[lang],
     rows: alive
       .slice(0, cap)
       .map((h) => [
@@ -161,8 +199,10 @@ export const exportGuildCsv = query({
     token: v.string(),
     guildId: v.string(),
     kind: v.union(v.literal("modActions"), v.literal("events"), v.literal("heat")),
+    // Optional để web cũ (chưa deploy) vẫn gọi được trong cửa sổ lệch deploy.
+    lang: v.optional(v.union(v.literal("vi"), v.literal("en"), v.literal("de"))),
   },
-  handler: async (ctx, { token, guildId, kind }) => {
+  handler: async (ctx, { token, guildId, kind, lang }) => {
     const user = await getUserByToken(ctx, token);
     const guild = await ctx.db
       .query("guilds")
@@ -182,7 +222,7 @@ export const exportGuildCsv = query({
     // Bảng nhiệt cũng là dữ liệu, nhưng trần riêng (top N) vì một server có thể
     // có hàng nghìn dòng heat — xuất hết không giúp gì mà chỉ tốn I/O.
     const cap = kind === "heat" ? limits.heatTopRows : limits.exportRows;
-    const built = await buildRows(ctx, guildId, kind, since, cap);
+    const built = await buildRows(ctx, guildId, kind, since, cap, lang ?? "vi");
     const csv = toCsv(built.header, built.rows);
     const stamp = new Date(now).toISOString().slice(0, 10);
 

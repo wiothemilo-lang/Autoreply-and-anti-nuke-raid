@@ -194,11 +194,13 @@ export default function TicketKindsCard({
     }
   }
 
-  async function toggle(k: Kind, enabled: boolean) {
+  async function toggle(k: Kind, enabled: boolean): Promise<boolean> {
     try {
       await setKindEnabled({ token: TOKEN(), guildId: g.discordId, key: k.key, enabled });
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false;
     }
   }
 

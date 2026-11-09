@@ -106,25 +106,30 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
   const updateConfig = useMutation(api.altDetection.updateAltConfig);
 
   const [saving, setSaving] = useState(false);
+  // Slider KHÔNG ghi mutation mỗi tick: giữ giá trị nháp, chỉ commit khi thả
+  // chuột / nhả phím / blur. Trước đây mỗi pixel kéo bắn một mutation + toast,
+  // slider bị disable giữa lúc kéo và thumb giật về giá trị server cũ.
+  const [draftRisk, setDraftRisk] = useState<number | null>(null);
 
   const enabled = altConfig?.altDetectionEnabled ?? false;
   const currentPunish = altConfig?.altPunish ?? "kick";
   const maxRisk = altConfig?.altMaxRiskScore ?? 70;
   const currentVpnMode = altConfig?.altVpnMode ?? "off";
   const safeMode = altConfig?.altSafeMode ?? true;
+  const shownRisk = draftRisk ?? maxRisk;
 
-  async function toggleEnabled() {
+  async function toggleEnabled(next: boolean): Promise<boolean> {
     setSaving(true);
-    // Tính giá trị MỚI một lần: `enabled` trong closure là giá trị CŨ, dùng nó để
-    // chọn thông báo sẽ hiện "Đã tắt" ngay khi người dùng vừa bật (và ngược lại).
-    const next = !enabled;
     try {
       await updateConfig({ token, guildId, altDetectionEnabled: next });
       toast.success(next ? translate("Đã bật Alt Detection") : translate("Đã tắt Alt Detection"));
+      return true;
     } catch (e: unknown) {
       toast.error((e as Error).message);
+      return false; // Switch tự trả núm về giá trị thật
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   async function setPunish(punish: string) {
@@ -138,22 +143,30 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
       toast.success(`Da doi hinh phat thanh ${punish}`);
     } catch (e: unknown) {
       toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
-  async function setThreshold(value: number) {
+  async function commitRisk(): Promise<void> {
+    if (draftRisk === null || draftRisk === maxRisk) {
+      setDraftRisk(null);
+      return;
+    }
+    const value = draftRisk;
     setSaving(true);
     try {
       await updateConfig({ token, guildId, altMaxRiskScore: value });
       toast.success(`Nguong rui ro: ${value}/100`);
     } catch (e: unknown) {
       toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+      setDraftRisk(null);
     }
-    setSaving(false);
   }
 
-  async function setSafeMode(v: boolean) {
+  async function setSafeMode(v: boolean): Promise<boolean> {
     setSaving(true);
     try {
       await updateConfig({ token, guildId, altSafeMode: v });
@@ -162,10 +175,13 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
           ? translate("Đã bật chế độ an toàn — chỉ phạt khi có đủ bằng chứng")
           : translate("Đã tắt chế độ an toàn — phạt theo điểm rủi ro"),
       );
+      return true;
     } catch (e: unknown) {
       toast.error((e as Error).message);
+      return false;
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   async function setVpnMode(mode: string) {
@@ -274,16 +290,19 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block">
               {translate("Ngưỡng rủi ro:")} {""}
-              <span className="text-primary font-bold">{maxRisk}/100</span>
+              <span className="text-primary font-bold">{shownRisk}/100</span>
             </label>
             <input
               type="range"
               min={10}
               max={100}
-              value={maxRisk}
-              onChange={(e) => setThreshold(parseInt(e.target.value))}
+              value={shownRisk}
+              onChange={(e) => setDraftRisk(Number(e.target.value))}
+              onPointerUp={commitRisk}
+              onKeyUp={commitRisk}
+              onBlur={commitRisk}
               className="w-full accent-primary"
-              disabled={saving}
+              disabled={saving && draftRisk === null}
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>{translate("10 (nghiêm ngặt)")}</span>

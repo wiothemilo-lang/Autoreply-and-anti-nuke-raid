@@ -562,7 +562,10 @@ export default function HaimiyaChat({
                       ))}
                     </div>
                   )}
-                  {translate(m.text)}
+                  {/* Chỉ dịch câu trả lời của bot. Nội dung người dùng gõ phải
+                      giữ NGUYÊN VĂN — translate() là gettext key, câu VI trùng
+                      key sẽ bị đổi thành EN trên bong bóng user. */}
+                  {m.role === "user" ? m.text : translate(m.text)}
                   {m.suggestions && i === messages.length - 1 && !typing && (
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
                       {m.suggestions.map((s) => (

@@ -114,17 +114,19 @@ export default function ModerationPanel({ data }: { data: GuildData }) {
     module: string,
     patch: Partial<Omit<ModuleConfig, "module">>,
     successMsg?: string,
-  ) {
+  ): Promise<boolean> {
     try {
       await updateModule({ token: TOKEN(), guildId: data.guild.discordId, module, ...patch });
       if (successMsg) toast.success(successMsg);
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false; // Switch tự trả núm về giá trị thật
     }
   }
 
   /** Cổng RIÊNG của tab Auto-mod: tắt chống nuke không tắt bộ lọc nội dung nữa. */
-  async function toggleAutomod(enabled: boolean) {
+  async function toggleAutomod(enabled: boolean): Promise<boolean> {
     try {
       await setAutomod({ token: TOKEN(), guildId: data.guild.discordId, enabled });
       toast.success(
@@ -132,8 +134,10 @@ export default function ModerationPanel({ data }: { data: GuildData }) {
           ? translate("Đã bật toàn bộ auto-mod nội dung")
           : translate("Đã tắt toàn bộ auto-mod nội dung"),
       );
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      return false;
     }
   }
 

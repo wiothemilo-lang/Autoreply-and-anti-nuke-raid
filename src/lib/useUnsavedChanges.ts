@@ -29,6 +29,19 @@ export function hasUnsavedChanges(): boolean {
   return dirtyPanels.size > 0;
 }
 
+/**
+ * Quyết định có chặn điều hướng SPA không (tách thuần để test được).
+ * Chỉ chặn khi CÓ thay đổi chưa lưu VÀ đổi pathname — đổi query/hash trong
+ * cùng trang (ví dụ mở tab con) không làm mất form.
+ */
+export function shouldBlockNavigation(
+  dirty: boolean,
+  currentPathname: string,
+  nextPathname: string,
+): boolean {
+  return dirty && currentPathname !== nextPathname;
+}
+
 /** Danh sách panel đang chờ lưu (để hiện thông báo cho đúng tên). */
 export function unsavedPanelIds(): string[] {
   return [...dirtyPanels];
@@ -37,10 +50,10 @@ export function unsavedPanelIds(): string[] {
 /**
  * Chặn RỜI TRANG khi còn thay đổi chưa lưu.
  *
- * Chỉ canh `beforeunload` (đóng tab / đổi trang / nút Back của trình duyệt).
- * Việc bấm sang panel khác trong cùng trang do `GuildPage` gọi `confirmLeave()`
- * — trình duyệt không bắt được thao tác đó, và chỉ dùng `window.confirm` ở
- * đúng chỗ thì mới hỏi được (bấm nhầm tab là hành vi phổ biến hơn đóng tab).
+ * Hook canh `beforeunload` (đóng tab / reload / Back của trình duyệt). Điều
+ * hướng SPA (Link, navigate, palette) do `GuildPage` chặn bằng `useBlocker` +
+ * `shouldBlockNavigation`; bấm sang panel khác trong cùng trang do `goToSection`
+ * gọi `confirmLeave()`. Ba lớp này phủ hết đường làm mất bản nháp.
  */
 export function useUnsavedChanges(panelId: string, dirty: boolean): void {
   useEffect(() => {

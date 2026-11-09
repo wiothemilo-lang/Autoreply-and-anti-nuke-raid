@@ -93,7 +93,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
     .filter((r) => r.name !== "@everyone")
     .map((r) => ({ value: r.roleId, label: r.name }));
 
-  async function toggleDailyReport(v: boolean) {
+  async function toggleDailyReport(v: boolean): Promise<boolean> {
     try {
       await updateSettings({
         token: TOKEN(),
@@ -103,12 +103,14 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
       toast.success(
         v ? translate("Đã bật báo cáo hàng ngày") : translate("Đã tắt báo cáo hàng ngày"),
       );
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false;
     }
   }
 
-  async function toggleEmergencyAlert(v: boolean) {
+  async function toggleEmergencyAlert(v: boolean): Promise<boolean> {
     try {
       await updateSettings({
         token: TOKEN(),
@@ -116,8 +118,10 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
         emergencyAlertEnabled: v,
       });
       toast.success(v ? translate("Đã bật cảnh báo khẩn") : translate("Đã tắt cảnh báo khẩn"));
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false;
     }
   }
 
@@ -136,7 +140,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
     }
   }
 
-  async function togglePingEveryone(v: boolean) {
+  async function togglePingEveryone(v: boolean): Promise<boolean> {
     try {
       await updateSettings({
         token: TOKEN(),
@@ -144,8 +148,10 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
         logPingEveryone: v,
       });
       toast.success(v ? translate("Đã bật ping @everyone") : translate("Đã tắt ping @everyone"));
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false;
     }
   }
 
@@ -181,6 +187,10 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
         modLogChannelId: modLogChannelId === "none" ? "" : modLogChannelId,
         modRoles,
         adminRoles,
+        // 2 field này nằm trong cùng tab Cơ bản và đã được tính vào `dirty`,
+        // nhưng trước đây nút "Lưu cài đặt" bỏ sót → báo đã lưu mà DB không đổi.
+        reportMinIntervalMin,
+        reportMinEvents,
       });
       toast.success(translate("Đã lưu cài đặt, bot áp dụng trong khoảng 3 phút"));
     } catch (e) {

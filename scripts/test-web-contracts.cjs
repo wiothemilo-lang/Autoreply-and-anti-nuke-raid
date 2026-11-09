@@ -1870,11 +1870,15 @@ const toggleFn = altPanelSrc.slice(
   altPanelSrc.indexOf("async function setPunish"),
 );
 check(
-  "AltDetectionPanel.toggleEnabled: thông báo và giá trị ghi cùng dùng `next` (không dùng closure cũ)",
-  /const next = !enabled;/.test(toggleFn) &&
+  "AltDetectionPanel.toggleEnabled: nhận `next` từ Switch, thông báo + ghi cùng giá trị (không closure cũ)",
+  /async function toggleEnabled\(next: boolean\)/.test(toggleFn) &&
     /altDetectionEnabled: next/.test(toggleFn) &&
     /next \? translate\("Đã bật Alt Detection"\)/.test(toggleFn) &&
-    !/\benabled \? translate\(/.test(toggleFn),
+    !/const next = !enabled;/.test(toggleFn),
+);
+check(
+  "AltDetectionPanel.toggleEnabled trả false khi lưu lỗi (Switch tự trả núm về)",
+  /return true;/.test(toggleFn) && /return false;/.test(toggleFn),
 );
 
 // Chunk bị xoá sau deploy: main.tsx phải gắn bộ tự tải lại (lib/staleChunk.ts).
@@ -3088,6 +3092,78 @@ check(
   /elapsedMs:\s*Date\.now\(\)\s*-\s*mountedAt\.current/.test(
     files.get("pages/FeedbackPage.tsx") ?? "",
   ),
+);
+
+// ─── Q. Đợt D (09/11/2026): lỗi "báo thành công nhưng không lưu" ────────────
+// Nhóm bug cùng lớp: UI nói đã lưu trong khi mutation từ chối / field không
+// được gửi / trạng thái công tắc không được trả về. Test khoá đúng hành vi
+// nguồn để không tái diễn khi refactor panel.
+const switchSrc = files.get("components/ui/switch.tsx") ?? "";
+check(
+  "Switch coi handler trả `false` là lưu thất bại (không chỉ Promise reject)",
+  /result === false/.test(switchSrc) && /if \(ok === false\) syncFromProp\(\)/.test(switchSrc),
+);
+
+const settingsSaveFn = settings.slice(
+  settings.indexOf("async function handleSave"),
+  settings.indexOf("const handleExportConfig"),
+);
+check(
+  "SettingsPanel.handleSave gửi reportMinIntervalMin + reportMinEvents (dirty có mà payload thiếu)",
+  /reportMinIntervalMin/.test(settingsSaveFn) && /reportMinEvents/.test(settingsSaveFn),
+);
+
+check(
+  "Dashboard.applyBatch kiểm res.ok trước khi toast thành công",
+  /if \(!res\?\.ok\)/.test(dashboardSrc) && /Phiên đăng nhập đã hết hạn/.test(dashboardSrc),
+);
+check(
+  "Dashboard.applyBatch không xoá lựa chọn khi done === 0",
+  /if \(done === 0\)/.test(dashboardSrc) && /Không server nào được cập nhật/.test(dashboardSrc),
+);
+
+const incidentsSrc = files.get("pages/GuildIncidents.tsx") ?? "";
+check(
+  "GuildIncidents kiểm res.ok và toast lỗi (không im lặng khi mutation từ chối)",
+  /if \(!res\?\.ok\)/.test(incidentsSrc) && /toast\.error/.test(incidentsSrc),
+);
+
+const sheetSrc = files.get("components/MobilePanelSheet.tsx") ?? "";
+check(
+  "MobilePanelSheet bỏ qua Escape đã bị Select/Dialog con preventDefault",
+  /e\.defaultPrevented/.test(sheetSrc),
+);
+
+check(
+  "AltDetection slider giữ draft + chỉ commit khi thả chuột/nhả phím/blur",
+  /setDraftRisk/.test(altPanelSrc) &&
+    /onPointerUp=\{commitRisk\}/.test(altPanelSrc) &&
+    /onKeyUp=\{commitRisk\}/.test(altPanelSrc) &&
+    !/onChange=\{\(e\) => setThreshold/.test(altPanelSrc),
+);
+check(
+  "useBotMonitor luôn đăng ký visibilitychange (mount lúc tab ẩn vẫn resume được)",
+  /document\.addEventListener\("visibilitychange", start\)/.test(monitorSrc) &&
+    /if \(!document\.hidden\) void tick\(\)/.test(monitorSrc),
+);
+
+check(
+  "HaimiyaChat chỉ dịch bong bóng bot, giữ nguyên văn nội dung người dùng",
+  /m\.role === "user" \? m\.text : translate\(m\.text\)/.test(haimiyaChat),
+);
+
+const dataExportSrc = fs.readFileSync(path.join(ROOT, "convex", "dataExport.ts"), "utf8");
+check(
+  "CSV header theo ngôn ngữ dashboard (không hardcode VI cho mọi người dùng)",
+  /HEADERS\.modActions\[lang\]/.test(dataExportSrc) &&
+    /HEADERS\.events\[lang\]/.test(dataExportSrc) &&
+    /HEADERS\.heat\[lang\]/.test(dataExportSrc) &&
+    /lang: v\.optional\(v\.union\(v\.literal\("vi"\)/.test(dataExportSrc),
+);
+const csvBtnSrc = files.get("components/dashboard/ExportCsvButton.tsx") ?? "";
+check(
+  "ExportCsvButton dịch nhãn + gửi lang hiện tại lên server",
+  /translate\(KIND_LABEL\[kind\]\)/.test(csvBtnSrc) && /lang: currentLanguage\(\)/.test(csvBtnSrc),
 );
 
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);

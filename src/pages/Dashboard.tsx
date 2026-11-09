@@ -78,8 +78,18 @@ export default function Dashboard() {
     setBatchBusy(true);
     try {
       const res = await setAntinukeBatch({ token, guildIds: selected, enabled });
-      const done = res?.done ?? 0;
-      const skipped = res?.skipped ?? 0;
+      // Mutation báo từ chối bằng { ok:false } (token hết hạn / mất quyền),
+      // KHÔNG throw — trước đây client vẫn toast thành công "cho 0 server".
+      if (!res?.ok) {
+        toast.error(translate("Phiên đăng nhập đã hết hạn — đăng nhập lại rồi thử lại"));
+        return;
+      }
+      const done = res.done ?? 0;
+      const skipped = res.skipped ?? 0;
+      if (done === 0) {
+        toast.error(translate("Không server nào được cập nhật — thử lại"));
+        return; // giữ lựa chọn để người dùng bấm lại, không xoá oan
+      }
       toast.success(
         enabled
           ? translate("Đã bật chống nuke cho {p0} server", { p0: done })

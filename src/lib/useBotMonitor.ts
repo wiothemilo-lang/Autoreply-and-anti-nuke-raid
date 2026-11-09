@@ -135,22 +135,23 @@ export function useBotMonitor(intervalMs = 5000): BotMonitor {
   }, []);
 
   useEffect(() => {
-    void tick();
-    // Chỉ đo khi tab ĐANG hiển thị — tab ẩn (người dùng chuyển app trên điện
-    // thoại) thì dừng vòng đo, tránh đốt hạn mức Convex vô ích.
-    if (document.hidden) return;
-    timerRef.current = window.setInterval(() => void tick(), effectiveInterval);
-    const onVisible = () => {
+    // LUÔN đăng ký listener TRƯỚC khi kiểm document.hidden. Bản cũ return sớm
+    // khi mount lúc tab ẩn → không có listener → hiện lại tab cũng không resume
+    // (latency kẹt null). Đồng thời guard cả trong callback interval để một
+    // visibilitychange bị lỡ không làm poll tiếp khi tab ẩn.
+    const start = () => {
       window.clearInterval(timerRef.current);
-      if (!document.hidden) {
-        void tick();
-        timerRef.current = window.setInterval(() => void tick(), effectiveInterval);
-      }
+      if (document.hidden) return;
+      void tick();
+      timerRef.current = window.setInterval(() => {
+        if (!document.hidden) void tick();
+      }, effectiveInterval);
     };
-    document.addEventListener("visibilitychange", onVisible);
+    start();
+    document.addEventListener("visibilitychange", start);
     return () => {
       window.clearInterval(timerRef.current);
-      document.removeEventListener("visibilitychange", onVisible);
+      document.removeEventListener("visibilitychange", start);
     };
   }, [tick, effectiveInterval, nonce]);
 
