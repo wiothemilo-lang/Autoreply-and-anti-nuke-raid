@@ -31,6 +31,8 @@ import { exportGuildCsv } from "../convex/dataExport";
 import { heatLeaderboard } from "../convex/reports";
 import { getGuild } from "../convex/guilds";
 import { setRetention } from "../convex/backup";
+import { botSetBackupRetentionHandler } from "../convex/bot_writes/backup";
+import { computeBotKey } from "../convex/botAuth";
 import { importGuildConfigHandler } from "../convex/guilds/configPortability";
 import { CURRENT_SESSION_AUTH_VERSION } from "../convex/auth";
 
@@ -359,6 +361,39 @@ async function run() {
       res?.ok === true &&
         tables.guilds[0].backupKeepCount === 50 &&
         tables.guilds[0].backupKeepDays === 365,
+      res,
+    );
+  }
+
+  console.log("── 5b. Đường BOT cũng phải áp hạn mức gói ──");
+  {
+    // Trước đây `!backup keep 50 365` đi thẳng botSetBackupRetentionHandler và
+    // chỉ kẹp trần cứng → guild Miễn phí vượt ngân sách storage 0.5 GB.
+    const BOT_KEY = "khoa-bot-32-bytes-cho-test-plans";
+    const botStatus = [{ _id: "bot-status", kind: "status", botKeySeed: computeBotKey(BOT_KEY) }];
+    await expectThrow(
+      "bot: guild Miễn phí giữ 10 bản bị chặn (không lách qua lệnh backup)",
+      () =>
+        botSetBackupRetentionHandler(makeCtx({ ...seed(), botStatus }), {
+          guildId: GUILD,
+          keepCount: 10,
+          keepDays: 0,
+          botKey: BOT_KEY,
+        }),
+      /Gói Miễn phí cho tối đa 3 bản backup giữ lại/,
+    );
+    const tables = { ...seed({ entitlements: [activeEnt("supporter")] }), botStatus };
+    const res = await botSetBackupRetentionHandler(makeCtx(tables), {
+      guildId: GUILD,
+      keepCount: 10,
+      keepDays: 30,
+      botKey: BOT_KEY,
+    });
+    check(
+      "bot: guild Đồng hành lưu được 10 bản / 30 ngày",
+      res?.ok === true &&
+        tables.guilds[0].backupKeepCount === 10 &&
+        tables.guilds[0].backupKeepDays === 30,
       res,
     );
   }

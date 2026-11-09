@@ -1198,8 +1198,17 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     // Đường đi thật của người dùng: gõ lệnh → handler gọi mutation → guild lưu
     // quy tắc → lần backup sau TỰ DỌN theo đúng quy tắc đó. Test này nối hết
     // bằng handler thật + ctx giả, nên lệch ở khâu nào cũng đỏ ngay.
-    const { ctx, guildRows, backupRows } = makeCtx({ seed: BOT_KEY });
+    const { ctx, guildRows, backupRows, entitlementRows } = makeCtx({ seed: BOT_KEY });
     guildRows.push({ _id: "gslash", discordId: "g-slash", name: "Server" });
+    // 2 bản / 30 ngày vượt hạn mức gói Miễn phí (3 bản / 7 ngày) — server phải
+    // đang ở gói Đồng hành mới đặt được quy tắc này.
+    entitlementRows.push({
+      _id: "e-slash",
+      guildId: "g-slash",
+      plan: "supporter",
+      startsAt: Date.now() - 86_400_000,
+      expiresAt: Date.now() + 30 * 86_400_000,
+    });
     const t0 = Date.now();
     for (let i = 0; i < 4; i++) {
       backupRows.push({

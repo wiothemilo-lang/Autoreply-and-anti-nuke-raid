@@ -350,6 +350,9 @@ export const getGuild = query({
         punish: m.punish,
         actions: m.actions && m.actions.length > 0 ? m.actions : [m.punish],
         whitelistRoles: m.whitelistRoles,
+        // Dashboard đọc + bot đọc `timeoutSeconds` (enforce/filters); thiếu ở
+        // projection thì giá trị admin đặt bị mất, bot luôn timeout 300s.
+        timeoutSeconds: m.timeoutSeconds ?? 300,
         heat: m.heat ?? MODULE_HEAT_DEFAULTS[m.module] ?? 10,
       })),
       channels: channels.map((c) => ({
@@ -505,6 +508,9 @@ export const getBotConfig = query({
       }));
     return {
       prefix: guild.prefix,
+      // Bot đọc `guildConfig.logLang` để dịch nhãn case log; thiếu field này
+      // thì dashboard lưu EN/DE xong log vẫn ra tiếng Việt.
+      logLang: guild.logLang ?? "vi",
       logChannelId: guild.logChannelId ?? null,
       modLogChannelId: guild.modLogChannelId ?? null,
       punishNoticeChannelId: guild.punishNoticeChannelId ?? null,
@@ -694,6 +700,9 @@ export const getBotConfig = query({
         punish: m.punish,
         actions: m.actions && m.actions.length > 0 ? m.actions : [m.punish],
         whitelistRoles: m.whitelistRoles,
+        // Dashboard đọc + bot đọc `timeoutSeconds` (enforce/filters); thiếu ở
+        // projection thì giá trị admin đặt bị mất, bot luôn timeout 300s.
+        timeoutSeconds: m.timeoutSeconds ?? 300,
         heat: m.heat ?? MODULE_HEAT_DEFAULTS[m.module] ?? 10,
       })),
     };

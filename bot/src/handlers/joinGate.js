@@ -232,49 +232,17 @@ module.exports = async function joinGate(client, member, store) {
       console.log(
         `[burst] ${member.guild.name}: BURST DETECTED! ${burst.count} joins, avg risk ${burst.avgRisk}`,
       );
-      // Auto-lockdown: lock all text channels if not already locked
+      // Auto-lockdown: dùng CHUNG lockGuild() để chụp quyền trước khi khoá.
+      // Trước đây nhánh này tự sửa permissionOverwrites + markLocked() nên
+      // không có lockPrev; unlockGuild() thấy thiếu ảnh chụp thì GIỮ NGUYÊN
+      // overwrite (đúng nguyên tắc an toàn) ⇒ kênh bị mute vĩnh viễn dù đã
+      // hết lockdownMinutes.
       try {
-        const { isLocked, markLocked } = require("../lockdown");
-        if (!isLocked(member.guild.id)) {
-          markLocked(member.guild.id);
-          // Lock all text channels
-          for (const [, ch] of member.guild.channels.cache) {
-            if (ch.isTextBased() && !ch.isThread()) {
-              try {
-                await ch.permissionOverwrites.edit(
-                  member.guild.id,
-                  { SendMessages: false },
-                  "Protogon Auto-Lockdown: burst alt detection",
-                );
-              } catch {}
-            }
-          }
-          // Đặt hạn mở khóa TRÊN CONVEX (botLockState) — trước đây chỉ gọi
-          // botUpdateLockdown (bật cờ tính năng) nên lockdownUntil không bao
-          // giờ được ghi: tickUnlocks chỉ mở khi lockdownRequested hoặc hết hạn
-          // → server bị khóa kênh VĨNH VIỄN cho tới khi mod tự /antinuke unlock.
-          // Phút phút = cấu hình lockdownMinutes (mặc định 5, trần 120) khớp
-          // trần validation botUpdateLockdown của Convex.
-          const lockMinutes = Math.max(1, Math.min(120, config.lockdownMinutes || 5));
-          await store.client
-            .mutation("bot_writes:botLockState", {
-              guildId: member.guild.id,
-              until: Date.now() + lockMinutes * 60_000,
-            })
-            .catch(() => {});
-          // Update config for auto-unlock
-          await store.client
-            .mutation("bot_writes:botUpdateLockdown", {
-              guildId: member.guild.id,
-              enabled: true,
-            })
-            .catch(() => {});
-          // Cache config xóa tự động sau 2 lượt ghi trên (convex.js). Bắt buộc
-          // đúng ở đây: `tickUnlocks` đọc `lockdownUntil` từ cache để mở khóa
-          // đúng hạn — cache cũ (until = null) làm server bị khóa lâu hơn
-          // lockMinutes đã hứa tới khi TTL 30 phút hết.
-
-          // Notify log channel
+        const { lockGuild } = require("../lockdown");
+        const applied = await lockGuild(store.client, member.guild, config, store);
+        if (applied) {
+          // Notify log channel — embed chi tiết burst (lockGuild đã gửi embed
+          // khoá chung kèm số kênh).
           const config2 = await store.getConfig(member.guild.id).catch(() => null);
           if (config2) {
             const { logEmbed, sendLog } = require("../util");

@@ -352,6 +352,27 @@ const sweepFn = () => calls.sweeps.get("interactionVerify").fn();
     await verify.handleVerifyConfirm(mkStore({ verifyEnabled: false }), inter);
     check("confirm: verify tắt → từ chối", /đã bị tắt/.test(inter._replies[0].content));
 
+    // server đã chuyển sang captcha → nút verify_confirm cũ KHÔNG được cấp role
+    {
+      const m = mkMember("u-captcha");
+      inter = mkInteraction({ guild: mkGuild("g1", m), userId: "u-captcha" });
+      await verify.handleVerifyConfirm(
+        mkStore({
+          verifyEnabled: true,
+          verifyMethod: "captcha",
+          unverifiedRoleId: "r-unv",
+          verifiedRoleId: "r-ver",
+        }),
+        inter,
+      );
+      check(
+        "confirm: server dùng captcha → nút cũ bị từ chối, KHÔNG cấp role",
+        /captcha/.test(inter._replies[0].content) &&
+          m._added.length === 0 &&
+          m._removed.length === 0,
+      );
+    }
+
     // thiếu role
     inter = mkInteraction({ guild: mkGuild("g1", mkMember("u1")) });
     await verify.handleVerifyConfirm(

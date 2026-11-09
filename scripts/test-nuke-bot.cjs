@@ -140,17 +140,24 @@ console.log("=== E. Người thật giữ nguyên quyền lợi ===");
   check("E2 mod role được miễn", isExempt(mod, {}, { modRoles: ["modrole"] }));
 }
 
-console.log("=== F. Bot logging hợp pháp (theo tên) ===");
+console.log("=== F. Bot logging hợp pháp (theo tên + phải là BOT thật) ===");
 {
-  check("F1 Carl-bot nhận diện", isKnownLoggingBot({ username: "Carl-bot", tag: "Carl-bot#0001" }));
-  check("F2 MEE6 nhận diện", isKnownLoggingBot({ username: "MEE6", tag: "MEE6#4876" }));
+  check(
+    "F1 Carl-bot nhận diện",
+    isKnownLoggingBot({ username: "Carl-bot", tag: "Carl-bot#0001", bot: true }),
+  );
+  check("F2 MEE6 nhận diện", isKnownLoggingBot({ username: "MEE6", tag: "MEE6#4876", bot: true }));
   check(
     "F3 bot nuke lạ KHÔNG nhận diện",
-    !isKnownLoggingBot({ username: "FreeNitroGen", tag: "FreeNitroGen#1234" }),
+    !isKnownLoggingBot({ username: "FreeNitroGen", tag: "FreeNitroGen#1234", bot: true }),
   );
   check(
     "F4 người thật không khớp",
-    !isKnownLoggingBot({ username: "carlbotfan", tag: "carlbotfan#9999" }),
+    !isKnownLoggingBot({ username: "carlbotfan", tag: "carlbotfan#9999", bot: false }),
+  );
+  check(
+    "F5 user mạo danh tên bot KHÔNG được miễn",
+    !isKnownLoggingBot({ username: "Carl-bot", tag: "Carl-bot#0001", bot: false }),
   );
 }
 

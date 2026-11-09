@@ -469,7 +469,7 @@ module.exports = {
     configs.set(gid, baseConfig());
     client.guilds.cache.set(gid, guild);
     const entry = {
-      executor: makeExecutorUser("carl-1", { username: "Carl-bot" }),
+      executor: makeExecutorUser("carl-1", { username: "Carl-bot", bot: true }),
       target: { id: "v" },
       changes: [],
     };
@@ -479,6 +479,28 @@ module.exports = {
     check(
       "Carl-bot ban bot spam → không bị coi là nuke",
       calls.memberBans.length === 0 && calls.events.length === 0,
+    );
+  }
+
+  // ── 3b. USER đổi tên thành "Carl-bot" KHÔNG được miễn — chỉ miễn BOT thật ──
+  {
+    clear();
+    const gid = "g-carl-fake";
+    const guild = makeGuild(gid, []);
+    configs.set(gid, baseConfig());
+    client.guilds.cache.set(gid, guild);
+    const entry = {
+      executor: makeExecutorUser("fake-carl", { username: "Carl-bot", bot: false }),
+      target: { id: "v" },
+      changes: [],
+    };
+    for (let i = 0; i < 3; i++) {
+      await audit.handleAuditEntry(entry, guild, "massBan", "x");
+    }
+    check(
+      "user mạo danh Carl-bot → VẪN bị xử lý (không miễn theo tên)",
+      calls.memberBans.includes("fake-carl") || calls.events.some((e) => e.module === "massBan"),
+      JSON.stringify({ bans: calls.memberBans, events: calls.events.length }),
     );
   }
 
@@ -1072,16 +1094,16 @@ module.exports = {
       _exec: executor,
     });
     // auditExecutor dùng auditLookup — nạp executor qua fetchAuditLogs
-    const setExec = (id) => {
+    const setExec = (id, bot = false) => {
       guild.fetchAuditLogs = async () => ({
         entries: {
-          first: () => ({ id: "e1", executor: { id, username: id } }),
-          find: () => ({ id: "e1", executor: { id, username: id } }),
+          first: () => ({ id: "e1", executor: { id, username: id, bot } }),
+          find: () => ({ id: "e1", executor: { id, username: id, bot } }),
         },
       });
     };
-    const run = async (id) => {
-      setExec(id);
+    const run = async (id, bot = false) => {
+      setExec(id, bot);
       await audit.handleAttributeEvent(mk());
       await new Promise((r) => setImmediate(r));
     };
@@ -1091,8 +1113,8 @@ module.exports = {
     // Whitelist toàn cục
     await run("white-1");
     check("attr: whitelist toàn cục → bỏ qua", calls.events.length === 0);
-    // Bot logging hợp pháp
-    await run("carl-bot-x");
+    // Bot logging hợp pháp (phải là BOT thật + đúng tên trong danh sách)
+    await run("Carl-bot", true);
     check("attr: bot logging (Carl-bot) → bỏ qua", calls.events.length === 0);
     // Không tra được executor → im lặng, không vỡ
     guild.fetchAuditLogs = async () => ({ entries: { first: () => null, find: () => null } });
