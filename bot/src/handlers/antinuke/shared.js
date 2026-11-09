@@ -63,6 +63,10 @@ const KNOWN_LOGGING_BOTS = [
 ];
 
 function isKnownLoggingBot(executor) {
+  // CHỈ miễn trừ BOT thật. Trước đây chỉ so tên nên người dùng đổi username
+  // thành "Carl-bot"/"Wick" là được bỏ qua TOÀN BỘ module nuke (mass ban,
+  // mass channel delete…). Audit log trả executor là User có cờ `bot`.
+  if (executor?.bot !== true) return false;
   // Chuẩn hóa: lowercase + bỏ dấu ngăn cách (-, _, space) rồi so CHÍNH XÁC —
   // so khớp includes trước đây bị lách bằng tên giả "carlbotfan"/"freecarlbot"
   // (bot nuke mượn tên bot logging để được bỏ qua toàn bộ anti-nuke).

@@ -74,11 +74,24 @@ function status(over: Partial<Status>): Status {
     const { ctx, mutations } = makeCtx(status({ lastHeartbeat: Date.now() - 30_000 }));
     const res: any = await handler(ctx, { botToken: "token-that" });
     check(
-      "heartbeat mới (< 3 phút) → từ chối xoay seed",
+      "heartbeat mới (< 2 nhịp sync) → từ chối xoay seed",
       res?.ok === false && String(res?.error ?? "").includes("heartbeat"),
       JSON.stringify(res),
     );
     check("lượt bị chặn KHÔNG gọi markBootstrapAttempt/storeBotKeySeed", mutations.length === 0);
+  }
+
+  // 1b. BIÊN quan trọng: nhịp sync là 180 giây, guard cũ 3 phút = đúng một
+  // nhịp nên ngay trước mỗi nhịp (181 giây) lại mở — đúng lúc cần chặn.
+  {
+    mockFetch(true);
+    const { ctx } = makeCtx(status({ lastHeartbeat: Date.now() - 181_000 }));
+    const res: any = await handler(ctx, { botToken: "token-that" });
+    check(
+      "heartbeat 181 giây (quá 3 phút cũ) → VẪN chặn",
+      res?.ok === false && String(res?.error ?? "").includes("heartbeat"),
+      JSON.stringify(res),
+    );
   }
 
   // 2. Heartbeat cũ (bot đang bị từ chối) → self-heal hợp lệ, cấp key mới.
@@ -87,7 +100,7 @@ function status(over: Partial<Status>): Status {
     const { ctx, mutations } = makeCtx(status({ lastHeartbeat: Date.now() - 10 * 60_000 }));
     const res: any = await handler(ctx, { botToken: "token-that" });
     check(
-      "heartbeat cũ (> 3 phút) → bootstrap thành công",
+      "heartbeat cũ (> 2 nhịp sync) → bootstrap thành công",
       res?.ok === true && /^[0-9a-f]{64}$/.test(String(res?.botKey ?? "")),
       JSON.stringify({ ok: res?.ok, error: res?.error }),
     );

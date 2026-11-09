@@ -8,6 +8,7 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { computeBotKey } from "./botAuth";
+import { BOT_SYNC_INTERVAL_MS } from "./heartbeat";
 
 /**
  * TỰ CẤP PHÁT CHÌA KHÓA BOT (bootstrap) — đóng cửa hậu "botKeySeed chưa đặt
@@ -84,13 +85,15 @@ const BOOTSTRAP_MAX_PER_WINDOW = 30;
 /**
  * Guard chống xoay seed ngoài luồng — sự cố 06/10: một tiến trình khác có
  * DISCORD_TOKEN gọi bootstrap trong khi bot thật đang chạy, xoay seed làm bot
- * bị từ chối 22 giờ. Heartbeat của bot được cập nhật ~60 giây/lần qua guild
- * sync. Heartbeat còn mới ⇒ bot thật đang sống ⇒ từ chối xoay.
+ * bị từ chối 22 giờ. Bot cập nhật heartbeat theo guild sync mỗi
+ * `BOT_SYNC_INTERVAL_MS` (180 giây), KHÔNG phải 60 giây. Cửa sổ phải rộng hơn
+ * một nhịp: nếu bằng đúng 180 giây, ngay trước mỗi nhịp heartbeatAge > 180s
+ * và guard lại mở — đúng lúc cần chặn.
  *
  * Self-heal hợp lệ vẫn qua được: khi bot bị từ chối botKey, call heartbeat
  * cũng bị từ chối theo, nên `lastHeartbeat` đã cũ trước khi bot gọi bootstrap.
  */
-const LIVE_HEARTBEAT_GUARD_MS = 3 * 60_000;
+const LIVE_HEARTBEAT_GUARD_MS = 2 * BOT_SYNC_INTERVAL_MS;
 
 function allowBootstrapCall(): boolean {
   const now = Date.now();

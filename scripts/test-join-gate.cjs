@@ -9,6 +9,14 @@ const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
 const Module = require("module");
 const fs = require("fs");
+const os = require("os");
+const path = require("path");
+// lockGuild() ghi ảnh chụp quyền xuống đĩa — cô lập khỏi bot/data của repo.
+const TMP_LOCK_STATE = path.join(
+  os.tmpdir(),
+  `protogon-join-gate-lockdown-${process.pid}-${Date.now()}.json`,
+);
+process.env.PROTOGON_LOCKDOWN_STATE = TMP_LOCK_STATE;
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
   if (request === "discord.js") return DJS_MOCK;
@@ -117,6 +125,8 @@ module.exports = {
       members: {
         cache,
         fetch: async (mid) => cache.get(mid) ?? null,
+        // lockGuild() kiểm quyền Manage Channels trước khi sửa overwrite.
+        fetchMe: async () => ({ permissions: { has: () => true } }),
         ban: async () => {},
       },
       roles: { cache: new Map(), everyone: { id } },
@@ -568,6 +578,7 @@ module.exports = {
     // Guild mặc định trong test dùng object nên sẽ ném TypeError, che mất phần
     // đặt hạn mở khóa trên Convex.
     const lockedChannels = [];
+    const editArgs = [];
     g.channels = {
       cache: new Map([
         [
@@ -577,8 +588,9 @@ module.exports = {
             isTextBased: () => true,
             isThread: () => false,
             permissionOverwrites: {
-              edit: async () => {
+              edit: async (_everyone, perms) => {
                 lockedChannels.push("c1");
+                editArgs.push({ id: "c1", perms });
               },
             },
           },
@@ -590,8 +602,9 @@ module.exports = {
             isTextBased: () => true,
             isThread: () => false,
             permissionOverwrites: {
-              edit: async () => {
+              edit: async (_everyone, perms) => {
                 lockedChannels.push("c2");
+                editArgs.push({ id: "c2", perms });
               },
             },
           },
@@ -665,12 +678,7 @@ module.exports = {
       !!lockState && Math.abs(lockState.args.until - wantUntil) < 5_000,
       String(lockState?.args.until),
     );
-    check(
-      "bật cờ lockdown để tickUnlocks mở đúng hạn",
-      calls.mutations.some(
-        (m) => m.name === "bot_writes:botUpdateLockdown" && m.args.enabled === true,
-      ),
-    );
+
     // Cooldown 15 phút: burst thứ 2 trong cửa sổ phải KHÔNG khoá lại.
     lockedChannels.length = 0;
     clear();
@@ -688,6 +696,18 @@ module.exports = {
       lockedChannels.length === 0 &&
         !calls.mutations.some((m) => m.name === "bot_writes:botLockState"),
       JSON.stringify(lockedChannels),
+    );
+
+    // Ảnh chụp quyền: unlockGuild phải TRẢ LẠI SendMessages (null = trước khoá
+    // không đặt) thay vì giữ deny vĩnh viễn. Đây là regression của nhánh
+    // joinGate tự sửa overwrite mà không lưu lockPrev.
+    const { unlockGuild } = require("../bot/src/lockdown");
+    editArgs.length = 0;
+    const unlocked = await unlockGuild(client, g, configs.get("g-burst"), store);
+    check(
+      "burst lockdown có ảnh chụp → unlock trả lại SendMessages",
+      unlocked === true && editArgs.some((e) => e.id === "c1" && e.perms.SendMessages === null),
+      JSON.stringify(editArgs),
     );
   }
   {
@@ -744,6 +764,8 @@ module.exports = {
     );
   }
 
+  fs.rmSync(TMP_LOCK_STATE, { force: true });
+  fs.rmSync(`${TMP_LOCK_STATE}.tmp`, { force: true });
   console.log(`\nKết quả join gate: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })();

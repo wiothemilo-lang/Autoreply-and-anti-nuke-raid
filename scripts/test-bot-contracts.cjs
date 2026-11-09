@@ -51,11 +51,23 @@ check(
 );
 
 // ─── 2. Burst auto-lockdown phải đặt hạn mở khóa trên Convex ─────────────────
+// Burst dùng CHUNG lockGuild() (lockdown.js) để có ảnh chụp quyền trước khi
+// khoá; nhánh cũ tự sửa overwrite + markLocked() nên unlock không trả quyền.
 const joinGateSrc = read("bot/src/handlers/joinGate.js");
+const lockdownSrc = read("bot/src/lockdown.js");
+const lockGuildBody = lockdownSrc.slice(
+  lockdownSrc.indexOf("async function lockGuild("),
+  lockdownSrc.indexOf("async function unlockGuild("),
+);
 check(
-  "joinGate burst lockdown gọi botLockState (ghi lockdownUntil để tickUnlocks mở được)",
-  /bot_writes:botLockState/.test(joinGateSrc),
-  "thiếu botLockState — server sẽ bị khóa kênh vĩnh viễn sau burst",
+  "joinGate burst lockdown dùng lockGuild (có ảnh chụp quyền để mở lại đúng)",
+  /require\("\.\.\/lockdown"\)/.test(joinGateSrc) && /lockGuild\(/.test(joinGateSrc),
+  "burst tự sửa overwrite — unlock sẽ giữ deny vĩnh viễn",
+);
+check(
+  "lockGuild ghi botLockState kèm until (tickUnlocks mở được đúng hạn)",
+  /bot_writes:botLockState/.test(lockGuildBody) && /\buntil\b/.test(lockGuildBody),
+  "thiếu botLockState/until — server sẽ bị khóa kênh vĩnh viễn sau burst",
 );
 // botUpdateLockdown không đặt lockdownUntil phía Convex — chỉ là cờ tính năng.
 // Đợt #5: thân hàm ở convex/bot_writes/settings.ts (wrapper giữ ở bot_writes.ts).

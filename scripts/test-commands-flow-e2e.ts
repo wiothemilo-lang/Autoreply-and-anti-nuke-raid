@@ -546,6 +546,15 @@ function newClient(extra: Row = {}) {
     // Đối xứng 2 lối vào cùng một tính năng: lệnh chat và lệnh slash phải cho
     // ra CÙNG một kết quả trong DB, và lệnh slash phải được đăng ký thật.
     const h = seed();
+    // 7 bản / 30 ngày vượt hạn mức gói Miễn phí (3 bản / 7 ngày) — đặt server ở
+    // gói Đồng hành để kiểm đúng luồng lệnh, không lẫn với cổng hạn mức.
+    h.rows("entitlements").push({
+      _id: "e-flow",
+      guildId: GID,
+      plan: "supporter",
+      startsAt: Date.now() - 86_400_000,
+      expiresAt: Date.now() + 30 * 86_400_000,
+    });
     const client = newClient();
     const store = makeStore();
     installHandlers(h);

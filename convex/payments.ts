@@ -27,6 +27,7 @@ import { canManageGuild, getUserByToken } from "./auth";
 import { requireBotAdmin } from "./hidden";
 import {
   PLAN_LABELS,
+  PLAN_ORDER,
   TERMS_VERSION,
   asPlanId,
   bestEntitlementForUser,
@@ -424,19 +425,36 @@ export const markPaidInternal = internalMutation({
       // Gói theo SERVER: cộng hạn vào entitlement của ĐÚNG server đã mua. Đơn cũ
       // (trước 08/10/2026, không có guildId) xử lý theo người như luật cũ để
       // không đụng dữ liệu đã bán.
-      const ent = row.guildId
+      //
+      // Một server có thể có NHIỀU dòng entitlement (nhiều admin cùng mua).
+      // `.first()` trước đây có thể trúng dòng đã hết hạn → applyEntitlement
+      // tính từ now và làm MẤT số ngày còn lại của dòng active khác. Chọn dòng
+      // active tốt nhất (hạng gói rồi hạn xa nhất), không có active thì chọn
+      // dòng hạn xa nhất để gia hạn thay vì tạo dòng trùng.
+      const rows = row.guildId
         ? await ctx.db
             .query("entitlements")
             .withIndex("by_guildId", (q) => q.eq("guildId", row.guildId as string))
-            .first()
+            .collect()
         : await ctx.db
             .query("entitlements")
             .withIndex("by_userId", (q) => q.eq("userId", row.userId))
-            .first();
-      const active =
-        isEntitled(ent, now) && ent
-          ? { plan: ent.plan, expiresAt: ent.expiresAt, startsAt: ent.startsAt }
-          : null;
+            .collect();
+      const activeRows = rows.filter((e) => isEntitled(e, now));
+      const bestActive =
+        activeRows.sort(
+          (a, b) =>
+            PLAN_ORDER.indexOf(asPlanId(b.plan)) - PLAN_ORDER.indexOf(asPlanId(a.plan)) ||
+            b.expiresAt - a.expiresAt,
+        )[0] ?? null;
+      const ent = bestActive ?? rows.sort((a, b) => b.expiresAt - a.expiresAt)[0] ?? null;
+      const active = bestActive
+        ? {
+            plan: bestActive.plan,
+            expiresAt: bestActive.expiresAt,
+            startsAt: bestActive.startsAt,
+          }
+        : null;
       const next = applyEntitlement(active, row.plan, now);
       if (next) {
         if (ent) {
@@ -778,9 +796,12 @@ export const grantPlan = mutation({
       .query("entitlements")
       .withIndex("by_userId", (q) => q.eq("userId", row._id))
       .collect();
+    // Cấp theo NGƯỜI (không có guildId) chỉ được chạm dòng KHÔNG gắn server.
+    // Filter `true` trước đây lấy cả dòng gắn server → admin cấp gói theo người
+    // lại gia hạn nhầm cho server, còn người dùng không có quyền lợi cá nhân.
     const ent =
       rows
-        .filter((e) => (guild ? e.guildId === guild : true))
+        .filter((e) => (guild ? e.guildId === guild : !e.guildId))
         .sort((a, b) => b.expiresAt - a.expiresAt)[0] ?? null;
     const active =
       ent && ent.expiresAt > now

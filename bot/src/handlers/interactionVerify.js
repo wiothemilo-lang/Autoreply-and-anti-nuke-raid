@@ -109,6 +109,14 @@ async function handleVerifyConfirm(store, interaction) {
   if (!config?.verifyEnabled) {
     return interaction.reply({ content: "❌ Xác minh đã bị tắt.", ephemeral: true });
   }
+  // Server đã chuyển sang captcha: nút `verify_confirm` cũ còn trong kênh
+  // KHÔNG được cấp role trực tiếp — nếu không, thành viên bỏ qua captcha.
+  if (config.verifyMethod === "captcha") {
+    return interaction.reply({
+      content: "❌ Server đang dùng xác minh bằng captcha — hãy bấm nút trên panel mới.",
+      ephemeral: true,
+    });
+  }
   const unverifiedRoleId = config.unverifiedRoleId;
   const verifiedRoleId = config.verifiedRoleId;
   if (!unverifiedRoleId || !verifiedRoleId) {

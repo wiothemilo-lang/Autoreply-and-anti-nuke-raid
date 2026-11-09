@@ -648,6 +648,69 @@ const run = async () => {
     check("hạn pioneer không bị đụng", tables.entitlements[0].expiresAt === t + 20 * 86_400_000);
   }
 
+  // markPaid: server có NHIỀU dòng entitlement → gia hạn dòng ACTIVE, không
+  // hồi sinh dòng đã hết hạn (trước đây .first() trúng dòng hết hạn ⇒ mất số
+  // ngày còn lại của dòng active).
+  {
+    const tables = seed();
+    const t = Date.now();
+    tables.payments.push({
+      _id: "p5",
+      userId: "u1",
+      discordId: "123456789012345678",
+      guildId: TEST_GUILD,
+      kind: "premium",
+      plan: "supporter",
+      amount: 49_000,
+      appTransId: "261006_multi",
+      status: "pending",
+      createdAt: t,
+    });
+    tables.entitlements.push(
+      {
+        _id: "e_expired",
+        userId: "u1",
+        discordId: "123456789012345678",
+        guildId: TEST_GUILD,
+        plan: "pioneer",
+        startsAt: t - 60 * 86_400_000,
+        expiresAt: t - 86_400_000,
+        createdAt: t - 60 * 86_400_000,
+        updatedAt: t - 60 * 86_400_000,
+      },
+      {
+        _id: "e_active",
+        userId: "u1",
+        discordId: "123456789012345678",
+        guildId: TEST_GUILD,
+        plan: "supporter",
+        startsAt: t - 20 * 86_400_000,
+        expiresAt: t + 10 * 86_400_000,
+        createdAt: t - 20 * 86_400_000,
+        updatedAt: t - 20 * 86_400_000,
+      },
+    );
+    const expiredBefore = tables.entitlements[0].expiresAt;
+    const activeBefore = tables.entitlements[1].expiresAt;
+    const ctx = makeCtx(tables);
+    await markHandler(ctx, {
+      appTransId: "261006_multi",
+      amountPaid: 49_000,
+      source: "callback",
+    });
+    check(
+      "gia hạn đúng dòng đang active (cộng 30 ngày từ hạn cũ)",
+      tables.entitlements[1].expiresAt === activeBefore + PREMIUM_MONTH_MS &&
+        tables.entitlements[1].lastPaymentId === "p5",
+      tables.entitlements[1],
+    );
+    check(
+      "dòng đã hết hạn KHÔNG bị hồi sinh / đổi hạn",
+      tables.entitlements[0].expiresAt === expiredBefore,
+      tables.entitlements[0],
+    );
+  }
+
   // ── startPayment: MỌI nhánh lỗi phải về client bằng ConvexError ────────────
   // Bug thật 07/10/2026: khách bấm "Ủng hộ" trên /donate thấy nguyên
   // "[CONVEX A(paymentsAction:startPayment)] [Request ID: …] Server Error
@@ -1316,6 +1379,9 @@ const run = async () => {
         grantH(makeCtx(downgrade), {
           token: "tok-good",
           discordId: "123456789012345678",
+          // Phải chỉ ĐÚNG server đang có gói pioneer — cấp theo người không
+          // được đọc dòng gắn server (xem test (e2)).
+          guildId: TEST_GUILD,
           plan: "supporter",
           days: 30,
         }),
@@ -1338,6 +1404,7 @@ const run = async () => {
     const renewRes = await grantH(makeCtx(renew), {
       token: "tok-good",
       discordId: "123456789012345678",
+      guildId: TEST_GUILD,
       plan: "supporter",
       days: 30,
     });
@@ -1348,6 +1415,36 @@ const run = async () => {
         renew.entitlements[0].expiresAt === expBefore + 30 * 86_400_000,
       renew.entitlements[0],
     );
+
+    // (e2) cấp theo NGƯỜI không được gia hạn nhầm dòng gắn server
+    {
+      const personal = seedTransfer();
+      personal.entitlements.push({
+        _id: "e_guild_only",
+        userId: "u1",
+        discordId: "123456789012345678",
+        guildId: TEST_GUILD,
+        plan: "supporter",
+        startsAt: Date.now() - 20 * 86_400_000,
+        expiresAt: Date.now() + 10 * 86_400_000,
+        createdAt: Date.now() - 20 * 86_400_000,
+        updatedAt: Date.now() - 20 * 86_400_000,
+      });
+      const guildExpBefore = personal.entitlements[0].expiresAt;
+      const personalRes = await grantH(makeCtx(personal), {
+        token: "tok-good",
+        discordId: "123456789012345678",
+        plan: "pioneer",
+        days: 30,
+      });
+      check(
+        "cấp theo người tạo dòng KHÔNG gắn server, không đụng dòng server",
+        personalRes.ok === true &&
+          personal.entitlements.some((e) => !e.guildId && e.plan === "pioneer") &&
+          personal.entitlements[0].expiresAt === guildExpBefore,
+        personal.entitlements,
+      );
+    }
 
     // (f) truyền guildId → quyền lợi gắn theo SERVER (planForGuild đọc được ngay)
     const withGuild = seedTransfer();
