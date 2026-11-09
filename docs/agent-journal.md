@@ -1,5 +1,13 @@
 # Nhật ký tiến trình agent
 
+## 2026-11-09 (3) — Chặn xoay botKeySeed ngoài luồng khi bot còn sống
+
+- ✅ **Guard**: `botBootstrapAction:requestBotKey` từ chối xoay seed khi `status.seeded && lastHeartbeat < 3 phút` (bot thật còn heartbeat ~60s/lần). Đặt guard **trước** `markBootstrapAttempt` → lượt bị chặn không đốt cooldown 10 phút của lần self-heal hợp lệ kế tiếp. `getBotKeyStatusInternal` trả thêm `lastHeartbeat` (không lộ seed).
+- 🧪 **Test**: `scripts/test-bot-bootstrap.ts` (9 case: heartbeat mới/cũ/null, chưa seed, token không phải bot, seed ghi = SHA-256(botKey)). Đã chứng minh **RED → GREEN**: bỏ guard thì 7 PASS/2 FAIL, có guard 9/9.
+- 📁 File đụng: `convex/botAuth.ts`, `convex/botBootstrapAction.ts`, `scripts/test-bot-bootstrap.ts`, `AGENTS.md` + `README.md` (29→30 suite TS), `docs/agent-journal.md`.
+- 🧪 Kiểm chứng: **30/30 TS** · **87/87 CJS** (158,6s) · tsc · lint · format:check toàn repo · repo-map · convex-contract sạch.
+- ▶️ Còn lại: chốt danh tính tác nhân xoay 06/10 bằng log VPS (xem "Đang dở"); bot production cần `bun install` trong `bot/` + restart do Dependabot đổi dependency.
+
 ## 2026-11-09 (2) — Dọn Dependabot + chốt quy trình PR + thu hẹp vụ botKeySeed
 
 - ✅ **Dependabot**: merge 12 PR (#53, #1, #9, #67, #8, #68, #70, #71, #72, #73, #75, #76); đóng #2 (nhánh không chung gốc), #14 (@types/node 26 lệch runtime 22), #4/#74 (plugin-react 6 cần Vite 7). Sửa kèm: three `outputColorSpace`, lucide 1.x bỏ brand icon → `BrandIcons` SVG nội bộ, React 19 + react-dom 19, lockfile `v1` khớp Bun 1.3.3 của CI, `ignore` major `@types/node`.
@@ -1106,8 +1114,8 @@ dashboard/{AutoModPanel,WelcomePanel,WhitelistPanel,OnboardingChecklist}.tsx}`,
   `bot/.bot-key` vẫn 05/10). Máy dev hiện tại không phải VPS, không SSH/log
   tháng 10 ⇒ cần lấy từ VPS: shell history quanh 08:49, pm2/out.log xoay vòng,
   OpenCode session storage, `.bot-key` lạ ngoài `bot/`, Convex logs (nếu còn).
-  Đề xuất chặn tái diễn: `requestBotKey` từ chối khi `lastHeartbeat` < 3 phút
-  (bot thật còn sống) — chờ duyệt trước khi sửa Convex production.
+  **Đã chặn tái diễn** (entry "2026-11-09 (3)"): `requestBotKey` từ chối xoay
+  khi `lastHeartbeat` < 3 phút — còn lại chỉ là truy nguyên danh tính.
 
 - ✅ **Backlog rà soát 30/09: đã sửa xong phần bug kỹ thuật** (entry "01/10/2026 (1)").
   Còn lại các mục cần **người quyết định chính sách** trên đường raid — xem mục "Backlog"

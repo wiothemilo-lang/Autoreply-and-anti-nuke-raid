@@ -81,6 +81,17 @@ const bootstrapCalls: number[] = [];
 const BOOTSTRAP_WINDOW_MS = 60_000;
 const BOOTSTRAP_MAX_PER_WINDOW = 30;
 
+/**
+ * Guard chống xoay seed ngoài luồng — sự cố 06/10: một tiến trình khác có
+ * DISCORD_TOKEN gọi bootstrap trong khi bot thật đang chạy, xoay seed làm bot
+ * bị từ chối 22 giờ. Heartbeat của bot được cập nhật ~60 giây/lần qua guild
+ * sync. Heartbeat còn mới ⇒ bot thật đang sống ⇒ từ chối xoay.
+ *
+ * Self-heal hợp lệ vẫn qua được: khi bot bị từ chối botKey, call heartbeat
+ * cũng bị từ chối theo, nên `lastHeartbeat` đã cũ trước khi bot gọi bootstrap.
+ */
+const LIVE_HEARTBEAT_GUARD_MS = 3 * 60_000;
+
 function allowBootstrapCall(): boolean {
   const now = Date.now();
   while (bootstrapCalls[0] && now - bootstrapCalls[0] >= BOOTSTRAP_WINDOW_MS) {
@@ -117,6 +128,18 @@ export const requestBotKey = action({
     const status = await ctx.runQuery(internal.botAuth.getBotKeyStatusInternal);
     const applicationError = assertExpectedBotApplication(bot, status.botApplicationId);
     if (applicationError) return { ok: false as const, error: applicationError };
+    // Bot thật còn sống (heartbeat mới) → không cho xoay seed ngoài luồng.
+    // Đặt TRƯỚC markBootstrapAttempt để lượt bị chặn không đốt cooldown 10 phút
+    // của lần self-heal hợp lệ kế tiếp.
+    const heartbeatAge =
+      status.lastHeartbeat === null ? Number.POSITIVE_INFINITY : Date.now() - status.lastHeartbeat;
+    if (status.seeded && heartbeatAge < LIVE_HEARTBEAT_GUARD_MS) {
+      return {
+        ok: false as const,
+        error:
+          "Bot đang chạy và gửi heartbeat gần đây — từ chối xoay chìa khóa ngoài luồng. Dừng bot trước nếu thật sự cần bootstrap lại.",
+      };
+    }
     // Chỉ ghi cooldown sau khi token + Application ID đã hợp lệ; caller random
     // không thể khóa bot thật trong 10 phút chỉ bằng một request sai.
     const gate = await ctx.runMutation(internal.botBootstrap.markBootstrapAttempt);

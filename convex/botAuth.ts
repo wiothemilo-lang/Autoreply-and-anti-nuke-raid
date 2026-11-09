@@ -124,6 +124,9 @@ export const getBotKeyStatusInternal = internalQuery({
       seeded: !!status?.botKeySeed,
       botApplicationId: status?.botApplicationId ?? null,
       lastBootstrapAt: status?.lastBootstrapAt ?? null,
+      // Cần cho guard chống xoay seed ngoài luồng: bot thật còn sống thì
+      // heartbeat mới; bot bị từ chối botKey thì heartbeat đã cũ.
+      lastHeartbeat: status?.lastHeartbeat ?? null,
     };
   },
 });
