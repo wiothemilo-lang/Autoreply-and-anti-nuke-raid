@@ -10,7 +10,6 @@ import {
   ExternalLink,
   FileUp,
   FolderTree,
-  Github,
   Loader2,
   MessageSquare,
   RefreshCw,
@@ -22,6 +21,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
+import { GithubMark } from "../BrandIcons";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Card, CardContent } from "../ui/card";
@@ -776,7 +776,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/50 px-3 py-2.5">
                 <span className="flex items-center gap-2 text-sm">
-                  <Github className="h-4 w-4" />
+                  <GithubMark className="h-4 w-4" />
                   {translate("Đồng thời đẩy lên GitHub (Gist riêng tư)")}{" "}
                 </span>
                 <Switch checked={pushGithub} onCheckedChange={setPushGithub} />
@@ -1389,7 +1389,7 @@ function BackupListCard({
                     )}
                     {b.pushedToGithub && (
                       <Badge className="gap-1 border border-border bg-secondary px-2 py-0.5 text-[10px] text-secondary-foreground">
-                        <Github className="h-3 w-3" /> GitHub
+                        <GithubMark className="h-3 w-3" /> GitHub
                       </Badge>
                     )}
                     {b.source === "import" && (

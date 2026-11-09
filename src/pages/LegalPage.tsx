@@ -1,8 +1,9 @@
 import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowUp, Facebook, MessageCircle, Scale, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowUp, MessageCircle, Scale, ShieldCheck } from "lucide-react";
 
 import { Badge } from "../components/ui/badge";
+import { FacebookMark } from "../components/BrandIcons";
 import { Button } from "../components/ui/button";
 import Footer from "../components/landing/Footer";
 import LangSwitch from "../components/LangSwitch";
@@ -157,7 +158,7 @@ export default function LegalPage({ slug }: { slug: LegalSlug }) {
                 </Button>
                 <Button asChild size="sm" variant="outline">
                   <a href={facebookUrl} target="_blank" rel="noreferrer">
-                    <Facebook className="h-4 w-4" /> Fanpage Facebook
+                    <FacebookMark className="h-4 w-4" /> Fanpage Facebook
                   </a>
                 </Button>
                 <button

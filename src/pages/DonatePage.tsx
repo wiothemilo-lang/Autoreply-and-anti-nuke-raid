@@ -5,7 +5,6 @@ import { useAction } from "convex/react";
 import {
   ArrowUp,
   Coffee,
-  Facebook,
   Heart,
   Loader2,
   MessageCircle,
@@ -16,6 +15,7 @@ import {
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { FacebookMark } from "../components/BrandIcons";
 import PaymentReturn from "../components/PaymentReturn";
 import Footer from "../components/landing/Footer";
 import LangSwitch from "../components/LangSwitch";
@@ -331,7 +331,7 @@ export default function DonatePage() {
               className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/30"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                <Facebook className="h-5 w-5" />
+                <FacebookMark className="h-5 w-5" />
               </span>
               <span>
                 <span className="block text-sm font-semibold text-foreground">
