@@ -154,7 +154,7 @@ Các lệnh kiểm chứng đã được allow sẵn trong `opencode.json` — c
   `scripts/test-*.ts`.
 - Sửa lỗi xong phải giải thích được **gốc rễ**, không phải chỉ "nó chạy rồi".
 - Ưu tiên sửa file có sẵn, tránh sinh file mới trùng chức năng.
-- Dashboard đồng bộ bot qua Convex trong ~1 phút — đừng kỳ vọng realtime khi test luồng cấu hình.
+- Dashboard đồng bộ bot qua Convex trong ~3 phút (guild sync + tick đều 180 giây) — đừng kỳ vọng realtime khi test luồng cấu hình.
 
 ## 4. Bối cảnh dự án cần biết
 

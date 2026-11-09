@@ -597,8 +597,8 @@ module.exports = {
       (m) => m.name === "bot_writes:botLockState" && m.args.guildId === gid,
     );
     check(
-      "lockdown hết hạn → mở khóa (reset overwrite + ghi trạng thái)",
-      calls.unlockEdits.includes(gid) && unlocks.length === 1 && unlocks[0].args.until === null,
+      "lockdown hết hạn sau restart, KHÔNG có ảnh chụp → giữ nguyên overwrite (không xoá trắng) + vẫn ghi trạng thái mở khoá",
+      calls.unlockEdits.length === 0 && unlocks.length === 1 && unlocks[0].args.until === null,
     );
     await audit.tickUnlocks();
     const unlocks2 = calls.mutations.filter(

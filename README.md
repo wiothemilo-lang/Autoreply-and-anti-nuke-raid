@@ -4,7 +4,7 @@
 
 Bot Discord tự động trả lời tin nhắn thành viên theo **từ khóa** hoặc khi bị **tag @mention** (nội dung do bạn tùy chỉnh), hỗ trợ đầy đủ **prefix (`!`) + slash commands**, kèm hệ thống **chống nuke/raid** bật tắt từng phần theo ý mod & owner — tất cả quản lý qua một **dashboard web** tùy chỉnh.
 
-> **Chất lượng**: 87 CJS + 28 TS test suites · coverage c8 (94,6% dòng / 97,3% hàm / 79,8% nhánh — toàn bộ engine chống nuke + alt detection + ticket + lớp dẫn log được phủ test trực tiếp, **không còn file nào dưới 80%**, **sàn coverage theo file** chặn engine bảo vệ tụt) · **mutation score 100%** (`bun run test:mutation`) · property-based + fuzz test · **memGuard sweeper bộ nhớ tập trung** · ESLint sạch · typecheck sạch · smoke test VPS · CI 4 job (lint + security + test → deploy): gitleaks chặn secret lộ, bun audit chặn CVE critical (`bun run test` để chạy local).
+> **Chất lượng**: 87 CJS + 29 TS test suites · coverage c8 (95,6% dòng / 97,8% hàm / 81,0% nhánh — toàn bộ engine chống nuke + alt detection + ticket + lớp dẫn log được phủ test trực tiếp, **không còn file nào dưới 80%**, **sàn coverage theo file** chặn engine bảo vệ tụt) · **mutation score 100%** (`bun run test:mutation`) · property-based + fuzz test · **memGuard sweeper bộ nhớ tập trung** · ESLint sạch · typecheck sạch · smoke test VPS · CI 4 job (lint + security + test → deploy): gitleaks chặn secret lộ, bun audit chặn CVE critical (`bun run test` để chạy local).
 >
 > **Hệ sinh thái**: threat relay liên server (chia sẻ signature raid ẩn danh, opt-in từng chiều) · preset bảo mật 1 chạm (server nhỏ / cộng đồng / rủi ro cao) — bật trên dashboard, tab Chống nuke.
 
@@ -27,7 +27,7 @@ Bot Discord tự động trả lời tin nhắn thành viên theo **từ khóa**
 ```
 
 - **Dashboard** (thư mục gốc): React + Vite + Tailwind + Convex. Đăng nhập bằng Discord (OAuth authorization code + PKCE; Convex trao đổi server-side, browser không giữ Discord access token), chọn server, cấu hình mọi thứ.
-- **Bot** (`bot/`): process Node.js standalone chạy 24/7 (máy bạn hoặc hosting). Đọc/ghi cấu hình qua Convex — dashboard và bot luôn đồng bộ trong ~1 phút.
+- **Bot** (`bot/`): process Node.js standalone chạy 24/7 (máy bạn hoặc hosting). Đọc/ghi cấu hình qua Convex — dashboard và bot đồng bộ trong ~3 phút (guild sync + tick đều 180 giây).
 - **Backend** (`convex/`): schema + query/mutation. Mọi ghi dữ liệu từ dashboard được kiểm tra quyền _Manage Guild_ (xác thực qua Discord OAuth); bot dùng các mutation riêng `bot-writes:*` bảo vệ bằng deploy key.
 
 ## Bắt đầu
@@ -64,7 +64,7 @@ bun run start
 
 **Bot trên cloud cần Convex backend công khai?** → Hướng dẫn deploy Convex Cloud miễn phí (`npx convex login` + `npx convex deploy`, lấy URL + Deploy Key): xem [`bot/README.md`](bot/README.md) → mục “Deploy Convex backend lên cloud miễn phí”.
 
-Bot tự đăng ký slash commands và đồng bộ server/kênh/role lên Convex mỗi 60 giây.
+Bot tự đăng ký slash commands và đồng bộ server/kênh/role lên Convex mỗi 180 giây.
 
 ### 4. Mời bot & quản lý
 
@@ -96,7 +96,7 @@ Bot tự đăng ký slash commands và đồng bộ server/kênh/role lên Conve
 - 📒 **Log kiểu Carl-bot, gộp 2 luồng** (Cài đặt → Kênh log): 🛡️ **Anti nuke/raid** → kênh log chung · ⚙️ **Auto-mod + lệnh thủ công của mod/owner** (ban/timeout/kick/warn/gỡ hình phạt/purge/xóa tin) → **gộp chung 1 kênh log hành động mod** (chưa đặt → kênh log chung), mỗi embed hiển thị `Offender` / `Reason` / `Responsible moderator` + `case N` tăng dần: bot tự động để tên bot, mod dùng lệnh để tên mod, lý do trống ghi **“không có lý do”**.
 - ⌨️ **Prefix + slash**: `!help !ping !prefix !autoreply !antinuke !heat !badword !setlog !backup !report !research`, `/ticket mo|khieunai|dong`, `/language` và tương đương `/…` (kèm `/backup now|list|restore|auto` để tạo/liệt kê/khôi phục + tự động backup định kỳ server ngay trong Discord).
 - ♻️ **Tùy chỉnh khôi phục (Backup server → Tùy chỉnh khôi phục)**: bật/tắt từng phần **role** và **emoji/sticker** khi bot khôi phục — đồng bộ bot ↔ web, áp dụng cho **cả backup Protogon lẫn file backup của bot nuke** (.msc/.json tải lên). Phần tắt sẽ được bỏ qua khi restore; kênh, tin nhắn + media vẫn xử lý bình thường.
-- 🖥️ **Dashboard**: server list, tổng quan, quản lý rule, chống nuke, cài đặt — áp dụng tự động sau ~1 phút.
+- 🖥️ **Dashboard**: server list, tổng quan, quản lý rule, chống nuke, cài đặt — áp dụng tự động sau ~3 phút.
 
 ## Kiểm thử & Coverage
 
@@ -112,9 +112,9 @@ Coverage được đo bằng [`c8`](https://github.com/bcoe/c8) (V8 native, khô
 
 | Chỉ số          | Giá trị | Ý nghĩa                                                    |
 | --------------- | ------- | ---------------------------------------------------------- |
-| Dòng            | 94,6%   | phần lớn dòng `bot/src` được test chạm tới                 |
-| Hàm             | 97,3%   | 97% hàm được **gọi thật** (không chỉ import)               |
-| Nhánh (if/else) | 79,8%   | cả hai phía true/false của phần lớn điều kiện đã được kiểm |
+| Dòng            | 95,6%   | phần lớn dòng `bot/src` được test chạm tới                 |
+| Hàm             | 97,8%   | 97% hàm được **gọi thật** (không chỉ import)               |
+| Nhánh (if/else) | 81,0%   | cả hai phía true/false của phần lớn điều kiện đã được kiểm |
 
 **Bản đồ nhiệt theo file** (phần quan trọng nhất — sinh từ `coverage/coverage-summary.json`, 56 file):
 
@@ -122,7 +122,7 @@ Coverage được đo bằng [`c8`](https://github.com/bcoe/c8) (V8 native, khô
 - ⚠️ **80–90% — 7 file**: `handlers/welcomeCard` (89,5%), `threatEngine` (89%), `antinuke/vandalBudget` (88,3%), `backupAudit` (88,2%), `actionBudget` (85,1%), `research` (82,7%), `altDetection` (82%) — luồng chính có test nhưng còn nhánh hiếm gặp chưa phủ.
 - ✅ **Không còn file nào dưới 80%**: entry-point `antinuke/index` (nối cổng gateway Discord) từng chỉ 13,9%, nay đã có bộ test orchestrator riêng (43 check) nên lên 100%. Phần kết nối gateway thật vẫn kiểm bằng `bun run smoke:vps` trên VPS.
 
-> **Giới hạn cần biết**: c8 chỉ đo được code chạy dưới V8 — 24 suite `.ts` chạy bằng **Bun** nên **không** xuất hiện trong báo cáo (đó là giới hạn ĐO, không phải giới hạn TEST; ví dụ `test-welcome-card.ts` vẫn kiểm thẻ ảnh rất kỹ, và `test-welcome-card-render.cjs` chạy dưới node để c8 thấy). Dashboard `src/` và `convex/` hiện **chưa** được đo — đó là hạn chế của chuỗi c8+Bun, chưa phải lỗi cấu hình.
+> **Giới hạn cần biết**: c8 chỉ đo được code chạy dưới V8 — 29 suite `.ts` chạy bằng **Bun** nên **không** xuất hiện trong báo cáo (đó là giới hạn ĐO, không phải giới hạn TEST; ví dụ `test-welcome-card.ts` vẫn kiểm thẻ ảnh rất kỹ, và `test-welcome-card-render.cjs` chạy dưới node để c8 thấy). Dashboard `src/` và `convex/` hiện **chưa** được đo — đó là hạn chế của chuỗi c8+Bun, chưa phải lỗi cấu hình.
 
 **Chống regress bằng ngưỡng**: `.c8rc.json` đặt ngưỡng tối thiểu (lines 58 / functions 65 / branches 50) — nếu code mới làm rớt coverage xuống dưới ngưỡng, `bun run test:coverage` thất bại, chặn regress trước khi commit.
 
@@ -143,7 +143,7 @@ bun run format:check    # CI dùng lệnh này để chặn code chưa format
 
 **Dependabot** (`.github/dependabot.yml`) quét weekly: root `bun`, `bot/` (discord.js, convex) và `github-actions` — tự tạo PR cập nhật, group các bump minor/patch thành 1 PR. Bot bảo mật không được để deps cũ.
 
-**Thứ tự gate trong CI**: `lint` (ESLint + Prettier + check repo-map/hợp đồng bot⇄Convex/đa ngôn ngữ) → `test` (87 CJS + 28 TS suites + coverage + typecheck) → `deploy` Convex production. Job sau chỉ chạy khi job trước pass.
+**Thứ tự gate trong CI**: `lint` (ESLint + Prettier + check repo-map/hợp đồng bot⇄Convex/đa ngôn ngữ) → `test` (87 CJS + 29 TS suites + coverage + typecheck) → `deploy` Convex production. Job sau chỉ chạy khi job trước pass.
 
 ## AI coding agent trên VPS (OpenCode)
 

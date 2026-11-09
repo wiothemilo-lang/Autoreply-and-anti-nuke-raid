@@ -389,6 +389,11 @@ export const getMetrics = query({
   handler: async (ctx, { token }) => {
     const user = await getUserByToken(ctx, token);
     if (!user) return null;
+    const status = await ctx.db
+      .query("botStatus")
+      .withIndex("by_kind", (q) => q.eq("kind", "status"))
+      .first();
+    if (!isBotAdminUser(user, status)) return null;
     const row = await ctx.db
       .query("botMetrics")
       .withIndex("by_kind_at", (q) => q.eq("kind", "latest"))
@@ -416,6 +421,11 @@ export const getMetricsHistory = query({
   handler: async (ctx, { token, limit }) => {
     const user = await getUserByToken(ctx, token);
     if (!user) return [];
+    const status = await ctx.db
+      .query("botStatus")
+      .withIndex("by_kind", (q) => q.eq("kind", "status"))
+      .first();
+    if (!isBotAdminUser(user, status)) return [];
     const take = Math.min(Math.max(limit ?? 288, 1), 576);
     const rows = await ctx.db
       .query("botMetrics")

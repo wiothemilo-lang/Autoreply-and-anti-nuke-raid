@@ -11,7 +11,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
                                                       ⇄ protogon.freebuff.app (Freebuff hosting)
 ```
 
-- Cấu hình bot ⇄ dashboard đồng bộ qua Convex, trễ ~1 phút.
+- Cấu hình bot ⇄ dashboard đồng bộ qua Convex, trễ ~3 phút (guild sync + tick đều 180 giây).
 - Deploy Convex: CI tự chạy sau push main (lint+test xanh); VPS agent cũng
   deploy được qua guardrail 4 lớp (xem `docs/opencode-vps-guide.md`).
 
@@ -151,7 +151,12 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
   `scripts/check-settings-signal.cjs` (thay đổi từ dashboard không được "đứng im") +
   `scripts/check-cron-boundary.cjs` (cron chỉ đặt cờ, không gọi hàm bot) +
   `scripts/check-timer-allowlist.cjs` (mọi `setInterval` phải có trong allowlist
-  kèm lý do, so hai chiều) — CI chạy cả 6 trong job lint.
+  kèm lý do, so hai chiều) +
+  `scripts/check-bot-payload.cjs` (payload bot gửi Convex khớp validator thật) +
+  `scripts/check-retention-clamp.cjs` (trần lưu bản giống nhau ở Convex và dashboard) +
+  `scripts/check-log-lang.cjs` (ngôn ngữ log khớp giữa Convex và bot) +
+  `scripts/check-ai-status.cjs` (aiStatus luôn trả providerCount, không lộ key) —
+  CI chạy cả 10 trong job lint.
 - Đa ngôn ngữ: UI viết chuỗi tiếng Việt thẳng trong JSX rồi bọc
   `translate("…")` (key = chuỗi VI). Thêm chuỗi mới → chạy
   `node scripts/check-i18n.cjs` để biết key nào còn thiếu bản EN; hằng số

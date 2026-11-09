@@ -51,7 +51,23 @@ const JOBS = argv.includes("--serial")
     );
 const RETRY = !argv.includes("--no-retry") && JOBS > 1;
 
-// Cổng cố định 127.0.0.1:8791 (kiira-proxy) và Chromium + build dist (browser-contracts).
+// Ảnh chụp quyền lockdown được persist xuống đĩa (bot/src/lockdown.js). Khi
+// chạy test, TUYỆT ĐỐI không dùng file runtime thật `bot/data/lockdown-state.json`:
+// suite này ghi state của guild giả, suite khác đọc lại → lẫn trạng thái và làm
+// bẩn dữ liệu production trên máy dev. Mọi suite con thừa hưởng env này.
+const LOCKDOWN_STATE_FILE = path.join(
+  os.tmpdir(),
+  `protogon-lockdown-state-runner-${process.pid}-${Date.now()}.json`,
+);
+process.env.PROTOGON_LOCKDOWN_STATE = LOCKDOWN_STATE_FILE;
+const cleanupLockdownState = () => {
+  fs.rmSync(LOCKDOWN_STATE_FILE, { force: true });
+  fs.rmSync(`${LOCKDOWN_STATE_FILE}.tmp`, { force: true });
+};
+process.on("exit", cleanupLockdownState);
+
+// Suite cần tài nguyên ĐỘC QUYỀN (proxy cục bộ, Chromium + build dist) chạy lẻ
+// sau khi pool xong: EXCLUSIVE bên dưới. Proxy kiira tự lấy cổng trống động.
 const EXCLUSIVE = ["test-kiira-proxy", "test-browser-contracts"];
 const SLOW_FIRST = [
   "test-backup-pipeline",
@@ -164,12 +180,23 @@ function runSuite(suite) {
     let timer;
     let grace;
     let child;
+    // Mỗi suite một file state riêng: suite A khoá guild giả không được để suite B
+    // đọc lại ảnh chụp của A (state là file trên đĩa, dùng chung giữa tiến trình).
+    const lockdownState = path.join(
+      os.tmpdir(),
+      `protogon-lockdown-${process.pid}-${baseName(suite)}.json`,
+    );
+    const cleanupLockdownState = () => {
+      fs.rmSync(lockdownState, { force: true });
+      fs.rmSync(`${lockdownState}.tmp`, { force: true });
+    };
     const finish = (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       clearTimeout(grace);
       live.delete(child);
+      cleanupLockdownState();
       // Con cháu đã thoát khỏi nhóm tiến trình có thể còn giữ pipe: đóng phía mình để không rò.
       child.stdout.destroy();
       child.stderr.destroy();
@@ -185,6 +212,7 @@ function runSuite(suite) {
       child = spawn(RUNNER, [path.join(SUITE_DIR, suite)], {
         stdio: ["ignore", "pipe", "pipe"],
         detached: process.platform !== "win32",
+        env: { ...process.env, PROTOGON_LOCKDOWN_STATE: lockdownState },
       });
     } catch (e) {
       resolve({ suite, code: 1, timedOut: false, out: String(e?.message || e), ms: 0 });

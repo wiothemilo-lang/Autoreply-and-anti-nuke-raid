@@ -25,6 +25,7 @@
 
 const { spawn } = require("child_process");
 const http = require("http");
+const net = require("net");
 const path = require("path");
 const fs = require("fs");
 
@@ -35,7 +36,9 @@ const BUN_BIN =
     fs.existsSync(candidate),
   ) ||
   "bun";
-const PORT = 8791; // port test riêng, tránh đụng proxy thật (8787)
+// Cổng test lấy ĐỘNG từ OS thay vì cố định 8791: từng có proxy cũ còn giữ cổng
+// sau một lượt chạy bị kill, khiến suite đỏ giả (health 200 từ proxy lạ, hits=undefined).
+let PORT = Number(process.env.KIIRA_TEST_PORT) || 0;
 
 let pass = 0;
 let fail = 0;
@@ -152,6 +155,18 @@ function stopServer(server) {
   return new Promise((resolve) => server.close(resolve));
 }
 
+/** Xin OS một cổng trống (bind :0 rồi nhả) — tránh đụng cổng cố định còn proxy cũ. */
+function pickFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
 function startProxy(upstream, extraEnv = {}) {
   return spawn(BUN_BIN, [PROXY_SCRIPT], {
     env: {
@@ -168,6 +183,7 @@ function startProxy(upstream, extraEnv = {}) {
 }
 
 (async () => {
+  if (!PORT) PORT = await pickFreePort();
   const src = fs.readFileSync(PROXY_SCRIPT, "utf8");
 
   // ─── 1. Hành vi thử lại thật sự ─────────────────────────────────────────

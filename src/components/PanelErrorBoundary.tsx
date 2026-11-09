@@ -56,11 +56,6 @@ export default class PanelErrorBoundary extends Component<Props, State> {
                   "Có lỗi xảy ra khi kết nối với backend. Trang khác vẫn hoạt động bình thường — bạn có thể chuyển sang mục khác ở sidebar.",
                 )}{" "}
               </p>
-              <p className="mt-2 max-w-xl text-xs text-muted-foreground">
-                {translate(
-                  "Có lỗi xảy ra khi kết nối với backend. Trang khác vẫn hoạt động bình thường — bạn có thể chuyển sang mục khác ở sidebar.",
-                )}
-              </p>
             </div>
           </div>
           <Button size="sm" onClick={() => window.location.reload()}>

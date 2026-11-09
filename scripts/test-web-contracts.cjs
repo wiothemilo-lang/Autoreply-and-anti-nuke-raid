@@ -2848,6 +2848,19 @@ check(
   "một đơn đang xác nhận khoá luôn nút các đơn khác (chú thích trong code cam kết per-row)",
 );
 
+// ─── X5. 09/11/2026 — thẻ lỗi panel chỉ được nói câu lỗi MỘT lần ────────────
+// Bug thật: PanelErrorBoundary render cùng câu "Có lỗi xảy ra khi kết nối với
+// backend…" hai lần (một <p text-sm>, một <p text-xs> copy-paste) — người dùng
+// đọc thành hai sự cố khác nhau. Luật: câu đó xuất hiện đúng 1 lần trong file.
+const PANEL_ERROR_SENTENCE =
+  "Có lỗi xảy ra khi kết nối với backend. Trang khác vẫn hoạt động bình thường";
+const panelErrorCount = panelBoundary.split(PANEL_ERROR_SENTENCE).length - 1;
+check(
+  "PanelErrorBoundary hiển thị câu lỗi kết nối đúng MỘT lần (không lặp thẻ text-xs)",
+  panelErrorCount === 1,
+  `câu lỗi xuất hiện ${panelErrorCount} lần — bản copy text-xs làm người dùng tưởng có 2 lỗi`,
+);
+
 // ─── Y. Đồng ý điều khoản + hạn mức theo GÓI (08/10/2026) ───────────────────
 // Khách phải TỰ TAY tick đồng ý (không tick sẵn), và cảnh báo "không nhận ngay"
 // phải xuất hiện trước khi trả tiền. Server vẫn là chốt cuối (xem

@@ -10,9 +10,24 @@
 // trình bot. Mỗi case ở đây dùng guildId RIÊNG để không lẫn trạng thái —
 // nếu không, một case để kẹt `locked` sẽ làm các case sau "tưởng đã khoá".
 const path = require("path");
+const os = require("os");
 const DJS_MOCK = require("./support/djs-mock-path.cjs");
 const Module = require("module");
 const fs = require("fs");
+
+// Ảnh chụp quyền được persist xuống đĩa, nên cả suite phải trỏ sang file tạm —
+// tuyệt đối không để test ghi vào `bot/data/lockdown-state.json` thật.
+const TMP_STATE = path.join(
+  os.tmpdir(),
+  `protogon-lockdown-state-${process.pid}-${Date.now()}.json`,
+);
+process.env.PROTOGON_LOCKDOWN_STATE = TMP_STATE;
+const cleanupState = () => {
+  fs.rmSync(TMP_STATE, { force: true });
+  fs.rmSync(`${TMP_STATE}.tmp`, { force: true });
+};
+// Dọn cả khi suite chết giữa chừng (process.exit/exception) — không để rác tmp.
+process.on("exit", cleanupState);
 
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
@@ -86,6 +101,30 @@ function mkStore() {
       },
     },
   };
+}
+
+/**
+ * Kênh giả có overwrite @everyone đọc được (để `prevOverwrite` chụp đúng giá
+ * trị trước khoá) + ghi lại mọi payload edit để assert lúc mở khoá.
+ * `cache: false` = trước khoá KHÔNG đặt quyền này (giá trị chụp là null).
+ */
+function mkPermChannel(id, { voice = false, allow = false, deny = false, cache = true } = {}) {
+  const ch = {
+    id,
+    name: id,
+    isTextBased: () => true,
+    isVoiceBased: () => voice,
+    edits: [],
+  };
+  ch.permissionOverwrites = {
+    cache: cache
+      ? new Map([["EVERYONE", { allow: { has: () => allow }, deny: { has: () => deny } }]])
+      : new Map(),
+    edit: async (t, p) => {
+      ch.edits.push(p);
+    },
+  };
+  return ch;
 }
 
 (async () => {
@@ -406,19 +445,124 @@ function mkStore() {
     );
   }
 
-  // ═══ 5. Tiến trình chạy lại mất trạng thái ═══
-  section("bot khởi động lại thì mất trạng thái khoá");
+  // ═══ 5. Tiến trình chạy lại: cờ `locked` mất, ảnh chụp quyền còn ═══
+  section("bot khởi động lại: cờ locked ở RAM, ảnh chụp quyền ở đĩa");
   {
     // Set `locked` chỉ nằm trong RAM. Sau restart, server thật vẫn đang bị
     // khoá ở Discord nhưng bot tưởng là chưa khoá → bị khoá 2 lần. Đây là
     // hành vi chấp nhận được (khoá lại là an toàn, còn hơn bỏ sót), nhưng phải
-    // ghi rõ để không ai tưởng là bug.
+    // ghi rõ để không ai tưởng là bug. Ảnh chụp quyền thì được persist xuống
+    // đĩa (mục 6) nên mở khoá sau restart vẫn trả đúng quyền cũ.
     check("Set không đọc từ đâu khác ngoài RAM", lockdown.isLocked("G9") === true);
     console.log("  ℹ️  Sau restart process, isLocked() = false cho mọi guild (Set chỉ ở RAM).");
     console.log("     `tickUnlocks` đọc `lockdownUntil` từ Convex nên vẫn mở khoá đúng hạn.");
+    console.log("     Ảnh chụp quyền nằm ở file state trên đĩa — xem mục 6.");
+  }
+
+  // ═══ 6. Persistence: restart vẫn trả lại ĐÚNG quyền đã chụp ═══
+  section("persistence — ảnh chụp quyền sống sót qua restart");
+  let restarted;
+  {
+    // 3 trạng thái phải khôi phục đúng: deny (false), allow (true), không đặt (null).
+    const textDeny = mkPermChannel("pd1", { deny: true });
+    const voiceAllow = mkPermChannel("pv1", { voice: true, allow: true });
+    const textNone = mkPermChannel("pn1", { cache: false });
+    const g = mkGuild("G10", {
+      channels: [textDeny, voiceAllow, textNone],
+      everyone: { id: "EVERYONE" },
+    });
+
+    const lockedOk = await lockdown.lockGuild({}, g, {}, mkStore());
+    check("khoá + chụp quyền thành công", lockedOk === true);
+
+    let persisted = null;
+    try {
+      persisted = JSON.parse(fs.readFileSync(TMP_STATE, "utf8"));
+    } catch {
+      // để check dưới báo FAIL kèm chi tiết
+    }
+    check(
+      "lockGuild ghi ảnh chụp xuống đĩa (deny=false, allow=true, null)",
+      persisted?.[g.id]?.[textDeny.id]?.value === false &&
+        persisted?.[g.id]?.[voiceAllow.id]?.value === true &&
+        persisted?.[g.id]?.[textNone.id]?.value === null,
+      JSON.stringify(persisted?.[g.id]),
+    );
+
+    // Mô phỏng restart: bỏ module khỏi require cache rồi require lại → `locked`
+    // và `lockPrev` trong RAM mất sạch, chỉ còn file state trên đĩa.
+    delete require.cache[require.resolve("../bot/src/lockdown.js")];
+    restarted = require("../bot/src/lockdown.js");
+    check("sau restart: RAM không còn cờ locked", restarted.isLocked(g.id) === false);
+    restarted.markLocked(g.id);
+
+    const ok = await restarted.unlockGuild({}, g, {}, mkStore());
+    check("sau restart: mở khoá thành công", ok === true);
+    check(
+      "sau restart: trả lại deny SendMessages đã chụp (false, không phải null)",
+      textDeny.edits.at(-1)?.SendMessages === false &&
+        !("Connect" in (textDeny.edits.at(-1) || {})),
+      JSON.stringify(textDeny.edits.at(-1)),
+    );
+    check(
+      "sau restart: trả lại allow Connect đã chụp (true, không phải null)",
+      voiceAllow.edits.at(-1)?.Connect === true &&
+        !("SendMessages" in (voiceAllow.edits.at(-1) || {})),
+      JSON.stringify(voiceAllow.edits.at(-1)),
+    );
+    check(
+      "sau restart: trả lại 'không đặt' (null), không bịa allow/deny",
+      textNone.edits.at(-1)?.SendMessages === null,
+      JSON.stringify(textNone.edits.at(-1)),
+    );
+
+    let after = null;
+    try {
+      after = JSON.parse(fs.readFileSync(TMP_STATE, "utf8"));
+    } catch {
+      // file bị xoá/hỏng → coi như đã dọn
+    }
+    check(
+      "mở khoá xong xoá entry của guild khỏi file state",
+      !after?.[g.id],
+      JSON.stringify(after),
+    );
+  }
+
+  // ═══ 7. Fallback: mất ảnh chụp → GIỮ NGUYÊN quyền, không xoá trắng ═══
+  section("fallback — mất ảnh chụp thì GIỮ NGUYÊN quyền @everyone");
+  {
+    const text = mkPermChannel("ft1", { cache: false });
+    const voice = mkPermChannel("fv1", { voice: true, cache: false });
+    const g = mkGuild("G11", { channels: [text, voice], everyone: { id: "EVERYONE" } });
+    // markLocked trực tiếp = đúng cảnh tick sau restart khi state đã mất/hỏng.
+    restarted.markLocked(g.id);
+
+    const warns = [];
+    const origWarn = console.warn;
+    console.warn = (...args) => warns.push(args.join(" "));
+    let ok;
+    try {
+      ok = await restarted.unlockGuild({}, g, {}, mkStore());
+    } finally {
+      console.warn = origWarn;
+    }
+
+    check("mất ảnh chụp: vẫn mở khoá + gỡ cờ", ok === true && !restarted.isLocked(g.id));
+    check(
+      "mất ảnh chụp: KHÔNG có edit SendMessages/Connect = null",
+      text.edits.length === 0 && voice.edits.length === 0,
+      `text=${JSON.stringify(text.edits)} voice=${JSON.stringify(voice.edits)}`,
+    );
+    check(
+      "mất ảnh chụp: cảnh báo giữ nguyên quyền để mod kiểm tra tay",
+      warns.some((w) => /không có ảnh chụp/.test(w) && /giữ nguyên/i.test(w)),
+      JSON.stringify(warns),
+    );
   }
 
   console.log(`\nKết quả lockdown: ${pass} PASS, ${fail} FAIL`);
+  cleanupState();
   fs.rmSync(path.join(__dirname, "_lockdown-util.cjs"), { force: true });
   process.exit(fail === 0 ? 0 : 1);
 })();

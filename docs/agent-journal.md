@@ -1,5 +1,12 @@
 # Nhật ký tiến trình agent
 
+## 2026-11-09 — Vá 4 lỗ hổng sau review: quyền metrics, lockdown mất state, docs lệch, panel lỗi trùng
+
+- ✅ Xong: `status:getMetrics`/`getMetricsHistory` nay đòi `isBotAdminUser` (trước đó user đăng nhập bất kỳ đọc được RAM/chi phí AI) + 10 test quyền; `lockdown.js` ghi `lockPrev` xuống `bot/data/lockdown-state.json` (tmp+rename) → restart giữa lúc khoá vẫn trả đúng quyền, mất state thì GIỮ NGUYÊN overwrite thay vì set null; runner test cô lập state qua `PROTOGON_LOCKDOWN_STATE`; `test-kiira-proxy` lấy cổng động (hết đỏ giả do proxy cũ giữ 8791); bỏ câu lỗi trùng trong PanelErrorBoundary + gate X5; docs 28→29 TS suites, 6→10 CI gates, ~1→~3 phút.
+- 📁 File đụng: `convex/status.ts`, `scripts/test-team-admins.ts`, `bot/src/lockdown.js`, `scripts/test-lockdown.cjs`, `scripts/test-audit-layers.cjs`, `scripts/run-all-tests.cjs`, `scripts/test-kiira-proxy.cjs`, `src/components/PanelErrorBoundary.tsx`, `scripts/test-web-contracts.cjs`, `opencode.json`, `README.md`, `AGENTS.md`, `bot/README.md`, `docs/repo-map.md`, `docs/decision-log.md`.
+- 🧪 Kiểm chứng: CJS **87/87** (149,1s) · TS **29/29** · coverage 95,64% dòng / 97,79% hàm / 80,97% nhánh, `lockdown.js` 96,76% (sàn 95) · mutation **20/20** · tsc/lint/format sạch · 10 gate tĩnh exit 0.
+- ▶️ Tiếp theo: không còn việc dở trong đợt này — chờ push + CI xanh.
+
 ## 2026-10-16 — Deploy VPS: pull `1f8afc1` + deploy Convex thủ công
 
 - ✅ Xong: pull `6e065c1`→`1f8afc1` (16 file, **không đụng `bot/`**), lockfile không đổi; cổng 4 lớp xanh 2 lần; `npx convex deploy` thủ công lên prod `accomplished-chipmunk-74` (EXIT=0, thêm 3 index `analyticsRate.by_kind`, `pageViews.by_day`, `pageViews.by_day_path`); `pm2 restart` → bot online pid mới, log `✅ Protogon đã online — 11 server` + 20 slash commands + prewarm 11/11, không lỗi mới.

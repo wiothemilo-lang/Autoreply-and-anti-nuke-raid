@@ -313,8 +313,8 @@ Quy tắc hiển thị trên mỗi embed moderation:
 
 ## Kiến trúc đồng bộ
 
-- Bot gửi **heartbeat + danh sách server/kênh/role** lên Convex mỗi 60 giây (dashboard dùng để hiển thị).
-- Dashboard ghi cấu hình xuống Convex; bot đọc lại sau **tối đa 30 giây** (cache).
+- Bot gửi **heartbeat + danh sách server/kênh/role** lên Convex mỗi **180 giây** (dashboard dùng để hiển thị).
+- Dashboard ghi cấu hình xuống Convex; bot nhận tín hiệu qua batch tick **180 giây** nên áp dụng sau **~3 phút** (cache 90 phút chỉ là lưới an toàn; guild có cờ chờ đọc lại sau 30 giây).
 - Bot ghi cấu hình qua các mutation riêng (`bot-writes:*`) — chỉ bot có deploy key mới gọi được.
 
 ## Báo cáo chống nuke hàng ngày

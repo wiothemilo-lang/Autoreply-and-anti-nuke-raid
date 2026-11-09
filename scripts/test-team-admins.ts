@@ -23,6 +23,9 @@ import {
   requireBotOwner,
   setTeamAdmins,
 } from "../convex/hidden";
+// Số đo hạ tầng (RAM, chi phí AI, số server) — comment trong convex/status.ts
+// nói CHỈ admin xem được, nên quyền đọc cũng phải nằm trong bộ test quyền này.
+import { getMetrics, getMetricsHistory } from "../convex/status";
 
 type Row = Record<string, any>;
 
@@ -108,8 +111,48 @@ function makeCtx(
     users,
     botStatus,
     entitlements: opts.entitlements ?? [],
+    // Số đo bot đẩy lên (getMetrics/getMetricsHistory). Luôn có sẵn dữ liệu để
+    // nhánh "người lạ nhận null/[]" chỉ có thể đúng nhờ CỔNG QUYỀN, không phải
+    // vì bảng rỗng.
+    botMetrics: [
+      {
+        _id: "m_latest",
+        kind: "latest",
+        at: now,
+        counters: { bot_messages_total: 42 },
+        gauges: { process_resident_memory_bytes: 123456789 },
+        histograms: { http_request_duration_ms: 7 },
+      },
+      {
+        _id: "m_sample",
+        kind: "sample",
+        at: now - 300_000,
+        gauges: { process_resident_memory_bytes: 120000000 },
+        histograms: { http_request_duration_ms: 6 },
+      },
+    ],
   };
   const patches: { id: string; patch: Row }[] = [];
+
+  /**
+   * Đuôi truy vấn của Convex: `withIndex(...)` cho phép nối `.order()` /
+   * `.take()` (getMetricsHistory dùng cả hai). Bản giả cũ chỉ có
+   * `first`/`collect`; bổ sung tối thiểu, giữ nguyên hành vi các test cũ.
+   */
+  const finishQuery = (filtered: Row[]) => ({
+    first: async () => filtered[0] ?? null,
+    collect: async () => filtered,
+    take: async (n: number) => filtered.slice(0, n),
+    order: (dir: "asc" | "desc") => {
+      const ordered = [...filtered].sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+      if (dir === "desc") ordered.reverse();
+      return {
+        first: async () => ordered[0] ?? null,
+        collect: async () => ordered,
+        take: async (n: number) => ordered.slice(0, n),
+      };
+    },
+  });
 
   const db = {
     query(table: string) {
@@ -151,10 +194,7 @@ function makeCtx(
           build(q);
           const filtered = rows.filter((r) => conds.every(([f, v]) => r[f] === v));
           void name;
-          return {
-            first: async () => filtered[0] ?? null,
-            collect: async () => filtered,
-          };
+          return finishQuery(filtered);
         },
       };
     },
@@ -403,6 +443,91 @@ console.log("── 5. getTeamAdmins ──");
     "member có đơn còn hạn → nhãn gói đúng; dòng hết hạn/rác → không nhãn",
     planView.members[0].plan === "supporter" && planView.owner?.plan === null,
     { members: planView.members, owner: planView.owner },
+  );
+}
+
+// ── 6. getMetrics / getMetricsHistory: số đo hạ tầng CHỈ admin xem được ───────
+console.log("── 6. getMetrics / getMetricsHistory ──");
+{
+  const getMetricsH = (getMetrics as any)._handler;
+  const getMetricsHistoryH = (getMetricsHistory as any)._handler;
+
+  const ownerCtx = makeCtx({ teamAdmins: [ADMIN_A] });
+  const ownerMetrics = await getMetricsH(ownerCtx.ctx, { token: "tok_owner" });
+  check(
+    "getMetrics: chủ bot thấy số đo (counters + gauges)",
+    ownerMetrics?.counters?.["bot_messages_total"] === 42 &&
+      ownerMetrics?.gauges?.["process_resident_memory_bytes"] === 123456789,
+    ownerMetrics,
+  );
+
+  const adminCtx = makeCtx({ teamAdmins: [ADMIN_A] });
+  const adminMetrics = await getMetricsH(adminCtx.ctx, { token: "tok_admin" });
+  check(
+    "getMetrics: quản trị viên nhóm thấy số đo",
+    typeof adminMetrics?.at === "number" && adminMetrics?.counters !== undefined,
+    adminMetrics,
+  );
+
+  const strangerCtx = makeCtx({ teamAdmins: [ADMIN_A] });
+  const strangerMetrics = await getMetricsH(strangerCtx.ctx, { token: "tok_stranger" });
+  check("getMetrics: người lạ đã đăng nhập nhận null", strangerMetrics === null, strangerMetrics);
+
+  const anonCtx = makeCtx({ teamAdmins: [ADMIN_A] });
+  const emptyTokenMetrics = await getMetricsH(anonCtx.ctx, { token: "" });
+  const missingTokenMetrics = await getMetricsH(anonCtx.ctx, { token: "tok_missing" });
+  check(
+    "getMetrics: token rỗng / không tồn tại nhận null",
+    emptyTokenMetrics === null && missingTokenMetrics === null,
+    { emptyTokenMetrics, missingTokenMetrics },
+  );
+
+  // Chưa bootstrap chủ bot (botStatus trống) ⇒ cửa đóng với cả người trong danh sách.
+  const noOwnerCtx = makeCtx({ ownerId: null, teamAdmins: [ADMIN_A] });
+  const noOwnerMetrics = await getMetricsH(noOwnerCtx.ctx, { token: "tok_admin" });
+  check(
+    "getMetrics: chưa có chủ bot ⇒ quản trị viên nhóm cũng nhận null",
+    noOwnerMetrics === null,
+    noOwnerMetrics,
+  );
+
+  const ownerHistory = await getMetricsHistoryH(ownerCtx.ctx, { token: "tok_owner" });
+  check(
+    "getMetricsHistory: chủ bot thấy lịch sử",
+    Array.isArray(ownerHistory) &&
+      ownerHistory.length === 1 &&
+      typeof ownerHistory[0]?.at === "number" &&
+      ownerHistory[0]?.gauges?.["process_resident_memory_bytes"] === 120000000,
+    ownerHistory,
+  );
+
+  const adminHistory = await getMetricsHistoryH(adminCtx.ctx, { token: "tok_admin" });
+  check(
+    "getMetricsHistory: quản trị viên nhóm thấy lịch sử",
+    Array.isArray(adminHistory) && adminHistory.length === 1,
+    adminHistory,
+  );
+
+  const strangerHistory = await getMetricsHistoryH(strangerCtx.ctx, { token: "tok_stranger" });
+  check(
+    "getMetricsHistory: người lạ đã đăng nhập nhận []",
+    Array.isArray(strangerHistory) && strangerHistory.length === 0,
+    strangerHistory,
+  );
+
+  const emptyTokenHistory = await getMetricsHistoryH(anonCtx.ctx, { token: "" });
+  const missingTokenHistory = await getMetricsHistoryH(anonCtx.ctx, { token: "tok_missing" });
+  check(
+    "getMetricsHistory: token rỗng / không tồn tại nhận []",
+    emptyTokenHistory.length === 0 && missingTokenHistory.length === 0,
+    { emptyTokenHistory, missingTokenHistory },
+  );
+
+  const noOwnerHistory = await getMetricsHistoryH(noOwnerCtx.ctx, { token: "tok_admin" });
+  check(
+    "getMetricsHistory: chưa có chủ bot ⇒ quản trị viên nhóm cũng nhận []",
+    noOwnerHistory.length === 0,
+    noOwnerHistory,
   );
 }
 
