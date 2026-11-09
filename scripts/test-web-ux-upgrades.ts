@@ -11,6 +11,7 @@ import {
   confirmLeave,
   hasUnsavedChanges,
   setPanelDirty,
+  shouldBlockNavigation,
   unsavedPanelIds,
 } from "../src/lib/useUnsavedChanges";
 import { filterCommands, foldDiacritics, scoreCommand } from "../src/components/CommandPalette";
@@ -116,6 +117,22 @@ setPanelDirty("c", false);
   g.confirm = orig;
   setPanelDirty("d", false);
 }
+
+// 5. shouldBlockNavigation: chặn điều hướng SPA (Link/navigate/back) khi form
+// còn bẩn — trước đây chỉ có beforeunload nên bấm Back mất bản nháp im lặng.
+check(
+  "sạch + đổi trang → KHÔNG chặn",
+  shouldBlockNavigation(false, "/dashboard/1", "/dashboard") === false,
+);
+check("bẩn + đổi trang → CHẶN", shouldBlockNavigation(true, "/dashboard/1", "/dashboard") === true);
+check(
+  "bẩn + đổi query/hash cùng trang → KHÔNG chặn (không mất form)",
+  shouldBlockNavigation(true, "/dashboard/1", "/dashboard/1") === false,
+);
+check(
+  "bẩn + đổi server (:guildId) → CHẶN",
+  shouldBlockNavigation(true, "/dashboard/111", "/dashboard/222") === true,
+);
 
 console.log("── #2 command palette ──");
 
@@ -665,7 +682,10 @@ console.log("── #11 sheet panel mobile ──");
     "sheet khoá cuộn trang nền khi mở",
     /document\.body\.style\.overflow = "hidden"/.test(sheetSrc),
   );
-  check("Esc đóng được sheet", /e\.key === "Escape"/.test(sheetSrc));
+  check(
+    "Esc đóng được sheet, nhưng KHÔNG đóng khi Select/Dialog con đã preventDefault",
+    /e\.key !== "Escape" \|\| e\.defaultPrevented/.test(sheetSrc),
+  );
   check(
     "sheet khai báo role/aria-modal + nhãn tên panel",
     /role="dialog"/.test(sheetSrc) &&

@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Check,
@@ -146,9 +147,14 @@ export default function GuildIncidents() {
   async function toggle(key: string, resolved: boolean) {
     setPending(key);
     try {
-      await setResolved({ token, guildId, incidentKey: key, resolved });
-    } catch {
-      /* Convex báo lỗi qua optimistic update — lần render sau sẽ tự đúng lại */
+      // Mutation từ chối bằng { ok:false } (hết phiên/mất quyền), KHÔNG throw —
+      // trước đây caller bỏ qua return nên UI đứng yên và người dùng tưởng đã lưu.
+      const res = await setResolved({ token, guildId, incidentKey: key, resolved });
+      if (!res?.ok) throw new Error(translate("Không có quyền xử lý sự cố này"));
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : translate("Không đánh dấu được sự cố — thử lại"),
+      );
     } finally {
       setPending(null);
     }

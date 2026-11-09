@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-import { BrowserRouter } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import App from "./App";
 import RootErrorBoundary from "./components/RootErrorBoundary";
 import { LangProvider, prepareInitialLanguage } from "./lib/i18n";
@@ -21,14 +21,18 @@ async function start() {
     // Tiếng Việt không có gì để chờ.
     await prepareInitialLanguage();
 
+    // DATA ROUTER (createBrowserRouter) thay BrowserRouter: `useBlocker` chỉ
+    // hoạt động dưới data router. App vẫn giữ <Routes> bên trong qua splat
+    // route — không phải chuyển toàn bộ cây route, chỉ đổi nhà cung cấp
+    // context để chặn được điều hướng SPA khi form còn thay đổi chưa lưu.
+    const router = createBrowserRouter([{ path: "*", element: <App /> }]);
+
     ReactDOM.createRoot(document.getElementById("root")!).render(
       <React.StrictMode>
         <LangProvider>
           <ConvexProvider client={convex}>
             <RootErrorBoundary>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
+              <RouterProvider router={router} />
             </RootErrorBoundary>
           </ConvexProvider>
         </LangProvider>

@@ -97,23 +97,27 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
     module: string,
     patch: Partial<Omit<ModuleConfig, "module">>,
     successMsg?: string,
-  ) {
+  ): Promise<boolean> {
     try {
       await updateModule({ token: TOKEN(), guildId: data.guild.discordId, module, ...patch });
       if (successMsg) toast.success(successMsg);
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false; // Switch tự trả núm về giá trị thật
     }
   }
 
-  async function toggleGlobal(enabled: boolean) {
+  async function toggleGlobal(enabled: boolean): Promise<boolean> {
     try {
       await setGlobal({ token: TOKEN(), guildId: data.guild.discordId, enabled });
       toast.success(
         enabled ? translate("Đã bật toàn bộ chống nuke") : translate("Đã tắt toàn bộ chống nuke"),
       );
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      return false;
     }
   }
 
@@ -139,23 +143,30 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
     }
   }
 
-  async function toggleRelay(field: "relayShare" | "relayReceive", value: boolean) {
+  async function toggleRelay(
+    field: "relayShare" | "relayReceive",
+    value: boolean,
+  ): Promise<boolean> {
     try {
       await setRelaySettings({ token: TOKEN(), guildId: data.guild.discordId, [field]: value });
       toast.success(
         value ? translate("Đã bật chia sẻ threat relay") : translate("Đã tắt threat relay"),
       );
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      return false;
     }
   }
 
-  async function setLockdown(patch: { enabled?: boolean; minutes?: number }) {
+  async function setLockdown(patch: { enabled?: boolean; minutes?: number }): Promise<boolean> {
     try {
       await updateLockdown({ token: TOKEN(), guildId: data.guild.discordId, ...patch });
       toast.success(translate("Đã lưu cài đặt khóa kênh"));
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false;
     }
   }
 
@@ -172,12 +183,14 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
     raidHuntEnabled?: boolean;
     raidHuntBanSuspects?: boolean;
     rollbackEnabled?: boolean;
-  }) {
+  }): Promise<boolean> {
     try {
       await updateSettings({ token: TOKEN(), guildId: data.guild.discordId, ...patch });
       toast.success(translate("Đã lưu cài đặt Raid Intel — bot áp dụng trong khoảng 3 phút"));
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false;
     }
   }
 

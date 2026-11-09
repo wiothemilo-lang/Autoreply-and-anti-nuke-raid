@@ -45,7 +45,10 @@ export default function MobilePanelSheet({
     document.body.style.overflow = "hidden";
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      // Select/Dialog con (Radix) chặn Escape ở document capture + preventDefault
+      // nhưng KHÔNG stopPropagation. Thiếu cờ này, đóng Select cũng đóng luôn sheet.
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      onClose();
     };
     window.addEventListener("keydown", onKey);
     // Đưa focus vào nút đóng: bàn phím không mất vị trí, và đọc bằng screen

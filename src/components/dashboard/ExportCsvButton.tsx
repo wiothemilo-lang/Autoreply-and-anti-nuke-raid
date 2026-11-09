@@ -6,7 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import { getSessionToken } from "../../lib/discord";
 import { downloadTextFile } from "../../lib/utils";
 import { friendlyConvexError } from "../../lib/convexError";
-import { translate } from "../../lib/i18n";
+import { currentLanguage, translate } from "../../lib/i18n";
 
 /** Ba loại dữ liệu xuất được — khớp union trong convex/dataExport.ts. */
 export type ExportKind = "modActions" | "events" | "heat";
@@ -43,18 +43,25 @@ export default function ExportCsvButton({ guildId, kind }: { guildId: string; ki
   const label =
     rows && days
       ? translate("{ten} — tối đa {n} dòng · {d} ngày", {
-          ten: KIND_LABEL[kind],
+          ten: translate(KIND_LABEL[kind]),
           n: rows,
           d: days,
         })
-      : KIND_LABEL[kind];
+      : translate(KIND_LABEL[kind]);
 
   const run = async () => {
     if (!token || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await convex.query(api.dataExport.exportGuildCsv, { token, guildId, kind });
+      const res = await convex.query(api.dataExport.exportGuildCsv, {
+        token,
+        guildId,
+        kind,
+        // Header CSV theo ngôn ngữ đang xem — trước đây server hardcode VI nên
+        // người dùng EN/DE vẫn nhận tiêu đề tiếng Việt (lẫn cả "Case"/"Module").
+        lang: currentLanguage(),
+      });
       if (!res) {
         setError(translate("Không xuất được dữ liệu của server này."));
         return;

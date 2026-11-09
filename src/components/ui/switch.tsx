@@ -39,7 +39,12 @@ export type SwitchProps = Omit<
   "onChange" | "defaultValue"
 > & {
   checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
+  /**
+   * Trả `false` (hoặc Promise resolve `false`) = lưu THẤT BẠI → tự trả công tắc
+   * về giá trị thật. Trước đây chỉ bắt Promise reject, nên handler `catch` rồi
+   * `toast.error` (resolve undefined) làm núm kẹt sai vĩnh viễn.
+   */
+  onCheckedChange: (checked: boolean) => void | boolean | Promise<unknown>;
   disabled?: boolean;
   /** Gắn vào nút bên trong để `<Label htmlFor>` còn trỏ đúng. */
   id?: string;
@@ -111,11 +116,19 @@ const Switch = React.forwardRef<HTMLSpanElement, SwitchProps>(
           syncFromProp();
           return;
         }
-        // Handler bất đồng bộ (mutation của dashboard): reject = lưu thất bại.
-        // Dashboard vẫn đang hiển thị giá trị cũ (subscription Convex chưa
-        // đổi) → remount về giá trị thật thay vì để công tắc nói dối.
+        // Handler bất đồng bộ (mutation của dashboard): reject HOẶC resolve
+        // `false` = lưu thất bại. Dashboard vẫn đang hiển thị giá trị cũ
+        // (subscription Convex chưa đổi) → remount về giá trị thật thay vì để
+        // công tắc nói dối. `catch` của caller thường chỉ toast rồi resolve
+        // undefined — đó chính là đường làm núm kẹt sai trước đây.
+        if (result === false) {
+          syncFromProp();
+          return;
+        }
         if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-          Promise.resolve(result).catch(syncFromProp);
+          Promise.resolve(result).then((ok) => {
+            if (ok === false) syncFromProp();
+          }, syncFromProp);
         }
       },
       [disabled, onCheckedChange, syncFromProp],

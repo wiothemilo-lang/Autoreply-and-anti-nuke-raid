@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useBlocker } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { useProductMotion } from "../lib/motion";
@@ -42,7 +42,7 @@ import CommandPalette, {
   useCommandPaletteShortcut,
   type CommandItem,
 } from "../components/CommandPalette";
-import { confirmLeave } from "../lib/useUnsavedChanges";
+import { confirmLeave, hasUnsavedChanges, shouldBlockNavigation } from "../lib/useUnsavedChanges";
 import { syncState } from "../lib/syncState";
 import MobilePanelSheet from "../components/MobilePanelSheet";
 import { HOME_SECTION, shouldUsePanelSheet, useNarrowViewport } from "../lib/mediaQuery";
@@ -180,6 +180,18 @@ export default function GuildPage() {
     // panel mới thay vì đứng ở vị trí cuộn cũ.
     if (window.innerWidth < 1024) window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
+
+  // Chặn MỌI điều hướng SPA (Link, navigate, back/forward, đổi :guildId) khi
+  // form còn thay đổi chưa lưu. `beforeunload` chỉ bắt reload/đóng tab — trước
+  // đây bấm Back trên header hoặc palette "Trang khác" làm mất bản nháp im lặng.
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    shouldBlockNavigation(hasUnsavedChanges(), currentLocation.pathname, nextLocation.pathname),
+  );
+  useEffect(() => {
+    if (blocker.state !== "blocked") return;
+    if (confirmLeave()) blocker.proceed();
+    else blocker.reset();
+  }, [blocker]);
 
   // ── Sheet panel trên mobile (đợt #4) ──
   // Màn hình hẹp thì panel cấu hình nằm trong sheet full-screen thay vì cuộn

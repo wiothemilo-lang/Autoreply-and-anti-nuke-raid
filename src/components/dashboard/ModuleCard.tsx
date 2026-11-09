@@ -145,7 +145,7 @@ export default function ModuleCard({
     module: string,
     patch: Partial<Omit<ModuleConfig, "module">>,
     successMsg?: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   unit: string;
   /** Module nuke/raid phạt trực tiếp — không hiển thị ô nhiệt. */
   showHeat?: boolean;
