@@ -46,7 +46,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/three": "0.186.0",
-    "@vitejs/plugin-react": "^4.3.3",
+    "@vitejs/plugin-react": "^6.2.1",
     "autoprefixer": "^10.6.2",
     "c8": "^12.0.0",
     "eslint": "^10.13.0",
