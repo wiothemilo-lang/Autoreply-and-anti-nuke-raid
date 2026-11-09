@@ -15,6 +15,13 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # @types/node phải cùng major với runtime thật (VPS chạy Node 22).
+      # Major 26 khiến typecheck chấp nhận API chỉ có ở Node 26 rồi crash
+      # lúc chạy production — CI xanh không bắt được vì types là compile-time.
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
     labels:
       - "dependencies"
 
