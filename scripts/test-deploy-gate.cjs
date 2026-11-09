@@ -46,7 +46,7 @@ const FULL_CMD = "bun run test && bun tsc -b --noEmit && bun run lint && bun run
 const GREEN_OUT = [
   "✅ test-ai-fallback (0.1s) — PASS case3: all fail → offline an toàn",
   "✅ test-backup-utils (1.3s) — Kết quả backup utils: 37 PASS, 0 FAIL",
-  "✅ 51/51 suites pass (47.1s)",
+  "✅ 87/87 suites pass (155.7s)",
   "All matched files use Prettier code style!",
 ].join("\n");
 
@@ -232,6 +232,44 @@ async function gateAfterRun(command, output, { status = "completed", tool = "she
     ])) === true,
   );
 
+  // ── 4c. Chống giả mạo cổng: echo / test:ts / redirect không được mở ──
+  {
+    const spoofs = [
+      ["echo đủ 4 tên lệnh", 'echo "bun run test tsc lint format:check"'],
+      [
+        "chỉ test:ts (31 suite) khớp nhầm bun run test",
+        "bun run test:ts && bun tsc -b --noEmit && bun run lint && bun run format:check",
+      ],
+      [
+        "nuốt lỗi bằng || true rồi echo tên lệnh",
+        "bun run test >/dev/null 2>&1 || true; echo tsc lint format:check",
+      ],
+    ];
+    for (const [label, cmd] of spoofs) {
+      check(`giả mạo cổng (${label}) → không mở`, (await gateAfterRun(cmd, GREEN_OUT)) === false);
+    }
+    check(
+      "output 51/51 (không khớp hợp đồng 87) → không mở",
+      (await gateAfterRun(FULL_CMD, GREEN_OUT.replace("87/87", "51/51"))) === false,
+    );
+    check(
+      "thiếu dòng Prettier xanh (output bị cắt) → không mở",
+      (await gateAfterRun(
+        FULL_CMD,
+        GREEN_OUT.replace("All matched files use Prettier code style!", ""),
+      )) === false,
+    );
+  }
+
+  // ── 4d. Chuỗi deploy hợp lệ (pull + install + test --serial) vẫn mở ──
+  check(
+    "chuỗi deploy đầy đủ (pull + install + test --serial) → MỞ",
+    (await gateAfterRun(
+      "git pull --no-rebase --no-edit && bun install && bun run test --serial && bun tsc -b --noEmit && bun run lint && bun run format:check",
+      GREEN_OUT,
+    )) === true,
+  );
+
   // ── 5. Output đỏ của từng tool riêng vẫn bị chặn ──
   for (const [label, red] of [
     ["tsc", "src/a.ts(1,2): error TS2322: Type 'x' is not assignable.\nFound 1 error."],
@@ -259,6 +297,56 @@ async function gateAfterRun(command, output, { status = "completed", tool = "she
     check("cổng mở → cho qua npx convex deploy", convexOk === true);
   }
 
+  // ── 6b. Cổng pm2/convex không bị bypass bởi wrapper/flag/lệnh lồng ──
+  {
+    const { hooks } = await freshHooks();
+    const mustBlock = [
+      "sudo pm2 restart protogon-bot",
+      "cd /home/wio/Protogon && pm2 restart protogon-bot",
+      "true; pm2 restart protogon-bot",
+      "pm2 reload protogon-bot",
+      "pm2 restart all",
+      'pm2 restart "protogon-bot"',
+      'bash -c "pm2 restart protogon-bot"',
+      "npx -y convex deploy",
+      "npx --yes convex deploy",
+      "npx convex@latest deploy",
+      "convex deploy",
+      "./node_modules/.bin/convex deploy",
+      "pnpm exec convex deploy",
+      "yarn convex deploy",
+      "bun x convex deploy",
+      "echo hi;npx convex deploy",
+      'bash -c "npx convex deploy"',
+    ];
+    for (const cmd of mustBlock) {
+      let blocked = false;
+      try {
+        await beforeCommand(hooks, cmd);
+      } catch {
+        blocked = true;
+      }
+      check(`cổng đóng: chặn "${cmd}"`, blocked === true);
+    }
+    // Không chặn nhầm lệnh chỉ đọc trạng thái / nhắc tên lệnh trong text.
+    const mustAllow = [
+      "pm2 status",
+      "pm2 logs protogon-bot --lines 20 --nostream",
+      'grep -rn "pm2 restart protogon-bot" docs/',
+      'git commit -m "docs: pm2 restart"',
+      'git commit -m "npx convex deploy"',
+    ];
+    for (const cmd of mustAllow) {
+      let blocked = false;
+      try {
+        await beforeCommand(hooks, cmd);
+      } catch {
+        blocked = true;
+      }
+      check(`không chặn nhầm: "${cmd}"`, blocked === false);
+    }
+  }
+
   // ── 7. Vá cổng KHÔNG nới lỏng denylist secret/infra ──
   {
     const { hooks } = await freshHooks();
@@ -275,6 +363,47 @@ async function gateAfterRun(command, output, { status = "completed", tool = "she
         blocked = true;
       }
       check(`vẫn chặn: ${label}`, blocked === true);
+    }
+  }
+
+  // ── 7b. Denylist secret/infra không bị bypass bởi biến thể viết thường,
+  // `env` trần, `sed`/`awk`/`dd` đọc .env, `/proc/self/environ`, `bash -c env` ──
+  {
+    const { hooks } = await freshHooks();
+    const mustBlock = [
+      "CONVEX_DEPLOY_KEY=abc npx convex deploy",
+      "convex_deploy_key=abc",
+      "env",
+      "env -0",
+      "sed -n 1,5p bot/.env",
+      "awk '{print}' bot/.env",
+      "dd if=bot/.env",
+      "cat /proc/self/environ",
+      "bash -c env",
+    ];
+    for (const cmd of mustBlock) {
+      let blocked = false;
+      try {
+        await beforeCommand(hooks, cmd);
+      } catch {
+        blocked = true;
+      }
+      check(`vẫn chặn secret/infra: "${cmd}"`, blocked === true);
+    }
+    const mustAllow = [
+      "env FOO=1 bun run test",
+      "cat bot/.env.example",
+      "ls -a",
+      'git commit -m "sửa .env. Xong"',
+    ];
+    for (const cmd of mustAllow) {
+      let blocked = false;
+      try {
+        await beforeCommand(hooks, cmd);
+      } catch {
+        blocked = true;
+      }
+      check(`không chặn nhầm secret: "${cmd}"`, blocked === false);
     }
   }
 

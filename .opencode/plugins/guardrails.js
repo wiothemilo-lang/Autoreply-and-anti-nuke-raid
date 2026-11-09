@@ -28,9 +28,99 @@ const CONVEX_ENV_TOOLS = /env(get|list)/i;
 
 const SECRET_HINTS = [".env", ".bot-key", "auth.json", "id_rsa", "credentials.json"];
 
+// Tách chuỗi lệnh thành từng segment theo &&, ||, ;, |, xuống dòng — TÔN TRỌNG
+// quote để `git commit -m "…; pm2 restart …"` không bị cắt giữa chuỗi.
+// Dùng chung cho denylist secret lẫn cổng deploy.
+function commandSegments(command) {
+  const s = String(command ?? "");
+  const out = [];
+  let buf = "";
+  let quote = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (quote) {
+      buf += ch;
+      if (ch === "\\" && i + 1 < s.length) {
+        buf += s[++i];
+      } else if (ch === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      buf += ch;
+      continue;
+    }
+    if (ch === "\\" && i + 1 < s.length) {
+      buf += ch + s[++i];
+      continue;
+    }
+    if ((ch === "&" && s[i + 1] === "&") || (ch === "|" && s[i + 1] === "|")) {
+      out.push(buf);
+      buf = "";
+      i++;
+      continue;
+    }
+    if (ch === ";" || ch === "\n" || ch === "|") {
+      out.push(buf);
+      buf = "";
+      continue;
+    }
+    buf += ch;
+  }
+  out.push(buf);
+  return out.map((x) => x.trim()).filter(Boolean);
+}
+
+/** Tokenize 1 segment, bỏ quote bao ngoài (không xử lý escape phức tạp). */
+function shellTokens(segment) {
+  const out = [];
+  let buf = "";
+  let quote = null;
+  for (let i = 0; i < segment.length; i++) {
+    const ch = segment[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+      else buf += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (buf) out.push(buf);
+      buf = "";
+      continue;
+    }
+    buf += ch;
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+
+const SHELLS = new Set(["bash", "sh", "zsh", "dash", "fish"]);
+
+/** Nếu segment là `bash -c "<lệnh>"` thì trả lệnh bên trong, ngược lại null. */
+function shellInner(segment) {
+  const tokens = shellTokens(segment);
+  let i = 0;
+  if (tokens[i]?.split("/").pop() === "sudo") {
+    i++;
+    while (i < tokens.length && tokens[i].startsWith("-")) i++;
+  }
+  if (!SHELLS.has(tokens[i]?.split("/").pop() ?? "")) return null;
+  if (tokens[i + 1] !== "-c" || tokens[i + 2] === undefined) return null;
+  return tokens.slice(i + 2).join(" ");
+}
+
 function looksLikeSecretAccess(command) {
-  const cmd = command.toLowerCase();
-  // Đọc trực tiếp file secret qua cat/less/tail/head/grep/xxod…
+  const raw = String(command ?? "").toLowerCase();
+  // `.env.example` / `.sample` / `.template` / `.dist` là file mẫu, không chứa
+  // secret thật — bỏ trước khi dò để không chặn nhầm `cat .env.example`.
+  const cmd = raw.replace(/\.env\.(?:example|sample|template|dist)/g, "");
+  // Đọc trực tiếp file secret qua cat/less/tail/head/grep/sed/awk…
   if (SECRET_HINTS.some((hint) => cmd.includes(hint))) {
     const readers = [
       "cat ",
@@ -45,9 +135,18 @@ function looksLikeSecretAccess(command) {
       "strings ",
       "print ",
       "source ",
-      ". ",
+      "sed ",
+      "awk ",
+      "dd ",
+      "od ",
+      "cut ",
+      "nl ",
+      "hexdump",
+      "perl ",
     ];
     if (readers.some((r) => cmd.includes(r))) return true;
+    // `. .env` (source) — neo đầu segment để không chặn nhầm dấu chấm câu.
+    if (/(^|[;&|]\s*)\.\s+/.test(cmd)) return true;
     // Redirect nội dung secret ra ngoài: `cp .env`, `< .env`, `$(< .env)`
     if (cmd.includes("cp ") || cmd.includes("< ") || cmd.includes("$(")) return true;
   }
@@ -63,15 +162,38 @@ function looksLikeSecretAccess(command) {
 const INFRA_LEAK_PATTERNS = [
   /systemctl\s+(cat|show)\s/, // unit file → Environment= chứa KIRA/bot key
   /docker\s+(inspect|exec|cp)\s/, // env container / copy file ra khỏi container
-  /\/proc\/\d+\/environ/, // env của process khác
+  /\/proc\/(?:self|\d+|\$\$)\/environ/, // env của process khác/chính shell
   /\bprintenv\b/, // dump env shell — chứa key provider của OpenCode
-  /^\s*env\s*[|>]/, // `env | ...` = dump toàn bộ env ra stdout
-  /\bCONVEX_DEPLOY_KEY\s*=/, // không in/nhét key deploy Convex ra lệnh
+  // lower-case vì `cmd` đã lowercase — pattern chữ HOA cũ không bao giờ khớp.
+  /\bconvex_deploy_key\b/, // không in/nhét key deploy Convex ra lệnh
 ];
 
+/** `env`, `env -0`, `sudo env -i` (không kèm lệnh) = dump toàn bộ env. */
+function isBareEnv(segment) {
+  const tokens = shellTokens(segment);
+  let i = 0;
+  if (tokens[i]?.split("/").pop() === "sudo") {
+    i++;
+    while (i < tokens.length && tokens[i].startsWith("-")) i++;
+  }
+  if (tokens[i]?.split("/").pop() !== "env") return false;
+  i++;
+  while (i < tokens.length && tokens[i].startsWith("-")) i++;
+  return i >= tokens.length;
+}
+
 function looksLikeInfraLeak(command) {
-  const cmd = command.toLowerCase();
-  return INFRA_LEAK_PATTERNS.some((re) => re.test(cmd));
+  const cmd = String(command ?? "").toLowerCase();
+  if (INFRA_LEAK_PATTERNS.some((re) => re.test(cmd))) return true;
+  for (const seg of commandSegments(cmd)) {
+    const inner = shellInner(seg);
+    if (inner !== null) {
+      if (looksLikeInfraLeak(inner)) return true;
+      continue;
+    }
+    if (isBareEnv(seg)) return true;
+  }
+  return false;
 }
 
 // Deploy bot (pm2 restart protogon-bot) là hành động production — chỉ cho qua khi
@@ -105,17 +227,84 @@ const FAIL_PATTERNS = [
   /error: script .+ exited with code [1-9]/, // bun/npm script thoát khác 0
 ];
 
-// Chỉ tính là kiểm chứng khi lệnh chạy trọn bộ 4 lớp và KHÔNG có dấu hiệu lỗi.
+// Chỉ tính là kiểm chứng khi lệnh chạy TRỌN bộ 4 lớp và KHÔNG có dấu hiệu lỗi.
+// Mỗi segment phải khớp CHÍNH XÁC whitelist — trước đây dùng `includes()` nên
+// `bun run test:ts` (31 suite TS) khớp "bun run test" và mở cổng dù chưa chạy
+// 87 suite .cjs; `echo "bun run test tsc lint format:check"` cũng mở cổng.
+const VERIFY_SEGMENTS = [
+  /^git pull(?: --[a-z-]+)*$/,
+  /^git status$/,
+  /^bun install$/,
+  /^bun run test(?: --serial)?$/,
+  /^bun tsc -b --noemit$/, // segment đã lowercase
+  /^bun run typecheck$/,
+  /^bun run lint$/,
+  /^bun run format:check$/,
+];
+
 function isFullVerifyRun(command, output) {
-  const cmd = String(command ?? "").toLowerCase();
   const text = String(output ?? "");
-  const hasAll =
-    cmd.includes("bun run test") &&
-    (cmd.includes("tsc") || cmd.includes("typecheck")) &&
-    cmd.includes("lint") &&
-    (cmd.includes("format:check") || cmd.includes("format"));
-  if (!hasAll) return false;
-  return !FAIL_PATTERNS.some((re) => re.test(text));
+  if (FAIL_PATTERNS.some((re) => re.test(text))) return false;
+  // Bằng chứng DƯƠNG: đúng số suite hợp đồng + prettier xanh. Output bị cắt
+  // hoặc chỉ chạy `test:ts` thì không có dòng tổng kết → cổng ĐÓNG (fail-closed).
+  if (!new RegExp(`\\b${CONTRACT_SUITES}/${CONTRACT_SUITES}\\s+suites pass\\b`).test(text)) {
+    return false;
+  }
+  if (!/All matched files use Prettier code style!/.test(text)) return false;
+
+  const segments = commandSegments(String(command ?? "")).map((s) => s.trim().toLowerCase());
+  if (segments.length === 0) return false;
+  const seen = { test: false, tsc: false, lint: false, format: false };
+  for (const seg of segments) {
+    if (!VERIFY_SEGMENTS.some((re) => re.test(seg))) return false;
+    if (/^bun run test(?: --serial)?$/.test(seg)) seen.test = true;
+    else if (/^bun (?:tsc -b --noemit|run typecheck)$/.test(seg)) seen.tsc = true;
+    else if (seg === "bun run lint") seen.lint = true;
+    else if (seg === "bun run format:check") seen.format = true;
+  }
+  return seen.test && seen.tsc && seen.lint && seen.format;
+}
+
+// Lệnh chỉ đọc text (git/grep/echo…) — bỏ qua khi dò pm2/convex để không chặn
+// nhầm commit message hay lệnh grep tài liệu. Lệnh thật trong segment khác vẫn
+// bị kiểm (echo x; pm2 restart → segment pm2 vẫn khớp).
+const TEXT_ONLY_SEGMENTS = /^(git|grep|rg|echo|printf|cat|sed|awk|less|more|head|tail|man)\b/;
+
+const PM2_MUTATING = new Set(["restart", "reload", "stop", "delete", "start", "kill", "resurrect"]);
+
+function isPm2Mutation(segment) {
+  const tokens = shellTokens(segment);
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i].split("/").pop() !== "pm2") continue;
+    return PM2_MUTATING.has((tokens[i + 1] ?? "").toLowerCase());
+  }
+  return false;
+}
+
+function isConvexDeploy(segment) {
+  const tokens = shellTokens(segment);
+  for (let i = 0; i < tokens.length; i++) {
+    const base = tokens[i].split("/").pop().replace(/@.*$/, "");
+    if (base !== "convex") continue;
+    let j = i + 1;
+    while (j < tokens.length && tokens[j].startsWith("-")) j++;
+    if ((tokens[j] ?? "").toLowerCase() === "deploy") return true;
+  }
+  return false;
+}
+
+/** Dò cả lệnh lồng trong `bash -c "…"`; bỏ qua segment chỉ đọc text. */
+function containsGateBypass(command, predicate) {
+  for (const seg of commandSegments(command)) {
+    const inner = shellInner(seg);
+    if (inner !== null) {
+      if (containsGateBypass(inner, predicate)) return true;
+      continue;
+    }
+    if (TEXT_ONLY_SEGMENTS.test(seg.trim())) continue;
+    if (predicate(seg)) return true;
+  }
+  return false;
 }
 
 // Lệnh của tool shell/bash nằm ở event.input.command (V2: input là object tool
@@ -194,10 +383,11 @@ export default {
             "hỏi người dùng (AGENTS.md điều khoản 1 + bảng vùng quyền 🟢🟡🔴).",
         );
       }
-      // Chặn restart bot khi chưa đủ điều kiện — bot là production thật.
-      // Tên process thật là "protogon-bot"; vẫn khớp "protogon" để chặn cả
-      // lệnh gõ thiếu (trước đây tài liệu ghi sai tên nên agent gõ nhầm).
-      if (/^\s*pm2\s+restart\s+protogon(-bot)?\b/.test(command)) {
+      // Chặn restart/reload/stop/delete process pm2 khi chưa đủ điều kiện —
+      // bot là production thật, service khác thuộc vùng 🟡 (hỏi trước). Regex
+      // cũ neo `^\s*` nên `sudo pm2`, `cd && pm2`, `pm2 reload`, `pm2 restart all`
+      // đều lọt. Nay tokenize từng segment, bỏ qua segment chỉ đọc text.
+      if (containsGateBypass(command, isPm2Mutation)) {
         if (!verifyGateActive()) {
           throw new Error(
             "GUARDRAIL: Chưa đủ điều kiện restart bot. Quy trình bắt buộc (AGENTS.md " +
@@ -210,7 +400,9 @@ export default {
         }
       }
       // Deploy Convex cũng là hành động production — cùng cổng kiểm chứng.
-      if (/(^|\s|&&)(npx|bunx|bun)\s+convex\s+deploy\b/.test(command)) {
+      // Nhận mọi runner (npx/bunx/bun x/pnpm exec/yarn) và `convex@version`,
+      // kể cả khi lồng trong `bash -c`.
+      if (containsGateBypass(command, isConvexDeploy)) {
         if (!verifyGateActive()) {
           throw new Error(
             "GUARDRAIL: Chưa đủ điều kiện deploy Convex. Quy trình bắt buộc: chạy " +

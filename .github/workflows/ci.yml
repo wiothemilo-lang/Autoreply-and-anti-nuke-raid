@@ -245,6 +245,10 @@ jobs:
         # in tên test đang chạy mỗi 20s, runner in full tail khi kill).
         env:
           TEST_SUITE_TIMEOUT_MS: "420000"
+          # Suite đỏ khi chạy song song rồi xanh khi chạy lẻ vẫn là ĐỎ trên CI:
+          # retry chỉ để chẩn đoán, không được che flaky (trước đây vẫn in
+          # "87/87 suites pass" và exit 0).
+          TEST_FLAKY_STRICT: "1"
         run: bun run test:coverage
       # 5 suite tầng Convex/Haimiya viết bằng TypeScript — trước đây không
       # runner nào chạy (test có mà không bao giờ chạy).

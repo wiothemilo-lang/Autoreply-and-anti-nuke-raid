@@ -59,6 +59,34 @@ export default tseslint.config(
     },
   },
 
+  // ─── Script ESM (build, proxy, eval) ───
+  // Trước đây block JS chỉ khớp `scripts/**/*.cjs` nên 4 file .mjs không chịu
+  // rule nào — `eslint .` vẫn xanh dù có biến chưa khai báo. Tách block riêng
+  // vì .mjs là module, không phải CommonJS.
+  {
+    files: ["scripts/**/*.mjs"],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      // `Bun` là global runtime của kiira-retry-proxy.mjs (chạy bằng Bun trên VPS).
+      globals: { ...globals.node, Bun: "readonly" },
+    },
+    rules: {
+      "no-undef": "error",
+      "no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrors: "none",
+        },
+      ],
+      "no-empty": ["error", { allowEmptyCatch: true }],
+      "no-constant-condition": ["error", { checkLoops: false }],
+    },
+  },
+
   // ─── OpenCode plugins (ESM, chạy trong runtime OpenCode/Bun) ───
   {
     files: [".opencode/**/*.js"],

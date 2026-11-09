@@ -50,6 +50,10 @@ const JOBS = argv.includes("--serial")
       Math.floor(Number(flagValue("--jobs") || process.env.TEST_JOBS) || Math.min(4, CPUS)),
     );
 const RETRY = !argv.includes("--no-retry") && JOBS > 1;
+// CI có thể bật chế độ nghiêm ngặt: suite đỏ khi chạy song song rồi xanh khi
+// chạy lẻ vẫn là ĐỎ (flaky che lỗi thật). Mặc định giữ retry để không đỏ oan
+// vì tranh chấp tài nguyên.
+const FLAKY_STRICT = process.env.TEST_FLAKY_STRICT === "1" || argv.includes("--strict");
 
 // Ảnh chụp quyền lockdown được persist xuống đĩa (bot/src/lockdown.js). Khi
 // chạy test, TUYỆT ĐỐI không dùng file runtime thật `bot/data/lockdown-state.json`:
@@ -348,13 +352,19 @@ async function runPool(list, jobs, onDone) {
   }
 
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
+  const flakyFailed = FLAKY_STRICT && flaky.length > 0;
+  const passed = all.length - failed.length - (flakyFailed ? flaky.length : 0);
   console.log(
-    `\n${failed.length === 0 ? "✅" : "❌"} ${all.length - failed.length}/${all.length} suites pass (${secs}s)`,
+    `\n${failed.length === 0 && !flakyFailed ? "✅" : "❌"} ${passed}/${all.length} suites pass (${secs}s)`,
   );
   if (flaky.length > 0) {
     console.log(
       `⚠️ ${flaky.length} suite chỉ xanh khi chạy lẻ: ${flaky.join(", ")} — sửa tính tất định của chúng (chạy --serial để kiểm)`,
     );
+  }
+  if (flakyFailed) {
+    console.error(`Suites flaky bị coi là đỏ (TEST_FLAKY_STRICT=1): ${flaky.join(", ")}`);
+    process.exit(1);
   }
   if (failed.length > 0) {
     console.error(
