@@ -40,6 +40,8 @@ import PageSplash from "../components/PageSplash";
 import UserTags from "../components/UserTags";
 
 import { dateLocale, translate } from "../lib/i18n";
+import { friendlyConvexError } from "../lib/convexError";
+import { toastConvexError } from "../lib/toastError";
 function AdminContent() {
   const token = getSessionToken();
   // Hai vai trò KHÁC nhau, cố ý tách: `isAdmin` = vào được cửa sổ này VÀ dùng
@@ -83,7 +85,7 @@ function AdminContent() {
         }),
       };
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : translate("Lỗi kết nối") };
+      return { ok: false, error: friendlyConvexError(e, translate("Lỗi kết nối")) };
     }
   };
   // Thông báo cập nhật + nhãn "bản cập nhật hiện tại" — feed CÔNG KHÔNG (cùng
@@ -97,7 +99,7 @@ function AdminContent() {
   // LƯU LƯỢNG TRANG (analytics tự host): query `stats` tự guard requireBotAdmin
   // — SKIP trước khi gọi khi người xem không phải Admin, không tốn lượt nào.
   const traffic = useQuery(api.analytics.stats, isAdmin === true ? { token } : "skip");
-  const noticeErr = (e: unknown) => (e instanceof Error ? e.message : translate("Lỗi kết nối"));
+  const noticeErr = (e: unknown) => friendlyConvexError(e, translate("Lỗi kết nối"));
   const saveNoticeForAdmin = async (args: {
     id?: Id<"announcements">;
     title: string;
@@ -324,7 +326,11 @@ function AdminContent() {
             />
             <SelfDiagnoseCard
               diag={diag}
-              onToggle={(enabled) => setDiag({ token, enabled }).catch(() => {})}
+              onToggle={(enabled) =>
+                setDiag({ token, enabled }).catch((e) =>
+                  toastConvexError(e, translate("Lưu thất bại")),
+                )
+              }
             />
             <HostHealthCard />
             <JobBacklogCard />
@@ -333,14 +339,26 @@ function AdminContent() {
             <ThreatIntelCard
               threat={threat}
               history={researchHistory}
-              onToggle={(enabled) => setThreat({ token, enabled }).catch(() => {})}
+              onToggle={(enabled) =>
+                setThreat({ token, enabled }).catch((e) =>
+                  toastConvexError(e, translate("Lưu thất bại")),
+                )
+              }
               onToggleAi={(aiWeeklyEnabled) =>
-                setThreat({ token, aiWeeklyEnabled }).catch(() => {})
+                setThreat({ token, aiWeeklyEnabled }).catch((e) =>
+                  toastConvexError(e, translate("Lưu thất bại")),
+                )
               }
               onToggleNotify={(notifyEnabled) =>
-                setThreat({ token, notifyEnabled }).catch(() => {})
+                setThreat({ token, notifyEnabled }).catch((e) =>
+                  toastConvexError(e, translate("Lưu thất bại")),
+                )
               }
-              onRemove={(keyword, kind) => removeThreatKw({ token, keyword, kind }).catch(() => {})}
+              onRemove={(keyword, kind) =>
+                removeThreatKw({ token, keyword, kind }).catch((e) =>
+                  toastConvexError(e, translate("Lưu thất bại")),
+                )
+              }
               onLearnNow={async () => {
                 try {
                   const res = await requestLearn({ token, requestedBy: "web-admin" });
@@ -348,7 +366,7 @@ function AdminContent() {
                 } catch (e) {
                   return {
                     ok: false,
-                    error: e instanceof Error ? e.message : translate("Lỗi kết nối"),
+                    error: friendlyConvexError(e, translate("Lỗi kết nối")),
                   };
                 }
               }}
@@ -363,7 +381,7 @@ function AdminContent() {
                 } catch (e) {
                   return {
                     ok: false,
-                    error: e instanceof Error ? e.message : translate("Lỗi kết nối"),
+                    error: friendlyConvexError(e, translate("Lỗi kết nối")),
                   };
                 }
               }}
@@ -386,7 +404,7 @@ function AdminContent() {
                     } catch (e) {
                       setTransferMsg({
                         kind: "err",
-                        text: e instanceof Error ? e.message : translate("Lỗi kết nối"),
+                        text: friendlyConvexError(e, translate("Lỗi kết nối")),
                       });
                     }
                     setConfirming(null);

@@ -93,7 +93,13 @@ const LEGACY_DISCORD_ACCESS_KEY = "wio_discord_access";
 
 /** Xóa token OAuth cũ đã lưu nhầm trong trình duyệt sau khi chuyển sang server-side flow. */
 export function clearLegacyDiscordAccess(): void {
-  localStorage.removeItem(LEGACY_DISCORD_ACCESS_KEY);
+  try {
+    localStorage.removeItem(LEGACY_DISCORD_ACCESS_KEY);
+  } catch {
+    // localStorage bị chặn (private mode / policy) → không có gì để dọn.
+    // Trước đây lỗi SecurityError ở đây ném NGAY lúc module main.tsx chạy,
+    // trước try/catch của start() ⇒ không mount React, preloader kẹt 0%.
+  }
 }
 
 /** Xóa token phiên ở cả hai nơi. */

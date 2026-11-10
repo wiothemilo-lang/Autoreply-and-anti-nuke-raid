@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { AlertTriangle, Flame, ListX, Plus, ShieldCheck, X } from "lucide-react";
@@ -16,7 +16,7 @@ import {
   MODERATION_MODULES,
   WARN_STRIKE_DEFAULTS,
 } from "../../lib/constants";
-import ModuleCard from "./ModuleCard";
+import ModuleCard, { ModuleNumber } from "./ModuleCard";
 import { HeatTable, SafetyBar } from "./HeatBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import type { GuildData, ModuleConfig } from "../../lib/types";
@@ -25,52 +25,7 @@ import { getSessionToken } from "../../lib/discord";
 import { translate } from "../../lib/i18n";
 const TOKEN = () => getSessionToken();
 
-function ModuleNumber({
-  value,
-  min,
-  max,
-  onCommit,
-}: {
-  value: number;
-  min: number;
-  max?: number;
-  onCommit: (n: number) => void;
-}) {
-  const [v, setV] = useState(String(value));
-  const [focused, setFocused] = useState(false);
-  useEffect(() => {
-    if (!focused) setV(String(value));
-  }, [value, focused]);
-  return (
-    <Input
-      type="number"
-      min={min}
-      max={max}
-      value={v}
-      onFocus={() => setFocused(true)}
-      onChange={(e) => setV(e.target.value)}
-      onBlur={() => {
-        setFocused(false);
-        const n = Number(v);
-        // Phải kiểm CẢ trần: thuộc tính max của <input> chỉ chặn con trỏ/spinner,
-        // gõ tay 999 vẫn qua. Trước đây chỉ kiểm min nên UI hiện 99 trong khi
-        // server đã clamp về 99 — hai bên lệch nhau, người dùng tưởng lưu sai.
-        // Ngoài miền → trả về giá trị server (effect dưới đây tự đồng bộ lại).
-        // Phải kiểm CẢ trần: thuộc tính max của <input> chỉ chặn con trỏ/spinner,
-        // gõ tay 999 vẫn qua. Trước đây chỉ kiểm min nên UI hiện 99 trong khi
-        // server đã clamp về 99 — hai bên lệch nhau, người dùng tưởng lưu sai.
-        // Ngoài miền → trả về giá trị server (effect dưới đây tự đồng bộ lại).
-        if (Number.isNaN(n) || n < min || (max !== undefined && n > max)) return;
-        onCommit(Math.round(n));
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-    />
-  );
-}
-
-export default function ModerationPanel({ data }: { data: GuildData }) {
+export default function AutoModPanel({ data }: { data: GuildData }) {
   const updateModule = useMutation(api.antinuke.updateModule);
   const updateSettings = useMutation(api.guilds.updateSettings);
   const setAutomod = useMutation(api.guilds.setAutomod);

@@ -1,5 +1,65 @@
 # Nhật ký tiến trình agent
 
+## Đang dở
+
+- 🔎 **botKeySeed 06/10 08:49:33 — đã thu hẹp, chưa chốt danh tính.** Xác nhận
+  xoay qua `botBootstrapAction:requestBotKey` (chỉ đường này ghi
+  `lastBootstrapAt`; `setBotSecrets` không ghi) ⇒ caller có DISCORD_TOKEN +
+  Application ID khớp. Bot thật không gọi (out.log không có bootstrap, cache
+  `bot/.bot-key` vẫn 05/10). Máy dev hiện tại không phải VPS, không SSH/log
+  tháng 10 ⇒ cần lấy từ VPS: shell history quanh 08:49, pm2/out.log xoay vòng,
+  OpenCode session storage, `.bot-key` lạ ngoài `bot/`, Convex logs (nếu còn).
+  **Đã chặn tái diễn** (entry "2026-11-09 (3)"): `requestBotKey` từ chối xoay
+  khi `lastHeartbeat` < 3 phút — còn lại chỉ là truy nguyên danh tính.
+
+- ✅ **Backlog rà soát 30/09: đã sửa xong phần bug kỹ thuật** (entry "01/10/2026 (1)").
+  Còn lại các mục cần **người quyết định chính sách** trên đường raid — xem mục "Backlog"
+  trong entry "30/09/2026 (3)".
+
+- ✅ **GIẢI TRỪ reinstall (25/09 20:15)**: staff Bhadoria420 xác nhận VM 205
+  KHÔNG nằm trên India node sắp reinstall ("The vps are not on india node"),
+  chưa mua node mới ("Not now"), reinstall node khác sẽ giải phóng đĩa host
+  ("The disk would be somewhat freed" — đúng gốc rễ sự cố #1/#2), và không cần
+  backup ("No need"). Việc deploy bản refactor lên VPS trở lại như kế hoạch
+  bình thường: user chạy git pull + bun install + pm2 restart (hướng dẫn đã
+  gửi); CI đã deploy Convex xanh; hosting mirror deployable.
+- 🔍 **Review refactor trên nhánh `host-deploy` (commit `df7dd00`, 18:56 25/09)**
+  — XONG phần review + ĐÃ MERGE (commit b6e2fcd + a639490): zip `l7qsdt.zip` =
+  snapshot repo nguyên vẹn tên `protogon-quality-pass`, niêm phong 24/09 06:04,
+  base ≈ main sau 24/09 sáng (journal có tới 3 mục 24/09, thiếu t3-devbox.md).
+  Refactor thật ~105 file, các nhóm chính: (1) **claimAt lease fencing** cho
+  backup (chống 2 lượt xử lý trùng, sửa cả lỗi chính tả "BÁO LỄN" main đang
+  có), (2) **cứng hoá sessionAuth** (rate-limit login + chuẩn hoá redirect URI),
+  (3) **botBootstrapAction** fetch Discord có AbortController 8s + xác nhận app
+  ID khớp, (4) **relay** chặn scan unbounded (MAX_SOURCE_HASHES/…), (5) **bộ
+  artifact Vercel** mới toàn phần: vercel.json (CSP có hash, noindex route
+  riêng tư), seo.ts, convexUrl.ts (allowlist URL Convex fail-closed), 404.js,
+  og-image — main chưa từng có. **Kiểm chứng trên chính code zip: 61/61 suite
+  CJS + 9/9 TS + tsc + lint + format XANH** (chạy trong /tmp, node_modules
+  riêng). Zip sạch secret (không .env/.pem/bot-key). → ĐÃ MERGE TOÀN BỘ (user
+  chốt "lấy hết") vào main: commit b6e2fcd (merge + chữa 3 regression của
+  zip: 2 index Convex, otherSlots ×2, seed authVersion cho 2 e2e) + a639490
+  (bỏ CSP hash chết trong Dockerfile.web/vercel.json + bổ sung /status vào
+  SPA routes — phát hiện khi build verify trước deploy).
+- ⬇️ **HẠ CẤP — reinstall KHÔNG còn đe doạ VM 205** (xem mục ✅ giải trừ
+  phía trên): cảnh báo 17:50 của staff Hiro (MLX) về reinstall India node
+  từng đặt VM 205 vào tình huống dữ liệu sẽ mất (geo-IP `203.154.14.8` =
+  Thái Lan, coi như bị ảnh hưởng tới khi staff xác nhận). Staff Bhadoria420
+  đã xác nhận 20:03–20:14: VM 205 không nằm trên node đó, chưa mua node mới,
+  reinstall node khác sẽ giải phóng đĩa host, không cần backup. Checklist
+  backup gấp hạ cấp thành việc nên làm khi rảnh (env vẫn nên lưu + xoay 2
+  key lộ vì đã vào screenshot). Runbook dự phòng vẫn giữ ở
+  `docs/t3-devbox.md` mục 7.
+
+---
+
+## 2026-11-10 (4) — Đợt 4/5 audit 50 subagent: độ dễ đọc/bảo trì web
+
+- ✅ **10 agent audit `src/`** (đợt 4/5) → gộp `ModuleNumber` về MỘT bản có kiểm trần (4 bản copy từng trôi, 3 bản cho gõ 999); `Switch` bỏ 7 prop chế độ-trình-diễn không call site nào dùng + 25 dòng CSS chết; `AutoModPanel` hết trùng tên `ModerationPanel`; `prepareInitialLanguage` mặc định 4s→250ms; `clearLegacyDiscordAccess` không ném SecurityError lúc bootstrap; `PremiumPage` khoá `guildPlan` theo server tự chọn (khách 1 server thấy banner gói); `toastConvexError`/`friendlyConvexError` thay 14 chỗ `String(e)`/`.catch(() => {})` từng để envelope Convex production lọt ra UI.
+- 📁 File đụng: `src/components/dashboard/{ModuleCard,AntiNukePanel,AutoModPanel,JoinGatePanel,WebhookPanel,AltDetectionPanel,VerifyPanel}.tsx`, `src/components/ui/{switch.tsx,switch.css}`, `src/lib/{toastError.ts,i18n.tsx,discord.ts,i18n.en.ts,i18n.de.ts}`, `src/pages/{Admin,PremiumPage}.tsx`, `scripts/test-web-{contracts.cjs,ux-upgrades.ts}`, docs.
+- 🧪 Kiểm chứng: **87/87 CJS** (153,7s) · **31/31 TS** (4,0s) · tsc · lint · format:check · repo-map · i18n (+self-test) · settings-signal · timer-allowlist · convex-contract sạch. Web contracts **474 PASS** (+12 check đợt 4); UX upgrades 246 PASS (sửa 4 check `planAvatarResize` từng luôn xanh vì truyền hàm vào tham số boolean).
+- ▶️ Tiếp theo: PR `refactor/web-readability`; đợt 5/5 — độ dễ đọc/bảo trì `bot/` + `scripts/`.
+
 ## 2026-11-10 (3) — Đợt 3/5 audit 50 subagent: bundle web
 
 - ✅ **10 agent audit `src/`** (đợt 3/5) → cắt khỏi critical path: bỏ `MotionConfig` khỏi `App.tsx` (chuyển `MotionRoot` xuống 8 trang dùng motion); `HaimiyaChat` nạp lười ở 4 trang + tách `HaimiyaAvatar` khỏi widget; `GuildPage` nạp lười `UnlockPanel`/`CommandPalette`; `switch.tsx` import THẲNG `ModernToggle` → chunk `vendor-three` (115 KB) + `NeuformBatchEffects` (68 KB) biến mất khỏi dist; i18n cap 4s→250ms; router có `errorElement` (lỗi chunk hết bị nuốt); Admin skip query admin-only khi chưa phải admin; StatsPage huỷ subscription heat/today khi tab ẩn; WebP cho cá voi + QR (88→50 KB, 102→35 KB).
@@ -1125,105 +1185,6 @@ dashboard/{AutoModPanel,WelcomePanel,WhitelistPanel,OnboardingChecklist}.tsx}`,
 - 🟢 **Test trình duyệt THẬT** (`scripts/test-browser-contracts.cjs`, 7 test, chạy trong `bun run test`): điều khiển Chromium bằng DevTools Protocol qua WebSocket sẵn có của Node — **không cài dependency mới**. Chặn request `/boot.js` rồi chứng minh app vẫn hiện + lớp phủ biến mất + bấm nút đổi ngôn ngữ được (toạ độ chuột thật); đường boot bình thường vẫn đúng; `/status` redirect + canonical; skip-link bằng Tab/Enter với focus rơi vào `<main>` (đã thêm `tabIndex={-1}`); public/private/404; 0 console error qua 6 route.
 - 🟢 Hoàn thiện: manifest bỏ `orientation: portrait-primary` (dashboard dùng được trên tablet xoay ngang); sitemap bỏ `lastmod` bịa — chỉ 3 trang pháp lý có ngày THẬT (LEGAL_UPDATED trong legalContent.ts); skip-link + `main#main` đủ ở MỌI trang (kể cả DiscordCallback); CI cài Chromium cho job test.
 - ✅ Kiểm chứng: **80/80 CJS + 18/18 TS** suites · tsc · lint · format · repo-map · convex-contract · i18n · settings-signal · coverage floor · mutation 12/12 · `nginx -t` trong container nginx:1.27 thật · browser suite 7/7. Cập nhật AGENTS.md + guardrails (79→80, 17→18) và repo-map.
-
-## Đang dở
-
-- 🔎 **botKeySeed 06/10 08:49:33 — đã thu hẹp, chưa chốt danh tính.** Xác nhận
-  xoay qua `botBootstrapAction:requestBotKey` (chỉ đường này ghi
-  `lastBootstrapAt`; `setBotSecrets` không ghi) ⇒ caller có DISCORD_TOKEN +
-  Application ID khớp. Bot thật không gọi (out.log không có bootstrap, cache
-  `bot/.bot-key` vẫn 05/10). Máy dev hiện tại không phải VPS, không SSH/log
-  tháng 10 ⇒ cần lấy từ VPS: shell history quanh 08:49, pm2/out.log xoay vòng,
-  OpenCode session storage, `.bot-key` lạ ngoài `bot/`, Convex logs (nếu còn).
-  **Đã chặn tái diễn** (entry "2026-11-09 (3)"): `requestBotKey` từ chối xoay
-  khi `lastHeartbeat` < 3 phút — còn lại chỉ là truy nguyên danh tính.
-
-- ✅ **Backlog rà soát 30/09: đã sửa xong phần bug kỹ thuật** (entry "01/10/2026 (1)").
-  Còn lại các mục cần **người quyết định chính sách** trên đường raid — xem mục "Backlog"
-  trong entry "30/09/2026 (3)".
-
-- 🔴 **Bot production OFFLINE từ 26/09 13:23 UTC (11h lúc phát hiện 27/09)** —
-  `status:botStatus` trả `online: false`, `guildCount: 9`, heartbeat cũ. Nghi do
-  VPS mất kết nốn/mất mạng (host Meowlix đã từng rơi `emergency_ro` 2 lần 25/09).
-  User báo "VPS đang lỗi mất kết nối, sẽ sớm fix". **Khi VPS sống lại, chạy ngay:**
-  `pm2 status` · `pm2 logs protogon-bot --lines 30 --nostream` · `df -h /` ·
-  `free -h` — rồi xác nhận heartbeat mới qua lại gọi `status:botStatus` (online
-  phải về `true`, `lastHeartbeat` < 3 phút). `reboot` thuộc vùng 🔴: user tự gõ.
-
-- ✅ **GIẢI TRỪ reinstall (25/09 20:15)**: staff Bhadoria420 xác nhận VM 205
-  KHÔNG nằm trên India node sắp reinstall ("The vps are not on india node"),
-  chưa mua node mới ("Not now"), reinstall node khác sẽ giải phóng đĩa host
-  ("The disk would be somewhat freed" — đúng gốc rễ sự cố #1/#2), và không cần
-  backup ("No need"). Việc deploy bản refactor lên VPS trở lại như kế hoạch
-  bình thường: user chạy git pull + bun install + pm2 restart (hướng dẫn đã
-  gửi); CI đã deploy Convex xanh; hosting mirror deployable.
-- 🔍 **Review refactor trên nhánh `host-deploy` (commit `df7dd00`, 18:56 25/09)**
-  — XONG phần review + ĐÃ MERGE (commit b6e2fcd + a639490): zip `l7qsdt.zip` =
-  snapshot repo nguyên vẹn tên `protogon-quality-pass`, niêm phong 24/09 06:04,
-  base ≈ main sau 24/09 sáng (journal có tới 3 mục 24/09, thiếu t3-devbox.md).
-  Refactor thật ~105 file, các nhóm chính: (1) **claimAt lease fencing** cho
-  backup (chống 2 lượt xử lý trùng, sửa cả lỗi chính tả "BÁO LỄN" main đang
-  có), (2) **cứng hoá sessionAuth** (rate-limit login + chuẩn hoá redirect URI),
-  (3) **botBootstrapAction** fetch Discord có AbortController 8s + xác nhận app
-  ID khớp, (4) **relay** chặn scan unbounded (MAX_SOURCE_HASHES/…), (5) **bộ
-  artifact Vercel** mới toàn phần: vercel.json (CSP có hash, noindex route
-  riêng tư), seo.ts, convexUrl.ts (allowlist URL Convex fail-closed), 404.js,
-  og-image — main chưa từng có. **Kiểm chứng trên chính code zip: 61/61 suite
-  CJS + 9/9 TS + tsc + lint + format XANH** (chạy trong /tmp, node_modules
-  riêng). Zip sạch secret (không .env/.pem/bot-key). → ĐÃ MERGE TOÀN BỘ (user
-  chốt "lấy hết") vào main: commit b6e2fcd (merge + chữa 3 regression của
-  zip: 2 index Convex, otherSlots ×2, seed authVersion cho 2 e2e) + a639490
-  (bỏ CSP hash chết trong Dockerfile.web/vercel.json + bổ sung /status vào
-  SPA routes — phát hiện khi build verify trước deploy).
-- ⬇️ **HẠ CẤP — reinstall KHÔNG còn đe doạ VM 205** (xem mục ✅ giải trừ
-  phía trên): cảnh báo 17:50 của staff Hiro (MLX) về reinstall India node
-  từng đặt VM 205 vào tình huống dữ liệu sẽ mất (geo-IP `203.154.14.8` =
-  Thái Lan, coi như bị ảnh hưởng tới khi staff xác nhận). Staff Bhadoria420
-  đã xác nhận 20:03–20:14: VM 205 không nằm trên node đó, chưa mua node mới,
-  reinstall node khác sẽ giải phóng đĩa host, không cần backup. Checklist
-  backup gấp hạ cấp thành việc nên làm khi rảnh (env vẫn nên lưu + xoay 2
-  key lộ vì đã vào screenshot). Runbook dự phòng vẫn giữ ở
-  `docs/t3-devbox.md` mục 7.
-- 🚧 **VPS chết — chờ Meowlix** (25/09): host storage đầy, staff xác nhận trong
-  ticket #363 _"our main node disk is full — wait till we buy a new node"_. VM
-  205 boot-loop, bot pm2 + dashboard chỉ còn tồn tại theo RAM. Checklist khôi
-  phục đã soạn ở `docs/t3-devbox.md` mục 4b — làm theo đúng thứ tự khi VM sống
-  lại (fs check → swarm → pm2/curl → redeploy t3-code → xoay 2 key lộ + fix
-  bashrc dòng 111 → docs).
-- 🚧 **Setup T3 Code devbox — sót 2 việc phía người dùng** (xem `docs/t3-devbox.md`):
-  (1) app mobile T3 đăng nhập bằng account `wiothemilo` (GitHub, cùng account
-  devbox) → bật T3 Connect → chấm xanh; (2) đổi `GH_TOKEN` trong Dokploy
-  (service `t3-code` → Environment) sang PAT của `wiothemilo` scope `repo` →
-  redeploy → kiểm `/workspace/repos/` có repo Protogon. Hạ tầng đã xanh:
-  T3 web 200, VS Code 302, devbox authorized `wiothemilo@gmail.com`, relay
-  provisioned. Việc agent còn treo: `t3 uninstall` trên host (tuỳ chọn).
-- Không có việc bắt buộc khác (ngoài khối VPS chết phía trên). (Nợ cũ "dọn 119 bản dịch EN chết + 12 DE mồ côi" ĐÃ XONG phiên 23/09 —
-  dùng `scripts/_i18n-dead-remove.cjs`, check-i18n giờ sạch 100% không còn mục ℹ️.)
-- ✅ Nợ cũ "~144 câu nội suy chưa bọc translate()" (ghi nhận 20/09) ĐÃ XONG — đo lại
-  24/09: check-i18n --all báo 0 JSX text · 0 biểu thức · 0 thuộc tính còn nợ (các đợt
-  viết lại copy lô 2→5 ngày 21/09 đã xử luôn khi viết lại copy). Sót lại cố ý: 3
-  `placeholder` mẫu cú pháp kỹ thuật (`{server} · {action}`…) và nhãn thuật ngữ
-  Kick/Ban — dịch sẽ phá mục đích sử dụng.
-- 🚧 **Chặn kỹ thuật đã xác định được quy luật (đọc trước khi làm tiếp)**: công cụ patch
-  (`str_replace`) chỉ sửa được **vùng ĐẦU của file lớn** — trong `src/lib/i18n.en.ts` (87 KB) sửa được
-  entry ở offset ~5 KB nhưng mọi `oldString` lấy từ offset ~56 KB đều báo "not found" (dòng tồn tại
-  thật, `grep` xác nhận; `i18n.de.ts` 92 KB và các file từ điển lớn tương tự). Quy tắc rút ra:
-  1. **Đừng sửa key ở cuối file từ điển lớn** — muốn đổi câu hiển thị thì tạo key MỚI chèn ở vùng đầu
-     (patch được) và chấp nhận entry cũ thành bản dịch chết (guard báo mềm), HOẶC ghi đè giá trị
-     EN/DE cho **cùng key** bằng entry trùng tên trong `i18n.*.labels.ts`/`.panels.ts` (file nhỏ, gộp
-     sau nên thắng) khi không cần đổi chính chuỗi VI.
-  2. Việc cần xoá entry ở vùng cuối → dùng `scripts/_i18n-dead-remove.cjs` (script xoá theo key-list,
-     backup + kiểm esbuild sau mỗi file) — KHÔNG dùng str_replace cho entry vùng cuối.
-  3. `str_replace` cũng có lúc báo "file does not exist" hoặc dùng snapshot cũ cho file vừa ghi → luôn
-     `grep`/`read_files` kiểm lại nội dung trên đĩa sau mỗi lần áp patch.
-  4. **Cách xử lý TỐT NHẤT khi cần sửa ở vùng cuối file lớn: đổi thiết kế cho khỏi phải sửa ở đó.**
-     Ca thật 23/09: `bot/src/handlers/backup.js` (2126 dòng) cần thêm `store.invalidate()` sau
-     `botRestoreSettings` ở dòng ~1781 — patch báo "not found" dù `grep` xác nhận chuỗi đúng.
-     Thay vì mò cách vá đuôi file, gom việc đó về **một điểm chặn duy nhất ở file nhỏ**
-     (`bot/src/convex.js`: proxy tự xoá cache sau mọi lượt ghi cấu hình của bot) → vừa vá được
-     cả 7 chỗ cùng lúc, vừa không bao giờ phải chạm đuôi file lớn nữa.
-
----
 
 ## 2026-09-27c — UX web: chưa lưu · ⌘K · bật hàng loạt · badge đồng bộ
 

@@ -54,13 +54,11 @@ export type SwitchProps = Omit<
   disabled?: boolean;
   /** Gắn vào nút bên trong để `<Label htmlFor>` còn trỏ đúng. */
   id?: string;
-  /** Nhãn truy cập. Hàng cấu hình đã có nhãn nhìn thấy được nên thường bỏ trống. */
-  label?: string;
 };
 
 const Switch = React.forwardRef<HTMLSpanElement, SwitchProps>(
   (
-    { checked, onCheckedChange, disabled, id, label, className, "aria-label": ariaLabel, ...rest },
+    { checked, onCheckedChange, disabled, id, className, "aria-label": ariaLabel, ...rest },
     forwardedRef,
   ) => {
     const rootRef = React.useRef<HTMLSpanElement | null>(null);
@@ -149,14 +147,8 @@ const Switch = React.forwardRef<HTMLSpanElement, SwitchProps>(
       >
         <ModernToggle
           key={revision}
-          mode="auto"
-          size={1}
-          opacity={1}
-          hue={0}
-          saturation={1}
-          brightness={1}
           defaultOn={checked}
-          label={label ?? ariaLabel ?? translate("Bật")}
+          label={ariaLabel ?? translate("Bật")}
           onChange={handleChange}
         />
       </span>

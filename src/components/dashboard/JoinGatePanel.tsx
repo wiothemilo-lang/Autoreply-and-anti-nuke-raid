@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import {
@@ -16,6 +16,7 @@ import { api } from "../../../convex/_generated/api";
 import { Card, CardContent } from "../ui/card";
 import { Switch } from "../ui/switch";
 import { Input } from "../ui/input";
+import { ModuleNumber } from "./ModuleCard";
 import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -24,42 +25,6 @@ import { getSessionToken } from "../../lib/discord";
 
 import { translate } from "../../lib/i18n";
 const TOKEN = () => getSessionToken();
-
-function ModuleNumber({
-  value,
-  min,
-  max,
-  onCommit,
-}: {
-  value: number;
-  min: number;
-  max?: number;
-  onCommit: (n: number) => void;
-}) {
-  const [v, setV] = useState(String(value));
-  const [focused, setFocused] = useState(false);
-  useEffect(() => {
-    if (!focused) setV(String(value));
-  }, [value, focused]);
-  return (
-    <Input
-      type="number"
-      min={min}
-      max={max}
-      value={v}
-      onFocus={() => setFocused(true)}
-      onChange={(e) => setV(e.target.value)}
-      onBlur={() => {
-        setFocused(false);
-        const n = Number(v);
-        if (!Number.isNaN(n) && n >= min) onCommit(Math.round(n));
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-    />
-  );
-}
 
 function GateRow({
   icon: Icon,

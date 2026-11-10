@@ -125,13 +125,16 @@ export default function PremiumPage() {
   // Trang bán đọc chính bảng đó nên không thể hứa thứ code không enforce.
   const mine = useQuery(api.guilds.listMine, token ? { token } : "skip");
   const catalog = useQuery(api.plans.catalog, {});
-  const serverPlan = useQuery(
-    api.plans.guildPlan,
-    token && server ? { token, guildId: server } : "skip",
-  );
   const servers = mine ?? [];
   /** Server đang chọn — chỉ có 1 server thì mặc định chọn luôn cho đỡ phải bấm. */
   const effectiveServer = server || (servers.length === 1 ? servers[0].discordId : "");
+  // Query PHẢI khoá theo `effectiveServer`, không phải state `server`: khách chỉ
+  // có 1 server không bấm chọn nên `server` rỗng — dùng state thô làm banner
+  // gói/ngày hết hạn không bao giờ hiện dù trang đã tự chọn server đó.
+  const serverPlan = useQuery(
+    api.plans.guildPlan,
+    token && effectiveServer ? { token, guildId: effectiveServer } : "skip",
+  );
   /**
    * Quyền lợi hiển thị lấy THẲNG từ `catalog` (convex/plans.ts) — cũng chính là
    * bảng server dùng để chặn vượt hạn mức. Nhờ vậy trang bán không thể quảng

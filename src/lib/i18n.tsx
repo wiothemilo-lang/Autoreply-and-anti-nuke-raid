@@ -120,11 +120,13 @@ let currentLang: Lang = typeof window === "undefined" ? "vi" : readInitialLang()
 if (currentLang !== "vi") void ensureDictionary(currentLang);
 
 /**
- * Chờ từ điển của ngôn ngữ ban đầu (tối đa `timeoutMs`) để lần vẽ đầu đã đúng
- * ngôn ngữ, không nháy tiếng Việt. Quá hạn thì vẽ luôn; từ điển tới muộn làm
- * LangProvider vẽ lại. Tiếng Việt không cần chờ gì.
+ * Chờ từ điển của ngôn ngữ đang chọn, TỐI ĐA `timeoutMs`.
+ *
+ * Mặc định 250ms (trước 10/11/2026 là 4000ms): chờ lâu chỉ đổi lấy first paint
+ * muộn — preloader đứng im dù app đã sẵn sàng. Từ điển tới muộn hơn thì
+ * `dictListeners` trong LangProvider tự vẽ lại, không mất bản dịch.
  */
-export async function prepareInitialLanguage(timeoutMs = 4000): Promise<void> {
+export async function prepareInitialLanguage(timeoutMs = 250): Promise<void> {
   if (currentLang === "vi") return;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<void>((resolve) => {
