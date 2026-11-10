@@ -48,9 +48,14 @@ Cài đặt cho agent khác: `docs/obsidian-mcp.md`.
 ## Đọc
 
 1. `00-index.md` — quy ước + trạng thái vault.
-2. `so-do-he-thong.md` — kiến trúc, luồng cấu hình, "hỏng đâu mở đó".
-3. Note mới nhất trong `phien-lam-viec/` khi tiếp tục việc dở.
-4. `hoi-thoai/00-index.md` khi cần lại bối cảnh một cuộc trò chuyện cũ.
+2. `so-do-tri-nho.md` — bản đồ liên kết trí nhớ: note nào nối note nào, đi tiếp ở đâu.
+3. `so-do-he-thong.md` — kiến trúc, luồng cấu hình, "hỏng đâu mở đó".
+4. Note mới nhất trong `phien-lam-viec/` khi tiếp tục việc dở.
+5. `hoi-thoai/00-index.md` khi cần lại bối cảnh một cuộc trò chuyện cũ.
+
+Agent ngoài OpenCode (Claude Code, Cursor, Codex): đưa chúng
+`cho-agent/00-bat-dau.md` (onboarding 5 phút) + `cho-agent/playbook-ghi-nho.md`.
+Kiểm định kỳ: `kiem-tra-vault.md` — link chết, note mồ côi, nội dung lệch code.
 
 Chỉ đọc khi cần định hướng hoặc khi người dùng nhắc vault. Đừng đọc cả vault
 mỗi phiên — index đủ.
