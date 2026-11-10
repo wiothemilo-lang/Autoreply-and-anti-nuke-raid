@@ -113,6 +113,10 @@ Cursor dùng `${env:VAR}` và không cần `type` cho remote server. Biến ph�
 trong môi trường **lúc Cursor khởi động** — mở Cursor từ terminal đã export nếu
 desktop entry không thấy biến.
 
+Đã có báo cáo `${env:VAR}` trong `headers` của remote server không được nội suy
+ở một số bản Cursor. Nếu gặp: copy entry sang `~/.cursor/mcp.json` (user-level,
+**không commit**) và dán key trực tiếp, hoặc dùng một server MCP stdio bọc HTTP.
+
 ## VS Code / GitHub Copilot
 
 File `.vscode/mcp.json` (đã có sẵn) dùng input prompt, key lưu trong secret
