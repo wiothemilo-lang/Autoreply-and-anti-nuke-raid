@@ -73,6 +73,14 @@
 
 ---
 
+## 2026-11-10 (12) — Skill vault + MCP Obsidian cho 5 agent
+
+- ✅ **Vault**: dời `second-brain/` vào working tree (Obsidian mở repo làm vault); `.obsidian/` + `second-brain/` bị gitignore — anchor `/second-brain/` ở root để không chặn nhầm `.opencode/skills/second-brain/`.
+- 🔌 **MCP**: dùng MCP dựng sẵn của plugin `obsidian-local-rest-api` 5.5.2 — HTTP loopback `127.0.0.1:27123/mcp/`, HTTPS 27124, key ở `~/.secrets/obsidian-api-key`. OpenCode global dùng `{file:...}` → `obsidian connected`; đã gọi thật `vault_list` + `vault_read`.
+- 🧩 **Agent khác**: thêm `.mcp.json` (Claude Code), `.cursor/mcp.json`, `.vscode/mcp.json`, `docs/obsidian-mcp.md` (kèm Codex + bảo mật + sự cố). Claude/Cursor/VS Code/Codex chưa cài trên máy → **chưa chạy thật**.
+- 🧪 **Kiểm chứng**: `opencode mcp list` connected; MCP `vault_list`/`vault_read` trả dữ liệu thật; prettier + JSON parse OK.
+- ▶️ Tiếp theo: PR #97 chờ CI; cài thử 1 client ngoài OpenCode; bulk-archive thread cũ nếu người dùng muốn.
+
 ## 2026-11-10 (11) — Vá fallback tick: ticket không còn đứng im khi batch lỗi
 
 - 🐛 **Lỗi**: nhánh fallback của `runTickOnceInner` (`bot/src/tick.js`) chỉ chạy hidden/verify/backup/báo cáo — **bỏ sót `jobs.ticketPanels` và `jobs.tickets`**. Khi `bot_tick:getPendingJobs` lỗi (deploy lệch, quá tải), bot tạm bỏ batch 10 phút mỗi lần ⇒ panel mở ticket không được dán, ticket không auto-close/closeChannel/purge, và **không có log nào** báo ticket đang đứng.
