@@ -453,6 +453,17 @@ async function main() {
     }
   }
 
+  // ── Cổng tĩnh: label metrics KHÔNG được chứa guildId (cardinality vô hạn) ──
+  {
+    const fs = require("fs");
+    const path = require("path");
+    const src = fs.readFileSync(path.join(__dirname, "..", "bot", "src", "convex.js"), "utf8");
+    check(
+      "metrics label getConfig cố định (không tạo series theo guild)",
+      !src.includes("getConfig:${guildId}") && src.includes('"getConfig",'),
+    );
+  }
+
   console.log = realLog;
   console.warn = realWarn;
   realLog(`\nKết quả metrics + logId: ${pass} PASS, ${fail} FAIL`);

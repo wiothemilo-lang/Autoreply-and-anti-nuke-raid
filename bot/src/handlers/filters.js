@@ -181,6 +181,22 @@ function wordBoundaryRegex(word) {
   return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(word)}([^\\p{L}\\p{N}]|$)`, "iu");
 }
 
+/**
+ * Cache RegExp của badWords theo IDENTITY mảng.
+ *
+ * Trước đây mỗi tin nhắn compile lại regex cho TỪNG từ (50 từ = 50 `new RegExp`
+ * mỗi message — cấp phát + parse pattern Unicode mỗi lần). Convex trả config mới
+ * khi cấu hình đổi → mảng mới → WeakMap tự nhả mảng cũ; không giữ guild nào.
+ */
+const badWordRegexCache = new WeakMap();
+function badWordRegexes(words) {
+  const cached = badWordRegexCache.get(words);
+  if (cached) return cached;
+  const compiled = words.filter(Boolean).map((w) => [w, wordBoundaryRegex(w)]);
+  badWordRegexCache.set(words, compiled);
+  return compiled;
+}
+
 function isExempt(member, config) {
   if (!member) return false;
   if (member.id === member.guild.ownerId) return true;
@@ -255,6 +271,15 @@ const BENIGN_LINK_HOSTS = new Set([
  *  (shopee.vn) vì kẻ xấu mua domain kiểu evil-shopee.vn để lách.
  */
 const BENIGN_SUFFIX_HOSTS = new Set(["github.io", "gitlab.io", "pages.dev"]);
+/** Set tra cứu O(1) thay vì `MALICIOUS_DOMAINS.includes` (quét tuyến tính/URL). */
+const MALICIOUS_SET = new Set(MALICIOUS_DOMAINS);
+/** Duyệt Set trực tiếp — `[...Set]` cấp phát mảng mới cho MỖI URL mỗi message. */
+function isBenignSuffixHost(host) {
+  for (const s of BENIGN_SUFFIX_HOSTS) {
+    if (host === s || host.endsWith("." + s)) return true;
+  }
+  return false;
+}
 function findSuspiciousLink(content) {
   const urls = content.match(/https?:\/\/[^\s<>"]+|www\.[^\s<>"]+/gi) || [];
   for (const raw of urls) {
@@ -264,7 +289,7 @@ function findSuspiciousLink(content) {
       .split(/[/?#]/)[0]
       .toLowerCase();
     if (BENIGN_LINK_HOSTS.has(host)) continue;
-    if ([...BENIGN_SUFFIX_HOSTS].some((s) => host === s || host.endsWith("." + s))) continue;
+    if (isBenignSuffixHost(host)) continue;
     return { host, url: raw };
   }
   return null;
@@ -278,7 +303,7 @@ function findMaliciousLink(content) {
       .replace(/^www\./i, "")
       .split(/[/?#]/)[0]
       .toLowerCase();
-    if (MALICIOUS_DOMAINS.includes(host)) return { kind: "domain", value: host };
+    if (MALICIOUS_SET.has(host)) return { kind: "domain", value: host };
     // URLhaus (abuse.ch) — domain malware mới được threatEngine nạp mỗi giờ.
     if (urlhausDomains.size > 0 && urlhausDomains.has(host)) {
       return { kind: "urlhaus-domain", value: host };
@@ -461,7 +486,7 @@ async function scanMessage(client, message, store, heat) {
   // 2) Từ ngữ xấu
   if (badwordCfg?.enabled && message.content && (config.badWords || []).length > 0) {
     const lower = message.content.toLowerCase();
-    const bad = (config.badWords || []).find((w) => w && wordBoundaryRegex(w).test(lower));
+    const bad = badWordRegexes(config.badWords).find(([, re]) => re.test(lower))?.[0];
     if (bad) {
       return punishFlow(
         client,

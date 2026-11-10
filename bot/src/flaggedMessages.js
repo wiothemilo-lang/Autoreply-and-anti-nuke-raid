@@ -22,7 +22,9 @@ function noteFlaggedMessage(content, guildId, reason, now = Date.now()) {
   try {
     const text = String(content ?? "");
     if (text.length < MIN_LEN || text.length > MAX_LEN) return false;
-    if (items.length >= MAX_TOTAL) items.shift();
+    // `shift()` là O(n) trên mảng 1200 phần tử (dịch toàn bộ index); splice
+    // đúng phần vượt trần rẻ hơn và giữ nguyên thứ tự cũ → mới.
+    if (items.length >= MAX_TOTAL) items.splice(0, items.length - MAX_TOTAL + 1);
     items.push({
       content: text,
       guildId: String(guildId ?? "unknown"),

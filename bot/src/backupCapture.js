@@ -514,7 +514,11 @@ async function runBackup(client, store, guildId, opts = {}) {
   }
 
   // ─── Compress + encrypt backup ──────────────────────────────────────────
-  const { backupJson, compressed, checksum, encrypted } = compressAndEncryptBackup(snapshot);
+  // Truyền checksum đã tính ở trên — tránh stringify + băm snapshot lần 2.
+  const { backupJson, compressed, checksum, encrypted } = compressAndEncryptBackup(
+    snapshot,
+    currentChecksum,
+  );
 
   let backupId;
   try {

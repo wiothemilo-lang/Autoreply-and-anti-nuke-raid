@@ -388,6 +388,21 @@ Module._load = function (request, parent) {
     );
   }
 
+  // ── logDedupe: burst > 500 trong cùng cửa sổ KHÔNG được phình Map ──
+  {
+    __resetLogDedupeForTest();
+    const { isDuplicateDelivery } = require("../bot/src/logDedupe");
+    const now = Date.now();
+    for (let i = 0; i < 700; i++) {
+      isDuplicateDelivery("burst-ch", { title: "t" + i, description: "d" }, now);
+    }
+    // Entry cũ nhất bị đẩy khỏi trần → gửi lại cùng chữ ký KHÔNG bị coi là trùng.
+    const oldestAgain = isDuplicateDelivery("burst-ch", { title: "t0", description: "d" }, now);
+    check("burst 700 log → entry cũ nhất bị cắt (không phình vô hạn)", oldestAgain === false);
+    const newestAgain = isDuplicateDelivery("burst-ch", { title: "t699", description: "d" }, now);
+    check("entry mới vẫn được chống trùng", newestAgain === true);
+  }
+
   fs.unlinkSync(DJS_MOCK);
   console.log(`\nKết quả util: ${pass} pass, ${fail} fail`);
   process.exit(fail > 0 ? 1 : 0);

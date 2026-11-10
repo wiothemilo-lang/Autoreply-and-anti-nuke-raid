@@ -834,9 +834,12 @@ console.log("── #12 mô phỏng auto-reply ──");
   );
   check(
     "bot khớp keyword giống hệt (bỏ keyword rỗng, lowercase 2 phía)",
-    /\(rule\.keywords \|\| \[\]\)\.some\(\(k\) => k && content\.includes\(k\.toLowerCase\(\)\)\)/.test(
+    // Bot cache keyword đã lowercase theo identity rule (WeakMap) để khỏi
+    // lowercase lại từng keyword mỗi tin nhắn — hợp đồng với web giữ nguyên:
+    // bỏ keyword rỗng, lowercase CẢ HAI phía trước khi so khớp.
+    /\(rule\.keywords \|\| \[\]\)\.filter\(Boolean\)\.map\(\(k\) => k\.toLowerCase\(\)\)/.test(
       botMsg,
-    ),
+    ) && /lowerKeywords\(rule\)\.some\(\(k\) => content\.includes\(k\)\)/.test(botMsg),
   );
   check("bot chỉ trả lời rule ĐẦU TIÊN khớp", /return; \/\/ reply once per message/.test(botMsg));
   check(

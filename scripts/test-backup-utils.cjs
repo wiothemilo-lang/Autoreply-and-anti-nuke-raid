@@ -248,5 +248,24 @@ function check(label, cond) {
   check("uncompressBackup chặn decompression bomb", capped, threw ? "threw" : `len=${out?.length}`);
 }
 
+// ── compressAndEncryptBackup: dùng checksum caller đã tính (khỏi stringify lần 2) ──
+{
+  const snap = { roles: [{ id: "r" }], channels: [], emojis: [], stickers: [], settings: {} };
+  const enc = utils.compressAndEncryptBackup(snap, "checksum-da-tinh");
+  check(
+    "compressAndEncryptBackup dùng snapshotChecksum truyền vào",
+    enc.snapshotChecksum === "checksum-da-tinh",
+  );
+  check(
+    "checksum nội dung vẫn được tính độc lập",
+    typeof enc.checksum === "string" && enc.checksum.length === 64,
+  );
+  const enc2 = utils.compressAndEncryptBackup(snap);
+  check(
+    "không truyền → tự tính snapshotChecksum như cũ",
+    enc2.snapshotChecksum === utils.computeSnapshotChecksum(snap),
+  );
+}
+
 console.log(`\nKết quả backup utils: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail > 0 ? 1 : 0);

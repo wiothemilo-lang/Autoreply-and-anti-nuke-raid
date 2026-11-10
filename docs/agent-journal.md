@@ -1,5 +1,12 @@
 # Nhật ký tiến trình agent
 
+## 2026-11-10 (2) — Đợt 2/5 audit 50 subagent: hiệu năng bot
+
+- ✅ **10 agent audit `bot/src`** (đợt 2/5) → sửa đường nóng: tick chống CHỒNG (restore dài không mở lượt 2); `getConfig` gộp 5 listener/message thành 1 query in-flight (force không join, invalidate cắt in-flight); metrics bỏ label `getConfig:<guildId>` (hết phình series/log); badWords regex cache theo identity mảng; autoReply thoát sớm khi rỗng + cache keyword lowercase; `logDedupe` cap cứng; `flaggedMessages` bỏ `shift()` O(n); altDetection cache ban list 10' + invalidate khi ban; welcomeCard cache ảnh nền có trần 32 MB; backup bỏ stringify/băm lần 2 + giải phóng chuỗi JSON sau parse; antinuke dọn `staleUnlockSwept`.
+- 📁 File đụng: `bot/src/{tick,convex,logDedupe,flaggedMessages,backupUtils,backupCapture,backupRestore,altDetection}.js`, `bot/src/handlers/{filters,messageCreate,welcomeCard}.js`, `bot/src/handlers/antinuke/{index,state}.js`, `scripts/test-{tick,convex-client,metrics,util,backup-utils,alt-detection,antinuke-state,welcome-card,web-ux-upgrades}.*`.
+- 🧪 Kiểm chứng: **87/87 CJS** (141,6s) · **31/31 TS** (4,1s) · typecheck · lint · format:check · 10 cổng tĩnh sạch. Test mới: tick chồng, getConfig song song, ban cache, cache ảnh nền, logDedupe cap, backup checksum, antinuke sweep.
+- ▶️ Tiếp theo: PR đợt 2; đợt 3/5 — bundle web; nợ: `/lock` defer, ticket retention, `analytics.stats` subscription.
+
 ## 2026-11-10 — Đợt 1/5 audit 50 subagent: cắt đọc toàn bảng Convex
 
 - ✅ **10 agent audit Convex** (đợt 1/5, tổng 50) → sửa đường nóng: `sessions.me`/`guilds.listMine` tra `manageableGuildIds` qua `by_discordId` (bỏ quét cả bảng); `getGuild` chỉ đọc panels/giveaways/autoReplies khi là chủ bot, giveaway qua index + `take(30)`; `hiddenPasswordIsSet` dùng index `by_hiddenPasswordHash`; `buildHiddenJobs` nhận guild đã đọc sẵn; `botTicketState` lấy ticket mới nhất qua index `(guildId, openerId, createdAt)`; `incidents` tra marks theo `(guildId, key)`; `reports` đưa `from`/`to` vào range index; `payments` dọn pending qua `(userId, status, createdAt)` + entitlement một lượt collect; `raidSamples` trim xác suất + lô.

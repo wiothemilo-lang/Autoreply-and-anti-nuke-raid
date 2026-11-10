@@ -277,6 +277,11 @@ fs.writeFileSync(
     S.buttonRaidHandledAt.set("live:m1", now);
     S.buttonRaidHandledAt.set("dead:m2", now);
 
+    S.staleUnlockSwept.clear();
+    S.staleUnlockSwept.add(`live:expired:${now - 1000}`); // mốc còn mới → giữ
+    S.staleUnlockSwept.add(`live:expired:${now - 90_000_000}`); // > 24h → xoá
+    S.staleUnlockSwept.add(`dead:expired:${now - 1000}`); // guild rời → xoá
+
     state.sweepMemory();
 
     check("sweep xóa bucket của guild đã rời", !S.buckets.has("dead:massJoin"));
@@ -297,6 +302,15 @@ fs.writeFileSync(
     check("sweep giữ appUserHandledAt mới", S.appUserHandledAt.has("live:u1"));
     check("sweep xóa lastExtAppProcessedAt guild chết", !S.lastExtAppProcessedAt.has("dead"));
     check("sweep xóa buttonRaidHandledAt guild chết", !S.buttonRaidHandledAt.has("dead:m2"));
+    check("sweep giữ mốc unlock còn mới", S.staleUnlockSwept.has(`live:expired:${now - 1000}`));
+    check(
+      "sweep xóa mốc unlock > 24h",
+      !S.staleUnlockSwept.has(`live:expired:${now - 90_000_000}`),
+    );
+    check(
+      "sweep xóa mốc unlock của guild đã rời",
+      !S.staleUnlockSwept.has(`dead:expired:${now - 1000}`),
+    );
   }
 
   // ── 9b. sweepMemory: entry exempt (owner/admin/whitelist) — hồi quy TDZ ──

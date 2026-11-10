@@ -179,6 +179,11 @@ class ConvexStore {
     // invalidate giữa chừng (bot vừa tự ghi cấu hình) thì kết quả CŨ không được
     // ghi đè cache — nếu không, cấu hình trước khi ghi bị giữ tới 30 phút.
     this._cacheGen = new Map(); // guildId -> số thế hệ
+    // Gộp các lượt getConfig SONG SONG cùng guild. Mỗi tin nhắn có 5 listener
+    // (messageCreate, filters, antinuke messages ×2, ticketActivity) cùng gọi
+    // getConfig; khi cache hết TTL/invalidate, cả 5 tạo 5 query Convex trùng
+    // (và 5 chuỗi retry nếu Convex lỗi). Chỉ giữ promise đang bay — xong là xoá.
+    this._configInflight = new Map(); // guildId -> Promise<config>
     this.ruleCooldowns = new Map(); // `${guildId}:${ruleId}` -> timestamp
     this._startedAt = Date.now();
     this._lastHeartbeat = 0;
@@ -351,29 +356,52 @@ class ConvexStore {
       const ttl = hasPending ? CONFIG_TTL_PENDING_MS : CONFIG_TTL_MS;
       if (now - hit.fetchedAt < ttl) return hit.config;
     }
-    const gen = this._cacheGen.get(guildId) ?? 0;
-    try {
-      const config = await withRetry(
-        () => this.client.query("guilds:getBotConfig", { guildId }),
-        `getConfig:${guildId}`,
-      );
-      // Chỉ ghi cache nếu không có lượt invalidate nào xen vào trong lúc fetch.
-      if ((this._cacheGen.get(guildId) ?? 0) === gen) {
-        this.cache.set(guildId, { config, fetchedAt: Date.now() });
-      }
-      return config;
-    } catch (err) {
-      console.error(`[convex] getConfig(${guildId}) failed after retries:`, err?.message);
-      // Return cached version if available (even if stale)
-      if (hit) return hit.config;
-      throw err;
+    // Cache miss: nếu đã có lượt fetch cùng guild đang bay, dùng chung promise.
+    // `force` KHÔNG join — người gọi force cần dữ liệu mới ngay.
+    if (!opts.force) {
+      const inflight = this._configInflight.get(guildId);
+      if (inflight) return inflight;
     }
+    const gen = this._cacheGen.get(guildId) ?? 0;
+    const promise = (async () => {
+      try {
+        // Label CỐ ĐỊNH: trước đây `getConfig:<guildId>` tạo một series
+        // Prometheus riêng cho từng guild, không bao giờ được xoá — mỗi
+        // guild từng join làm phình registry + log metrics (hàng chục MB/ngày).
+        const config = await withRetry(
+          () => this.client.query("guilds:getBotConfig", { guildId }),
+          "getConfig",
+        );
+        // Chỉ ghi cache nếu không có lượt invalidate nào xen vào trong lúc fetch.
+        if ((this._cacheGen.get(guildId) ?? 0) === gen) {
+          this.cache.set(guildId, { config, fetchedAt: Date.now() });
+        }
+        return config;
+      } catch (err) {
+        console.error(`[convex] getConfig(${guildId}) failed after retries:`, err?.message);
+        // Return cached version if available (even if stale)
+        if (hit) return hit.config;
+        throw err;
+      }
+    })();
+    if (!opts.force) {
+      this._configInflight.set(guildId, promise);
+      const clear = () => {
+        if (this._configInflight.get(guildId) === promise) this._configInflight.delete(guildId);
+      };
+      promise.then(clear, clear);
+    }
+    return promise;
   }
 
   /** Invalidate the cache after the bot itself writes config. */
   invalidate(guildId) {
     this._cacheGen.set(guildId, (this._cacheGen.get(guildId) ?? 0) + 1);
     this.cache.delete(guildId);
+    // Lượt fetch đang bay mang dữ liệu TRƯỚC khi ghi cấu hình → người gọi mới
+    // phải tạo lượt mới thay vì join promise cũ (promise cũ vẫn phục vụ đúng
+    // những caller đã nhận nó; chúng chỉ không ghi cache nhờ gen check).
+    this._configInflight.delete(guildId);
   }
 
   /**

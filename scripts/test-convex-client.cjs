@@ -542,6 +542,37 @@ function freshStore() {
     );
   }
 
+  // ── getConfig: gộp lượt SONG SONG cùng guild (5 listener/message) ─────────
+  {
+    const store = freshStore();
+    let queries = 0;
+    store._rawClient.query = async (name, args) => {
+      queries++;
+      await new Promise((r) => setTimeout(r, 10));
+      return { guildId: args.guildId, config: true };
+    };
+    const [a, b, c] = await Promise.all([
+      store.getConfig("g-par"),
+      store.getConfig("g-par"),
+      store.getConfig("g-par"),
+    ]);
+    check("3 getConfig song song cùng guild → chỉ 1 query Convex", queries === 1);
+    check("cả 3 nhận cùng config", a === b && b === c && a?.config === true);
+
+    // force KHÔNG join lượt đang bay — người gọi force cần dữ liệu mới ngay.
+    const store2 = freshStore();
+    let forced = 0;
+    store2._rawClient.query = async (name, args) => {
+      forced++;
+      await new Promise((r) => setTimeout(r, 10));
+      return { guildId: args.guildId };
+    };
+    const p1 = store2.getConfig("g-force2");
+    const p2 = store2.getConfig("g-force2", { force: true });
+    await Promise.all([p1, p2]);
+    check("force không join lượt đang bay → 2 query", forced === 2);
+  }
+
   console.log(`\nKết quả: ${pass} pass, ${fail} fail`);
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {

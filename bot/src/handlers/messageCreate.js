@@ -7,18 +7,35 @@ function channelAllowed(rule, message) {
   return rule.channels.includes(message.channel.id);
 }
 
+/**
+ * Cache keyword đã lowercase theo identity của rule (Convex trả rule mới khi
+ * cấu hình đổi → WeakMap tự nhả). Trước đây mỗi tin nhắn `toLowerCase()` lại
+ * toàn bộ keyword của mọi rule — cấp phát chuỗi mới cho từng từ mỗi message.
+ */
+const keywordLowerCache = new WeakMap();
+function lowerKeywords(rule) {
+  const cached = keywordLowerCache.get(rule);
+  if (cached) return cached;
+  const out = (rule.keywords || []).filter(Boolean).map((k) => k.toLowerCase());
+  keywordLowerCache.set(rule, out);
+  return out;
+}
+
 async function handleAutoReply(client, message, config, store) {
+  const rules = config.autoReplies || [];
+  // Server không bật auto-reply: thoát TRƯỚC khi lowercase nội dung tin nhắn.
+  if (rules.length === 0) return;
   const mentioned = message.mentions.users.has(client.user.id);
   const content = message.content.toLowerCase();
 
-  for (const rule of config.autoReplies || []) {
+  for (const rule of rules) {
     if (!rule.enabled) continue;
     if (!channelAllowed(rule, message)) continue;
 
     const matched =
       rule.triggerType === "mention"
         ? mentioned
-        : (rule.keywords || []).some((k) => k && content.includes(k.toLowerCase()));
+        : lowerKeywords(rule).some((k) => content.includes(k));
     if (!matched) continue;
 
     if (store.isCooledDown(message.guild.id, rule._id, rule.cooldownSeconds || 0)) continue;

@@ -21,6 +21,44 @@ const { registerSweep } = require("./sweeper");
 
 const DAY_MS = 86_400_000;
 
+/**
+ * Cache danh sách ban theo guild cho Layer 8 (so username với người từng bị ban).
+ *
+ * `guild.bans.fetch()` KHÔNG tham số luôn gọi REST lấy TOÀN BỘ ban list (tới
+ * 1000 entry) — trước đây chạy MỖI join, nên raid 100 join = 100 request +
+ * parse 1000 entry, dễ 429 và chặn event loop. Cache 10 phút là đủ: đây là
+ * heuristic, không phải cổng chặn. `guildBanAdd` gọi invalidate để bản mới
+ * nhất có hiệu lực ngay.
+ */
+const BANS_CACHE_TTL_MS = 10 * 60_000;
+const BANS_CACHE_MAX_GUILDS = 500;
+const bansCache = new Map(); // guildId -> { at, usernames: string[] }
+
+async function cachedBannedUsernames(guild) {
+  const now = Date.now();
+  const hit = bansCache.get(guild.id);
+  if (hit && now - hit.at < BANS_CACHE_TTL_MS) return hit.usernames;
+  const bans = await guild.bans.fetch();
+  const usernames = [];
+  for (const [, ban] of bans) {
+    // Tên < 5 ký tự không đủ tín hiệu (trùng ngẫu nhiên quá cao) — bỏ ngay
+    // khi nạp cache thay vì lọc lại mỗi join.
+    if (ban.user?.username && ban.user.username.length >= 5) usernames.push(ban.user.username);
+  }
+  bansCache.set(guild.id, { at: now, usernames });
+  if (bansCache.size > BANS_CACHE_MAX_GUILDS) {
+    // Guild rời không được dọn ở đây; cắt entry cũ nhất khi vượt trần.
+    const oldest = bansCache.keys().next().value;
+    if (oldest !== undefined) bansCache.delete(oldest);
+  }
+  return usernames;
+}
+
+/** Xoá cache ban của 1 guild (gọi từ guildBanAdd/Remove). */
+function invalidateBanCache(guildId) {
+  if (guildId) bansCache.delete(String(guildId));
+}
+
 // ——— Utility: simple username similarity (Levenshtein-like) ———
 function levenshtein(a, b) {
   if (a === b) return 0;
@@ -441,10 +479,9 @@ async function analyzeNewMember(member, config, getConfig, store) {
 
   // Layer 8: Cross-reference with banned users (require HIGH similarity)
   try {
-    const bans = await member.guild.bans.fetch();
-    for (const [, ban] of bans) {
-      if (ban.user.username.length < 5) continue;
-      const banUserSim = usernameSimilarity(member.user.username, ban.user.username);
+    const bannedUsernames = await cachedBannedUsernames(member.guild);
+    for (const bannedName of bannedUsernames) {
+      const banUserSim = usernameSimilarity(member.user.username, bannedName);
       if (banUserSim >= 90) {
         // Require 90%+ match with banned users
         riskScore += 25;
@@ -1016,6 +1053,12 @@ function sweepStaleGuilds(liveGuildIds) {
       removed++;
     }
   }
+  for (const guildId of [...bansCache.keys()]) {
+    if (!liveGuildIds.has(guildId)) {
+      bansCache.delete(guildId);
+      removed++;
+    }
+  }
   return removed;
 }
 
@@ -1038,6 +1081,8 @@ module.exports = {
   scanGuildForAltsAsync,
   // Đợt 7: dọn guild đã rời (memGuard)
   sweepStaleGuilds,
+  // Cache ban list: guildBanAdd/Remove gọi để bản mới có hiệu lực ngay
+  invalidateBanCache,
   // Đợt #4: dọn dữ liệu voice cũ (qua vòng sweep chung)
   sweepVoiceIpMap,
   VOICE_DATA_TTL_MS,

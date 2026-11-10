@@ -97,6 +97,34 @@ async function inkOf(png: Buffer) {
   // lớn glyph bị bỏ → mực tụt rõ rệt.
   check(`chữ có dấu vẫn vẽ đủ (ink=${vietInk.light})`, vietInk.light > withText.light * 0.85);
 
+  console.log("\n── Cache ảnh nền: nhiều join không tải lại cùng URL ──");
+  {
+    const backupMod = require("../bot/src/handlers/backup");
+    const origAssert = backupMod.assertSafeRemoteUrl;
+    const origFetch = (globalThis as any).fetch;
+    let fetches = 0;
+    backupMod.assertSafeRemoteUrl = async (u: string) => u;
+    (globalThis as any).fetch = async () => {
+      fetches++;
+      return {
+        ok: true,
+        headers: { get: (k: string) => (k === "content-type" ? "image/png" : null) },
+        arrayBuffer: async () => basic,
+      };
+    };
+    try {
+      const url = "https://example.test/nen.png";
+      await card.renderCard({ eyebrow: "A", name: "B", meta: "C", backgroundUrl: url });
+      await card.renderCard({ eyebrow: "A", name: "B", meta: "C", backgroundUrl: url });
+      check("2 thẻ cùng ảnh nền → chỉ 1 lần tải", fetches === 1);
+      await card.renderCard({ eyebrow: "A", name: "B", meta: "C", backgroundUrl: url + "?v=2" });
+      check("URL nền khác → tải mới", fetches === 2);
+    } finally {
+      backupMod.assertSafeRemoteUrl = origAssert;
+      (globalThis as any).fetch = origFetch;
+    }
+  }
+
   console.log("\n── Emoji bị bỏ khỏi ẢNH (không vẽ ô tofu) ──");
   const FONT = "24px ProtogonCard";
   const drawable = (t: string) => card._drawableTextForTest(FONT, t);
