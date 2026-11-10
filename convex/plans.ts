@@ -180,7 +180,24 @@ export async function bestEntitlementForUser(
   ctx: QueryCtx,
   userId: Id<"users"> | null | undefined,
 ): Promise<{ plan: string; startsAt: number; expiresAt: number } | null> {
-  if (!userId) return null;
+  return (await entitlementSnapshotForUser(ctx, userId)).best;
+}
+
+/**
+ * Một lượt đọc trả CẢ dòng tốt nhất còn hạn LẪN dòng bất kỳ (kể cả hết hạn).
+ *
+ * `payments.premiumStatus` trước đây gọi `bestEntitlementForUser` rồi, khi
+ * không có gói active, query lại `by_userId` lần nữa chỉ để lấy dòng cũ nhất —
+ * 2 lượt collect trên cùng index cho một câu trả lời.
+ */
+export async function entitlementSnapshotForUser(
+  ctx: QueryCtx,
+  userId: Id<"users"> | null | undefined,
+): Promise<{
+  best: { plan: string; startsAt: number; expiresAt: number } | null;
+  any: { plan: string; startsAt: number; expiresAt: number } | null;
+}> {
+  if (!userId) return { best: null, any: null };
   const rows = await ctx.db
     .query("entitlements")
     .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -198,7 +215,11 @@ export async function bestEntitlementForUser(
       bestRank = rank;
     }
   }
-  return best;
+  const first = rows[0];
+  return {
+    best,
+    any: first ? { plan: first.plan, startsAt: first.startsAt, expiresAt: first.expiresAt } : null,
+  };
 }
 
 /** Kết quả tra gói của một server. */

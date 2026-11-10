@@ -75,13 +75,20 @@ export const historyForGuild = query({
     if (!canManageGuild(user, guild)) {
       return { page: [], isDone: true, continueCursor: "" };
     }
+    // `from`/`to` phải nằm trong RANGE của index, không phải filter sau index:
+    // filter sau index vẫn quét toàn bộ lịch sử guild rồi mới loại, nên tìm
+    // kiếm trong 1 ngày vẫn tốn reads bằng tìm cả năm. Index đã kết thúc bằng
+    // `createdAt` nên đưa mốc vào đây là miễn phí.
     let q = ctx.db
       .query("antinukeEvents")
-      .withIndex("by_guildId_createdAt", (qq) => qq.eq("guildId", guildId))
+      .withIndex("by_guildId_createdAt", (qq) =>
+        qq
+          .eq("guildId", guildId)
+          .gte("createdAt", from ?? 0)
+          .lte("createdAt", to ?? Number.MAX_SAFE_INTEGER),
+      )
       .order("desc");
     if (module) q = q.filter((qq) => qq.eq(qq.field("module"), module));
-    if (from !== undefined) q = q.filter((qq) => qq.gte(qq.field("createdAt"), from));
-    if (to !== undefined) q = q.filter((qq) => qq.lte(qq.field("createdAt"), to));
     const term = search?.trim().toLowerCase();
     if (term) {
       // Case-insensitive prefix match on the culprit's name: [term, term + maxChar)

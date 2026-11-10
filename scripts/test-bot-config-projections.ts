@@ -92,7 +92,9 @@ function makeCtx() {
         .flat()
         .find((r) => r._id === id) ?? null,
     query: (table: string) => ({
-      withIndex: (_name: string, bound: (q: any) => any) => {
+      // `bound` TUỲ CHỌN — Convex cho phép withIndex("tên") không range
+      // (hiddenPasswordIsSet quét index by_hiddenPasswordHash để trả O(1)).
+      withIndex: (_name: string, bound?: (q: any) => any) => {
         const capture: Record<string, unknown> = {};
         const q = {
           eq: (field: string, value: unknown) => {
@@ -100,7 +102,7 @@ function makeCtx() {
             return q;
           },
         };
-        bound(q);
+        if (bound) bound(q);
         const list = (rows[table] ?? []).filter((r) =>
           Object.entries(capture).every(([field, value]) => r[field] === value),
         );

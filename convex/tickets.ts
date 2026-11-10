@@ -354,23 +354,22 @@ export const botTicketState = query({
     const open = await ctx.db
       .query("tickets")
       .withIndex("by_guildId_status", (q) => q.eq("guildId", guildId).eq("status", "open"))
-      .collect();
-    // ⚠️ KHÔNG dùng `order("desc").take(1)` ở đây: index
-    // `by_guildId_openerId` có field cuối `openerId`, mà sau `eq` thì field
-    // đó cố định → thứ tự trả về là thứ tự scan, KHÔNG phải mới nhất. Lấy
-    // nhầm bản ghi cũ thì cooldown tính sai và vòng "đã có ticket mở" bị
-    // bypass (người dùng mở được 2 ticket cùng lúc).
-    const mine = newestFirst(
-      await ctx.db
-        .query("tickets")
-        .withIndex("by_guildId_openerId", (q) => q.eq("guildId", guildId).eq("openerId", userId))
-        .collect(),
-    );
-    const last = mine[0];
-    // Ticket ĐANG MỞ của riêng người này. Tách khỏi `last`: dữ liệu cũ có thể
-    // có nhiều ticket mở, và bản ghi mới nhất đã đóng trong khi bản ghi cũ
-    // vẫn mở — lúc đó vẫn phải trả kênh cũ.
-    const openTicket = mine.find((t) => t.status === "open");
+      .take(1_000);
+    // Index có `createdAt` CUỐI nên `order("desc").first()` là "mới nhất" thật.
+    // Trước đây collect toàn bộ ticket của user rồi sort — số reads tăng theo
+    // toàn bộ lịch sử ticket của người đó, mỗi lần bấm mở ticket.
+    const last = await ctx.db
+      .query("tickets")
+      .withIndex("by_guildId_openerId_createdAt", (q) =>
+        q.eq("guildId", guildId).eq("openerId", userId),
+      )
+      .order("desc")
+      .first();
+    // Ticket ĐANG MỞ của riêng người này — dùng lại `open` vừa đọc cho
+    // openCount, không query thêm. Tách khỏi `last`: dữ liệu cũ có thể có
+    // nhiều ticket mở, và bản mới nhất đã đóng trong khi bản cũ vẫn mở.
+    // Sắp mới-nhất-trước để giữ đúng hành vi cũ khi dữ liệu có nhiều ticket mở.
+    const openTicket = newestFirst(open.filter((t) => t.openerId === userId))[0];
     return {
       openCount: open.length,
       lastOpenedAt: last?.createdAt ?? null,

@@ -138,11 +138,9 @@ export type BotCloseTicketArgs = ObjectType<typeof botCloseTicketArgs>;
 
 export async function botCloseTicketHandler(ctx: MutationCtx, args: BotCloseTicketArgs) {
   await requireBotKeyStrict(ctx, args.botKey);
-  const row = await ctx.db
-    .query("tickets")
-    .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-    .collect();
-  const ticket = row.find((t) => t._id === args.ticketId);
+  // `findGuildTicket` đọc đúng 1 document + kiểm guild; trước đây collect toàn
+  // bộ ticket của guild rồi `.find` cho MỖI cú bấm đóng (N reads/click).
+  const ticket = await findGuildTicket(ctx, args.guildId, args.ticketId);
   // Không tìm thấy = ticket đã bị dọn khỏi DB (giới hạn 200 bản/server).
   // Trả ok thay vì ném: người dùng bấm nút trên kênh cũ vẫn không nên thấy lỗi.
   if (!ticket) return { ok: true, found: false };

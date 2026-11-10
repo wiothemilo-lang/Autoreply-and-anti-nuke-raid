@@ -1,5 +1,12 @@
 # Nhật ký tiến trình agent
 
+## 2026-11-10 — Đợt 1/5 audit 50 subagent: cắt đọc toàn bảng Convex
+
+- ✅ **10 agent audit Convex** (đợt 1/5, tổng 50) → sửa đường nóng: `sessions.me`/`guilds.listMine` tra `manageableGuildIds` qua `by_discordId` (bỏ quét cả bảng); `getGuild` chỉ đọc panels/giveaways/autoReplies khi là chủ bot, giveaway qua index + `take(30)`; `hiddenPasswordIsSet` dùng index `by_hiddenPasswordHash`; `buildHiddenJobs` nhận guild đã đọc sẵn; `botTicketState` lấy ticket mới nhất qua index `(guildId, openerId, createdAt)`; `incidents` tra marks theo `(guildId, key)`; `reports` đưa `from`/`to` vào range index; `payments` dọn pending qua `(userId, status, createdAt)` + entitlement một lượt collect; `raidSamples` trim xác suất + lô.
+- 📁 File đụng: `convex/{auth,sessions,guilds,hidden,bot_tick,botAuth,incidents,reports,tickets,payments,plans,schema}.ts`, `convex/bot_writes/{tickets,antinuke}.ts`, `scripts/test-{tickets-convex,plans-gating,bot-config-projections,db-io-balance}.ts`.
+- 🧪 Kiểm chứng: **87/87 CJS** (155,4s) · **31/31 TS** (4,3s) · typecheck · lint · format:check · 10 cổng tĩnh sạch. Cổng tĩnh mới trong `test-db-io-balance.ts` khoá đúng hình dạng query (không collect toàn bảng) chống tái phát.
+- ▶️ Tiếp theo: PR `perf/convex-read-cost`; đợt 2/5 — 10 agent audit hiệu năng `bot/src`; còn nợ `bot_tick` ticket retention và `analytics.stats` subscription.
+
 ## 2026-11-09 (3) — Chặn xoay botKeySeed ngoài luồng khi bot còn sống
 
 - ✅ **Guard**: `botBootstrapAction:requestBotKey` từ chối xoay seed khi `status.seeded && lastHeartbeat < 3 phút` (bot thật còn heartbeat ~60s/lần). Đặt guard **trước** `markBootstrapAttempt` → lượt bị chặn không đốt cooldown 10 phút của lần self-heal hợp lệ kế tiếp. `getBotKeyStatusInternal` trả thêm `lastHeartbeat` (không lộ seed).

@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getUserByToken, canManageGuild, guildAccessibleBy } from "./auth";
+import { getUserByToken, canManageGuild, listBotGuildsForUser } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { hiddenPasswordIsSet, isBotOwnerUser } from "./hidden";
 import { clampReportMinEvents, clampReportMinIntervalMinutes } from "./reports";
@@ -87,24 +87,18 @@ export const listMine = query({
   handler: async (ctx, { token }) => {
     const user = await getUserByToken(ctx, token);
     if (!user) return null;
-    // TỐI ƯU (audit Convex): index by_botInGuild — hot-path mở dashboard.
-    const all = await ctx.db
-      .query("guilds")
-      .withIndex("by_botInGuild", (q) => q.eq("botInGuild", true))
-      .collect();
-    // Chỉ hiện server bot đang đứng trong (server đã xóa/kick bot sẽ tự biến mất).
-    return all
-      .filter((g) => guildAccessibleBy(user, g))
-      .map((g) => ({
-        discordId: g.discordId,
-        name: g.name,
-        icon: g.icon ?? null,
-        memberCount: g.memberCount ?? null,
-        prefix: g.prefix,
-        antinukeEnabled: g.antinukeEnabled,
-        botInGuild: g.botInGuild,
-        lastHeartbeat: g.lastHeartbeat ?? null,
-      }));
+    // Tra đúng danh sách server user quản lý thay vì quét cả bảng `guilds`.
+    // `listBotGuildsForUser` đã lọc botInGuild + giữ thứ tự Discord trả về.
+    return (await listBotGuildsForUser(ctx, user)).map((g) => ({
+      discordId: g.discordId,
+      name: g.name,
+      icon: g.icon ?? null,
+      memberCount: g.memberCount ?? null,
+      prefix: g.prefix,
+      antinukeEnabled: g.antinukeEnabled,
+      botInGuild: g.botInGuild,
+      lastHeartbeat: g.lastHeartbeat ?? null,
+    }));
   },
 });
 
@@ -118,10 +112,6 @@ export const getGuild = query({
       .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
       .first();
     if (!guild || !canManageGuild(user, guild)) return null;
-    const autoReplies = await ctx.db
-      .query("autoReplies")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .collect();
     const modules = await ctx.db
       .query("antinukeModules")
       .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
@@ -148,20 +138,31 @@ export const getGuild = query({
       .first();
     const ownerDiscordId = botStatus?.ownerDiscordId;
     const isBotOwner = isBotOwnerUser(user, botStatus);
-    const panels = (
-      await ctx.db
-        .query("reactionRolePanels")
-        .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-        .collect()
-    ).sort((a, b) => b.createdAt - a.createdAt);
-    const giveaways = (
-      await ctx.db
-        .query("giveaways")
-        .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-        .collect()
-    )
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 30);
+    // Tính năng CHỈ chủ bot dùng — manager thường không cần đọc. Trước đây 3
+    // query này chạy cho MỌI người rồi mới trả `[]`, và giveaways collect cả
+    // lịch sử (kèm entries) rồi slice 30. Bây giờ: chỉ đọc khi là owner, và
+    // giveaway lấy thẳng 30 bản mới nhất qua index.
+    const panels = isBotOwner
+      ? (
+          await ctx.db
+            .query("reactionRolePanels")
+            .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+            .collect()
+        ).sort((a, b) => b.createdAt - a.createdAt)
+      : [];
+    const giveaways = isBotOwner
+      ? await ctx.db
+          .query("giveaways")
+          .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", guildId))
+          .order("desc")
+          .take(30)
+      : [];
+    const autoReplies = isBotOwner
+      ? await ctx.db
+          .query("autoReplies")
+          .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+          .collect()
+      : [];
     // TRẦN theo gói (P4): log hành động mod — Miễn phí 30 dòng (mức cũ), gói trả
     // phí 100/200. Đây là thứ khách mua thêm khi nâng gói, và cũng là trần I/O
     // cho payload dashboard (payload này chạy mỗi lần mở trang server).
@@ -193,7 +194,7 @@ export const getGuild = query({
         // Cổng mật khẩu ẩn là TOÀN CỤC (thuộc chủ bot, không thuộc server này) →
         // mọi server đều báo cùng trạng thái, không còn cảnh server có mật khẩu
         // thì khoá còn server khác thì mở toang.
-        hiddenPasswordSet: await hiddenPasswordIsSet(ctx),
+        hiddenPasswordSet: await hiddenPasswordIsSet(ctx, botStatus),
         isBotOwner,
         botOwnerSet: !!ownerDiscordId,
         theme: guild.theme ?? "graphite",
@@ -795,14 +796,18 @@ export const resetHeat = mutation({
     if (!guild || !canManageGuild(user, guild)) {
       throw new Error("Không có quyền quản lý server này");
     }
-    const states = await ctx.db
-      .query("heatStates")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .collect();
-    for (const s of states) {
-      if (userId && s.userId !== userId) continue;
-      await ctx.db.delete(s._id);
-    }
+    // Có userId → tra đúng 1 document qua index; trước đây vẫn collect TOÀN BỘ
+    // heatStates của guild rồi `continue` từng dòng (đọc H document cho 1 xoá).
+    const states = userId
+      ? await ctx.db
+          .query("heatStates")
+          .withIndex("by_guildId_userId", (q) => q.eq("guildId", guildId).eq("userId", userId))
+          .collect()
+      : await ctx.db
+          .query("heatStates")
+          .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+          .collect();
+    for (const s of states) await ctx.db.delete(s._id);
     // Báo bot xóa nhiệt trong bộ nhớ (bot kiểm tra cờ này định kỳ).
     // settingsChangedAt là BẮT BUỘC ở đây: cờ heatResetRequested được bot đọc
     // qua bundle cache, mà `hasPending` phía bot chỉ rút ngắn TTL khi bản cache
