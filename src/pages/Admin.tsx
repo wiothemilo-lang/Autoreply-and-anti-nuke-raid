@@ -132,11 +132,20 @@ function AdminContent() {
       return { ok: false, error: noticeErr(e) };
     }
   };
-  const { status, latency, avg, incidents, lastUpdate, nextUpdate, refresh } = useBotMonitor(60000);
-  const threat = useQuery(api.threatIntel.getSettings, { token });
-  const researchHistory = useQuery(api.threatIntel.getResearchHistory, { token });
+  // Người đã đăng nhập nhưng CHƯA là admin vẫn mount trang (chỉ thấy thẻ thông
+  // báo) — skip mọi subscription admin-only để không đốt lượt đọc Convex:
+  // mỗi cái là 1 lượt user + 1 lượt botStatus, nhân với mọi lần vào /admin.
+  const { status, latency, avg, incidents, lastUpdate, nextUpdate, refresh } = useBotMonitor(
+    60000,
+    isAdmin === true,
+  );
+  const threat = useQuery(api.threatIntel.getSettings, isAdmin === true ? { token } : "skip");
+  const researchHistory = useQuery(
+    api.threatIntel.getResearchHistory,
+    isAdmin === true ? { token } : "skip",
+  );
   const setThreat = useMutation(api.threatIntel.setResearchSettings);
-  const diag = useQuery(api.selfDiagnose.getSettings, { token });
+  const diag = useQuery(api.selfDiagnose.getSettings, isAdmin === true ? { token } : "skip");
   const setDiag = useMutation(api.selfDiagnose.setEnabled);
   const removeThreatKw = useMutation(api.threatIntel.removeKeyword);
   const requestLearn = useMutation(api.threatIntel.requestManualLearn);

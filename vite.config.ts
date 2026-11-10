@@ -17,9 +17,11 @@ const VENDOR_GROUPS: Record<string, RegExp> = {
   "vendor-convex": /node_modules\/convex\//,
   "vendor-motion": /node_modules\/(framer-motion|motion-dom|motion-utils)\//,
   "vendor-icons": /node_modules\/lucide-react\//,
-  // three chỉ tới từ các variant toggle WebGL của bộ ThreeUI đã vendor —
-  // gom một chỗ để không nằm nhân bản trong mọi chunk dùng tới (đo 28/09:
-  // three xuất hiện trong CẢ GlassToggle LẪN NeuformBatchEffects).
+  // three chỉ tới từ các variant toggle WebGL của bộ ThreeUI đã vendor.
+  // Sau 10/11/2026 `ui/switch.tsx` import thẳng ModernToggle nên nhánh này
+  // KHÔNG còn được dựng vào artifact — giữ khai báo làm lưới an toàn nếu ai
+  // đó import lại `SkeuomorphicToggleCollection` (cây shader vẫn được
+  // `scripts/_resolve-shaders.cjs` kiểm tra độc lập).
   "vendor-three": /node_modules\/(three|@napi-rs)\//,
 };
 

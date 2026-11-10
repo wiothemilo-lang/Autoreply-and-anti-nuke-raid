@@ -66,13 +66,20 @@ function bindVisibilityResync(): void {
   });
 }
 
-/** Trạng thái bot tổng thể + thông tin chủ bot (bot tự đồng bộ 24/7 từ Discord). */
-export function useBotStatus(): BotStatus | null {
+/**
+ * Trạng thái bot tổng thể + thông tin chủ bot (bot tự đồng bộ 24/7 từ Discord).
+ *
+ * `enabled=false` → SKIP subscription và không chạy bộ đếm thời gian. Dùng cho
+ * cửa sổ Admin: người đã đăng nhập nhưng CHƯA là admin vẫn mount trang, mà
+ * mỗi subscription là một lượt đọc `botStatus` + user tính vào hạn mức Convex.
+ */
+export function useBotStatus(enabled = true): BotStatus | null {
   // botStatus giờ khai báo args (botKey tùy chọn cho script chẩn đoán) — truyền
   // object rỗng từ web; hoặc bỏ qua args nhưng useQuery cần đối số đầy đủ.
-  const data = useQuery(api.status.botStatus, {});
+  const data = useQuery(api.status.botStatus, enabled ? {} : "skip");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!enabled) return;
     bindVisibilityResync();
     nowListeners.add(setNow);
     startSharedTicker();
@@ -80,7 +87,7 @@ export function useBotStatus(): BotStatus | null {
       nowListeners.delete(setNow);
       stopSharedTickerIfIdle();
     };
-  }, []);
+  }, [enabled]);
   if (data === undefined) return null;
   return {
     online: !!data.online && isHeartbeatFresh(data.lastHeartbeat, now),

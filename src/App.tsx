@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { Route, Routes } from "react-router-dom";
-import { MotionConfig } from "framer-motion";
 import { Toaster } from "sonner";
 import NotFound from "./pages/NotFound";
 import RequireAuth from "./components/RequireAuth";
@@ -153,86 +152,84 @@ export default function App() {
           (ngoài Suspense, cùng chỗ header) nên hiện trên MỌI trang kể cả landing,
           không phụ thuộc chunk route nào. Tắt trên /auth + /callback (màn tạm). */}
       {!transient && <UpdateNotice />}
-      <MotionConfig reducedMotion="user">
-        <Suspense fallback={<RouteFallback />}>
-          <BootSignal />
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/discord/callback" element={<DiscordCallback />} />
-            {/* Trang công khai, không cần đăng nhập: Discord yêu cầu URL riêng cho
+      <Suspense fallback={<RouteFallback />}>
+        <BootSignal />
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/discord/callback" element={<DiscordCallback />} />
+          {/* Trang công khai, không cần đăng nhập: Discord yêu cầu URL riêng cho
               Terms of Service và Privacy Policy khi xác minh bot. */}
-            <Route path="/terms" element={<LegalPage slug="terms" />} />
-            <Route path="/privacy" element={<LegalPage slug="privacy" />} />
-            <Route path="/data-deletion" element={<LegalPage slug="data-deletion" />} />
-            <Route path="/monitor" element={<Monitor />} />
-            {/* Ủng hộ nhà phát triển + xem trước gói Premium. Cả hai trang công
+          <Route path="/terms" element={<LegalPage slug="terms" />} />
+          <Route path="/privacy" element={<LegalPage slug="privacy" />} />
+          <Route path="/data-deletion" element={<LegalPage slug="data-deletion" />} />
+          <Route path="/monitor" element={<Monitor />} />
+          {/* Ủng hộ nhà phát triển + xem trước gói Premium. Cả hai trang công
                 khai: ai cũng đọc được, kể cả khách chưa đăng nhập. */}
-            <Route path="/donate" element={<DonatePage />} />
-            <Route path="/feedback" element={<FeedbackPage />} />
-            <Route path="/premium" element={<PremiumPage />} />
-            {/* Trang tính năng công khai (SEO quốc tế, nội dung 3 thứ tiếng). */}
-            <Route path="/features" element={<FeaturesPage />} />
-            {/* Alias dễ nhớ của trang giám sát — không nhân bản component: cùng
+          <Route path="/donate" element={<DonatePage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
+          <Route path="/premium" element={<PremiumPage />} />
+          {/* Trang tính năng công khai (SEO quốc tế, nội dung 3 thứ tiếng). */}
+          <Route path="/features" element={<FeaturesPage />} />
+          {/* Alias dễ nhớ của trang giám sát — không nhân bản component: cùng
                 1 trang Monitor. CANONICAL là /monitor; /status chỉ là đường
                 vào phụ và hosting đã redirect 301 /status → /monitor (xem
                 vercel.json + Dockerfile.web). Route này vẫn tồn tại để
                 (1) hosting/dev chưa áp redirect thì không 404,
                 (2) seo.ts canonical hóa /status về /monitor thay vì để 2 URL
                 tự khai canonical. Khai báo trong src/lib/routes.json. */}
-            <Route path="/status" element={<Monitor />} />
-            <Route
-              path="/admin"
-              element={
-                <RequireAuth>
-                  <Admin />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/stats"
-              element={
-                <RequireAuth>
-                  <StatsPage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <RequireAuth>
-                  <Dashboard />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/dashboard/:guildId"
-              element={
-                <RequireAuth>
-                  <GuildPage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/dashboard/:guildId/history"
-              element={
-                <RequireAuth>
-                  <GuildHistory />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/dashboard/:guildId/incidents"
-              element={
-                <RequireAuth>
-                  <GuildIncidents />
-                </RequireAuth>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-      </MotionConfig>
+          <Route path="/status" element={<Monitor />} />
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth>
+                <Admin />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/stats"
+            element={
+              <RequireAuth>
+                <StatsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <Dashboard />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard/:guildId"
+            element={
+              <RequireAuth>
+                <GuildPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard/:guildId/history"
+            element={
+              <RequireAuth>
+                <GuildHistory />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard/:guildId/incidents"
+            element={
+              <RequireAuth>
+                <GuildIncidents />
+              </RequireAuth>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
       {/* Dock nổi góc dưới trái — lối tắt quen tay mở CÙNG bảng chọn với header.
           Đặt SAU nội dung trang (ngoài <Suspense>) là cố ý: thứ tự tab giữ
           nguyên như bản dock cũ (nội dung trước, phụ kiện nổi sau), và nằm

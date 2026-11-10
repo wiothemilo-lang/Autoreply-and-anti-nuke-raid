@@ -27,8 +27,7 @@ import { DEFAULT_THEME, SERVER_THEMES } from "../lib/constants";
 import PanelErrorBoundary from "../components/PanelErrorBoundary";
 import PageSplash, { PanelSkeleton } from "../components/PageSplash";
 import BotLogo from "../components/BotLogo";
-import HaimiyaChat from "../components/HaimiyaChat";
-import UnlockPanel, { hiddenUnlockKey } from "../components/dashboard/UnlockPanel";
+import { hiddenUnlockKey } from "../lib/hiddenUnlock";
 import { api } from "../../convex/_generated/api";
 import { Badge } from "../components/ui/badge";
 import { cn } from "../lib/utils";
@@ -38,13 +37,11 @@ import { GUILD_HEARTBEAT_FRESH_MS, isGuildHeartbeatFresh, timeAgo } from "../lib
 import type { GuildData } from "../lib/types";
 import OverviewPanel from "../components/dashboard/OverviewPanel";
 import OnboardingChecklist from "../components/dashboard/OnboardingChecklist";
-import CommandPalette, {
-  useCommandPaletteShortcut,
-  type CommandItem,
-} from "../components/CommandPalette";
+import { useCommandPaletteShortcut, type CommandItem } from "../lib/commandPalette";
 import { confirmLeave, hasUnsavedChanges, shouldBlockNavigation } from "../lib/useUnsavedChanges";
 import { syncState } from "../lib/syncState";
 import MobilePanelSheet from "../components/MobilePanelSheet";
+import MotionRoot from "../components/MotionRoot";
 import { HOME_SECTION, shouldUsePanelSheet, useNarrowViewport } from "../lib/mediaQuery";
 
 import LangSwitch from "../components/LangSwitch";
@@ -67,6 +64,14 @@ const AltDetectionPanel = lazy(() => import("../components/dashboard/AltDetectio
 const WebhookPanel = lazy(() => import("../components/dashboard/WebhookPanel"));
 const HiddenPanel = lazy(() => import("../components/dashboard/HiddenPanel"));
 const TicketPanel = lazy(() => import("../components/dashboard/TicketPanel"));
+// Chỉ mở khi chủ bot vào mục Ẩn và chưa mở khoá — tách chunk để mọi lượt xem
+// dashboard khác không phải tải form mật khẩu.
+const UnlockPanel = lazy(() => import("../components/dashboard/UnlockPanel"));
+// Palette chỉ cần khi bấm ⌘K / Ctrl+K — trước đây import tĩnh kéo
+// @radix-ui/react-dialog vào chunk GuildPage.
+const CommandPalette = lazy(() => import("../components/CommandPalette"));
+// Widget chat tách chunk riêng — xem ghi chú ở Landing.tsx.
+const HaimiyaChat = lazy(() => import("../components/HaimiyaChat"));
 
 type SectionKey =
   | "overview"
@@ -401,227 +406,239 @@ export default function GuildPage() {
   );
 
   return (
-    <div className="relative min-h-screen overflow-x-clip" style={themeVars}>
-      <HaimiyaChat position="dashboard" />
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} items={commands} />
-      <div className="relative z-10">
-        <header className="border-b border-border/60 bg-background/70 backdrop-blur">
-          {/* Header 2 hàng cho điện thoại: hàng 1 là điều hướng + nhận diện
+    <MotionRoot>
+      <div className="relative min-h-screen overflow-x-clip" style={themeVars}>
+        <Suspense fallback={null}>
+          <HaimiyaChat position="dashboard" />
+        </Suspense>
+        {paletteOpen && (
+          <Suspense fallback={null}>
+            <CommandPalette open onOpenChange={setPaletteOpen} items={commands} />
+          </Suspense>
+        )}
+        <div className="relative z-10">
+          <header className="border-b border-border/60 bg-background/70 backdrop-blur">
+            {/* Header 2 hàng cho điện thoại: hàng 1 là điều hướng + nhận diện
               server + hành động (mời bot, đổi ngôn ngữ); hàng 2 là dải badge
               cuộn ngang. Trước đây tất cả nằm trong 1 hàng flex-wrap nên
               badge đội chiều cao và hàng hành động bị đẩy xuống, tràn khỏi
               mép phải (trang bị overflow-x-clip nên phần tràn không xem được). */}
-          <div className="container py-3 max-sm:px-3 sm:py-5">
-            <div className="flex items-center gap-2.5 sm:gap-4">
-              <Link
-                to="/dashboard"
-                aria-label={translate("← Về danh sách server")}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-              {icon ? (
-                <img
-                  src={icon}
-                  alt=""
-                  className="h-10 w-10 shrink-0 rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl"
-                />
-              ) : (
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary font-display text-base font-bold text-muted-foreground sm:h-12 sm:w-12 sm:rounded-2xl sm:text-lg">
-                  {data.guild.name.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-              <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <BotLogo
-                    className="hidden h-10 w-10 shrink-0 ring-2 ring-primary/25 sm:block"
-                    fallbackClassName="h-6 w-6"
+            <div className="container py-3 max-sm:px-3 sm:py-5">
+              <div className="flex items-center gap-2.5 sm:gap-4">
+                <Link
+                  to="/dashboard"
+                  aria-label={translate("← Về danh sách server")}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+                {icon ? (
+                  <img
+                    src={icon}
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl"
                   />
-                  <h1 className="min-w-0 truncate font-display text-lg font-bold tracking-tight sm:text-2xl">
-                    {data.guild.name}
-                  </h1>
-                </div>
-                <div className="mt-1.5 hidden flex-wrap items-center gap-1.5 sm:flex">{badges}</div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-                <LangSwitch />
-                {clientId && (
-                  <a
-                    href={buildBotInviteUrl(clientId)}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={translate("Mời thêm")}
-                  >
-                    <Badge variant="secondary" className="cursor-pointer px-2 py-1.5 sm:px-3">
-                      <Bot className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{translate("Mời thêm")}</span>
-                    </Badge>
-                  </a>
+                ) : (
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary font-display text-base font-bold text-muted-foreground sm:h-12 sm:w-12 sm:rounded-2xl sm:text-lg">
+                    {data.guild.name.slice(0, 2).toUpperCase()}
+                  </span>
                 )}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <BotLogo
+                      className="hidden h-10 w-10 shrink-0 ring-2 ring-primary/25 sm:block"
+                      fallbackClassName="h-6 w-6"
+                    />
+                    <h1 className="min-w-0 truncate font-display text-lg font-bold tracking-tight sm:text-2xl">
+                      {data.guild.name}
+                    </h1>
+                  </div>
+                  <div className="mt-1.5 hidden flex-wrap items-center gap-1.5 sm:flex">
+                    {badges}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                  <LangSwitch />
+                  {clientId && (
+                    <a
+                      href={buildBotInviteUrl(clientId)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={translate("Mời thêm")}
+                    >
+                      <Badge variant="secondary" className="cursor-pointer px-2 py-1.5 sm:px-3">
+                        <Bot className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">{translate("Mời thêm")}</span>
+                      </Badge>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile: badge thành dải cuộn ngang, -mx-3/px-3 khớp đúng padding
+                container ở mobile nên dải chạm mép màn hình mà KHÔNG vượt quá. */}
+              <div className="-mx-3 mt-2.5 flex items-center gap-1.5 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
+                {badges}
               </div>
             </div>
+          </header>
 
-            {/* Mobile: badge thành dải cuộn ngang, -mx-3/px-3 khớp đúng padding
-                container ở mobile nên dải chạm mép màn hình mà KHÔNG vượt quá. */}
-            <div className="-mx-3 mt-2.5 flex items-center gap-1.5 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
-              {badges}
-            </div>
-          </div>
-        </header>
-
-        <main
-          id="main"
-          tabIndex={-1}
-          className="container w-full max-w-full py-4 max-sm:px-3 max-sm:pb-32 sm:py-8"
-        >
-          <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[230px_1fr]">
-            {/* Sidebar — min-w-0: nếu thiếu, nội dung panel rộng (bảng hình
+          <main
+            id="main"
+            tabIndex={-1}
+            className="container w-full max-w-full py-4 max-sm:px-3 max-sm:pb-32 sm:py-8"
+          >
+            <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[230px_1fr]">
+              {/* Sidebar — min-w-0: nếu thiếu, nội dung panel rộng (bảng hình
                 phạt 720px…) sẽ kéo cả track grid rộng hơn màn hình và bị
                 overflow-x-clip cắt mất mép phải (không cuộn xem được). */}
-            <aside className="h-fit min-w-0 max-lg:sticky max-lg:top-0 max-lg:z-20 lg:sticky lg:top-6">
-              {/* Mobile: nav là app tab bar dính trên đầu (sticky) — đổi mục cấu
+              <aside className="h-fit min-w-0 max-lg:sticky max-lg:top-0 max-lg:z-20 lg:sticky lg:top-6">
+                {/* Mobile: nav là app tab bar dính trên đầu (sticky) — đổi mục cấu
                 hình không phải cuộn ngược lên tìm. Cuộn ngang 1 hàng, ẩn thanh
                 cuộn; pr-3 để mục cuối không dính sát mép khi quét tay. */}
-              <nav
-                className="flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-card/50 p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-lg:-mx-3 max-lg:rounded-none max-lg:border-x-0 max-lg:border-t-0 max-lg:bg-background/95 max-lg:px-3 max-lg:pr-4 max-lg:backdrop-blur lg:flex-col lg:overflow-visible lg:px-1.5"
-                aria-label={translate("Điều hướng bảng điều khiển")}
-              >
-                {(() => {
-                  const renderItem = (item: (typeof NAV_ITEMS)[number]) => {
-                    const Icon = item.icon;
-                    const active = section === item.key;
-                    return (
-                      <button
-                        key={item.key}
-                        onClick={() => goToSection(item.key)}
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "group relative flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                          // Touch target ≥ 44px trên mobile (max-sm:py-2.5).
-                          "max-sm:gap-1.5 max-sm:px-2.5 max-sm:py-2",
-                          active
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                        )}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        {translate(item.label)}
-                      </button>
-                    );
-                  };
-                  const overview = NAV_ITEMS.filter((i) => i.key === "overview");
-                  const byKey = new Map(NAV_ITEMS.map((i) => [i.key, i]));
-                  return (
-                    <>
-                      {overview.map(renderItem)}
-                      {NAV_GROUPS.map((group) => (
-                        <div
-                          key={group.key}
-                          // `contents`: ở mobile nhóm biến mất khỏi layout nên
-                          // các nút vẫn xếp liền nhau trong hàng cuộn ngang;
-                          // ở desktop trở lại thành khối dọc có tiêu đề.
-                          className="contents lg:mt-4 lg:block"
+                <nav
+                  className="flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-card/50 p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-lg:-mx-3 max-lg:rounded-none max-lg:border-x-0 max-lg:border-t-0 max-lg:bg-background/95 max-lg:px-3 max-lg:pr-4 max-lg:backdrop-blur lg:flex-col lg:overflow-visible lg:px-1.5"
+                  aria-label={translate("Điều hướng bảng điều khiển")}
+                >
+                  {(() => {
+                    const renderItem = (item: (typeof NAV_ITEMS)[number]) => {
+                      const Icon = item.icon;
+                      const active = section === item.key;
+                      return (
+                        <button
+                          key={item.key}
+                          onClick={() => goToSection(item.key)}
+                          aria-current={active ? "page" : undefined}
+                          className={cn(
+                            "group relative flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                            // Touch target ≥ 44px trên mobile (max-sm:py-2.5).
+                            "max-sm:gap-1.5 max-sm:px-2.5 max-sm:py-2",
+                            active
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                          )}
                         >
-                          <p className="hidden px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground lg:block">
-                            {translate(group.label)}
-                          </p>
-                          <div className="contents lg:flex lg:flex-col lg:gap-0.5">
-                            {group.items.map((key) => {
-                              const item = byKey.get(key);
-                              return item ? renderItem(item) : null;
-                            })}
+                          <Icon className="h-4 w-4 shrink-0" />
+                          {translate(item.label)}
+                        </button>
+                      );
+                    };
+                    const overview = NAV_ITEMS.filter((i) => i.key === "overview");
+                    const byKey = new Map(NAV_ITEMS.map((i) => [i.key, i]));
+                    return (
+                      <>
+                        {overview.map(renderItem)}
+                        {NAV_GROUPS.map((group) => (
+                          <div
+                            key={group.key}
+                            // `contents`: ở mobile nhóm biến mất khỏi layout nên
+                            // các nút vẫn xếp liền nhau trong hàng cuộn ngang;
+                            // ở desktop trở lại thành khối dọc có tiêu đề.
+                            className="contents lg:mt-4 lg:block"
+                          >
+                            <p className="hidden px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground lg:block">
+                              {translate(group.label)}
+                            </p>
+                            <div className="contents lg:flex lg:flex-col lg:gap-0.5">
+                              {group.items.map((key) => {
+                                const item = byKey.get(key);
+                                return item ? renderItem(item) : null;
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </>
-                  );
-                })()}
-              </nav>
-              <div className="mt-4 hidden rounded-xl border border-border bg-secondary/50 p-4 text-xs text-muted-foreground lg:block">
-                <p className="mb-2 font-medium text-foreground">{translate("Haimiya gợi ý")}</p>
-                <p>
-                  {translate(
-                    "• Auto-mod = spam tin, mention, từ xấu, ảnh/file, link mời + link độc hại.",
-                  )}
-                </p>
-                <p className="mt-1">
-                  {translate(
-                    "• Moderation = thông báo sau khi bot phạt (ban · timeout · warn · kick) — chọn mức chi tiết riêng cho từng hành động.",
-                  )}
-                </p>
-                <p className="mt-1">{translate("• Join Gate = chặn selfbot khi vào server.")}</p>
-                <p className="mt-1">{translate("• Nuke/raid phạt trực tiếp, không cộng nhiệt.")}</p>
-                <p className="mt-1">
-                  {translate(
-                    "• ⭐ Whitelist = chọn người dùng/role miễn trừ moderation, anti-raid và nuke.",
-                  )}
-                </p>
-                <p className="mt-1">
-                  {translate(
-                    "• 💾 Backup server = chụp role + kênh lên đám mây riêng; khôi phục lại khi server bị nuke phá sập.",
-                  )}
-                </p>
-                <p className="mt-1">
-                  {translate(
-                    "• 🛠️ Lệnh mod: /mod timeout · kick · ban · purge + !timeout !kick !ban !purge — mọi hình phạt hiện trong mục Hình phạt.",
-                  )}{" "}
-                </p>
-                <p className="mt-1">
-                  {translate(
-                    "• 🔒 Tính năng ẩn — khu vực riêng tư, chỉ chủ sở hữu bot mở khóa bằng mật khẩu.",
-                  )}{" "}
-                </p>
-                <p className="mt-1">
-                  {translate("• Mỗi server có độ tương phản riêng trong Cài đặt.")}
-                </p>
-                <p className="mt-1">
-                  {translate(
-                    "• 🔗 Webhook & Log = bot tự tạo webhook tên/avatar/màu tùy chỉnh để nhận log.",
-                  )}
-                </p>
-                <p className="mt-1">{translate("• Thay đổi áp dụng trong ~3 phút.")}</p>
-              </div>
-            </aside>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </nav>
+                <div className="mt-4 hidden rounded-xl border border-border bg-secondary/50 p-4 text-xs text-muted-foreground lg:block">
+                  <p className="mb-2 font-medium text-foreground">{translate("Haimiya gợi ý")}</p>
+                  <p>
+                    {translate(
+                      "• Auto-mod = spam tin, mention, từ xấu, ảnh/file, link mời + link độc hại.",
+                    )}
+                  </p>
+                  <p className="mt-1">
+                    {translate(
+                      "• Moderation = thông báo sau khi bot phạt (ban · timeout · warn · kick) — chọn mức chi tiết riêng cho từng hành động.",
+                    )}
+                  </p>
+                  <p className="mt-1">{translate("• Join Gate = chặn selfbot khi vào server.")}</p>
+                  <p className="mt-1">
+                    {translate("• Nuke/raid phạt trực tiếp, không cộng nhiệt.")}
+                  </p>
+                  <p className="mt-1">
+                    {translate(
+                      "• ⭐ Whitelist = chọn người dùng/role miễn trừ moderation, anti-raid và nuke.",
+                    )}
+                  </p>
+                  <p className="mt-1">
+                    {translate(
+                      "• 💾 Backup server = chụp role + kênh lên đám mây riêng; khôi phục lại khi server bị nuke phá sập.",
+                    )}
+                  </p>
+                  <p className="mt-1">
+                    {translate(
+                      "• 🛠️ Lệnh mod: /mod timeout · kick · ban · purge + !timeout !kick !ban !purge — mọi hình phạt hiện trong mục Hình phạt.",
+                    )}{" "}
+                  </p>
+                  <p className="mt-1">
+                    {translate(
+                      "• 🔒 Tính năng ẩn — khu vực riêng tư, chỉ chủ sở hữu bot mở khóa bằng mật khẩu.",
+                    )}{" "}
+                  </p>
+                  <p className="mt-1">
+                    {translate("• Mỗi server có độ tương phản riêng trong Cài đặt.")}
+                  </p>
+                  <p className="mt-1">
+                    {translate(
+                      "• 🔗 Webhook & Log = bot tự tạo webhook tên/avatar/màu tùy chỉnh để nhận log.",
+                    )}
+                  </p>
+                  <p className="mt-1">{translate("• Thay đổi áp dụng trong ~3 phút.")}</p>
+                </div>
+              </aside>
 
-            {/* Content — bọc trong error boundary để một panel lỗi không làm trắng cả trang.
+              {/* Content — bọc trong error boundary để một panel lỗi không làm trắng cả trang.
                 Mỗi panel là lazy chunk: mở tab nào mới tải JS tab đó. Suspense nằm
                 Ở ĐÂY (không để bubble lên App) để fallback chỉ thay vùng panel,
                 header/sidebar giữ nguyên khi đang tải chunk. */}
-            <div className="min-w-0">
-              {/* Onboarding: chỉ ở tab Tổng quan — người mới vào thấy ngay cần làm gì. */}
-              {section === "overview" && (
-                <div className="mb-4">
-                  <OnboardingChecklist
-                    data={data}
-                    onOpenSection={(key) => setSection(key as SectionKey)}
-                  />
-                </div>
-              )}
-              {sheetOpen ? (
-                <MobilePanelSheet
-                  title={translate(NAV_ITEMS.find((i) => i.key === section)?.label ?? "")}
-                  onClose={closeSheet}
-                >
-                  {panelNode}
-                </MobilePanelSheet>
-              ) : (
-                panelNode
-              )}
+              <div className="min-w-0">
+                {/* Onboarding: chỉ ở tab Tổng quan — người mới vào thấy ngay cần làm gì. */}
+                {section === "overview" && (
+                  <div className="mb-4">
+                    <OnboardingChecklist
+                      data={data}
+                      onOpenSection={(key) => setSection(key as SectionKey)}
+                    />
+                  </div>
+                )}
+                {sheetOpen ? (
+                  <MobilePanelSheet
+                    title={translate(NAV_ITEMS.find((i) => i.key === section)?.label ?? "")}
+                    onClose={closeSheet}
+                  >
+                    {panelNode}
+                  </MobilePanelSheet>
+                ) : (
+                  panelNode
+                )}
 
-              <div className="mt-10 flex justify-center">
-                <a
-                  href={`https://discord.com/channels/${data.guild.discordId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-primary"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" /> {translate("Mở Discord server")}{" "}
-                </a>
+                <div className="mt-10 flex justify-center">
+                  <a
+                    href={`https://discord.com/channels/${data.guild.discordId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> {translate("Mở Discord server")}{" "}
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
+    </MotionRoot>
   );
 }
