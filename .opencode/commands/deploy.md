@@ -31,7 +31,7 @@ push-idempotent: deploy cùng commit 2 lần chỉ ghi nhận, không phá dữ 
 3. **Kiểm chứng đủ 4 lớp** — tất cả phải XANH, chưa xanh thì SỬA trước khi tiếp:
 
    ```bash
-   bun run test && bun tsc -b --noEmit && bun run lint && bun run format:check
+   bun run test && bun run typecheck && bun run lint && bun run format:check
    ```
 
    Format lệch → chạy `bun run format` rồi kiểm tra lại (biến đổi tất-định, tự

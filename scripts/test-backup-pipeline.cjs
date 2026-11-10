@@ -206,11 +206,14 @@ const check = (label, ok) => {
   ]
     .map((p) => fs.readFileSync(path.join(__dirname, "..", p), "utf8"))
     .join("\n");
+  // Kiểm từng tham số thay vì nguyên chuỗi destructuring: đổi thứ tự/thêm
+  // tham số là refactor hợp lệ, không được làm đỏ cổng.
   check(
     "runBackup có tham số skipNotice",
-    /const \{\s*pushToGithub: pushToGithubOpt = false,\s*includeMessages = false,\s*skipNotice = false,\s*claimAt,?\s*\} = opts;/.test(
-      src,
-    ),
+    /pushToGithub: pushToGithubOpt = false/.test(src) &&
+      /includeMessages = false/.test(src) &&
+      /skipNotice = false/.test(src) &&
+      /claimAt,?/.test(src),
   );
   check("skipNotice chỉ thông báo khi true (auto vẫn im lặng)", src.includes("if (skipNotice) {"));
   // Móc neo kèm DẤU MỞ NGOẶC: hàm runRestorePlan có tên bắt đầu bằng
@@ -245,9 +248,15 @@ const check = (label, ok) => {
   );
 
   // ---- 5. pushToGithub gửi bản ĐÃ NÉN (không còn backupJson: json thô) ----
+  // Assert trên LỜI GỌI thật, không trên comment: comment còn nguyên mà payload
+  // regress về JSON thô thì cổng cũ vẫn xanh.
+  const ghPushBlock = src.slice(
+    src.indexOf("pushBackupToGithub(store, {"),
+    src.indexOf("});", src.indexOf("pushBackupToGithub(store, {")),
+  );
   check(
     "runBackup đẩy GitHub bằng backupJson nén (trước đây JSON thô >900KB bị Gist từ chối)",
-    src.includes("// Gửi bản ĐÃ NÉN") && !/backupJson: json,/.test(src),
+    ghPushBlock.includes("backupJson,") && !/backupJson:\s*json\b/.test(ghPushBlock),
   );
 
   // ---- 6. Action githubPush phải CHUYỂN TIẾP botKey vào botSetBackupGithub ----

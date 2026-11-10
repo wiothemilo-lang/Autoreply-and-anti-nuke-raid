@@ -18,7 +18,7 @@ Xử lý bug theo đúng quy trình AGENTS.md (nhánh 🐛 Bug thật), không l
    heat, joinGate, backup, oauth client id…) → thêm test đúng chỗ cạnh test cũ,
    chạy lại toàn bộ `bun run test` phải xanh toàn bộ suites (
    xem AGENTS.md Pha 4).
-6. **Kiểm chứng đủ**: `bun tsc -b --noEmit` + `bun run lint`.
+6. **Kiểm chứng đủ**: `bun run typecheck` + `bun run lint`.
 7. **Báo cáo**: gốc rễ → bản vá → kết quả số → rồi mới commit (KHÔNG push).
 
 Yêu cầu mơ hồ thì dừng và hỏi thay vì đoán.

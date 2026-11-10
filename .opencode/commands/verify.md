@@ -9,7 +9,7 @@ agent: build
 1. `bun run test` — toàn bộ test suites phải xanh (số lượng: xem AGENTS.md — runner tự kiểm khớp). Nếu đỏ: đọc kỹ lỗi,
    xác định đây là bug thật hay lỗi môi trường (thiếu node_modules → chạy
    `bun install` trước), KHÔNG vá bừa cho hết đỏ.
-2. `bun tsc -b --noEmit` — typecheck phải sạch. Nếu vừa đụng file trong
+2. `bun run typecheck` — typecheck phải sạch. Nếu vừa đụng file trong
    `convex/` mà chưa codegen, chạy `bun convex dev --once` rồi typecheck lại.
 3. `bun run lint` — ESLint phải sạch.
 4. `bun run format:check` — format Prettier phải sạch (CI đã đỏ 5 run vì bước

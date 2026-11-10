@@ -2,6 +2,16 @@
 
 ## Đang dở
 
+- 📋 **Nợ sau 5 đợt audit (50 subagent)** — chưa làm vì cần đổi schema/hành vi hoặc
+  rủi ro trung bình: fallback `bot_tick` thiếu `jobs.ticketPanels`/`jobs.tickets`
+  (ticket đứng im âm thầm khi batch lỗi ≥10 phút); retention ticket trong
+  `bot_tick`; `analytics.stats` subscription luôn mount ở StatsPage;
+  `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk backup
+  lớn; dedupe `useGuildPlan`/`useSessionMe`; gom hook watch job của `BackupPanel`;
+  tách `HaimiyaChat` media helpers; `SiteNav` tách `PagesPanel`; bỏ monkey-patch
+  `globalThis.fetch` trong `ai.js`; xoá voice-IP dead code trong `altDetection.js`;
+  gộp `processDetection` của `antinuke/audit.js`; tách `ticketActionButton`.
+
 - 🔎 **botKeySeed 06/10 08:49:33 — đã thu hẹp, chưa chốt danh tính.** Xác nhận
   xoay qua `botBootstrapAction:requestBotKey` (chỉ đường này ghi
   `lastBootstrapAt`; `setBotSecrets` không ghi) ⇒ caller có DISCORD_TOKEN +
@@ -52,6 +62,13 @@
   `docs/t3-devbox.md` mục 7.
 
 ---
+
+## 2026-11-10 (5) — Đợt 5/5 audit 50 subagent: cổng kiểm chứng + bảo trì bot/scripts
+
+- ✅ **10 agent audit `bot/` + `scripts/`** (đợt 5/5, đủ 50/50) → vá lỗi "cổng xanh giả": `test-db-io-balance` `block()` ném lỗi khi thiếu mốc (2 check âm tính từng PASS RỖNG); `test-bot-contracts` cắt theo ranh giới hàm/listener thay comment; `test-backup-pipeline` assert lời gọi `pushBackupToGithub` thật thay comment "Gửi bản ĐÃ NÉN"; 2 suite `check-sync-trust`/`check-research-chain` đổi tên `test-*` để runner thật sự chạy (**87→89 CJS**); gate typecheck đổi `bun tsc -b --noEmit` → `bun run typecheck` (bao cả `convex/`) ở AGENTS/README/commands/docs; `bun tsc` chỉ build 2 project con của root nên lỗi `convex/` từng lọt cổng local.
+- 📁 Gom trùng lặp: `scripts/lib/commentScan.cjs` (máy trạng thái `blankComments`) dùng chung 4 cổng tĩnh — `stripComments` regex từng nuốt code sau URL; `filters.js` dùng `MODULE_LABELS` của antinuke; `antinuke/ai.js` gom 3 khối `Promise.race` 6s thành `withAiTimeout()` có `clearTimeout`; `package.json` convex `^1.48.0` → `^1.49.0` khớp `bot/package.json`; README coverage cập nhật 95,6% dòng / 97,7% hàm / 81,1% nhánh (79 file, 76 ≥90%, 17 file 100%).
+- 🧪 Kiểm chứng: **89/89 CJS** (147,4s) · **31/31 TS** (6,2s) · `bun run typecheck` sạch · lint · format:check · repo-map · i18n · settings-signal · cron-boundary · timer-allowlist · bot-payload · convex-contract · ai-status · retention-clamp · log-lang · `test:coverage` + `coverage:floor` xanh.
+- ▶️ Tiếp theo: PR `refactor/bot-scripts-maintainability`; nợ còn lại ghi ở "Đang dở" (fallback `bot_tick` thiếu ticket jobs, `analytics.stats` subscription, `revenueStats` take 1000, `getJobBacklog` full scan, payload backup lớn).
 
 ## 2026-11-10 (4) — Đợt 4/5 audit 50 subagent: độ dễ đọc/bảo trì web
 

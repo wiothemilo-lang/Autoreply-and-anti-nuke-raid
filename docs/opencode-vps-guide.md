@@ -642,7 +642,7 @@ typecheck + lint + format:check, hết hạn sau 15 phút). Quy trình trong l�
 
 1. `git pull --no-rebase --no-edit` (conflict → dừng hỏi)
 2. `bun install --frozen-lockfile` (chỉ khi lockfile đổi)
-3. `bun run test && bun tsc -b --noEmit && bun run lint && bun run format:check`
+3. `bun run test && bun run typecheck && bun run lint && bun run format:check`
 4. `pm2 restart protogon-bot`
 5. Xác minh: `pm2 status` → `protogon-bot` online, `pm2 logs protogon-bot --lines 30
 --nostream` → không crash loop. Chết lại → vá theo log, không restart mù.
@@ -691,7 +691,7 @@ phải restart vì Convex).
 | T3 Code không kết nối được VPS                                         | Port SSH/firewall, hoặc VPS tắt                                                                                                                 | Dùng T3 Connect (đi qua relay của T3); kiểm tra `t3 service status` trên VPS                                                                         |     | Agent đọc được file .env | CẤM — phải xảy ra lỗi cấu hình | Kiểm tra rule `read: { "*.env": "deny", ... }` trong `opencode.json` đang dùng |
 | Agent chạm env hạ tầng (unit systemd/container)                        | Vùng 🔴 — guardrails chặn `systemctl cat/show`, `docker inspect/exec`, `printenv`                                                               | Đúng thiết kế. Chẩn đoán bằng `status`/`journalctl`/`docker logs`; cần giá trị env → hỏi người dùng                                                  |
 | CI đỏ ở job security trên PR Dependabot                                | GITHUB_TOKEN bị giới hạn quyền trên PR dependabot — gitleaks-action gọi API bị từ chối                                                          | Đã vá 19/09: nhánh CLI chạy gitleaks trực tiếp cho PR dependabot (`ci.yml`); nếu tái diễn thì xem lại version action                                 |
-| `/deploy` dừng ở bước restart với lỗi GUARDRAIL                        | Chưa chạy đủ 4 lớp kiểm chứng xanh trong phiên, hoặc đã quá 15 phút kể từ lần chạy cuối                                                         | Chạy lại `bun run test && bun tsc -b --noEmit && bun run lint && bun run format:check` rồi restart — không tìm lối tắt quanh guardrail               |
+| `/deploy` dừng ở bước restart với lỗi GUARDRAIL                        | Chưa chạy đủ 4 lớp kiểm chứng xanh trong phiên, hoặc đã quá 15 phút kể từ lần chạy cuối                                                         | Chạy lại `bun run test && bun run typecheck && bun run lint && bun run format:check` rồi restart — không tìm lối tắt quanh guardrail                 |
 | `npx convex deploy` báo "Error: you are not authenticated" / thiếu key | `CONVEX_DEPLOY_KEY` chưa export trong shell VPS (setup 1 lần — mục "Setup 1 lần cho agent deploy Convex từ VPS" phía trên)                      | Người dùng thêm `export CONVEX_DEPLOY_KEY=...` vào `~/.bashrc` rồi `source ~/.bashrc`; agent DỪNG chờ — không in key ra chat, không ghi key vào file |
 | Token Kiira hết nhanh                                                  | OpenCode đọc rất nhiều file mỗi task                                                                                                            | 30M tokens/ngày thường đủ; nếu hết, chuyển model phụ sang Groq free (console.groq.com)                                                               |
 

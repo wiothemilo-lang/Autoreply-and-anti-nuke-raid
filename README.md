@@ -4,7 +4,7 @@
 
 Bot Discord tự động trả lời tin nhắn thành viên theo **từ khóa** hoặc khi bị **tag @mention** (nội dung do bạn tùy chỉnh), hỗ trợ đầy đủ **prefix (`!`) + slash commands**, kèm hệ thống **chống nuke/raid** bật tắt từng phần theo ý mod & owner — tất cả quản lý qua một **dashboard web** tùy chỉnh.
 
-> **Chất lượng**: 87 CJS + 31 TS test suites · coverage c8 (95,6% dòng / 97,8% hàm / 81,0% nhánh — toàn bộ engine chống nuke + alt detection + ticket + lớp dẫn log được phủ test trực tiếp, **không còn file nào dưới 80%**, **sàn coverage theo file** chặn engine bảo vệ tụt) · **mutation score 100%** (`bun run test:mutation`) · property-based + fuzz test · **memGuard sweeper bộ nhớ tập trung** · ESLint sạch · typecheck sạch · smoke test VPS · CI 4 job (lint + security + test → deploy): gitleaks chặn secret lộ, bun audit chặn CVE critical (`bun run test` để chạy local).
+> **Chất lượng**: 89 CJS + 31 TS test suites · coverage c8 (95,6% dòng / 97,7% hàm / 81,1% nhánh — toàn bộ engine chống nuke + alt detection + ticket + lớp dẫn log được phủ test trực tiếp, **không còn file nào dưới 80%**, **sàn coverage theo file** chặn engine bảo vệ tụt) · **mutation score 100%** (`bun run test:mutation`) · property-based + fuzz test · **memGuard sweeper bộ nhớ tập trung** · ESLint sạch · typecheck sạch · smoke test VPS · CI 4 job (lint + security + test → deploy): gitleaks chặn secret lộ, bun audit chặn CVE critical (`bun run test` để chạy local).
 >
 > **Hệ sinh thái**: threat relay liên server (chia sẻ signature raid ẩn danh, opt-in từng chiều) · preset bảo mật 1 chạm (server nhỏ / cộng đồng / rủi ro cao) — bật trên dashboard, tab Chống nuke.
 
@@ -113,13 +113,13 @@ Coverage được đo bằng [`c8`](https://github.com/bcoe/c8) (V8 native, khô
 | Chỉ số          | Giá trị | Ý nghĩa                                                    |
 | --------------- | ------- | ---------------------------------------------------------- |
 | Dòng            | 95,6%   | phần lớn dòng `bot/src` được test chạm tới                 |
-| Hàm             | 97,8%   | 97% hàm được **gọi thật** (không chỉ import)               |
-| Nhánh (if/else) | 81,0%   | cả hai phía true/false của phần lớn điều kiện đã được kiểm |
+| Hàm             | 97,7%   | 97% hàm được **gọi thật** (không chỉ import)               |
+| Nhánh (if/else) | 81,1%   | cả hai phía true/false của phần lớn điều kiện đã được kiểm |
 
 **Bản đồ nhiệt theo file** (sinh từ `coverage/coverage-summary.json`, 79 file):
 
-- ✅ **≥ 90% — 76/79 file**: toàn bộ engine chống nuke, alt detection, ticket, backup và lớp dẫn log; 16 file đạt 100% (`backupJobs`, `caseLog`, `logI18n`, `misfire`, `register-slash`, `util`, `handlers/backup`, `handlers/hidden`, `handlers/interactionCommon`, `handlers/interactionVerify`, `handlers/lang`, `handlers/researchCommands`, `handlers/ticketActivity`, `handlers/antinuke/enforce`, `handlers/antinuke/index`, `handlers/antinuke/nukeRollback`). Bản đầy đủ theo từng file: `coverage/coverage-summary.json`.
-- ⚠️ **80–90% — 3 file**: `handlers/welcomeCard` (89,5%), `altDetection` (83,9%), `backupImport` (80,2%) — luồng chính có test nhưng còn nhánh hiếm gặp chưa phủ.
+- ✅ **≥ 90% — 76/79 file**: toàn bộ engine chống nuke, alt detection, ticket, backup và lớp dẫn log; 17 file đạt 100% (`backupJobs`, `caseLog`, `logDedupe`, `logI18n`, `misfire`, `register-slash`, `util`, `handlers/backup`, `handlers/hidden`, `handlers/interactionCommon`, `handlers/interactionVerify`, `handlers/lang`, `handlers/researchCommands`, `handlers/ticketActivity`, `handlers/antinuke/enforce`, `handlers/antinuke/index`, `handlers/antinuke/nukeRollback`). Bản đầy đủ theo từng file: `coverage/coverage-summary.json`.
+- ⚠️ **80–90% — 3 file**: `handlers/welcomeCard` (86,9%), `altDetection` (84,1%), `backupImport` (80,2%) — luồng chính có test nhưng còn nhánh hiếm gặp chưa phủ.
 - ✅ **Không còn file nào dưới 80%**: entry-point `antinuke/index` (nối cổng gateway Discord) từng chỉ 13,9%, nay đã có bộ test orchestrator riêng (43 check) nên lên 100%. Phần kết nối gateway thật vẫn kiểm bằng `bun run smoke:vps` trên VPS.
 
 > **Giới hạn cần biết**: c8 chỉ đo được code chạy dưới V8 — 31 suite `.ts` chạy bằng **Bun** nên **không** xuất hiện trong báo cáo (đó là giới hạn ĐO, không phải giới hạn TEST; ví dụ `test-welcome-card.ts` vẫn kiểm thẻ ảnh rất kỹ, và `test-welcome-card-render.cjs` chạy dưới node để c8 thấy). Dashboard `src/` và `convex/` hiện **chưa** được đo — đó là hạn chế của chuỗi c8+Bun, chưa phải lỗi cấu hình.
@@ -143,7 +143,7 @@ bun run format:check    # CI dùng lệnh này để chặn code chưa format
 
 **Dependabot** (`.github/dependabot.yml`) quét weekly: root `bun`, `bot/` (discord.js, convex) và `github-actions` — tự tạo PR cập nhật, group các bump minor/patch thành 1 PR. Bot bảo mật không được để deps cũ.
 
-**Thứ tự gate trong CI**: `lint` (ESLint + Prettier + check repo-map/hợp đồng bot⇄Convex/đa ngôn ngữ) → `test` (87 CJS + 31 TS suites + coverage + typecheck) → `deploy` Convex production. Job sau chỉ chạy khi job trước pass.
+**Thứ tự gate trong CI**: `lint` (ESLint + Prettier + check repo-map/hợp đồng bot⇄Convex/đa ngôn ngữ) → `test` (89 CJS + 31 TS suites + coverage + typecheck) → `deploy` Convex production. Job sau chỉ chạy khi job trước pass.
 
 ## AI coding agent trên VPS (OpenCode)
 
@@ -176,7 +176,7 @@ Bộ cấu hình an toàn đi kèm repo:
 bun install
 bun convex dev --once   # codegen + chạy Convex local (http://127.0.0.1:3210)
 bun run dev             # Vite dev server
-bun tsc -b --noEmit     # typecheck
+bun run typecheck       # typecheck web + convex
 ```
 
 > Lưu ý: bot process không chạy trong môi trường preview (hosting tĩnh). Chạy `bot/` trên máy/VPS của bạn.

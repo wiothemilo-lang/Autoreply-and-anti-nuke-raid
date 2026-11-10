@@ -26,6 +26,7 @@
  */
 const fs = require("fs");
 const path = require("path");
+const { blankComments } = require("./lib/commentScan.cjs");
 
 const ROOT = path.resolve(__dirname, "..");
 const BOT_SRC = path.join(ROOT, "bot", "src");
@@ -91,57 +92,6 @@ const ALLOWED_TIMERS = {
     timers: ["urlhausInt", "openphishInt", "ngramInt", "stInt"],
   },
 };
-
-/**
- * Xoá COMMENT nhưng GIỮ NGUYÊN độ dài và số dòng (thay bằng khoảng trắng).
- *
- * Vì sao không dùng regex `//[^\n]*` như cổng khác: trong bot có rất nhiều
- * URL (`https://…`) trong chuỗi — regex đó sẽ nuốt mất phần còn lại của dòng,
- * tức là cổng có thể BỎ SÓT một `setInterval` thật nằm sau URL trên cùng dòng.
- * Ở đây đi qua máy trạng thái nên chuỗi không bị nhầm là comment.
- */
-function blankComments(src) {
-  const out = src.split("");
-  let i = 0;
-  const blank = (from, to) => {
-    for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
-  };
-  while (i < src.length) {
-    const c = src[i];
-    if (c === '"' || c === "'" || c === "`") {
-      const quote = c;
-      i++;
-      while (i < src.length) {
-        if (src[i] === "\\") {
-          i += 2;
-          continue;
-        }
-        if (src[i] === quote) {
-          i++;
-          break;
-        }
-        i++;
-      }
-      continue;
-    }
-    if (c === "/" && src[i + 1] === "/") {
-      let j = i;
-      while (j < src.length && src[j] !== "\n") j++;
-      blank(i, j);
-      i = j;
-      continue;
-    }
-    if (c === "/" && src[i + 1] === "*") {
-      const end = src.indexOf("*/", i + 2);
-      const stop = end < 0 ? src.length : end + 2;
-      blank(i, stop);
-      i = stop;
-      continue;
-    }
-    i++;
-  }
-  return out.join("");
-}
 
 /**
  * Suy ra "tên" của một lần gọi `setInterval` — dùng để định danh ổn định bất

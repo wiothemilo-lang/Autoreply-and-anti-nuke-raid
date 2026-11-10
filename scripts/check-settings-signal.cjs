@@ -50,6 +50,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { blankComments } = require("./lib/commentScan.cjs");
 
 const ROOT = path.resolve(__dirname, "..");
 const CONVEX_DIR = path.join(ROOT, "convex");
@@ -103,7 +104,9 @@ const ALLOWLIST = {
  * (gỡ code ghi nhưng comment còn nguyên → cổng báo SẠCH sai).
  */
 function stripComments(src) {
-  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+  // Máy trạng thái (không phải regex) để `https://…` trong chuỗi không nuốt
+  // phần còn lại của dòng — bug cổng báo SẠCH sai, xem scripts/lib/commentScan.cjs.
+  return blankComments(src);
 }
 
 /** Tách khối `{...}` khớp ngoặc kể từ vị trí `open` (đã trỏ vào dấu `{`). */

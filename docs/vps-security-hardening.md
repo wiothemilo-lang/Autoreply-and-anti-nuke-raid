@@ -181,8 +181,8 @@ lại, nhưng tệp dưới đây là "điểm vào" đúng và tiết kiệm to
 | Debug lỗi gọi Convex của bot | `scripts/check-convex-contract.cjs` (hợp đồng tên hàm bot ⇄ Convex)                                   | `node scripts/check-convex-contract.cjs`       |
 | Bot không phản hồi / AI hỏng | `convex/haimiya.ts` (`aiStatus`, `aiProviders`), `bot/src/ai.js`                                      | `node scripts/check-ai-status.cjs --self-test` |
 | Thẻ ảnh chào không vẽ        | `bot/src/handlers/welcomeCard.js` + `bot/assets/fonts/`                                               | `bun run test:ts`                              |
-| Vá lỗi dashboard/web         | `src/pages/*`, `src/lib/*`, `src/components/*`                                                        | `bun tsc -b --noEmit && bun run lint`          |
-| Vá lỗi backend Convex        | `convex/*.ts` (KHÔNG sửa `convex/_generated/`)                                                        | `bun convex dev --once && bun tsc -b --noEmit` |
+| Vá lỗi dashboard/web         | `src/pages/*`, `src/lib/*`, `src/components/*`                                                        | `bun run typecheck && bun run lint`            |
+| Vá lỗi backend Convex        | `convex/*.ts` (KHÔNG sửa `convex/_generated/`)                                                        | `bun convex dev --once && bun run typecheck`   |
 | Quét lỗ hổng bảo mật sâu     | `.opencode/skills/security-audit/` (skill tự kích hoạt khi nói "security audit")                      | — (chạy trên bản clone, xem §3.4)              |
 
 ### 3.3. Mẫu prompt cho Freebuff CLI (dán thẳng)

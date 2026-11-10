@@ -7,7 +7,7 @@
 ## Kiến trúc tổng
 
 ```
-bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React+Vite dashboard)
+bot/ (discord.js, Bun, pm2 `protogon-bot` trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React+Vite dashboard)
                                                       ⇄ protogon.freebuff.app (Freebuff hosting)
 ```
 
@@ -68,7 +68,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 | `lib/mediaQuery.ts`               | Ngưỡng `lg` 1024px + `NARROW_MEDIA_QUERY`, hàm thuần `isNarrowViewport` / `shouldUsePanelSheet`, hook `useNarrowViewport` — đợt #4                                                                                                                                                                            |
 | `lib/constants.ts`                | SERVER_THEMES (đã mono xám), hằng số                                                                                                                                                                                                                                                                          |
 
-## bot/ — Discord bot (CommonJS, chạy pm2 `protogon`)
+## bot/ — Discord bot (CommonJS, chạy pm2 `protogon-bot`)
 
 | Nhóm                                                                                                         | Vai trò                                                                                                                                                                             |
 | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -151,7 +151,7 @@ bot/ (discord.js, Bun, pm2 trên VPS) ⇄ convex/ (DB + backend) ⇄ src/ (React
 
 ## Vòng lặp làm việc
 
-- Kiểm chứng: `bun run test` (87 CJS suites, chạy song song — gồm `test-browser-contracts` chạy Chromium headless THẬT qua DevTools Protocol) · `bun run test:ts` (31 TS suites, gồm `test-team-admins` cho quyền quản trị viên nhóm + `test-analytics` cho lưu lượng trang tự host) · `bun tsc -b --noEmit` ·
+- Kiểm chứng: `bun run test` (89 CJS suites, chạy song song — gồm `test-browser-contracts` chạy Chromium headless THẬT qua DevTools Protocol) · `bun run test:ts` (31 TS suites, gồm `test-team-admins` cho quyền quản trị viên nhóm + `test-analytics` cho lưu lượng trang tự host) · `bun run typecheck` ·
   `bun run lint` · `bun run format:check` — chi tiết gộp 1 lệnh xem skill
   `verification-loop`.
 - Route/SEO/hosting: `src/lib/routes.json` là NGUỒN DUY NHẤT — thêm trang công khai PHẢI khai báo ở đó; `scripts/test-web-contracts.cjs` + `scripts/test-route-manifest.ts` suy kỳ vọng cho vercel.json / nginx / sitemap / robots.txt TỪ bảng. Alias (`/status` → `/monitor`) chỉ redirect 301, không tự khai canonical.
