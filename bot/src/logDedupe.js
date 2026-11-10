@@ -55,6 +55,12 @@ function isDuplicateDelivery(channelId, embed, now = Date.now()) {
     for (const [k, t] of recent) {
       if (now - t >= DUP_WINDOW_MS) recent.delete(k);
     }
+    // Burst log > MAX_ENTRIES trong cùng cửa sổ 3s: vòng trên không xoá được gì
+    // (mọi entry còn hạn) → Map phình vô hạn. Cắt entry CŨ NHẤT (Map giữ thứ tự
+    // chèn) cho tới khi về trần; chấp nhận có thể bỏ sót 1 log trùng cực hiếm.
+    while (recent.size > MAX_ENTRIES) {
+      recent.delete(recent.keys().next().value);
+    }
   }
   return false;
 }

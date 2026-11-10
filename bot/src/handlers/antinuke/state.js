@@ -270,6 +270,17 @@ module.exports = function createAntiNukeState({ client, store }) {
       const guildId = key.split(":")[0];
       if (!live.has(guildId) || ts < stale) buttonRaidHandledAt.delete(key);
     }
+    // `staleUnlockSwept` trước đây chỉ ADD, không bao giờ xoá: mỗi đợt lockdown
+    // hết hạn sinh 1 key vĩnh viễn (~140 B). Key dạng
+    // `${guildId}:expired:${lockdownUntil}` → bỏ khi guild rời hoặc mốc đã cũ
+    // hơn 24h (không còn lượt quét nào có thể gặp lại đúng mốc đó).
+    for (const key of staleUnlockSwept) {
+      const guildId = key.split(":")[0];
+      const until = Number(key.slice(key.lastIndexOf(":") + 1));
+      if (!live.has(guildId) || !Number.isFinite(until) || now - until > 86_400_000) {
+        staleUnlockSwept.delete(key);
+      }
+    }
     if (buckets.size > BUCKET_MAX) {
       // Giữ lại 200 key gần nhất (chống phình vô hạn)
       const keys = [...buckets.keys()].slice(0, buckets.size - BUCKET_MAX);

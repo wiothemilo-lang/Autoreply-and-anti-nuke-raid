@@ -39,6 +39,7 @@ const calls = {
 };
 let batchResponse = null;
 let batchShouldThrow = false;
+let batchDelayMs = 0;
 let fallbackQueries = {};
 let claimOk = true;
 let claimAt = null;
@@ -121,7 +122,13 @@ globalThis.fetch = async () => {
 };
 
 (async () => {
-  const { runTickOnce, runBackupJobs, setupTick, startClaimRenewal } = require("../bot/src/tick");
+  const {
+    runTickOnce,
+    runBackupJobs,
+    setupTick,
+    startClaimRenewal,
+    _resetBatchBackoffForTest,
+  } = require("../bot/src/tick");
 
   let pass = 0;
   let fail = 0;
@@ -144,6 +151,7 @@ globalThis.fetch = async () => {
       query: async (name) => {
         calls.queries.push(name);
         if (name === "bot_tick:getPendingJobs") {
+          if (batchDelayMs) await new Promise((r) => setTimeout(r, batchDelayMs));
           if (batchShouldThrow) throw new Error("batch chưa deploy");
           return batchResponse;
         }
@@ -539,6 +547,22 @@ globalThis.fetch = async () => {
       calls.mutations.length === 0,
     );
     stopNoop();
+  }
+
+  // ── Chống tick CHỒNG: restore/backup dài >180s không được mở lượt thứ 2 ──
+  {
+    batchShouldThrow = false;
+    batchResponse = { selfDiagnose: {}, hidden: [], verifyPanels: [], backups: [] };
+    // Ca batch lỗi phía trên đặt backoff 10 phút — test không chờ thật.
+    _resetBatchBackoffForTest();
+    clear();
+    batchDelayMs = 50;
+    const p1 = runTickOnce(client, store);
+    const p2 = runTickOnce(client, store);
+    await Promise.all([p1, p2]);
+    batchDelayMs = 0;
+    const batchCalls = calls.queries.filter((n) => n === "bot_tick:getPendingJobs").length;
+    check("tick chồng (lượt trước chưa xong) → chỉ 1 batch query", batchCalls === 1);
   }
 
   fs.unlinkSync(DJS_MOCK);

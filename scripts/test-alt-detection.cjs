@@ -230,6 +230,28 @@ module.exports = {
     analysisHuman.riskScore < 40 && analysisHuman.action === "pass",
   );
 
+  // ══════════ 7b. Cache ban list: nhiều join không fetch lại (chống 429) ══════════
+  {
+    const banGuild = mkGuild("g-bancache", [
+      mkMember("bc-1", "abcdef", { avatar: "av", createdDaysAgo: 800 }),
+      mkMember("bc-2", "ghijkl", { avatar: "av2", createdDaysAgo: 800 }),
+    ]);
+    let banFetches = 0;
+    banGuild.bans = {
+      fetch: async () => {
+        banFetches++;
+        return new Map([["b1", { user: { username: "bannedperson" } }]]);
+      },
+    };
+    const cfg = { altMaxRiskScore: 70 };
+    await alt.analyzeNewMember(banGuild.members.cache.get("bc-1"), cfg, async () => null, storeOk);
+    await alt.analyzeNewMember(banGuild.members.cache.get("bc-2"), cfg, async () => null, storeOk);
+    check("2 join liên tiếp → chỉ 1 lần bans.fetch (cache 10 phút)", banFetches === 1);
+    alt.invalidateBanCache("g-bancache");
+    await alt.analyzeNewMember(banGuild.members.cache.get("bc-1"), cfg, async () => null, storeOk);
+    check("invalidate sau khi ban → fetch lại ngay", banFetches === 2);
+  }
+
   // ══════════ 8. Chống phạt oan: điểm chạm ngưỡng nhưng 0 bằng chứng độc lập → chỉ theo dõi ══════════
   // Điểm: age 5 ngày < minAge 30 (+10, KHÔNG phải <3d nên không strong) + sim 83
   // (+10, < 85 nên KHÔNG strong) − positive 10 (avatar + tên thường) = 10.

@@ -15,6 +15,7 @@ const createAntiNukeExternalApp = require("./externalApp");
 const createAntiNukeMembers = require("./members");
 const createAntiNukeMessages = require("./messages");
 const createAntiNukeAudit = require("./audit");
+const { invalidateBanCache } = require("../../altDetection");
 const { registerSweep } = require("../../sweeper");
 
 module.exports = function createAntiNuke(client, store, heat) {
@@ -62,6 +63,9 @@ module.exports = function createAntiNuke(client, store, heat) {
 
   function attach() {
     client.on("guildBanAdd", async (ban) => {
+      // Alt Detection cache ban list 10 phút — người vừa bị ban phải có hiệu lực
+      // ngay cho join kế tiếp, không chờ hết TTL.
+      invalidateBanCache(ban.guild?.id);
       await handleAttributeEvent({
         guild: ban.guild,
         module: "massBan",

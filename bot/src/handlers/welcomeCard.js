@@ -105,9 +105,37 @@ function shade(hex, amount) {
  * (dùng chung 1 chỗ, không nhân bản logic kiểm tra địa chỉ nội bộ).
  * Mọi thất bại → null; người gọi tự chọn đường dự phòng.
  */
-async function fetchImage(url) {
+/**
+ * Cache buffer ảnh NỀN theo URL (avatar mỗi người chỉ join 1 lần nên không
+ * cache). Trước đây mỗi join tải lại ảnh nền của server: DNS lookup + HTTP +
+ * tới 6 MB — 100 join = 100 lượt tải cùng một file. Cache có trần byte để
+ * không phình RAM; ảnh nền đổi thì URL mới (dashboard tạo storage URL mới).
+ */
+const IMAGE_CACHE_TTL_MS = 10 * 60_000;
+const IMAGE_CACHE_MAX_BYTES = 32 * 1024 * 1024;
+const imageCache = new Map(); // url -> { buf, at }
+let imageCacheBytes = 0;
+
+function cacheImage(url, buf) {
+  if (buf.length > IMAGE_CACHE_MAX_BYTES) return;
+  while (imageCache.size > 0 && imageCacheBytes + buf.length > IMAGE_CACHE_MAX_BYTES) {
+    const [oldUrl, entry] = imageCache.entries().next().value;
+    imageCache.delete(oldUrl);
+    imageCacheBytes -= entry.buf.length;
+  }
+  const prev = imageCache.get(url);
+  if (prev) imageCacheBytes -= prev.buf.length;
+  imageCache.set(url, { buf, at: Date.now() });
+  imageCacheBytes += buf.length;
+}
+
+async function fetchImage(url, opts = {}) {
   const raw = String(url || "").trim();
   if (!raw) return null;
+  if (opts.cacheable) {
+    const hit = imageCache.get(raw);
+    if (hit && Date.now() - hit.at < IMAGE_CACHE_TTL_MS) return hit.buf;
+  }
   let safe;
   try {
     safe = await require("./backup").assertSafeRemoteUrl(raw);
@@ -123,6 +151,7 @@ async function fetchImage(url) {
     if (!type.startsWith("image/")) return null;
     const buf = Buffer.from(await res.arrayBuffer());
     if (!buf.length || buf.length > MAX_IMAGE_BYTES) return null;
+    if (opts.cacheable) cacheImage(raw, buf);
     return buf;
   } catch {
     return null;
@@ -273,7 +302,7 @@ async function renderCard(o = {}) {
   try {
     // Tải ảnh SONG SONG: thẻ phải xong trong vài trăm ms, không xếp hàng 2 lượt chờ.
     const [bgBuf, avatarBuf] = await Promise.all([
-      fetchImage(o.backgroundUrl),
+      fetchImage(o.backgroundUrl, { cacheable: true }),
       fetchImage(o.avatarUrl),
     ]);
     const [bgImg, avatarImg] = await Promise.all([

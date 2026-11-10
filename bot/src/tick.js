@@ -267,8 +267,32 @@ async function runBackupJobs(client, store, items) {
   }
 }
 
-/** Một lượt tick: 1 query batch → xử lý toàn bộ việc chờ của mọi guild. */
+/**
+ * Chặn 2 lượt tick CHỒNG nhau.
+ *
+ * Vì sao: `setInterval` không chờ lượt trước xong. `runBackupJobs` có thể chạy
+ * backup/restore hàng chục phút (REPLAY_DELAY 1,1s/tin nhắn), nên khi restore
+ * dài, mỗi 180s lại có thêm một lượt: batch `getPendingJobs` đọc toàn bộ guild
+ * (2G document) + claim backup/restore trùng + xử lý panel trùng. Bỏ lượt mới
+ * an toàn hơn — lượt sau luôn có sau tối đa 180s.
+ */
+let tickRunning = false;
+
 async function runTickOnce(client, store, heat) {
+  if (tickRunning) {
+    console.warn("[tick] lượt trước chưa xong — bỏ lượt này để tránh chồng chéo");
+    return;
+  }
+  tickRunning = true;
+  try {
+    return await runTickOnceInner(client, store, heat);
+  } finally {
+    tickRunning = false;
+  }
+}
+
+/** Một lượt tick: 1 query batch → xử lý toàn bộ việc chờ của mọi guild. */
+async function runTickOnceInner(client, store, heat) {
   let jobs = null;
   if (Date.now() >= batchBrokenUntil) {
     try {
@@ -402,10 +426,16 @@ function setupTick(client, store, heat) {
   }
 }
 
+/** Test hook: xoá backoff batch (suite không chờ 10 phút thật). */
+function _resetBatchBackoffForTest() {
+  batchBrokenUntil = 0;
+}
+
 module.exports = {
   setupTick,
   runBackupJobs,
   runTickOnce,
+  _resetBatchBackoffForTest,
   applySettingsChanges,
   startClaimRenewal,
 };

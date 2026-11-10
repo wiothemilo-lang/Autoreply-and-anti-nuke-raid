@@ -659,13 +659,15 @@ async function restoreCore(
 }
 
 async function runRestore(client, store, guildId, backupJson, backupName, options = {}) {
-  let json = backupJson;
+  // Giữ chuỗi trong OBJECT để giải phóng được sau khi parse: gán null cho biến
+  // bị ESLint coi là "vô dụng", còn đây là chủ ý cho GC (xem cuối hàm).
+  const raw = { json: backupJson };
   try {
-    json = decompressAndDecryptBackup(backupJson);
+    raw.json = decompressAndDecryptBackup(backupJson);
   } catch {}
   // Xác minh toàn vẹn TRƯỚC khi tạo bất cứ thứ gì: khôi phục từ bản bị sửa/cắt
   // cụt sẽ tạo cấu trúc sai mà vẫn báo thành công.
-  const integrity = verifyBackupChecksum(json, options.expectedChecksum);
+  const integrity = verifyBackupChecksum(raw.json, options.expectedChecksum);
   if (integrity.checked && !integrity.ok) {
     throw new Error(
       "Backup hỏng — checksum không khớp nội dung (dữ liệu đã bị thay đổi sau khi lưu). Dừng khôi phục để không tạo cấu trúc sai; hãy chọn bản backup khác.",
@@ -673,10 +675,14 @@ async function runRestore(client, store, guildId, backupJson, backupName, option
   }
   let backup;
   try {
-    backup = JSON.parse(json);
+    backup = JSON.parse(raw.json);
   } catch {
     throw new Error("Backup bi hong (khong doc duoc JSON)");
   }
+  // Giải phóng chuỗi JSON thô NGAY sau khi parse: restore replay tin nhắn có
+  // thể chạy hàng chục phút (REPLAY_DELAY 1,1s/tin) và async frame vẫn giữ
+  // chuỗi đã giải nén (tới 64 MB) suốt thời gian đó.
+  raw.json = null;
   if (
     options.restoreRoles === false ||
     options.restoreChannels === false ||

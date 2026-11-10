@@ -131,11 +131,16 @@ function getEncryptionKey() {
 /**
  * Compress + encrypt a backup JSON string for storage.
  * Returns { backupJson, compressed, checksum, encrypted }.
+ *
+ * `precomputedSnapshotChecksum`: caller (backupCapture) đã tính checksum này để
+ * so sánh incremental NGAY TRƯỚC ĐÓ — truyền vào để khỏi stringify + băm
+ * snapshot lần thứ hai (snapshot 3000 tin ≈ 3-4 MB → tiết kiệm 1 pass +
+ * 1 chuỗi tạm mỗi lượt backup). Không truyền thì tự tính như cũ.
  */
-function compressAndEncryptBackup(snapshot) {
+function compressAndEncryptBackup(snapshot, precomputedSnapshotChecksum) {
   const json = JSON.stringify(snapshot);
   const checksum = computeChecksum(json);
-  const snapshotChecksum = computeSnapshotChecksum(snapshot);
+  const snapshotChecksum = precomputedSnapshotChecksum ?? computeSnapshotChecksum(snapshot);
   const encKey = getEncryptionKey();
   let finalJson = json;
   let encrypted = false;
