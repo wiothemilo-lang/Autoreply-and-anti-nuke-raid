@@ -1,6 +1,6 @@
 /**
- * check-research-chain.cjs — kiểm tra chuỗi provider research (Kira/Mimo trước,
- * Groq/NVIDIA sau) mà KHÔNG cần key thật hay mạng. Chạy: node scripts/check-research-chain.cjs
+ * test-research-chain.cjs — kiểm tra chuỗi provider research (Kira/Mimo trước,
+ * Groq/NVIDIA sau) mà KHÔNG cần key thật hay mạng. Chạy: node scripts/test-research-chain.cjs
  *
  * Lưu ý: KHÔNG đọc/ghi biến môi trường thật của sandbox — module con chạy trong
  * process con với env giả lập truyền qua argv (Base64) để tránh bị chặn.

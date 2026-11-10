@@ -4,6 +4,21 @@
  */
 const aiClient = require("../../ai");
 
+/** Trần chờ AI cho mọi nhánh phân tích — một chỗ để không lệch 6000/6000/6000. */
+const AI_TIMEOUT_MS = 6000;
+
+/**
+ * Chờ `promise` tối đa AI_TIMEOUT_MS rồi trả null (AI coi như offline).
+ * `clearTimeout` ở finally để lời gọi xong sớm không giữ timer 6 giây.
+ */
+function withAiTimeout(promise) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), AI_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 module.exports = function createAntiNukeLayer({ state }) {
   const { joiners } = state.state;
 
@@ -36,7 +51,7 @@ module.exports = function createAntiNukeLayer({ state }) {
       if (!aiClient.aiAvailable()) return null;
       const recentJoins = joiners.get(guild.id)?.length ?? 0;
       const recentSamples = await recentAiSamples(opts?.store);
-      const res = await Promise.race([
+      const res = await withAiTimeout(
         aiClient.classifyViolation({
           module,
           count,
@@ -49,8 +64,7 @@ module.exports = function createAntiNukeLayer({ state }) {
           evidence: opts?.evidence ?? undefined,
           recentSamples,
         }),
-        new Promise((r) => setTimeout(() => r(null), 6000)),
-      ]);
+      );
       if (!res || res.offline) return null;
       return res;
     } catch (err) {
@@ -74,7 +88,7 @@ module.exports = function createAntiNukeLayer({ state }) {
   ) {
     try {
       if (!aiClient.aiAvailable()) return null;
-      const res = await Promise.race([
+      const res = await withAiTimeout(
         aiClient.analyzeRaid({
           module,
           count,
@@ -84,8 +98,7 @@ module.exports = function createAntiNukeLayer({ state }) {
           recentActions: recentActions ? String(recentActions).slice(0, 1500) : undefined,
           evidence: opts?.evidence ?? undefined,
         }),
-        new Promise((r) => setTimeout(() => r(null), 6000)),
-      ]);
+      );
       if (!res || res.offline) return null;
       return res;
     } catch (err) {
@@ -108,7 +121,7 @@ module.exports = function createAntiNukeLayer({ state }) {
   ) {
     try {
       if (!aiClient.aiAvailable()) return null;
-      const res = await Promise.race([
+      const res = await withAiTimeout(
         aiClient.analyzeExternalApp({
           count,
           windowSeconds,
@@ -119,8 +132,7 @@ module.exports = function createAntiNukeLayer({ state }) {
           evidence: opts?.evidence ?? undefined,
           knownThreats: opts?.knownThreats ?? undefined,
         }),
-        new Promise((r) => setTimeout(() => r(null), 6000)),
-      ]);
+      );
       if (!res || res.offline) return null;
       return res;
     } catch (err) {

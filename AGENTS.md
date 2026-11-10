@@ -9,12 +9,12 @@
 
 ## 0. Nhận diện công việc trước khi làm
 
-| Thành phần    | Vị trí                                                        | Công nghệ                                        |
-| ------------- | ------------------------------------------------------------- | ------------------------------------------------ |
-| Bot Discord   | `bot/`                                                        | discord.js, CommonJS, chạy Bun trên VPS          |
-| Dashboard web | `src/`                                                        | React + Vite + Tailwind + shadcn/ui (TypeScript) |
-| Backend/DB    | `convex/`                                                     | Convex functions (TypeScript)                    |
-| Test          | `scripts/test-*.cjs` (CommonJS), `scripts/test-*.ts` (Convex) | node:test                                        |
+| Thành phần    | Vị trí                                                        | Công nghệ                                                |
+| ------------- | ------------------------------------------------------------- | -------------------------------------------------------- |
+| Bot Discord   | `bot/`                                                        | discord.js, CommonJS, chạy Bun trên VPS                  |
+| Dashboard web | `src/`                                                        | React + Vite + Tailwind + shadcn/ui (TypeScript)         |
+| Backend/DB    | `convex/`                                                     | Convex functions (TypeScript)                            |
+| Test          | `scripts/test-*.cjs` (CommonJS), `scripts/test-*.ts` (Convex) | harness tự viết (assert) qua `scripts/run-all-tests.cjs` |
 
 Khi nhận việc, **tự phân loại** rồi đi đúng nhánh:
 
@@ -72,9 +72,10 @@ thôi. Khi nghi file có thể sửa dở: xem `git diff` trước khi sửa ti�
 
 Đơn vị công việc chỉ coi là XONG khi tất cả điều này thoả:
 
-- [ ] `bun run test` — toàn bộ suites xanh (hiện tại **87 suites** — số liệu 04/10/2026; đếm theo lệnh này, KHÔNG cộng suite .ts của `bun run test:ts`. Nếu runner báo ít hơn nhiều → có suite bị bỏ sót, điều tra trước khi kết luận xanh). Số liệu này phải khớp với `CONTRACT_SUITES` trong `.opencode/plugins/guardrails.js` — đổi suite mới phải sửa CẢ HAI chỗ trong cùng commit
+- [ ] `bun run test` — toàn bộ suites xanh (hiện tại **89 suites** — số liệu 10/11/2026; đếm theo lệnh này, KHÔNG cộng suite .ts của `bun run test:ts`. Nếu runner báo ít hơn nhiều → có suite bị bỏ sót, điều tra trước khi kết luận xanh). Số liệu này phải khớp với `CONTRACT_SUITES` trong `.opencode/plugins/guardrails.js` — đổi suite mới phải sửa CẢ HAI chỗ trong cùng commit
 - [ ] `bun run test:ts` — 31 suite tầng Convex/Haimiya/bot/web viết bằng TypeScript (chạy bằng bun; tách khỏi `bun run test` để không đụng phép đo coverage c8). Đụng `convex/`, `bot/src/ai.js`, logic panel hoặc thẻ ảnh `bot/src/handlers/welcomeCard.js` thì bắt buộc chạy
-- [ ] `bun tsc -b --noEmit` — typecheck sạch
+- [ ] `bun run typecheck` — typecheck sạch CẢ web (`src/`) LẪN `convex/` (lệnh cũ `bun tsc -b --noEmit` chỉ build 2 project con của root, bỏ sót `convex/tsconfig.json`)
+- [ ] `bun run test:coverage` + `bun run coverage:floor` — khi đụng engine bảo vệ trong `bot/src` (CI chạy cả hai; sàn theo file chặn engine tụt)
 - [ ] `bun run lint` — sạch
 - [ ] `node scripts/check-repo-map.cjs` — bản đồ khớp cấu trúc thật (chỉ khi
       thêm/xoá trang/panel/module/Convex function; CI cũng chặn bước này)
@@ -185,7 +186,7 @@ Các lệnh kiểm chứng đã được allow sẵn trong `opencode.json` — c
 
 ```
 bun run test              # toàn bộ test suites (~1 phút, chạy song song; thêm --serial để chạy tuần tự) — chạy sau MỌI thay đổi logic
-bun tsc -b --noEmit       # typecheck
+bun run typecheck         # typecheck web + convex (tsc -b && tsc -p convex)
 bun run lint              # ESLint
 bun run test:coverage     # test + đo coverage (c8, có ngưỡng chặn)
 bun run test:mutation     # mutation testing (phải 100% kill)

@@ -306,7 +306,11 @@ const root = new URL("..", import.meta.url).pathname;
 const src = (p: string) => readFileSync(`${root}/${p}`, "utf8");
 const block = (text: string, start: string, end: string) => {
   const i = text.indexOf(start);
-  if (i < 0) return "";
+  // Không tìm thấy mốc = nguồn đã đổi tên/di chuyển. Trả "" thì mọi check
+  // dạng "không chứa X" bên dưới PASS RỖNG (false green) — đúng lỗi cổng hiệu
+  // năng im lặng. Thà đỏ to còn hơn xanh giả.
+  if (i < 0) throw new Error(`block(): không thấy mốc bắt đầu "${start}"`);
+  // Mốc kết thúc thiếu là bình thường khi hàm nằm CUỐI file — cắt tới hết.
   const j = text.indexOf(end, i + start.length);
   return text.slice(i, j < 0 ? undefined : j);
 };

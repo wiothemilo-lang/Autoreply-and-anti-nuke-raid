@@ -2,16 +2,13 @@ const { PermissionFlagsBits } = require("discord.js");
 const { sendCaseLog } = require("../caseLog");
 const { heatSettings, punishMember, choosePunish } = require("../heat");
 const { actionsOf, cleanupMessages } = require("../moduleActions");
-const { automodEnabled } = require("./antinuke/shared");
+const { automodEnabled, MODULE_LABELS: SHARED_MODULE_LABELS } = require("./antinuke/shared");
 const { registerSweep } = require("../sweeper");
 
-const MODULE_LABELS = {
-  badword: "Từ ngữ xấu",
-  invite: "Link mời Discord",
-  attachment: "Spam ảnh/file đính kèm",
-  mention: "Spam mention",
-  malware: "Link độc hại & file nguy hiểm",
-};
+// badword/invite/attachment/malware đã có trong nhãn chung của antinuke — dùng
+// lại để sửa nhãn một chỗ là cả log antinuke lẫn log filter đổi theo. Chỉ
+// `mention` là riêng của bộ lọc nội dung.
+const MODULE_LABELS = { ...SHARED_MODULE_LABELS, mention: "Spam mention" };
 
 const INVITE_RE = /(?:discord\.(?:gg|me)\/|discord(?:app)?\.com\/invite\/)[a-zA-Z0-9_-]+/gi;
 

@@ -31,6 +31,7 @@ import { safeRedirectPath } from "../src/lib/discord";
 import { friendlyConvexError } from "../src/lib/convexError";
 import { AVATAR_MAX_DIM, planAvatarResize } from "../src/lib/avatarImage";
 import { CHUNK_RELOAD_COOLDOWN_MS, installStaleChunkRecovery } from "../src/lib/staleChunk";
+import { hiddenUnlockKey } from "../src/lib/hiddenUnlock";
 import { evaluateConfigHealth, healthGrade, HEALTH_TARGETS } from "../src/lib/configHealth";
 import {
   compareIncidentPeriods,
@@ -1550,6 +1551,15 @@ console.log("── #17 friendlyConvexError ──");
     );
   }
 }
+
+// ── Khoá mở tính năng ẩn phải TOÀN CỤC, không kèm guildId ────────────────────
+// Bug cũ: khoá gắn theo server nên chủ bot nhập lại mật khẩu ở từng dashboard,
+// và server chưa từng đặt mật khẩu thì cổng mở toang. Khoá đổi mà quên migrate
+// = mọi người mất trạng thái mở khoá; thêm guildId = tái phát đúng bug cũ.
+check("hiddenUnlockKey ổn định và không phụ thuộc server", () => {
+  const k = hiddenUnlockKey();
+  return k === "protogon_hidden_unlocked" && !/guild|\d{15,}/i.test(k);
+});
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

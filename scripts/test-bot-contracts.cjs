@@ -88,9 +88,12 @@ const interactionSrc = read("bot/src/handlers/interactionVerify.js");
 const hasMap = /const verifyAttempts = new Map\(\)/.test(interactionSrc);
 // Kiểm tra thật: trong hàm xử lý nút, trước khi setCode phải có
 // check verifyAttempts.get + trả lời chặn khi vượt hạn mức.
+// Mốc kết thúc là KHAI BÁO HÀM KẾ TIẾP, không phải comment: đổi lời comment
+// từng làm đoạn cắt rộng ra và assertion có thể xanh nhờ code không liên quan.
+const captchaStart = interactionSrc.indexOf("async function handleVerifyRequestCaptcha");
 const captchaBranch = interactionSrc.slice(
-  interactionSrc.indexOf("async function handleVerifyRequestCaptcha"),
-  interactionSrc.indexOf("// Tạo mã captcha và gửi DM"),
+  captchaStart,
+  interactionSrc.indexOf("\nasync function ", captchaStart + 10),
 );
 check("verifyAttempts được khai báo", hasMap);
 check(
@@ -211,9 +214,11 @@ check(
 );
 
 const indexSrc = read("bot/src/index.js");
+// Cùng lý do: mốc kết thúc là listener kế tiếp, không phải comment phân vùng.
+const uncaughtStart = indexSrc.indexOf('process.on("uncaughtException"');
 const uncaughtBranch = indexSrc.slice(
-  indexSrc.indexOf('process.on("uncaughtException"'),
-  indexSrc.indexOf("// --- Event handlers ---"),
+  uncaughtStart,
+  indexSrc.indexOf("\nclient.on(", uncaughtStart + 10),
 );
 check(
   "uncaughtException chẩn đoán có timeout rồi exit non-zero để PM2 restart",
