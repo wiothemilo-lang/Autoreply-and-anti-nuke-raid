@@ -27,6 +27,7 @@ không coi là lỗi.
 1. `00-index.md` — quy ước + trạng thái vault.
 2. `so-do-he-thong.md` — kiến trúc, luồng cấu hình, "hỏng đâu mở đó".
 3. Note mới nhất trong `phien-lam-viec/` khi tiếp tục việc dở.
+4. `hoi-thoai/00-index.md` khi cần lại bối cảnh một cuộc trò chuyện cũ.
 
 Chỉ đọc khi cần định hướng hoặc khi người dùng nhắc vault. Đừng đọc cả vault
 mỗi phiên — index đủ.
@@ -37,6 +38,8 @@ mỗi phiên — index đủ.
 - Quyết định: `quyet-dinh/YYYY-MM-DD-slug.md`, dùng `template/quyet-dinh.md`,
   rồi thêm một dòng vào `docs/decision-log.md`.
 - Ý tưởng: `y-tuong/slug.md`, dùng `template/y-tuong.md`.
+- Hội thoại: `hoi-thoai/YYYY-MM-DD-HHMM-slug.md`, dùng `template/hoi-thoai.md`
+  (chi tiết ở skill `chat-archive`).
 
 Cuối phiên, chưng cất đúng 3 đích: journal (5 dòng), decision-log (1 dòng mỗi
 quyết định), repo-map (khi cấu trúc đổi). Phần còn lại giữ trong vault.
