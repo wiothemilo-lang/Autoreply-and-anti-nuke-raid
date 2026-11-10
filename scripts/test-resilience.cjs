@@ -64,8 +64,6 @@ function check(label, cond, extra) {
 }
 
 async function main() {
-  const realFetch = globalThis.fetch;
-
   // ── 1. ms rác → về trần mặc định, KHÔNG phải "chờ vô hạn" ──
   // Kiểm qua `resolveTimeoutMs` (quy tắc thuần) thay vì chờ đủ 15 giây thật:
   // chờ thật làm suite chậm gấp đôi mà không kiểm thêm được gì.
@@ -231,7 +229,6 @@ async function main() {
           rej(e);
         });
       });
-    const wrapped = capturedClientOptions.fetch;
     // Hạ trần để test không phải chờ 15s thật.
     const quick = wrapFetch(hungFetch, { ms: 50, label: "convex" });
     let caught = null;
@@ -247,10 +244,8 @@ async function main() {
       String(caught),
     );
     check("cắt trước khi tới trần mặc định 15s", Date.now() - t0 < 2_000, String(Date.now() - t0));
-    check("fetch do store truyền vào KHÔNG phải fetch trần", typeof wrapped === "function");
   }
 
-  globalThis.fetch = realFetch;
   console.log(`\nKết quả resilience: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 }

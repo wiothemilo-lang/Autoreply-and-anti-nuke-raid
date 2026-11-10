@@ -270,7 +270,7 @@ function makeCtx(tables: Record<string, Row[]>) {
     first: async () => out[0] ?? null,
     collect: async () => out,
     take: async (n: number) => out.slice(0, n),
-    order: () => view(out),
+    order: (dir: string) => view(dir === "desc" ? [...out].reverse() : out),
   });
   const db = {
     query: (table: string) => {
@@ -1109,7 +1109,7 @@ const run = async () => {
       ["kind", "plan", "amount", "discordId", "reportedAt"].every((f) => f in (rows[0] as any)),
       rows[0],
     );
-    check("đơn báo sau được xếp trước (mới nhất lên đầu)", rows[1].appTransId === "261008_d");
+    check("đơn báo sau được xếp trước (mới nhất lên đầu)", rows[0].appTransId === "261008_d");
     await expectThrows(
       "không phải chủ bot → không đọc được hàng chờ",
       () => listReportedH(makeCtxWithRun(seedTransfer()), { token: "tok-sai" }),

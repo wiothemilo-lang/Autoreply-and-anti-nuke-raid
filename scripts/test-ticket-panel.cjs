@@ -82,7 +82,6 @@ module.exports = {
   function makeStore(config) {
     const calls = [];
     return {
-      calls,
       _mutations: calls,
       getConfig: async () => config,
       client: {

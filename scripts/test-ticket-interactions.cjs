@@ -66,7 +66,6 @@ const T = {
   errMaxOpen: "ERR_MAX_{n}/{max}",
   errAlreadyOpen: "ERR_ALREADY_{ch}",
   errRequiredFields: "ERR_REQUIRED_{fields}",
-  unclaimDone: "UNCLAIM_DONE",
   claimMine: "CLAIM_MINE",
   claimTaken: "CLAIM_TAKEN_{staff}",
   claimDone: "CLAIM_DONE_{staff}",
@@ -94,7 +93,6 @@ const ctl = {
   closeResult: { closed: true },
   claimResult: { ok: true },
   claimThrows: false,
-  unclaimThrows: false,
   closeMutThrows: false,
   unbanThrows: false,
   queryThrows: false,
@@ -309,7 +307,6 @@ Module._load = function (request, parent) {
     ctl.closeResult = { closed: true };
     ctl.claimResult = { ok: true };
     ctl.claimThrows = false;
-    ctl.unclaimThrows = false;
     ctl.closeMutThrows = false;
     ctl.unbanThrows = false;
     ctl.queryThrows = false;

@@ -1,4 +1,5 @@
 node_modules
+package-lock.json
 dist
 isolate/
 .env
@@ -32,3 +33,6 @@ scripts/_*.mjs
 
 # Font tải về để vẽ ảnh chia sẻ (xem header scripts/build-og-image.cjs)
 assets/brand/fonts/
+
+# Báo cáo sinh bởi scripts/update-vps-findings.sh
+docs/vps-audit-*.md

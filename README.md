@@ -28,7 +28,7 @@ Bot Discord tự động trả lời tin nhắn thành viên theo **từ khóa**
 
 - **Dashboard** (thư mục gốc): React + Vite + Tailwind + Convex. Đăng nhập bằng Discord (OAuth authorization code + PKCE; Convex trao đổi server-side, browser không giữ Discord access token), chọn server, cấu hình mọi thứ.
 - **Bot** (`bot/`): process Node.js standalone chạy 24/7 (máy bạn hoặc hosting). Đọc/ghi cấu hình qua Convex — dashboard và bot đồng bộ trong ~3 phút (guild sync + tick đều 180 giây).
-- **Backend** (`convex/`): schema + query/mutation. Mọi ghi dữ liệu từ dashboard được kiểm tra quyền _Manage Guild_ (xác thực qua Discord OAuth); bot dùng các mutation riêng `bot-writes:*` bảo vệ bằng deploy key.
+- **Backend** (`convex/`): schema + query/mutation. Mọi ghi dữ liệu từ dashboard được kiểm tra quyền _Manage Guild_ (xác thực qua Discord OAuth); bot dùng các mutation riêng `bot_writes:*` bảo vệ bằng `botKey` (SHA-256 của seed do chủ bot đặt).
 
 ## Bắt đầu
 
@@ -60,7 +60,7 @@ bun install
 bun run start
 ```
 
-**Không có máy/VPS để chạy bot?** → Dùng **Wispbyte miễn phí** (wispbyte.com — cloud chuyên host bot Discord, không cần thẻ, bot chạy 24/7 không ngủ, chỉ cần đăng nhập panel 1 lần/2 tuần): `cd bot && npm install && npm run pack:host` rồi upload `protogon-bot.zip` theo hướng dẫn trong [`bot/README.md`](bot/README.md) → mục “Chạy bot MIỄN PHÍ trên Wispbyte”.
+**Không có máy/VPS để chạy bot?** → Dùng **Wispbyte miễn phí** (wispbyte.com — cloud chuyên host bot Discord, không cần thẻ, bot chạy 24/7 không ngủ, chỉ cần đăng nhập panel 1 lần/2 tuần): `cd bot && bun install && bun run pack:host` rồi upload `protogon-bot.zip` theo hướng dẫn trong [`bot/README.md`](bot/README.md) → mục “Chạy bot MIỄN PHÍ trên Wispbyte”.
 
 **Bot trên cloud cần Convex backend công khai?** → Hướng dẫn deploy Convex Cloud miễn phí (`npx convex login` + `npx convex deploy`, lấy URL + Deploy Key): xem [`bot/README.md`](bot/README.md) → mục “Deploy Convex backend lên cloud miễn phí”.
 
@@ -116,9 +116,9 @@ Coverage được đo bằng [`c8`](https://github.com/bcoe/c8) (V8 native, khô
 | Hàm             | 97,7%   | 97% hàm được **gọi thật** (không chỉ import)               |
 | Nhánh (if/else) | 81,1%   | cả hai phía true/false của phần lớn điều kiện đã được kiểm |
 
-**Bản đồ nhiệt theo file** (sinh từ `coverage/coverage-summary.json`, 79 file):
+**Bản đồ nhiệt theo file** (sinh từ `coverage/coverage-summary.json`, 77 file):
 
-- ✅ **≥ 90% — 76/79 file**: toàn bộ engine chống nuke, alt detection, ticket, backup và lớp dẫn log; 17 file đạt 100% (`backupJobs`, `caseLog`, `logDedupe`, `logI18n`, `misfire`, `register-slash`, `util`, `handlers/backup`, `handlers/hidden`, `handlers/interactionCommon`, `handlers/interactionVerify`, `handlers/lang`, `handlers/researchCommands`, `handlers/ticketActivity`, `handlers/antinuke/enforce`, `handlers/antinuke/index`, `handlers/antinuke/nukeRollback`). Bản đầy đủ theo từng file: `coverage/coverage-summary.json`.
+- ✅ **≥ 90% — 75/77 file**: toàn bộ engine chống nuke, alt detection, ticket, backup và lớp dẫn log; 16 file đạt 100% (`caseLog`, `logDedupe`, `logI18n`, `misfire`, `register-slash`, `util`, `handlers/backup`, `handlers/hidden`, `handlers/interactionCommon`, `handlers/interactionVerify`, `handlers/lang`, `handlers/researchCommands`, `handlers/ticketActivity`, `handlers/antinuke/enforce`, `handlers/antinuke/index`, `handlers/antinuke/nukeRollback`). Bản đầy đủ theo từng file: `coverage/coverage-summary.json`.
 - ⚠️ **80–90% — 3 file**: `handlers/welcomeCard` (86,9%), `altDetection` (84,1%), `backupImport` (80,2%) — luồng chính có test nhưng còn nhánh hiếm gặp chưa phủ.
 - ✅ **Không còn file nào dưới 80%**: entry-point `antinuke/index` (nối cổng gateway Discord) từng chỉ 13,9%, nay đã có bộ test orchestrator riêng (43 check) nên lên 100%. Phần kết nối gateway thật vẫn kiểm bằng `bun run smoke:vps` trên VPS.
 

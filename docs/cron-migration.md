@@ -42,7 +42,7 @@ Bốn điểm cố ý giữ trong mẫu này:
 4. Chống trùng nằm ở phía server (`lastReportAt`, `backupClaimedAt`), không nằm ở
    RAM bot — bot restart không chạy lại job đã xong.
 
-## 3 vòng đã chuyển
+## 2 vòng đã chuyển
 
 | Vòng cũ (`setInterval`)                                                                  | Cron mới (`convex/crons.ts`)         | Mutation quét                           | Bot xử lý ở                            |
 | ---------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------- | -------------------------------------- |
@@ -63,14 +63,14 @@ không nhận botKey — không mở thêm mặt cửa cho bot.
 Đổi hành vi có chủ ý: báo cáo ngày trễ tối đa 30 phút (thay vì 15) vẫn nằm trong
 ngày; auto-backup trễ tối đa 1 giờ nhưng lịch tính theo ngày nên không đổi kết quả.
 
-## 25 vòng giữ lại trong bot (kèm lý do)
+## 26 vòng giữ lại trong bot (kèm lý do)
 
-> Đếm theo lần khảo sát đầu đợt (28 vòng − 3 đã chuyển). Trong đó 5 vòng dọn
+> Đếm theo lần khảo sát đầu đợt (28 vòng − 2 đã chuyển). Trong đó 4 vòng dọn
 > RAM đã được GOM về một vòng sweep chung (`bot/src/sweeper.js`) nhưng vẫn ở
 > lại tiến trình bot — cổng `check-cron-boundary.cjs` giữ nguyên ranh giới này.
 
 **Dọn bộ nhớ trong RAM của tiến trình** — cron không có RAM để dọn, và nếu dọn
-bằng cách đọc lại từ DB thì tốn reads vô ích mỗi phút. Năm vòng này trước đây
+bằng cách đọc lại từ DB thì tốn reads vô ích mỗi phút. Bốn vòng này trước đây
 mỗi module tự dựng timer riêng lúc `require`; nay đã gom về **MỘT** vòng sweep
 chung `bot/src/sweeper.js` (xem mục kế bên), mỗi việc giữ chu kỳ RIÊNG:
 
@@ -80,7 +80,6 @@ chung `bot/src/sweeper.js` (xem mục kế bên), mỗi việc giữ chu kỳ RI
 | `handlers/filters.js`           | 5 phút  | Xoá bucket chống spam                                         |
 | `handlers/interactionVerify.js` | 5 phút  | Xoá rate-limit xác minh tương tác                             |
 | `handlers/antinuke/index.js`    | 20 giây | tickUnlocks/tickHeatResets/tickVandalReleases + `sweepMemory` |
-| `altDetection.js`               | 1 giờ   | Dọn `voiceIpMap`                                              |
 
 **Chạm Discord/gateway (bot là nguồn sự thật)**:
 
@@ -120,7 +119,7 @@ và dùng lại liên tục:
 
 ## Vòng sweep chung của tiến trình bot (`bot/src/sweeper.js`)
 
-Năm vòng dọn RAM phía trên trước đây là 5 `setInterval` riêng, mỗi cái một vòng
+Bốn vòng dọn RAM phía trên trước đây là 4 `setInterval` riêng, mỗi cái một vòng
 `try/catch` riêng và được dựng lúc `require` (test require module là bị giữ tiến
 trình). Nay:
 
@@ -193,12 +192,12 @@ vì 4 (vẫn xanh — 5 cái mới đều có tín hiệu đúng).
 
 - `scripts/test-backup-pipeline.cjs` — có case hồi quy **kiến trúc**: `crons.ts`
   phải khai báo lịch, `index.js` không được còn `autoBackupInterval`/
-  `autoBackupSweep`, `backupJobs.js` không được còn `autoBackupSweep`. Ràng buộc
+  `autoBackupSweep`. Ràng buộc
   kiến trúc có test ⇒ không thể vô tình lùi về vòng quét trong bot.
 - `scripts/test-daily-report.cjs` — tương tự cho `reportInterval`, cộng kiểm
   ngưỡng 20h khớp ở cả 2 phía và `botSetReportAt` xoá cờ sau khi gửi.
 - `scripts/test-sweeper.cjs` — engine sweep (đếm hạn, cô lập lỗi, một timer),
-  hành vi thật của captcha/voice-IP, và chặn hồi quy: 5 module không được tự
+  hành vi thật của captcha, và chặn hồi quy: 4 module không được tự
   dựng `setInterval`, chu kỳ phải khớp, `index.js` phải gọi `startSweeper`.
 - `scripts/test-backup-convex.ts` / `scripts/test-bot-tick-settings.ts` — hành vi
   của hai mutation quét và việc bot nhận `jobs.reports` từ batch tick.

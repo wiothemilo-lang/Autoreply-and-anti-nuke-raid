@@ -24,6 +24,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { blankComments } = require("./lib/commentScan.cjs");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -58,7 +59,9 @@ const convexFiles = walk(path.join(ROOT, "convex"), ".ts").filter(
   (f) => !f.includes(`${path.sep}_generated${path.sep}`) && !f.endsWith("tsconfig.ts"),
 );
 for (const file of convexFiles) {
-  const text = fs.readFileSync(file, "utf8");
+  // Bỏ comment: `// export const foo` không được tính là export thật, nếu không
+  // gate sẽ xanh trong khi bot gọi một function đã bị comment/xoá.
+  const text = blankComments(fs.readFileSync(file, "utf8"));
   const module = path.basename(file, ".ts");
   let m;
   while ((m = EXPORT_RE.exec(text))) {

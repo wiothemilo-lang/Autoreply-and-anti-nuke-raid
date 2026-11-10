@@ -1319,8 +1319,7 @@ check(
   /finishBootOverlay\(\)/.test(bootBoundary) && !/window\.__bootDone/.test(bootBoundary),
 );
 {
-  const mainSrc = files.get("pages/Main.tsx") ?? "";
-  const mainReal = mainSrc || fs.readFileSync(path.join(ROOT, "src", "main.tsx"), "utf8");
+  const mainReal = fs.readFileSync(path.join(ROOT, "src", "main.tsx"), "utf8");
   check(
     "Bootstrap lỗi (trước khi React mount) cũng gọi finishBootOverlay",
     /finishBootOverlay\(\)/.test(mainReal) && /catch \(error\)/.test(mainReal),
@@ -1360,10 +1359,6 @@ check("App gọi __bootDone khi đã vẽ xong", /window\.__bootDone/.test(bootA
 check(
   "Tín hiệu __bootDone nằm BÊN TRONG <Suspense> (không nhảy qua RouteFallback)",
   /<Suspense[^]*?\n\s*<BootSignal \/>/.test(bootAppSrc),
-);
-check(
-  "App lỗi toàn trang cũng mở preloader (fail-open, không phụ thuộc /boot.js)",
-  /finishBootOverlay/.test(bootBoundary),
 );
 check("App khai báo kiểu __bootDone cho TypeScript", /__bootDone\?: \(\) => void/.test(bootAppSrc));
 // Đừng thêm transition width cho thanh: JS đã easing và đặt % mỗi frame, bộ

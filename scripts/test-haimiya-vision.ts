@@ -7,7 +7,6 @@
 //   D) history không đổi khi không có ảnh; system prompt có ghi chú ảnh
 //   F) ảnh KHÔNG kèm chữ vẫn hỏi được (bug 27/09/2026: "Tin nhắn rỗng")
 import { ask } from "../convex/haimiya";
-import { computeBotKey } from "../convex/botAuth";
 
 const askHandler = (ask as any)._handler;
 if (typeof askHandler !== "function") {

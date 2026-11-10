@@ -253,6 +253,7 @@ fs.writeFileSync(
 
     S.appMsgSamples.clear();
     S.appMsgSamples.set("live:app1", [{ ts: now }]);
+    S.appMsgSamples.set("dead:app1", [{ ts: now }]);
 
     S.buttonClickEvents.clear();
     S.buttonClickEvents.set("live:m1", {
@@ -295,7 +296,10 @@ fs.writeFileSync(
     check("sweep xóa patternBuckets stale", !S.patternBuckets.has("live:u1:long"));
     check("sweep xóa recentMessages quá 60s", !S.recentMessages.has("live:u1"));
     check("sweep xóa appEvents stale", !S.appEvents.has("live"));
-    check("sweep xóa appMsgSamples guild chết", S.appMsgSamples.has("live:app1"));
+    check(
+      "sweep xóa appMsgSamples guild chết",
+      !S.appMsgSamples.has("dead:app1") && S.appMsgSamples.has("live:app1"),
+    );
     check("sweep xóa buttonClickEvents toàn stale", !S.buttonClickEvents.has("live:m1"));
     check("sweep xóa lastConfigs guild chết", !S.lastConfigs.has("dead"));
     check("sweep xóa appUserHandledAt stale", !S.appUserHandledAt.has("live:u2"));

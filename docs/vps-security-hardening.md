@@ -247,8 +247,8 @@ uptime                                  # load average
 
 ### 4.2. 🟡 Phải hỏi trước khi agent làm
 
-`pm2 restart/stop/delete protogon-bot`, `docker restart/stop`, `kill <pid>`, sửa
-unit file của dịch vụ khác. Agent **in đúng lệnh + nguyên nhân**, bạn tự chạy (hoặc
+`pm2 stop/delete protogon-bot` (restart CHỈ qua `/deploy` sau 4 lớp xanh),
+`docker restart/stop`, `kill <pid>`, sửa unit file của dịch vụ khác. Agent **in đúng lệnh + nguyên nhân**, bạn tự chạy (hoặc
 gật "ok").
 
 ### 4.3. 🔴 Không bao giờ (kể cả "để debug")

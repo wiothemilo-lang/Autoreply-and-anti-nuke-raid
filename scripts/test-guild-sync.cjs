@@ -131,7 +131,7 @@ function makeClient(guilds) {
       "botSyncGuilds gửi guilds + globalStatus đầy đủ",
       sync?.args?.guilds?.length === 1 &&
         sync.args.globalStatus?.guildCount === 1 &&
-        typeof sync.args.globalStatus.version === "string" &&
+        /^v\d+$/.test(sync.args.globalStatus.version) &&
         typeof sync.args.globalStatus.ownerName === "string",
     );
     check("isSyncHealthy=true ngay sau sync thành công", gs.isSyncHealthy() === true);

@@ -18,7 +18,7 @@ minimal delta re-check set.**
 Run the full gate in ONE command, output filtered:
 
 ```
-bun run format:check 2>&1 | tail -1; echo ===; bun run lint 2>&1 | tail -2; echo ===; bun tsc -b --noEmit 2>&1 | tail -3; echo ===; bun run test 2>&1 | tail -3
+bun run format:check 2>&1 | tail -1; echo ===; bun run lint 2>&1 | tail -2; echo ===; bun run typecheck 2>&1 | tail -3; echo ===; bun run test 2>&1 | tail -3
 ```
 
 - Format lệch → chạy `bun run format` (biến đổi tất-định, tự sửa được) rồi

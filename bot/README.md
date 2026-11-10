@@ -30,8 +30,8 @@ CONVEX_DEPLOY_KEY=<deploy key — xem mục Deploy Keys bên dưới>
 
 ```bash
 cd bot
-npm install
-npm run pack:host    # tạo protogon-bot.zip (gồm cả .env, không gồm node_modules)
+bun install
+bun run pack:host    # tạo protogon-bot.zip (không gồm .env, .bot-key, node_modules)
 ```
 
 Rồi trên panel Wispbyte:
@@ -115,7 +115,7 @@ Xong! Từ đó push code lên `main` là backend tự cập nhật. Muốn depl
 ## Tối ưu RAM & dung lượng
 
 - Bot **không cache tin nhắn** (giới hạn 0), giới hạn cache thành viên/người dùng (tối đa 200), và tự sweep cache cũ — phù hợp gói 512 MB RAM của Wispbyte.
-- `npm run pack:host` loại bỏ `node_modules`, `.git`, `.md` khỏi zip (gồm cả `.env` nếu có) → file chỉ ~20 KB.
+- `bun run pack:host` loại bỏ `node_modules`, `.git`, `.md`, `.env`, `.bot-key`, `data/` khỏi zip → còn mã nguồn + font (~0,6 MB).
 
 ## Yêu cầu
 
