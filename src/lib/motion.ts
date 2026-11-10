@@ -18,7 +18,7 @@ import { useReducedMotion, type Variants } from "framer-motion";
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 /** Thời lượng (giây) — ngắn, vì app là nơi thao tác liên tục. */
-export const DUR = {
+const DUR = {
   fast: 0.14,
   base: 0.2,
   slow: 0.28,

@@ -8,15 +8,13 @@ import { useCountUp } from "../lib/motion";
  */
 export default function CountUp({
   value,
-  durationMs,
   format,
   className,
 }: {
   value: number;
-  durationMs?: number;
   format?: (n: number) => string;
   className?: string;
 }) {
-  const shown = useCountUp(value, durationMs);
+  const shown = useCountUp(value);
   return <span className={className}>{format ? format(shown) : shown}</span>;
 }

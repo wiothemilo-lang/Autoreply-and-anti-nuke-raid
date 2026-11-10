@@ -6,8 +6,6 @@ import { Button } from "./ui/button";
 import { translate } from "../lib/i18n";
 interface Props {
   children: ReactNode;
-  /** Reset boundary state when this key changes (e.g. khi đổi section). */
-  resetKey?: string;
 }
 
 interface State {
@@ -29,12 +27,6 @@ export default class PanelErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("[PanelErrorBoundary]", error, info.componentStack);
-  }
-
-  componentDidUpdate(prevProps: Props): void {
-    if (this.props.resetKey !== prevProps.resetKey && this.state.error) {
-      this.setState({ error: null });
-    }
   }
 
   render() {

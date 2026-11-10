@@ -27,7 +27,7 @@ function LatencyChart({ samples }: { samples: number[] }) {
   const w = 600;
   const h = 150;
   const max = Math.max(...samples, LATENCY_SLOW * 1.5, 100);
-  const min = Math.min(...samples, 0);
+  const min = 0;
   const stepX = w / (samples.length - 1);
   const pts = samples.map((v, i) => {
     const x = i * stepX;
@@ -389,12 +389,7 @@ export default function Monitor() {
             </div>
 
             <div className="space-y-4">
-              <UpdateWindow
-                lastUpdate={lastUpdate}
-                nextUpdate={nextUpdate}
-                onRefresh={refresh}
-                showRefresh
-              />
+              <UpdateWindow lastUpdate={lastUpdate} nextUpdate={nextUpdate} onRefresh={refresh} />
               <div className="rounded-xl border border-border bg-secondary/30 p-4 text-xs leading-relaxed text-muted-foreground">
                 <p className="mb-1 font-semibold text-foreground">{translate("ℹ️ Ghi chú")}</p>
                 <p>{translate("• Không hiển thị tên server — chỉ hiện số lượng để bảo mật.")}</p>

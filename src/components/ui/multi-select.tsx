@@ -3,7 +3,7 @@ import { Check, ChevronDown, Search, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 import { translate } from "../../lib/i18n";
-export interface MultiSelectOption {
+interface MultiSelectOption {
   value: string;
   label: string;
   sublabel?: string;

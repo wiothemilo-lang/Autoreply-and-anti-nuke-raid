@@ -10,7 +10,7 @@
  * còn nhẹ hơn và không kéo thêm ~30KB vào bundle.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { CornerDownLeft, Search } from "lucide-react";
 
@@ -19,31 +19,18 @@ import { translate } from "../lib/i18n";
 import type { CommandItem } from "../lib/commandPalette";
 import { filterCommands } from "../lib/commandPalette";
 
-export type { CommandItem } from "../lib/commandPalette";
 export { filterCommands, foldDiacritics, scoreCommand } from "../lib/commandPalette";
 
 export default function CommandPalette({
-  open,
   onOpenChange,
   items,
 }: {
-  open: boolean;
   onOpenChange: (v: boolean) => void;
   items: CommandItem[];
 }) {
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
-  const listRef = useRef<HTMLUListElement>(null);
-
   const results = useMemo(() => filterCommands(items, query).slice(0, 12), [items, query]);
-
-  // Mở lại thì luôn bắt đầu từ trống — giữ chuỗi cũ gây rối mỗi lần gọi.
-  useEffect(() => {
-    if (open) {
-      setQuery("");
-      setCursor(0);
-    }
-  }, [open]);
 
   useEffect(() => {
     if (cursor >= results.length) setCursor(0);
@@ -69,7 +56,7 @@ export default function CommandPalette({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm" />
         <Dialog.Content
@@ -96,7 +83,7 @@ export default function CommandPalette({
               {translate("Không có kết quả nào.")}
             </p>
           ) : (
-            <ul ref={listRef} className="max-h-72 overflow-y-auto p-1.5" role="listbox">
+            <ul className="max-h-72 overflow-y-auto p-1.5" role="listbox">
               {results.map((item, i) => (
                 <li key={item.id}>
                   <button

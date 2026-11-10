@@ -108,8 +108,6 @@ export function clearSessionToken(): void {
   sessionStorage.removeItem(SESSION_TOKEN_KEY);
 }
 
-export const PERM_MANAGE_GUILD = 0x20n;
-
 export function base64UrlEncode(bytes: Uint8Array): string {
   let bin = "";
   bytes.forEach((b) => (bin += String.fromCharCode(b)));
@@ -230,10 +228,6 @@ export function buildSilentAuthorizeUrl(
     prompt: "none",
   });
   return `https://discord.com/oauth2/authorize?${params.toString()}`;
-}
-
-export function hasPermission(permissions: string, bit: bigint): boolean {
-  return (BigInt(permissions) & bit) !== 0n;
 }
 
 export function discordAvatarUrl(

@@ -605,7 +605,6 @@ export const DEFAULT_PUNISH_NOTICE: Record<string, PunishNoticeLevel> = {
 
 /** Giá trị mặc định cho hệ thống nhiệt độ vi phạm. */
 export const HEAT_DEFAULTS = {
-  max: 100,
   enabled: true,
   decayPerMin: 3,
   warnAt: 25,
@@ -649,18 +648,17 @@ export interface ServerTheme {
   ring: string;
   /** Màu hiển thị cho ô chọn */
   swatch: string;
-  swatch2: string;
 }
 
 // Bảng xám dùng chung — thiết kế đen trắng thuần khiết, mọi "chủ đề" chỉ khác
 // nhau về độ đậm nhạt (contrast) thay vì sắc màu. Điều này giữ `--primary`
 // trung tính dù server cũ từng lưu theme màu nào trong DB.
 const SHADES = {
-  pure: { primary: "0 0% 9%", ring: "0 0% 9%", swatch: "#111111", swatch2: "#111111" },
-  strong: { primary: "0 0% 18%", ring: "0 0% 18%", swatch: "#2e2e2e", swatch2: "#2e2e2e" },
-  mid: { primary: "0 0% 32%", ring: "0 0% 32%", swatch: "#525252", swatch2: "#525252" },
-  soft: { primary: "0 0% 45%", ring: "0 0% 45%", swatch: "#737373", swatch2: "#737373" },
-  light: { primary: "0 0% 62%", ring: "0 0% 62%", swatch: "#9e9e9e", swatch2: "#9e9e9e" },
+  pure: { primary: "0 0% 9%", ring: "0 0% 9%", swatch: "#111111" },
+  strong: { primary: "0 0% 18%", ring: "0 0% 18%", swatch: "#2e2e2e" },
+  mid: { primary: "0 0% 32%", ring: "0 0% 32%", swatch: "#525252" },
+  soft: { primary: "0 0% 45%", ring: "0 0% 45%", swatch: "#737373" },
+  light: { primary: "0 0% 62%", ring: "0 0% 62%", swatch: "#9e9e9e" },
 };
 
 export const SERVER_THEMES: Record<string, ServerTheme> = {

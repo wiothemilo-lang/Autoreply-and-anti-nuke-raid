@@ -11,7 +11,7 @@ import { cn } from "../lib/utils";
  *   preloader trong index.html. Muốn đổi khung cắt/độ đậm: sửa hằng số rồi
  *   chạy lại `node scripts/build-logo-assets.cjs` — đừng sửa tay file PNG.
  */
-export function WhaleIcon({ className }: { className?: string }) {
+function WhaleIcon({ className }: { className?: string }) {
   return (
     <img
       src="/logo-mark.png"
