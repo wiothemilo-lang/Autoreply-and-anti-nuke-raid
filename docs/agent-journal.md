@@ -73,6 +73,13 @@
 
 ---
 
+## 2026-11-10 (13) — Ẩn bán Premium + tắt giới hạn theo gói
+
+- ✅ Xong: 2 công tắc `SALES_ENABLED`/`PLAN_LIMITS_ENABLED` trong `convex/plans.ts` (đều `false`); server chặn đơn Premium MỚI ở `createTransferIntent` + `startPayment`, mọi server dùng trần cao nhất; web xoá `PremiumPage`/`PlanCard`, `/premium` redirect 301 về `/`, bỏ khỏi nav/sitemap/llms, sửa Điều khoản 3 ngôn ngữ
+- 📁 File đụng: `convex/{plans,payments,paymentsAction}.ts`, `src/{App.tsx,pages/DonatePage.tsx,lib/*}`, `public/*`, `vercel.json`, `Dockerfile.web`, `scripts/test-{plans-gating,payments,backup-convex}.ts`, `scripts/test-web-{contracts,ux-upgrades}.*`, docs
+- 🧪 Kiểm chứng: test-plans-gating 22/22 · test-payments 120/120 · test-backup-convex 134/134 · (đang chạy bộ đầy đủ + lint/typecheck)
+- ▶️ Tiếp theo: PR + merge khi CI xanh; bật lại bán = đổi 2 cờ thành `true`
+
 ## 2026-11-10 (12) — Skill vault + MCP Obsidian cho 5 agent
 
 - ✅ **Vault**: dời `second-brain/` vào working tree (Obsidian mở repo làm vault); `.obsidian/` + `second-brain/` bị gitignore — anchor `/second-brain/` ở root để không chặn nhầm `.opencode/skills/second-brain/`.

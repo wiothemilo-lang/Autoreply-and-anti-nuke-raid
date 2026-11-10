@@ -31,6 +31,7 @@ import {
   queryOrderMacHex,
   verifyCallbackMacHex,
 } from "./payments";
+import { SALES_ENABLED } from "./plans";
 
 /**
  * Lỗi trỏ tới client — ConvexError chứ KHÔNG phải Error thường.
@@ -126,6 +127,14 @@ export const startPayment = action({
     customAmount: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<StartPaymentResult> => {
+    // Công tắc bán gói: chặn TRƯỚC khi gọi ZaloPay (không tạo đơn, không gọi
+    // mạng). Đơn cũ vẫn được queryOrder/handleCallback xử lý bình thường.
+    if (args.kind === "premium" && !SALES_ENABLED) {
+      throw paymentError(
+        "PAYMENT_SALES_DISABLED",
+        "Gói Premium tạm chưa mở bán. Mọi tính năng đang mở miễn phí — bạn không cần mua gì.",
+      );
+    }
     const cfg = readConfig();
     let intent: IntentInfo;
     try {

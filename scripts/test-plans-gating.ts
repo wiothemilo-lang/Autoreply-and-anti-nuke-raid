@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 import {
   HARD_CAPS,
   PLAN_LIMITS,
+  PLAN_LIMITS_ENABLED,
   TERMS_VERSION,
   asPlanId,
   assertWithinLimit,
@@ -215,6 +216,7 @@ async function run() {
       asPlanId("pioneer") === "pioneer",
   );
   const keys = Object.keys(HARD_CAPS) as (keyof typeof HARD_CAPS)[];
+  const DATA_KEYS = ["exportRows", "exportDays", "heatTopRows", "historyRows"] as const;
   check(
     "hạn mức TĂNG DẦN theo gói và gói cao nhất chạm trần cứng (không 'vô hạn' suông)",
     keys.every(
@@ -225,9 +227,12 @@ async function run() {
     ),
     PLAN_LIMITS,
   );
+  const expectedDefault = PLAN_LIMITS_ENABLED ? PLAN_LIMITS.free : PLAN_LIMITS.pioneer;
   check(
-    "planLimits(undefined) = gói Miễn phí (khách chưa mua không vượt trần)",
-    planLimits(undefined).autoReplyRules === PLAN_LIMITS.free.autoReplyRules,
+    PLAN_LIMITS_ENABLED
+      ? "planLimits(undefined) = gói Miễn phí (khách chưa mua không vượt trần)"
+      : "giới hạn theo gói đang tắt → planLimits(undefined) = trần cao nhất",
+    planLimits(undefined).autoReplyRules === expectedDefault.autoReplyRules,
   );
   check(
     "nextPlan: miễn phí → đồng hành → tiên phong → null",
@@ -253,21 +258,36 @@ async function run() {
   check(
     "đúng trần thì cho qua",
     (() => {
-      assertWithinLimit("free", "autoReplyRules", 5);
+      assertWithinLimit("free", "autoReplyRules", PLAN_LIMITS_ENABLED ? 5 : 50);
       return true;
     })(),
   );
-  const msgFree = await expectThrow(
-    "vượt trần gói Miễn phí → nêu trần + gói kế tiếp",
-    async () => assertWithinLimit("free", "badWords", 21),
-    /Gói Miễn phí cho tối đa 20 từ khoá cấm.*Đồng hành để dùng 60/,
-  );
-  void msgFree;
-  await expectThrow(
-    "ở gói cao nhất mà vẫn vượt → chỉ cách giảm xuống trần",
-    async () => assertWithinLimit("pioneer", "backupKeepCount", 51),
-    /đã ở gói cao nhất.*giảm xuống 50/,
-  );
+  if (PLAN_LIMITS_ENABLED) {
+    const msgFree = await expectThrow(
+      "vượt trần gói Miễn phí → nêu trần + gói kế tiếp",
+      async () => assertWithinLimit("free", "badWords", 21),
+      /Gói Miễn phí cho tối đa 20 từ khoá cấm.*Đồng hành để dùng 60/,
+    );
+    void msgFree;
+    await expectThrow(
+      "ở gói cao nhất mà vẫn vượt → chỉ cách giảm xuống trần",
+      async () => assertWithinLimit("pioneer", "backupKeepCount", 51),
+      /đã ở gói cao nhất.*giảm xuống 50/,
+    );
+  } else {
+    check(
+      "giới hạn tắt: Miễn phí dùng đúng trần cao nhất (50 rule)",
+      (() => {
+        assertWithinLimit("free", "autoReplyRules", 50);
+        return true;
+      })(),
+    );
+    await expectThrow(
+      "giới hạn tắt: vượt trần cứng vẫn chặn, không gợi ý nâng gói",
+      async () => assertWithinLimit("free", "autoReplyRules", 51),
+      /đã ở gói cao nhất.*giảm xuống 50/,
+    );
+  }
 
   console.log("── 3. planForGuild: gói của ĐÚNG server ──");
   check(
@@ -306,320 +326,345 @@ async function run() {
     ).plan === "free",
   );
 
-  console.log("── 4. Chặn thật: rule auto reply ──");
-  await expectThrow(
-    "server Miễn phí đã có 5 rule → thêm rule thứ 6 bị chặn kèm đường nâng gói",
-    () => addH(makeCtx(seed({ rules: 5 })), ruleArgs("rule-moi")),
-    /Gói Miễn phí cho tối đa 5 rule auto reply.*Đồng hành để dùng 30/,
-  );
-  {
-    // Mua gói cho server → mở được ngay (không cần chờ gì khác).
-    const tables = seed({ rules: 5, entitlements: [activeEnt("supporter")] });
-    const res = await addH(makeCtx(tables), ruleArgs("rule-moi"));
+  if (!PLAN_LIMITS_ENABLED) {
+    console.log("── 4-11. Giới hạn theo gói đang TẮT — kiểm tra trần cao nhất ──");
     check(
-      "server có gói Đồng hành → thêm được rule thứ 6 (mua là mở ngay)",
-      res?.ok === true && tables.autoReplies.length === 6,
+      "mọi hạn mức của free đều bằng trần cứng (không còn cắt theo gói)",
+      keys.every((k) => planLimits("free")[k] === HARD_CAPS[k]),
+      planLimits("free"),
     );
-  }
-
-  console.log("── 5. Chặn thật: hạn mức backup ──");
-  await expectThrow(
-    "Miễn phí: giữ 10 bản backup bị chặn (trần 3)",
-    () => retentionH(makeCtx(seed()), { token: "tok", guildId: GUILD, keepCount: 10, keepDays: 0 }),
-    /Gói Miễn phí cho tối đa 3 bản backup giữ lại/,
-  );
-  await expectThrow(
-    "Miễn phí: giữ backup 30 ngày bị chặn (trần 7)",
-    () => retentionH(makeCtx(seed()), { token: "tok", guildId: GUILD, keepCount: 3, keepDays: 30 }),
-    /Gói Miễn phí cho tối đa 7 ngày giữ backup.*Đồng hành để dùng 30/,
-  );
-  {
-    const tables = seed({ entitlements: [activeEnt("supporter")] });
-    const res = await retentionH(makeCtx(tables), {
-      token: "tok",
-      guildId: GUILD,
-      keepCount: 10,
-      keepDays: 30,
-    });
     check(
-      "Đồng hành: 10 bản / 30 ngày lưu được và ghi đúng vào guild",
-      res?.ok === true &&
-        tables.guilds[0].backupKeepCount === 10 &&
-        tables.guilds[0].backupKeepDays === 30,
-      res,
+      "planLimits bỏ qua tham số gói khi công tắc tắt",
+      planLimits("supporter").backupKeepCount === HARD_CAPS.backupKeepCount &&
+        planLimits("pioneer").exportRows === HARD_CAPS.exportRows,
     );
-  }
-  {
-    // Số vượt TRẦN CỨNG vẫn được KẸP về trần như hành vi cũ (999 → 50), không
-    // ném lỗi: đây là chuẩn hoá dữ liệu vào, không phải khách xin thêm quyền lợi.
-    const tables = seed({ entitlements: [activeEnt("pioneer")] });
-    const res = await retentionH(makeCtx(tables), {
-      token: "tok",
-      guildId: GUILD,
-      keepCount: 51,
-      keepDays: 400,
-    });
     check(
-      "Tiên phong: 51/400 bị KẸP về trần cứng 50/365 (không ném lỗi)",
-      res?.ok === true &&
-        tables.guilds[0].backupKeepCount === 50 &&
-        tables.guilds[0].backupKeepDays === 365,
-      res,
+      "assertWithinLimit cho free chạm đúng trần cao nhất ở cả 3 nhóm ghi",
+      (() => {
+        assertWithinLimit("free", "badWords", HARD_CAPS.badWords);
+        assertWithinLimit("free", "backupKeepCount", HARD_CAPS.backupKeepCount);
+        assertWithinLimit("free", "backupKeepDays", HARD_CAPS.backupKeepDays);
+        return true;
+      })(),
     );
-  }
-
-  console.log("── 5b. Đường BOT cũng phải áp hạn mức gói ──");
-  {
-    // Trước đây `!backup keep 50 365` đi thẳng botSetBackupRetentionHandler và
-    // chỉ kẹp trần cứng → guild Miễn phí vượt ngân sách storage 0.5 GB.
-    const BOT_KEY = "khoa-bot-32-bytes-cho-test-plans";
-    const botStatus = [{ _id: "bot-status", kind: "status", botKeySeed: computeBotKey(BOT_KEY) }];
+    console.log("  (các test hành vi theo từng gói được giữ trong nhánh PLAN_LIMITS_ENABLED)");
+  } else {
+    console.log("── 4. Chặn thật: rule auto reply ──");
     await expectThrow(
-      "bot: guild Miễn phí giữ 10 bản bị chặn (không lách qua lệnh backup)",
+      "server Miễn phí đã có 5 rule → thêm rule thứ 6 bị chặn kèm đường nâng gói",
+      () => addH(makeCtx(seed({ rules: 5 })), ruleArgs("rule-moi")),
+      /Gói Miễn phí cho tối đa 5 rule auto reply.*Đồng hành để dùng 30/,
+    );
+    {
+      // Mua gói cho server → mở được ngay (không cần chờ gì khác).
+      const tables = seed({ rules: 5, entitlements: [activeEnt("supporter")] });
+      const res = await addH(makeCtx(tables), ruleArgs("rule-moi"));
+      check(
+        "server có gói Đồng hành → thêm được rule thứ 6 (mua là mở ngay)",
+        res?.ok === true && tables.autoReplies.length === 6,
+      );
+    }
+
+    console.log("── 5. Chặn thật: hạn mức backup ──");
+    await expectThrow(
+      "Miễn phí: giữ 10 bản backup bị chặn (trần 3)",
       () =>
-        botSetBackupRetentionHandler(makeCtx({ ...seed(), botStatus }), {
-          guildId: GUILD,
-          keepCount: 10,
-          keepDays: 0,
-          botKey: BOT_KEY,
-        }),
+        retentionH(makeCtx(seed()), { token: "tok", guildId: GUILD, keepCount: 10, keepDays: 0 }),
       /Gói Miễn phí cho tối đa 3 bản backup giữ lại/,
     );
-    const tables = { ...seed({ entitlements: [activeEnt("supporter")] }), botStatus };
-    const res = await botSetBackupRetentionHandler(makeCtx(tables), {
-      guildId: GUILD,
-      keepCount: 10,
-      keepDays: 30,
-      botKey: BOT_KEY,
-    });
-    check(
-      "bot: guild Đồng hành lưu được 10 bản / 30 ngày",
-      res?.ok === true &&
-        tables.guilds[0].backupKeepCount === 10 &&
-        tables.guilds[0].backupKeepDays === 30,
-      res,
+    await expectThrow(
+      "Miễn phí: giữ backup 30 ngày bị chặn (trần 7)",
+      () =>
+        retentionH(makeCtx(seed()), { token: "tok", guildId: GUILD, keepCount: 3, keepDays: 30 }),
+      /Gói Miễn phí cho tối đa 7 ngày giữ backup.*Đồng hành để dùng 30/,
     );
-  }
-
-  console.log("── 6. Quyền hạn vẫn là chốt đầu tiên ──");
-  await expectThrow(
-    "token sai → chặn trước khi xét gói (không lộ hạn mức)",
-    () => addH(makeCtx(seed({ rules: 5 })), { ...ruleArgs("x"), token: "tok-sai" }),
-    /Không có quyền quản lý|Phiên đăng nhập/,
-  );
-
-  console.log("── 7. Nhập file cấu hình không lọt hạn mức gói ──");
-  {
-    const words = (n: number) => Array.from({ length: n }, (_, i) => `từ ${i}`);
-    const importCfg = (tables: Record<string, Row[]>, badWords: string[]) =>
-      importGuildConfigHandler(makeCtx(tables) as any, {
+    {
+      const tables = seed({ entitlements: [activeEnt("supporter")] });
+      const res = await retentionH(makeCtx(tables), {
         token: "tok",
         guildId: GUILD,
-        config: { badWords },
+        keepCount: 10,
+        keepDays: 30,
       });
-
-    const tFree = seed();
-    await expectThrow(
-      "Miễn phí nhập 30 từ qua file cấu hình → chặn theo gói (từng lọt trần cứng 100)",
-      () => importCfg(tFree, words(30)),
-      /Gói Miễn phí cho tối đa 20 từ khoá cấm/,
-    );
-    check(
-      "chặn TRƯỚC khi ghi — badWords của guild không bị đụng",
-      tFree.guilds[0].badWords === undefined,
-    );
-
-    const tSup = seed({ entitlements: [activeEnt("supporter")] });
-    const ok = await importCfg(tSup, words(30));
-    check(
-      "Đồng hành nhập 30 từ (≤60) qua file cấu hình → ghi được",
-      ok.ok === true && tSup.guilds[0].badWords?.length === 30,
-      ok,
-    );
-
-    const tFreeOk = seed();
-    const ok2 = await importCfg(tFreeOk, words(15));
-    check(
-      "Miễn phí 15 từ (≤20) vẫn qua — không chặn oan",
-      ok2.ok === true && tFreeOk.guilds[0].badWords?.length === 15,
-      ok2,
-    );
-  }
-
-  console.log("── 8. Đặc quyền dữ liệu (P1–P4): trần + đường nâng gói ──");
-  const DATA_KEYS = ["exportRows", "exportDays", "heatTopRows", "historyRows"] as const;
-  check(
-    "4 hạn mức dữ liệu đều tăng dần theo gói và gói cao nhất chạm trần cứng",
-    DATA_KEYS.every(
-      (k) =>
-        PLAN_LIMITS.free[k] < PLAN_LIMITS.supporter[k] &&
-        PLAN_LIMITS.supporter[k] <= PLAN_LIMITS.pioneer[k] &&
-        PLAN_LIMITS.pioneer[k] === HARD_CAPS[k],
-    ),
-    DATA_KEYS.map((k) => [k, PLAN_LIMITS.free[k], PLAN_LIMITS.pioneer[k]]),
-  );
-  check(
-    "gói Miễn phí VẪN xuất được dữ liệu (không khoá sau tường trả phí)",
-    PLAN_LIMITS.free.exportRows > 0 && PLAN_LIMITS.free.exportDays > 0,
-    PLAN_LIMITS.free,
-  );
-  check(
-    "catalog() niêm yết đủ 4 hạn mức mới (trang bán không tự đặt số)",
-    (() => {
-      const c = catalogH({});
-      return (
-        c.limits.free.exportRows === PLAN_LIMITS.free.exportRows &&
-        c.limits.supporter.exportDays === PLAN_LIMITS.supporter.exportDays &&
-        c.limits.pioneer.heatTopRows === HARD_CAPS.heatTopRows &&
-        c.limits.pioneer.historyRows === HARD_CAPS.historyRows
+      check(
+        "Đồng hành: 10 bản / 30 ngày lưu được và ghi đúng vào guild",
+        res?.ok === true &&
+          tables.guilds[0].backupKeepCount === 10 &&
+          tables.guilds[0].backupKeepDays === 30,
+        res,
       );
-    })(),
-  );
-  await expectThrow(
-    "Miễn phí xin xuất 5.000 dòng → nêu trần 100 + gói kế tiếp cho 1000",
-    async () => assertWithinLimit("free", "exportRows", 5_000),
-    /Gói Miễn phí cho tối đa 100 dòng mỗi lượt xuất dữ liệu.*Đồng hành để dùng 1000 dòng mỗi lượt xuất dữ liệu/,
-  );
-  await expectThrow(
-    "xuất lịch sử 2.000 ngày ở gói cao nhất → chỉ cách giảm xuống 1095",
-    async () => assertWithinLimit("pioneer", "exportDays", 2_000),
-    /đã ở gói cao nhất.*giảm xuống 1095 ngày lịch sử xuất được/,
-  );
+    }
+    {
+      // Số vượt TRẦN CỨNG vẫn được KẸP về trần như hành vi cũ (999 → 50), không
+      // ném lỗi: đây là chuẩn hoá dữ liệu vào, không phải khách xin thêm quyền lợi.
+      const tables = seed({ entitlements: [activeEnt("pioneer")] });
+      const res = await retentionH(makeCtx(tables), {
+        token: "tok",
+        guildId: GUILD,
+        keepCount: 51,
+        keepDays: 400,
+      });
+      check(
+        "Tiên phong: 51/400 bị KẸP về trần cứng 50/365 (không ném lỗi)",
+        res?.ok === true &&
+          tables.guilds[0].backupKeepCount === 50 &&
+          tables.guilds[0].backupKeepDays === 365,
+        res,
+      );
+    }
 
-  console.log("── 9. Xuất CSV: chặn ở TẦNG ĐỌC theo gói (không phải ẩn nút) ──");
-  const exportH = (exportGuildCsv as any)._handler;
-  const exportVia = (t: Record<string, Row[]>, kind: string) =>
-    exportH(makeCtx(t), { token: "tok", guildId: GUILD, kind }) as Promise<any>;
-  const modActionRows = (n: number, createdAt = Date.now()): Row[] =>
-    Array.from({ length: n }, (_, i) => ({
-      _id: `ma${i}`,
-      guildId: GUILD,
-      action: "🛠️ Ban",
-      caseNumber: i + 1,
-      targetName: `Nguyễn Văn ${i}`,
-      targetId: `900000000000000${i}`,
-      executorName: "mod",
-      executorId: "123456789012345678",
-      reason: "spam",
-      details: "",
-      createdAt,
-    }));
-  const heatRows = (n: number): Row[] =>
-    Array.from({ length: n }, (_, i) => ({
-      _id: `h${i}`,
-      guildId: GUILD,
-      userId: `800000000000000${i}`,
-      username: `user-${i}`,
-      heat: n - i,
-      warnStrikes: 0,
-      updatedAt: Date.now(),
-    }));
-  {
-    const tFree = seed();
-    tFree.modActions = modActionRows(150);
-    const res = await exportVia(tFree, "modActions");
-    check(
-      "Miễn phí: 150 hành động → file đúng 100 dòng + cờ 'còn nữa' (không im lặng trả thiếu)",
-      res?.rows === 100 && res?.truncated === true && res?.exportRows === 100,
-      res && { rows: res.rows, truncated: res.truncated, exportRows: res.exportRows },
-    );
+    console.log("── 5b. Đường BOT cũng phải áp hạn mức gói ──");
+    {
+      // Trước đây `!backup keep 50 365` đi thẳng botSetBackupRetentionHandler và
+      // chỉ kẹp trần cứng → guild Miễn phí vượt ngân sách storage 0.5 GB.
+      const BOT_KEY = "khoa-bot-32-bytes-cho-test-plans";
+      const botStatus = [{ _id: "bot-status", kind: "status", botKeySeed: computeBotKey(BOT_KEY) }];
+      await expectThrow(
+        "bot: guild Miễn phí giữ 10 bản bị chặn (không lách qua lệnh backup)",
+        () =>
+          botSetBackupRetentionHandler(makeCtx({ ...seed(), botStatus }), {
+            guildId: GUILD,
+            keepCount: 10,
+            keepDays: 0,
+            botKey: BOT_KEY,
+          }),
+        /Gói Miễn phí cho tối đa 3 bản backup giữ lại/,
+      );
+      const tables = { ...seed({ entitlements: [activeEnt("supporter")] }), botStatus };
+      const res = await botSetBackupRetentionHandler(makeCtx(tables), {
+        guildId: GUILD,
+        keepCount: 10,
+        keepDays: 30,
+        botKey: BOT_KEY,
+      });
+      check(
+        "bot: guild Đồng hành lưu được 10 bản / 30 ngày",
+        res?.ok === true &&
+          tables.guilds[0].backupKeepCount === 10 &&
+          tables.guilds[0].backupKeepDays === 30,
+        res,
+      );
+    }
 
-    // Bản ghi cũ hơn cửa sổ 90 ngày của gói Miễn phí phải KHÔNG lọt file.
-    tFree.modActions.push({
-      ...modActionRows(1, Date.now() - 200 * DAY)[0],
-      _id: "ma-cu",
-      reason: "RẤT-CŨ-KHÔNG-LỌT",
-    });
-    const resOld = await exportVia(tFree, "modActions");
-    check(
-      "Miễn phí: cửa sổ 90 ngày → bản ghi 200 ngày trước bị loại (exportDays chặn thật)",
-      !resOld.csv.includes("RẤT-CŨ-KHÔNG-LỌT"),
+    console.log("── 6. Quyền hạn vẫn là chốt đầu tiên ──");
+    await expectThrow(
+      "token sai → chặn trước khi xét gói (không lộ hạn mức)",
+      () => addH(makeCtx(seed({ rules: 5 })), { ...ruleArgs("x"), token: "tok-sai" }),
+      /Không có quyền quản lý|Phiên đăng nhập/,
     );
 
-    const tSup = seed({ entitlements: [activeEnt("supporter")] });
-    tSup.modActions = modActionRows(150);
-    const resSup = await exportVia(tSup, "modActions");
+    console.log("── 7. Nhập file cấu hình không lọt hạn mức gói ──");
+    {
+      const words = (n: number) => Array.from({ length: n }, (_, i) => `từ ${i}`);
+      const importCfg = (tables: Record<string, Row[]>, badWords: string[]) =>
+        importGuildConfigHandler(makeCtx(tables) as any, {
+          token: "tok",
+          guildId: GUILD,
+          config: { badWords },
+        });
+
+      const tFree = seed();
+      await expectThrow(
+        "Miễn phí nhập 30 từ qua file cấu hình → chặn theo gói (từng lọt trần cứng 100)",
+        () => importCfg(tFree, words(30)),
+        /Gói Miễn phí cho tối đa 20 từ khoá cấm/,
+      );
+      check(
+        "chặn TRƯỚC khi ghi — badWords của guild không bị đụng",
+        tFree.guilds[0].badWords === undefined,
+      );
+
+      const tSup = seed({ entitlements: [activeEnt("supporter")] });
+      const ok = await importCfg(tSup, words(30));
+      check(
+        "Đồng hành nhập 30 từ (≤60) qua file cấu hình → ghi được",
+        ok.ok === true && tSup.guilds[0].badWords?.length === 30,
+        ok,
+      );
+
+      const tFreeOk = seed();
+      const ok2 = await importCfg(tFreeOk, words(15));
+      check(
+        "Miễn phí 15 từ (≤20) vẫn qua — không chặn oan",
+        ok2.ok === true && tFreeOk.guilds[0].badWords?.length === 15,
+        ok2,
+      );
+    }
+
+    console.log("── 8. Đặc quyền dữ liệu (P1–P4): trần + đường nâng gói ──");
     check(
-      "Đồng hành: cùng 150 hành động → lấy đủ 150 (trần 1000), không cắt oan",
-      resSup?.rows === 150 && resSup?.truncated === false && resSup?.exportRows === 1_000,
-      resSup && { rows: resSup.rows, truncated: resSup.truncated },
+      "4 hạn mức dữ liệu đều tăng dần theo gói và gói cao nhất chạm trần cứng",
+      DATA_KEYS.every(
+        (k) =>
+          PLAN_LIMITS.free[k] < PLAN_LIMITS.supporter[k] &&
+          PLAN_LIMITS.supporter[k] <= PLAN_LIMITS.pioneer[k] &&
+          PLAN_LIMITS.pioneer[k] === HARD_CAPS[k],
+      ),
+      DATA_KEYS.map((k) => [k, PLAN_LIMITS.free[k], PLAN_LIMITS.pioneer[k]]),
+    );
+    check(
+      "gói Miễn phí VẪN xuất được dữ liệu (không khoá sau tường trả phí)",
+      PLAN_LIMITS.free.exportRows > 0 && PLAN_LIMITS.free.exportDays > 0,
+      PLAN_LIMITS.free,
+    );
+    check(
+      "catalog() niêm yết đủ 4 hạn mức mới (trang bán không tự đặt số)",
+      (() => {
+        const c = catalogH({});
+        return (
+          c.limits.free.exportRows === PLAN_LIMITS.free.exportRows &&
+          c.limits.supporter.exportDays === PLAN_LIMITS.supporter.exportDays &&
+          c.limits.pioneer.heatTopRows === HARD_CAPS.heatTopRows &&
+          c.limits.pioneer.historyRows === HARD_CAPS.historyRows
+        );
+      })(),
+    );
+    await expectThrow(
+      "Miễn phí xin xuất 5.000 dòng → nêu trần 100 + gói kế tiếp cho 1000",
+      async () => assertWithinLimit("free", "exportRows", 5_000),
+      /Gói Miễn phí cho tối đa 100 dòng mỗi lượt xuất dữ liệu.*Đồng hành để dùng 1000 dòng mỗi lượt xuất dữ liệu/,
+    );
+    await expectThrow(
+      "xuất lịch sử 2.000 ngày ở gói cao nhất → chỉ cách giảm xuống 1095",
+      async () => assertWithinLimit("pioneer", "exportDays", 2_000),
+      /đã ở gói cao nhất.*giảm xuống 1095 ngày lịch sử xuất được/,
     );
 
-    const tHeat = seed();
-    tHeat.heatStates = heatRows(15);
-    const resHeat = await exportVia(tHeat, "heat");
-    check(
-      "bảng nhiệt: Miễn phí cắt ở top 10 dù có 15 người (trần riêng heatTopRows)",
-      resHeat?.rows === 10 && resHeat?.truncated === true,
-      resHeat && { rows: resHeat.rows, truncated: resHeat.truncated },
-    );
+    console.log("── 9. Xuất CSV: chặn ở TẦNG ĐỌC theo gói (không phải ẩn nút) ──");
+    const exportH = (exportGuildCsv as any)._handler;
+    const exportVia = (t: Record<string, Row[]>, kind: string) =>
+      exportH(makeCtx(t), { token: "tok", guildId: GUILD, kind }) as Promise<any>;
+    const modActionRows = (n: number, createdAt = Date.now()): Row[] =>
+      Array.from({ length: n }, (_, i) => ({
+        _id: `ma${i}`,
+        guildId: GUILD,
+        action: "🛠️ Ban",
+        caseNumber: i + 1,
+        targetName: `Nguyễn Văn ${i}`,
+        targetId: `900000000000000${i}`,
+        executorName: "mod",
+        executorId: "123456789012345678",
+        reason: "spam",
+        details: "",
+        createdAt,
+      }));
+    const heatRows = (n: number): Row[] =>
+      Array.from({ length: n }, (_, i) => ({
+        _id: `h${i}`,
+        guildId: GUILD,
+        userId: `800000000000000${i}`,
+        username: `user-${i}`,
+        heat: n - i,
+        warnStrikes: 0,
+        updatedAt: Date.now(),
+      }));
+    {
+      const tFree = seed();
+      tFree.modActions = modActionRows(150);
+      const res = await exportVia(tFree, "modActions");
+      check(
+        "Miễn phí: 150 hành động → file đúng 100 dòng + cờ 'còn nữa' (không im lặng trả thiếu)",
+        res?.rows === 100 && res?.truncated === true && res?.exportRows === 100,
+        res && { rows: res.rows, truncated: res.truncated, exportRows: res.exportRows },
+      );
 
-    const tEvil = seed();
-    tEvil.modActions = [{ ...modActionRows(1)[0], reason: '=HYPERLINK("http://x","bấm")' }];
-    const resEvil = await exportVia(tEvil, "modActions");
-    check(
-      "CSV injection: lý do bắt đầu bằng '=' bị vô hiệu (Excel không thi hành công thức)",
-      resEvil.csv.includes("'=HYPERLINK"),
-      resEvil.csv.split("\r\n")[1],
-    );
+      // Bản ghi cũ hơn cửa sổ 90 ngày của gói Miễn phí phải KHÔNG lọt file.
+      tFree.modActions.push({
+        ...modActionRows(1, Date.now() - 200 * DAY)[0],
+        _id: "ma-cu",
+        reason: "RẤT-CŨ-KHÔNG-LỌT",
+      });
+      const resOld = await exportVia(tFree, "modActions");
+      check(
+        "Miễn phí: cửa sổ 90 ngày → bản ghi 200 ngày trước bị loại (exportDays chặn thật)",
+        !resOld.csv.includes("RẤT-CŨ-KHÔNG-LỌT"),
+      );
 
-    const tStranger = seed();
-    tStranger.users[0].manageableGuildIds = ["999999999999999999"];
-    check(
-      "người không quản lý được server → null (không lộ dữ liệu server khác)",
-      (await exportVia(tStranger, "modActions")) === null,
-    );
-  }
+      const tSup = seed({ entitlements: [activeEnt("supporter")] });
+      tSup.modActions = modActionRows(150);
+      const resSup = await exportVia(tSup, "modActions");
+      check(
+        "Đồng hành: cùng 150 hành động → lấy đủ 150 (trần 1000), không cắt oan",
+        resSup?.rows === 150 && resSup?.truncated === false && resSup?.exportRows === 1_000,
+        resSup && { rows: resSup.rows, truncated: resSup.truncated },
+      );
 
-  console.log("── 10. /stats: trần bảng nhiệt theo gói ──");
-  const heatH = (heatLeaderboard as any)._handler;
-  {
-    const mk = (plan?: string) => {
-      const t = seed(plan ? { entitlements: [activeEnt(plan)] } : {});
-      t.heatStates = heatRows(40);
-      return t;
-    };
-    const ask = (t: Record<string, Row[]>) =>
-      heatH(makeCtx(t), { token: "tok", guildId: GUILD, limit: 50 });
-    const freeTop = await ask(mk());
-    check(
-      "Miễn phí: xin limit=50 nhưng server trả 10 (gọi thẳng API cũng không vượt trần)",
-      freeTop?.length === 10,
-      freeTop?.length,
-    );
-    const supTop = await ask(mk("supporter"));
-    check("Đồng hành: nhận 30 dòng", supTop?.length === 30, supTop?.length);
-    const pioTop = await ask(mk("pioneer"));
-    check(
-      "Tiên phong: 40 người → 40 dòng, nhiệt cao nhất đứng đầu (sort thật)",
-      pioTop?.length === 40 && pioTop?.[0]?.heat === 40 && pioTop?.[39]?.heat === 1,
-      pioTop?.slice(0, 3).map((r: Row) => r.heat),
-    );
-  }
+      const tHeat = seed();
+      tHeat.heatStates = heatRows(15);
+      const resHeat = await exportVia(tHeat, "heat");
+      check(
+        "bảng nhiệt: Miễn phí cắt ở top 10 dù có 15 người (trần riêng heatTopRows)",
+        resHeat?.rows === 10 && resHeat?.truncated === true,
+        resHeat && { rows: resHeat.rows, truncated: resHeat.truncated },
+      );
 
-  console.log("── 11. Dashboard: log hành động cắt theo gói ──");
-  const getGuildH = (getGuild as any)._handler;
-  {
-    const mk = (plan?: string) => {
-      const t = seed(plan ? { entitlements: [activeEnt(plan)] } : {});
-      t.modActions = modActionRows(40);
-      return t;
-    };
-    const freeData = await getGuildH(makeCtx(mk()), { token: "tok", guildId: GUILD });
-    check(
-      "Miễn phí: 30 dòng log hành động (đúng mức cũ, không đổi hành vi cũ)",
-      freeData?.modActions?.length === 30,
-      freeData?.modActions?.length,
-    );
-    const supData = await getGuildH(makeCtx(mk("supporter")), {
-      token: "tok",
-      guildId: GUILD,
-    });
-    check(
-      "Đồng hành: 40 dòng có sẵn → nhận đủ 40 (trần 100)",
-      supData?.modActions?.length === 40,
-      supData?.modActions?.length,
-    );
+      const tEvil = seed();
+      tEvil.modActions = [{ ...modActionRows(1)[0], reason: '=HYPERLINK("http://x","bấm")' }];
+      const resEvil = await exportVia(tEvil, "modActions");
+      check(
+        "CSV injection: lý do bắt đầu bằng '=' bị vô hiệu (Excel không thi hành công thức)",
+        resEvil.csv.includes("'=HYPERLINK"),
+        resEvil.csv.split("\r\n")[1],
+      );
+
+      const tStranger = seed();
+      tStranger.users[0].manageableGuildIds = ["999999999999999999"];
+      check(
+        "người không quản lý được server → null (không lộ dữ liệu server khác)",
+        (await exportVia(tStranger, "modActions")) === null,
+      );
+    }
+
+    console.log("── 10. /stats: trần bảng nhiệt theo gói ──");
+    const heatH = (heatLeaderboard as any)._handler;
+    {
+      const mk = (plan?: string) => {
+        const t = seed(plan ? { entitlements: [activeEnt(plan)] } : {});
+        t.heatStates = heatRows(40);
+        return t;
+      };
+      const ask = (t: Record<string, Row[]>) =>
+        heatH(makeCtx(t), { token: "tok", guildId: GUILD, limit: 50 });
+      const freeTop = await ask(mk());
+      check(
+        "Miễn phí: xin limit=50 nhưng server trả 10 (gọi thẳng API cũng không vượt trần)",
+        freeTop?.length === 10,
+        freeTop?.length,
+      );
+      const supTop = await ask(mk("supporter"));
+      check("Đồng hành: nhận 30 dòng", supTop?.length === 30, supTop?.length);
+      const pioTop = await ask(mk("pioneer"));
+      check(
+        "Tiên phong: 40 người → 40 dòng, nhiệt cao nhất đứng đầu (sort thật)",
+        pioTop?.length === 40 && pioTop?.[0]?.heat === 40 && pioTop?.[39]?.heat === 1,
+        pioTop?.slice(0, 3).map((r: Row) => r.heat),
+      );
+    }
+
+    console.log("── 11. Dashboard: log hành động cắt theo gói ──");
+    const getGuildH = (getGuild as any)._handler;
+    {
+      const mk = (plan?: string) => {
+        const t = seed(plan ? { entitlements: [activeEnt(plan)] } : {});
+        t.modActions = modActionRows(40);
+        return t;
+      };
+      const freeData = await getGuildH(makeCtx(mk()), { token: "tok", guildId: GUILD });
+      check(
+        "Miễn phí: 30 dòng log hành động (đúng mức cũ, không đổi hành vi cũ)",
+        freeData?.modActions?.length === 30,
+        freeData?.modActions?.length,
+      );
+      const supData = await getGuildH(makeCtx(mk("supporter")), {
+        token: "tok",
+        guildId: GUILD,
+      });
+      check(
+        "Đồng hành: 40 dòng có sẵn → nhận đủ 40 (trần 100)",
+        supData?.modActions?.length === 40,
+        supData?.modActions?.length,
+      );
+    }
   }
 
   console.log("── 12. Cổng tĩnh: 4 điểm chặn mới không revert lặng lẽ ──");

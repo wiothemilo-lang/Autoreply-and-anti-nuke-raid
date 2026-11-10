@@ -1,9 +1,14 @@
-# Tích hợp ZaloPay — thanh toán /donate + /premium
+# Tích hợp ZaloPay — thanh toán /donate + Premium (tạm ẩn)
 
+> **10/11/2026 — BÁN GÓI ĐANG TẮT.** `SALES_ENABLED = false` trong
+> `convex/plans.ts`: `createTransferIntent` và `startPayment` từ chối mọi đơn
+> Premium MỚI; `/premium` redirect 301 về `/`; dashboard không còn thẻ gói.
+> Đơn cũ vẫn xác nhận/gia hạn được. Bật lại chỉ cần đổi cờ thành `true`.
+>
 > 06/10/2026 · Code: `convex/payments.ts` (logic + giá) · `convex/paymentsAction.ts`
 > (action Node gọi ZaloPay) · `convex/http.ts` (IPN `/zalopay/callback`) ·
-> `src/components/PaymentReturn.tsx` + `DonatePage`/`PremiumPage` (UI) ·
-> test: `scripts/test-payments.ts` (65 assertion hermetic).
+> `src/components/PaymentReturn.tsx` + `DonatePage` (UI; trang Premium đã xoá) ·
+> test: `scripts/test-payments.ts` (120 assertion hermetic).
 
 ## 1. Đăng ký tài khoản ZaloPay ( việc của CON NGƯỜI — agent không làm thay )
 
@@ -72,8 +77,9 @@ Trang ?order= ──► paymentsAction.queryOrder (poll ≤4 lần)
 ## 4. Checklist chuyển SANDBOX → LIVE
 
 - [ ] Thanh toán thử sandbox thành công: đơn trong bảng `payments` chuyển
-      `paid`, `entitlements` có dòng đúng hạn, trang /premium hiện "Gói … đang
-      hoạt động — dùng tới …".
+      `paid`, `entitlements` có dòng đúng hạn, `payments.premiumStatus` báo
+      "Gói … đang hoạt động — dùng tới …" (bật `SALES_ENABLED` trước khi thử
+      đơn Premium mới; trang /premium đã ẩn).
 - [ ] Kiểm tra IPN tới nơi: ZaloPay Developer Portal → callback log (sandbox).
 - [ ] On production deployment: set `ZALOPAY_MODE=live` + bộ key production
       (`npx convex env set …`) — key sandbox ≠ key production.

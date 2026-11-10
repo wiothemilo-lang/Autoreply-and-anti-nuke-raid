@@ -8,7 +8,8 @@ import { api } from "../../convex/_generated/api";
 import { dateLocale, translate } from "../lib/i18n";
 
 /**
- * Banner kết quả thanh toán ZaloPay — dùng chung cho /donate và /premium.
+ * Banner kết quả thanh toán ZaloPay — dùng cho /donate; vẫn xử lý đơn
+ * `kind: "premium"` cũ (link quay về từ cổng thanh toán trước 10/11/2026).
  *
  * Vì sao PHẢI query lại thay vì tin `?order=`: tham số URL đổi được dễ như
  * gõ địa chỉ — chỉ trạng thái server (đã verify MAC key2/key1 ở backend) mới

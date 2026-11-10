@@ -214,11 +214,13 @@ for (const slug of LEGAL_SLUGS) {
 // Rà soát pháp lý 09/10/2026 đối chiếu Luật TMĐT 122/2025/QH15 và VBHN
 // 47/VBHN-VPQH 2026 (Luật BVQLNTD) — khoá nội dung mới để không bị xoá quên.
 check(
-  "terms: nêu tuổi 18+ cho giao dịch mua Premium (3 bản)",
-  ["phải đủ 18 tuổi", "at least 18 years old", "mindestens 18 Jahre alt"].every((s) =>
-    legalContent.includes(s),
-  ),
-  "thiếu độ tuổi mua Premium",
+  "terms: nói rõ CHƯA bán gói trả phí (3 bản) — không còn điều khoản mua Premium khi chưa đủ điều kiện",
+  [
+    "chưa mở bán gói trả phí",
+    "no paid plan is on sale",
+    "kostenpflichtige Tarife werden nicht verkauft",
+  ].every((s) => legalContent.includes(s)),
+  "Điều khoản vẫn mô tả việc mua gói trả phí",
 );
 check(
   "terms: mục Luật áp dụng và giải quyết tranh chấp (3 bản)",
@@ -2589,7 +2591,7 @@ check(
   uncaughtLeftovers.length === 0,
   uncaughtLeftovers.join(", "),
 );
-for (const rel of ["pages/DonatePage.tsx", "pages/PremiumPage.tsx", "pages/FeedbackPage.tsx"]) {
+for (const rel of ["pages/DonatePage.tsx", "pages/FeedbackPage.tsx"]) {
   check(
     `${rel} hiện lỗi qua friendlyConvexError (fallback đã dịch)`,
     (files.get(rel) ?? "").includes("friendlyConvexError("),
@@ -2599,16 +2601,10 @@ for (const rel of ["pages/DonatePage.tsx", "pages/PremiumPage.tsx", "pages/Feedb
 // 3) Luồng ZaloPay yêu cầu đăng nhập, QR tĩnh thì công khai CÓ NGHĨA — khoá
 //    ranh giới bảo mật này: QR là ảnh tĩnh gửi tiền thẳng vào ví chủ, không qua
 //    server; còn tạo đơn ZaloPay (gọi API, rate-limit tại ZaloPay) phải qua phiên.
-const premiumSrc = files.get("pages/PremiumPage.tsx") ?? "";
 check(
   "tạo đơn ZaloPay trên /donate bắt buộc có token phiên (chưa đăng nhập → /auth)",
   donateSrc.includes("if (!token)") && donateSrc.includes("/auth?returnTo="),
   "DonatePage cho phép gọi startPayment không cần đăng nhập",
-);
-check(
-  "tạo đơn ZaloPay trên /premium cũng bắt buộc token phiên",
-  premiumSrc.includes("if (!token)") && premiumSrc.includes("/auth?returnTo="),
-  "PremiumPage cho phép gọi startPayment không cần đăng nhập",
 );
 check(
   "khối QR công khai vẫn còn chú thích 'không cần đăng nhập' + tên chủ ví (cân bằng minh bạch)",
@@ -2616,81 +2612,53 @@ check(
   "chuỗi minh bạch khối QR bị xoá — khách không biết tiền đi đâu",
 );
 
-// ─── W. Plan A — mua bằng chuyển khoản ngân hàng (08/10/2026) ───────────────
-// Tiền về ví cá nhân, KHÔNG có webhook: quyền lợi chỉ được ghi khi chủ bot so
-// sao kê rồi bấm xác nhận. Cổng này khoá hai điều dễ vỡ nhất: (1) client không
-// bao giờ được tự cấp Premium, và (2) trang mua phải nói rõ cam kết ≤24h, nơi
-// báo khi chậm, hoàn tiền và căn cứ pháp lý — thiếu một mục là khách không có
-// cơ sở khiếu nại.
+// ─── W. 10/11/2026 — Premium TẠM ẨN (chưa đủ điều kiện đăng ký kinh doanh) ───
+// Chủ dự án chưa thể bán gói hợp pháp, nên toàn bộ bề mặt bán bị gỡ: trang
+// /premium, thẻ gói trong dashboard, lối vào menu. Route vẫn tồn tại để link cũ
+// và link quay về từ cổng thanh toán không 404 — nhưng phải REDIRECT, không
+// render trang bán. Cổng này chặn việc "ẩn nửa vời" (còn nút mua, còn sitemap).
+const appSrcEarly = files.get("App.tsx") ?? "";
 check(
-  "PremiumPage tạo mã CK riêng từng đơn (createTransferIntent)",
-  premiumSrc.includes("api.payments.createTransferIntent"),
-  "PremiumPage không tạo được mã chuyển khoản",
+  "trang bán Premium đã bị xoá (không còn component nào render bảng giá)",
+  !files.has("pages/PremiumPage.tsx") && !files.has("components/dashboard/PlanCard.tsx"),
+  "PremiumPage/PlanCard vẫn còn trong src/",
 );
 check(
-  "PremiumPage khách tự báo đã CK (reportTransfer)",
-  premiumSrc.includes("api.payments.reportTransfer"),
-  "thiếu nút/luồng báo đã chuyển khoản",
-);
-// Liệt kê CHÍNH XÁC mọi hàm payments trang này gọi — chỉ được là các hàm của
-// luồng CK (tạo mã, báo, đọc trạng thái). Một hàm ghi quyền lợi lọt vào danh
-// sách này là client tự cấp Premium (đã từng là rủi ro thật).
-const premiumApiCalls = [...premiumSrc.matchAll(/api\.payments\.(\w+)/g)].map((m) => m[1]);
-const PREMIUM_ALLOWED_API = new Set([
-  "createTransferIntent",
-  "reportTransfer",
-  "orderStatus",
-  "premiumStatus",
-]);
-check(
-  "PremiumPage theo dõi trạng thái ĐƠN CỦA CHÍNH MÌNH (orderStatus) + chỉ gọi API luồng CK",
-  premiumSrc.includes("api.payments.orderStatus") &&
-    premiumApiCalls.length > 0 &&
-    premiumApiCalls.every((n) => PREMIUM_ALLOWED_API.has(n)),
-  `lời gọi lạ: ${premiumApiCalls.filter((n) => !PREMIUM_ALLOWED_API.has(n)).join(", ")}`,
+  "/premium redirect vĩnh viễn về trang chủ trong manifest route",
+  (() => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "src/lib/routes.json"), "utf8"));
+    const premium = manifest.routes.find((r) => r.path === "/premium");
+    return (
+      premium?.redirect === "/" &&
+      premium.index === false &&
+      premium.sitemap === false &&
+      premium.spaFallback === false
+    );
+  })(),
+  "manifest route còn index/sitemap hoặc không redirect — Google vẫn thấy trang bán",
 );
 check(
-  "PremiumPage KHÔNG còn gọi API ZaloPay (startPayment) — đã chuyển hẳn sang CK",
-  !premiumSrc.includes("startPayment") && !premiumSrc.includes("api.paymentsAction"),
-  "PremiumPage còn sót luồng ZaloPay",
+  "App.tsx đưa /premium về / bằng <Navigate> (link cũ không 404)",
+  /path="\/premium"\s+element=\{<Navigate to="\/" replace \/>\}/.test(appSrcEarly),
+  "route /premium không redirect — trang trắng hoặc 404",
 );
 check(
-  "chính sách cam kết kích hoạt CHẬM NHẤT 24 giờ sau khi xác nhận tiền",
-  premiumSrc.includes("chậm nhất 24 giờ") && premiumSrc.includes("xác nhận đã nhận tiền"),
-  "mất cam kết 24h — khách không biết thời hạn nhận gói",
+  "menu + dashboard không còn lối vào /premium hay thẻ gói",
+  !/to="\/premium"/.test(files.get("lib/navItems.ts") ?? "") &&
+    !/PlanCard/.test(files.get("components/dashboard/OverviewPanel.tsx") ?? ""),
+  "còn link/thẻ gói trong dashboard",
 );
 check(
-  "chính sách chỉ rõ nơi báo khi quá 24h (Discord chủ bot + MÃ ĐƠN)",
-  premiumSrc.includes("Báo tại Discord kèm mã đơn") && premiumSrc.includes("{ma}"),
-  "mất đường khiếu nại kèm mã đơn",
+  "sitemap + llms.txt không còn quảng cáo /premium",
+  !fs.readFileSync(path.join(ROOT, "public/sitemap.xml"), "utf8").includes("/premium") &&
+    !fs.readFileSync(path.join(ROOT, "public/llms.txt"), "utf8").includes("/premium"),
+  "sitemap/llms.txt vẫn mời khách tới trang bán đã ẩn",
 );
 check(
-  "chính sách có mục hoàn tiền 100% khi lỗi từ phía dịch vụ",
-  premiumSrc.includes("Hoàn tiền:") && premiumSrc.includes("HOÀN 100%"),
-  "mất cam kết hoàn tiền",
-);
-check(
-  "chính sách có mục thanh toán an toàn (không xin mật khẩu ví/OTP/thẻ)",
-  premiumSrc.includes("Thanh toán an toàn:") && premiumSrc.includes("mật khẩu ví"),
-  "mất cảnh báo chống lừa đảo",
-);
-// Căn cứ pháp lý: Luật TMĐT 51/2005/QH11 đã bị thay thế bởi Luật TMĐT
-// 122/2025/QH15 (hiệu lực 01/7/2026 — rà soát 09/10/2026 theo văn bản tham khảo).
-// Gate yêu cầu số hiệu MỚI để không ai vô tình đưa bản trích dẫn cũ trở lại.
-check(
-  "chính sách nêu căn cứ pháp lý VN (BLDS 2015 Điều 119 · Luật BVNTD 19/2023/QH15 + VBHN 47 · TMĐT 122/2025/QH15)",
-  premiumSrc.includes("Bộ luật Dân sự 2015 (Điều 119)") &&
-    premiumSrc.includes("19/2023/QH15") &&
-    premiumSrc.includes("47/VBHN-VPQH") &&
-    premiumSrc.includes("122/2025/QH15") &&
-    !premiumSrc.includes("51/2005/QH11"),
-  "thiếu căn cứ pháp lý hoặc còn trích dẫn Luật TMĐT cũ 51/2005/QH11",
-);
-check(
-  "chính sách nêu quyền chấm dứt đơn phương 30 ngày khi thông tin sai/thiếu (Điều 38 VBHN 47)",
-  premiumSrc.includes("Quyền chấm dứt trong 30 ngày:") &&
-    premiumSrc.includes("đơn phương chấm dứt giao dịch trong 30 ngày"),
-  "mất quyền lợi người tiêu dùng trong giao dịch từ xa",
+  "hosting tĩnh cũng redirect /premium (vercel 301 + nginx location)",
+  fs.readFileSync(path.join(ROOT, "vercel.json"), "utf8").includes('"source": "/premium"') &&
+    fs.readFileSync(path.join(ROOT, "Dockerfile.web"), "utf8").includes("location = /premium"),
+  "một hosting vẫn phục vụ /premium",
 );
 
 // ─── X. Admin: đơn chờ xác nhận + tổng doanh thu + quản trị viên nhóm ───────
@@ -2857,93 +2825,22 @@ check(
   `câu lỗi xuất hiện ${panelErrorCount} lần — bản copy text-xs làm người dùng tưởng có 2 lỗi`,
 );
 
-// ─── Y. Đồng ý điều khoản + hạn mức theo GÓI (08/10/2026) ───────────────────
-// Khách phải TỰ TAY tick đồng ý (không tick sẵn), và cảnh báo "không nhận ngay"
-// phải xuất hiện trước khi trả tiền. Server vẫn là chốt cuối (xem
-// scripts/test-payments.ts), nhưng cổng này khoá phần UI khỏi bị tháo mất.
-const planCard = files.get("components/dashboard/PlanCard.tsx") ?? "";
+// ─── Y. 10/11/2026 — giới hạn theo gói đang TẮT ─────────────────────────────
+// Mọi server dùng trần cao nhất (PLAN_LIMITS_ENABLED trong convex/plans.ts), nên
+// dashboard không còn thẻ gói/hạn mức để tránh mời nâng cấp thứ không tồn tại.
+// Server vẫn là chốt cuối: test-payments.ts + test-plans-gating.ts kiểm công tắc.
 check(
-  "PremiumPage có ô tick đồng ý KHÔNG tick sẵn (checked={agreed} + disabled tới khi tick)",
-  premiumSrc.includes("checked={agreed}") && premiumSrc.includes("disabled={!agreed"),
-  "ô đồng ý bị tick sẵn hoặc nút mua bật khi chưa đồng ý",
-);
-check(
-  "đơn mua gửi kèm server + consent + phiên bản điều khoản (server kiểm lại)",
-  premiumSrc.includes("guildId: effectiveServer") &&
-    premiumSrc.includes("consent: true") &&
-    premiumSrc.includes("termsVersion: catalog?.termsVersion"),
-  "thiếu dữ liệu đồng ý/chọn server khi tạo đơn",
-);
-// So khớp trên chuỗi ĐÃ GỘP khoảng trắng: JSX bị Prettier thụt lề lại (vd khi
-// bọc thêm <MotionRoot>) không được làm test đỏ giả.
-const premiumFlat = premiumSrc.replace(/\s+/g, " ");
-check(
-  "cảnh báo 'không được cấp tự động' có TRƯỚC khi trả tiền (dưới nút mua + trong hộp xác nhận)",
-  premiumFlat.includes(
-    "Gói KHÔNG được cấp tự động — bạn chỉ nhận được sau khi admin kiểm tra và kích hoạt.",
-  ) &&
-    premiumFlat.includes(
-      "Gói không được cấp tự động: sau khi chuyển khoản, admin đối soát rồi kích hoạt — chậm nhất 24 giờ.",
-    ),
-  "cảnh báo nhận hàng chậm bị thiếu ở bước mua",
-);
-check(
-  "có đếm ngược tới mốc cam kết 24h + lối báo chậm kèm mã đơn khi quá hạn",
-  premiumSrc.includes("Còn khoảng {gio} giờ trước mốc cam kết 24 giờ.") &&
-    premiumSrc.includes("Đã quá cam kết 24 giờ"),
-  "mất đếm ngược/đường báo chậm — cam kết 24h không có gì đỡ",
-);
-check(
-  "quyền lợi trên trang bán lấy từ catalog (không tự viết tay danh sách tính năng)",
-  premiumSrc.includes("api.plans.catalog") &&
-    premiumSrc.includes("planBullets(plan.id)") &&
-    !premiumSrc.includes("plan.features"),
-  "trang bán còn tự quảng cáo danh sách không gắn với hạn mức thật",
-);
-check(
-  "chọn server khi mua là bắt buộc và hiện gói hiện tại của server đó",
-  premiumSrc.includes("api.guilds.listMine") &&
-    premiumSrc.includes("api.plans.guildPlan") &&
-    premiumSrc.includes('id="buy-server"'),
-  "thiếu bước chọn server — không biết gói áp cho server nào",
-);
-check(
-  "gói áp dụng theo TỪNG server được nói rõ cho khách",
-  premiumSrc.includes("Gói áp dụng theo TỪNG SERVER"),
-  "khách không biết phạm vi gói",
-);
-check(
-  "dashboard có thẻ gói + hạn mức thật của server (PlanCard dùng plans.guildPlan)",
-  planCard.includes("api.plans.guildPlan") &&
-    planCard.includes("plan.limits.autoReplyRules") &&
-    planCard.includes("plan.limits.backupKeepCount") &&
-    (files.get("components/dashboard/OverviewPanel.tsx") ?? "").includes("<PlanCard"),
-  "thẻ gói không nối vào dashboard",
-);
-check(
-  "thẻ gói nhắc trước khi hết hạn (≤3 ngày) — không để tụt hạn mức âm thầm",
-  planCard.includes("endingSoon") && planCard.includes("daysLeft <= 3"),
-  "thiếu nhắc hết hạn",
-);
-check(
-  "Admin tô đỏ đơn đã báo quá 12 giờ chưa xác nhận (giữ cam kết 24h)",
+  "Admin tô đỏ đơn đã báo quá 12 giờ chưa xác nhận (giữ cam kết 24h cho đơn cũ)",
   adminSrc.includes("Quá 12 giờ chưa xác nhận") && adminSrc.includes("12 * 3600_000"),
   "đơn tồn không cảnh báo — cam kết 24h dễ vỡ",
 );
-check(
-  "trang bán KHÔNG còn liệt kê tính năng không có gì chặn (tên riêng bot, xuất dữ liệu…)",
-  !/Tên riêng cho bot|Báo cáo nâng cao & xuất dữ liệu|Số kênh riêng/.test(premiumSrc),
-  "còn quảng cáo thứ code không enforce",
-);
 
-// ─── 10/10/2026 — bề mặt công khai KHÁC cũng không được hứa suông ────────────
-// /premium đã sạch từ 09/10, nhưng meta SEO (đúng thứ Google in ra cho khách)
-// và /donate vẫn giữ copy của bảng gói CŨ — “nhiều kênh riêng hơn, báo cáo nâng
-// cao, tên bot riêng, hỗ trợ ưu tiên” — và câu “mọi tính năng đều miễn phí”
-// trong khi gói Miễn phí bị trần thật (5 rule / 20 từ khoá / 3 bản backup /
-// 7 ngày) ở convex/plans.ts. Bốn cổng dưới đây khoá lại cả bốn bề mặt: meta SEO,
-// trang ủng hộ, từ điển EN/DE, và trang pháp lý.
+// ─── 10/11/2026 — copy công khai phải khớp việc TẠM NGỪNG BÁN ───────────────
+// Ba bề mặt từng hứa hạn mức/giá của gói trả phí: meta SEO, trang ủng hộ và
+// Điều khoản. Khi chưa bán được, chúng phải nói đúng sự thật — nếu không,
+// khách vẫn bị mời mua một thứ không tồn tại.
 const donateCopySrc = files.get("pages/DonatePage.tsx") ?? "";
+const legalTruthSrc = files.get("lib/legalContent.ts") ?? "";
 const seoMetaAll = [
   seo,
   files.get("lib/i18n.en.labels.ts") ?? "",
@@ -2957,37 +2854,23 @@ check(
   "còn copy gói cũ trong thẻ meta — không dòng nào trong plans.ts enforce",
 );
 check(
-  "meta SEO mô tả đúng hạn mức thật của gói Premium (rule tự trả lời / từ khoá cấm / backup)",
-  /nâng hạn mức rule tự trả lời/.test(seo) &&
-    /raise the limits on auto-reply rules/.test(seo) &&
-    /heben die Limits für Auto-Antwort-Regeln/.test(seo),
-  "mô tả gói phải nói đúng thứ code chặn",
+  "meta SEO nói Premium TẠM NGỪNG BÁN (không mời nâng cấp, không nêu giá)",
+  /tạm ngừng bán/.test(seo) &&
+    /temporarily not for sale/.test(seo) &&
+    /vorübergehend nicht/.test(seo),
+  "meta vẫn mời mua gói trong khi server chặn mọi đơn Premium",
 );
 check(
-  "không còn tuyên bố “mọi tính năng đều miễn phí” ở meta/ủng hộ (gói Miễn phí có trần thật)",
-  !/Mọi tính năng luôn miễn phí|Every feature stays free|Alle Funktionen bleiben kostenlos/.test(
-    seoMetaAll,
-  ) && !/Mọi tính năng đều miễn phí/.test(donateCopySrc),
-  "tuyên bố tuyệt đối trái với plans.ts là quảng cáo sai",
+  "trang ủng hộ không còn nút/lối vào gói Premium",
+  !/to="\/premium"/.test(donateCopySrc) && !/Xem gói Premium/.test(donateCopySrc),
+  "nút 'Xem gói Premium' vẫn còn trên /donate",
 );
 check(
-  "các mục ủng hộ không hứa hạn trả lời / ưu tiên hỗ trợ (pháp lý nói không phải nghĩa vụ)",
-  !/được trả lời trong 24 giờ/.test(donateCopySrc) && !/Ưu tiên hỗ trợ/.test(donateCopySrc),
-  "hứa SLA 24h cho quyền góp trong khi Điều khoản §6 phủ nhận nghĩa vụ đó",
-);
-const legalTruthSrc = files.get("lib/legalContent.ts") ?? "";
-check(
-  "Điều khoản §6 tách bạch gói Miễn phí (không SLA) với cam kết của gói trả phí",
-  /Gói Miễn phí được cung cấp miễn phí, không kèm cam kết mức dịch vụ/.test(legalTruthSrc) &&
-    /LÀ nghĩa vụ của chúng tôi/.test(legalTruthSrc) &&
-    /ARE our obligation/.test(legalTruthSrc) &&
-    /SIND die auf der Premium-Seite/.test(legalTruthSrc),
-  "Điều khoản nói “miễn phí, không SLA” trong khi đang bán gói kèm cam kết 24h — mâu thuẫn",
-);
-check(
-  "Điều khoản không còn khẳng định Protogon “cung cấp miễn phí cho cộng đồng”",
-  !/cung cấp miễn phí cho cộng đồng|provided free of charge to the community/.test(legalTruthSrc),
-  "câu đó trái với việc bán gói Premium",
+  "Điều khoản nói rõ mọi tính năng đang miễn phí, không phát sinh giao dịch mua bán",
+  /Toàn bộ tính năng hiện được cung cấp miễn phí/.test(legalTruthSrc) &&
+    /no paid plan is on sale/.test(legalTruthSrc) &&
+    /kostenpflichtige Tarife werden nicht verkauft/.test(legalTruthSrc),
+  "Điều khoản còn mô tả việc mua bán gói trả phí",
 );
 
 // ─── 14/10/2026 — Cửa DevTools + analytics tự host ──────────────────────────
@@ -3182,7 +3065,6 @@ const motionPages = [
   "pages/DonatePage.tsx",
   "pages/FeaturesPage.tsx",
   "pages/FeedbackPage.tsx",
-  "pages/PremiumPage.tsx",
 ];
 check(
   "mọi trang dùng motion đều bọc <MotionRoot> (giữ reducedMotion cho cả trang)",
@@ -3338,14 +3220,6 @@ for (const [name, path] of [
       /toastConvexError|friendlyConvexError/.test(src),
   );
 }
-
-const batch4PremiumSrc = files.get("pages/PremiumPage.tsx") ?? "";
-check(
-  "PremiumPage khoá guildPlan theo server tự chọn (khách 1 server thấy banner)",
-  /const effectiveServer = server \|\|/.test(batch4PremiumSrc) &&
-    /token && effectiveServer \? \{ token, guildId: effectiveServer \}/.test(batch4PremiumSrc) &&
-    !/token && server \? \{ token, guildId: server \}/.test(batch4PremiumSrc),
-);
 
 check(
   "clearLegacyDiscordAccess không ném SecurityError lúc bootstrap",

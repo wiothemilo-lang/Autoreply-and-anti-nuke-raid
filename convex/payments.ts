@@ -28,6 +28,7 @@ import { requireBotAdmin } from "./hidden";
 import {
   PLAN_LABELS,
   PLAN_ORDER,
+  SALES_ENABLED,
   TERMS_VERSION,
   asPlanId,
   entitlementSnapshotForUser,
@@ -570,6 +571,14 @@ export const createTransferIntent = mutation({
     termsVersion: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<TransferIntentInfo> => {
+    // Công tắc bán gói: chặn Ở ĐƯỜNG CÔNG KHAI, không chỉ ẩn nút web — tránh
+    // việc khách gọi thẳng mutation vẫn tạo được đơn khi chưa đủ điều kiện kinh
+    // doanh. `createIntentInternal` giữ nguyên để đơn cũ / test / admin vẫn dùng.
+    if (args.kind === "premium" && !SALES_ENABLED) {
+      throw new Error(
+        "Gói Premium tạm chưa mở bán. Mọi tính năng đang mở miễn phí — bạn không cần mua gì.",
+      );
+    }
     const intent: TransferIntentInfo = await ctx.runMutation(
       internal.payments.createIntentInternal,
       {

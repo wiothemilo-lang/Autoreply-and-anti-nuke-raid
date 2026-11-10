@@ -2,16 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAction } from "convex/react";
-import {
-  ArrowUp,
-  Coffee,
-  Heart,
-  Loader2,
-  MessageCircle,
-  QrCode,
-  Sparkles,
-  Star,
-} from "lucide-react";
+import { ArrowUp, Coffee, Heart, Loader2, MessageCircle, QrCode, Star } from "lucide-react";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -30,9 +21,8 @@ import { api } from "../../convex/_generated/api";
  * Trang /donate — ủng hộ nhà phát triển.
  *
  * Vì sao cần: Protogon do nhóm RFTV vận hành, gói Miễn phí dùng được cho mọi
- * server (gói Premium là tuỳ chọn trả phí, xem /premium). Người dùng
- * muốn giúp thì cần một chỗ rõ ràng; không có nó thì chỉ có người đã biết mới
- * ủng hộ. Nút thanh toán ZaloPay chạy THẬT (tạo đơn + ký MAC ở Convex —
+ * server. Người dùng muốn giúp thì cần một chỗ rõ ràng; không có nó thì chỉ có
+ * người đã biết mới ủng hộ. Nút thanh toán ZaloPay chạy THẬT (tạo đơn + ký MAC ở Convex —
  * convex/payments.ts): trang chỉ nhận paymentUrl rồi redirect, giá do server
  * chốt theo plan, không bao giờ nhận số tiền từ client.
  *
@@ -135,7 +125,7 @@ export default function DonatePage() {
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground">
               {translate(
-                "Protogon do nhóm RFTV tự bỏ chi phí máy chủ và thời gian duy trì. Gói Miễn phí vẫn dùng được cho mọi server — quyền góp ở đây KHÔNG nằm trong luồng mua gói Premium, mà để bot có thêm tháng độ ổn định.",
+                "Protogon do nhóm RFTV tự bỏ chi phí máy chủ và thời gian duy trì. Mọi tính năng đang mở miễn phí cho mọi server — quyền góp ở đây chỉ để bot có thêm tháng độ ổn định.",
               )}
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -144,12 +134,6 @@ export default function DonatePage() {
                   <MessageCircle className="h-4 w-4" />
                   {translate("Ủng hộ qua Discord")}
                 </a>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/premium">
-                  <Sparkles className="h-4 w-4" />
-                  {translate("Xem gói Premium")}
-                </Link>
               </Button>
             </div>
           </header>
@@ -263,7 +247,7 @@ export default function DonatePage() {
                 </ul>
                 <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
                   {translate(
-                    "Ủng hộ qua QR là quà tặng cá nhân, không tự mở khoá Premium. Cần xác nhận thì nhắn trong Discord.",
+                    "Ủng hộ qua QR là quà tặng cá nhân, không mở khoá tính năng nào. Cần xác nhận thì nhắn trong Discord.",
                   )}
                 </p>
               </div>

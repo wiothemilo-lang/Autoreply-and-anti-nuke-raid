@@ -12,7 +12,6 @@ import type * as altDetection from "../altDetection.js";
 import type * as analytics from "../analytics.js";
 import type * as announcements from "../announcements.js";
 import type * as antinuke from "../antinuke.js";
-import type * as audit from "../audit.js";
 import type * as auth from "../auth.js";
 import type * as autoreplies from "../autoreplies.js";
 import type * as backup from "../backup.js";
@@ -83,7 +82,6 @@ declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
   announcements: typeof announcements;
   antinuke: typeof antinuke;
-  audit: typeof audit;
   auth: typeof auth;
   autoreplies: typeof autoreplies;
   backup: typeof backup;

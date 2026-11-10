@@ -29,6 +29,26 @@ export const TERMS_VERSION = 1;
 
 export type PlanId = "free" | "supporter" | "pioneer";
 
+/**
+ * Công tắc BÁN GÓI — TẮT từ 10/11/2026 vì chưa đủ điều kiện đăng ký kinh doanh.
+ *
+ * Tắt = server từ chối MỌI đường tạo đơn Premium (`createTransferIntent` lẫn
+ * ZaloPay), không chỉ ẩn nút trên web. Đơn cũ vẫn xác nhận/gia hạn được.
+ * Bật lại chỉ cần đổi `false` → `true`; không phải sửa call site.
+ */
+export const SALES_ENABLED = false;
+
+/**
+ * Công tắc GIỚI HẠN THEO GÓI — tắt cùng lý do: mọi server dùng hạn mức cao nhất
+ * (pioneer) cho tới khi mở bán trở lại. Tách khỏi `SALES_ENABLED` để sau này có
+ * thể bán gói mà vẫn không cắt tính năng, hoặc ngược lại.
+ *
+ * Tắt ở đây phủ CẢ `planLimits()` (đường đọc: CSV/heat/log) LẪN
+ * `assertWithinLimit()` (đường ghi: rule/từ khoá/retention) — hai hàm là nơi
+ * duy nhất đọc bảng hạn mức.
+ */
+export const PLAN_LIMITS_ENABLED = false;
+
 /** Thứ tự gói — dùng để so gói nào cao hơn (nâng/hạ). */
 export const PLAN_ORDER: PlanId[] = ["free", "supporter", "pioneer"];
 
@@ -135,6 +155,7 @@ export function asPlanId(plan: string | null | undefined): PlanId {
 }
 
 export function planLimits(plan: string | null | undefined): PlanLimits {
+  if (!PLAN_LIMITS_ENABLED) return PLAN_LIMITS.pioneer;
   return PLAN_LIMITS[asPlanId(plan)];
 }
 
@@ -154,7 +175,10 @@ export function assertWithinLimit(
   key: keyof PlanLimits,
   next: number,
 ): void {
-  const id = asPlanId(plan);
+  // Khi giới hạn theo gói đang TẮT, mọi server dùng trần của gói cao nhất.
+  // Dùng id "pioneer" (không phải id thật) để câu gợi ý nâng cấp không nói
+  // "nâng lên Đồng hành để dùng 30" trong khi trần thực tế đã là 50.
+  const id = PLAN_LIMITS_ENABLED ? asPlanId(plan) : "pioneer";
   const cap = PLAN_LIMITS[id][key];
   if (next <= cap) return;
   const up = nextPlan(id);

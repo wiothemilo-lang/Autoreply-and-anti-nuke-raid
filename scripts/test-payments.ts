@@ -18,7 +18,7 @@
 // Convex mutation gọi thẳng như hàm.
 import { createHmac } from "node:crypto";
 
-import { TERMS_VERSION } from "../convex/plans";
+import { SALES_ENABLED, TERMS_VERSION } from "../convex/plans";
 import {
   DONATE_TIERS_VND,
   PREMIUM_MONTH_MS,
@@ -850,7 +850,9 @@ const run = async () => {
   });
 
   // Tạo đơn CK: giá server chốt, KHÔNG cấp quyền lợi
-  {
+  // Khi công tắc bán gói TẮT, đường công khai phải từ chối Premium ngay —
+  // còn ủng hộ (donate) vẫn hoạt động bình thường.
+  if (SALES_ENABLED) {
     const tables = seedTransfer();
     const intent = await createTransferH(makeCtxWithRun(tables), {
       token: "tok-good",
@@ -940,6 +942,21 @@ const run = async () => {
         }),
       "không quản lý server này",
     );
+  } else {
+    await expectThrows(
+      "bán gói đang tắt → gọi thẳng mutation vẫn bị chặn",
+      () =>
+        createTransferH(makeCtxWithRun(seedTransfer()), {
+          token: "tok-good",
+          kind: "premium",
+          plan: "supporter",
+          ...buyFields(),
+          consent: true,
+        }),
+      "chưa mở bán",
+    );
+  }
+  {
     await expectThrows(
       "mệnh giá client gửi bị chặn (giá chết tại server)",
       () =>

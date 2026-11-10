@@ -27,7 +27,7 @@ export interface LegalDoc {
 }
 
 /** Ngày rà soát gần nhất — hiển thị ở đầu mỗi văn bản. */
-export const LEGAL_UPDATED = "10/10/2026";
+export const LEGAL_UPDATED = "10/11/2026";
 
 /**
  * Bố cục cố định: mọi ngôn ngữ phải có ĐÚNG các văn bản này, cùng số mục.
@@ -44,7 +44,7 @@ const VI: LegalDoc[] = [
       "Quy định áp dụng khi bạn mời Protogon vào server hoặc dùng dashboard tại protogon.freebuff.app.",
     updated: LEGAL_UPDATED,
     intro:
-      "Protogon là bot Discord kèm bảng điều khiển web tại protogon.freebuff.app, do đội ngũ RFTV vận hành. Gói Miễn phí dùng được cho mọi server; gói Premium là dịch vụ trả phí tuỳ chọn, quyền lợi và chính sách mua bán ghi tại trang Gói Premium (catalog lấy trực tiếp từ hệ thống nên không thể quảng cáo khác hành vi thật). Khi mời bot vào server, đăng nhập dashboard hoặc dùng bất kỳ tính năng nào, bạn đồng ý với các điều khoản dưới đây. Nếu không đồng ý, hãy gỡ bot khỏi server và ngừng dùng dashboard.",
+      "Protogon là bot Discord kèm bảng điều khiển web tại protogon.freebuff.app, do đội ngũ RFTV vận hành. Toàn bộ tính năng hiện được cung cấp miễn phí cho mọi server; chúng tôi chưa mở bán gói trả phí nào. Khi mời bot vào server, đăng nhập dashboard hoặc dùng bất kỳ tính năng nào, bạn đồng ý với các điều khoản dưới đây. Nếu không đồng ý, hãy gỡ bot khỏi server và ngừng dùng dashboard.",
     sections: [
       {
         heading: "1. Phạm vi và cách hiểu",
@@ -58,7 +58,6 @@ const VI: LegalDoc[] = [
         paragraphs: [
           "Bạn cần một tài khoản Discord hợp lệ và phải tuân theo Điều khoản dịch vụ cùng Nguyên tắc cộng đồng của Discord. Protogon không hướng tới người dùng dưới 13 tuổi hoặc dưới độ tuổi tối thiểu theo luật tại nơi bạn sinh sống.",
           "Để cấu hình bot cho một server, bạn phải có quyền quản trị server đó. Protogon không cấp quyền mà bạn chưa có trên Discord.",
-          "Để mua gói Premium trên dashboard, bạn phải đủ 18 tuổi và có đầy đủ năng lực hành vi dân sự theo quy định pháp luật; người chưa đủ 18 tuổi chỉ tham gia giao dịch khi có người giám hộ hợp pháp đứng tên.",
         ],
       },
       {
@@ -95,7 +94,7 @@ const VI: LegalDoc[] = [
       {
         heading: "6. Tính khả dụng và hỗ trợ",
         paragraphs: [
-          "Gói Miễn phí được cung cấp miễn phí, không kèm cam kết mức dịch vụ (SLA). Với gói Premium (trả phí), các cam kết ghi tại mục “Chính sách mua bán” của trang Gói Premium — kích hoạt chậm nhất 24 giờ kể từ khi xác nhận đã nhận tiền và hoàn tiền khi lỗi từ phía dịch vụ — LÀ nghĩa vụ của chúng tôi và bạn được hưởng đầy đủ. Bot có thể gián đoạn khi Discord, nhà cung cấp hạ tầng hoặc dịch vụ AI gặp sự cố; chúng tôi xử lý và thông báo trong kênh cộng đồng.",
+          "Toàn bộ tính năng được cung cấp miễn phí, không kèm cam kết mức dịch vụ (SLA) và không phát sinh giao dịch mua bán nào. Bot có thể gián đoạn khi Discord, nhà cung cấp hạ tầng hoặc dịch vụ AI gặp sự cố; chúng tôi xử lý và thông báo trong kênh cộng đồng.",
           "Hỗ trợ được thực hiện qua kênh Discord của cộng đồng. Thời gian phản hồi phụ thuộc tình trạng thực tế, không phải nghĩa vụ theo hợp đồng.",
         ],
       },
@@ -308,7 +307,7 @@ const EN: LegalDoc[] = [
       "The rules that apply when you invite Protogon to a server or use the dashboard at protogon.freebuff.app.",
     updated: LEGAL_UPDATED,
     intro:
-      "Protogon is a Discord bot with a web dashboard at protogon.freebuff.app, operated by the RFTV team. The free plan works for every server; Premium plans are optional paid services whose benefits and purchase policy are stated on the Premium page (the catalogue is read straight from the backend, so the site cannot advertise behaviour the code does not enforce). By inviting the bot, signing in to the dashboard, or using any feature, you agree to the terms below. If you do not agree, remove the bot from your server and stop using the dashboard.",
+      "Protogon is a Discord bot with a web dashboard at protogon.freebuff.app, operated by the RFTV team. Every feature is currently provided free of charge for every server; no paid plan is on sale. By inviting the bot, signing in to the dashboard, or using any feature, you agree to the terms below. If you do not agree, remove the bot from your server and stop using the dashboard.",
     sections: [
       {
         heading: "1. Scope and interpretation",
@@ -322,7 +321,6 @@ const EN: LegalDoc[] = [
         paragraphs: [
           "You need a valid Discord account and must comply with Discord's Terms of Service and Community Guidelines. Protogon is not intended for users under 13, or under the minimum age required by the law where you live.",
           "To configure the bot for a server you must hold administrative rights on that server. Protogon never grants you permissions you do not already have on Discord.",
-          "To buy a Premium plan on the dashboard you must be at least 18 years old and have full civil capacity under the law; anyone under 18 may only take part in a transaction when a legal guardian is the contracting party.",
         ],
       },
       {
@@ -357,7 +355,7 @@ const EN: LegalDoc[] = [
       {
         heading: "6. Availability and support",
         paragraphs: [
-          "The free plan is provided free of charge with no service-level commitment (SLA). For paid Premium plans, the commitments stated under \u201cPurchase policy\u201d on the Premium page \u2014 activation within 24 hours of payment confirmation, and a refund when the fault is ours \u2014 ARE our obligation and you receive them in full. The bot may be interrupted when Discord, our hosting provider, or the AI service has an incident; we work on it and report in the community channel.",
+          "Every feature is provided free of charge, with no service-level commitment (SLA) and no purchase transaction. The bot may be interrupted when Discord, our hosting provider, or the AI service has an incident; we work on it and report in the community channel.",
           "Support happens through our Discord community. Response times depend on real-world workload and are not a contractual obligation.",
         ],
       },
@@ -572,7 +570,7 @@ const DE: LegalDoc[] = [
       "Die Regeln, die gelten, wenn du Protogon auf einen Server einlädst oder das Dashboard unter protogon.freebuff.app nutzt.",
     updated: LEGAL_UPDATED,
     intro:
-      "Protogon ist ein Discord-Bot mit Web-Dashboard unter protogon.freebuff.app, betrieben vom RFTV-Team. Der kostenlose Tarif ist für jeden Server nutzbar; Premium-Tarife sind optionale kostenpflichtige Leistungen, deren Vorteile und Kaufbedingungen auf der Premium-Seite stehen (der Katalog wird direkt aus dem Backend gelesen, die Website kann also nicht anderes bewerben als der Code durchsetzt). Wenn du den Bot einlädst, dich im Dashboard anmeldest oder eine Funktion nutzt, akzeptierst du die folgenden Bedingungen. Wenn du nicht einverstanden bist, entferne den Bot vom Server und nutze das Dashboard nicht weiter.",
+      "Protogon ist ein Discord-Bot mit Web-Dashboard unter protogon.freebuff.app, betrieben vom RFTV-Team. Alle Funktionen sind derzeit für jeden Server kostenlos; kostenpflichtige Tarife werden nicht verkauft. Wenn du den Bot einlädst, dich im Dashboard anmeldest oder eine Funktion nutzt, akzeptierst du die folgenden Bedingungen. Wenn du nicht einverstanden bist, entferne den Bot vom Server und nutze das Dashboard nicht weiter.",
     sections: [
       {
         heading: "1. Geltungsbereich und Auslegung",
@@ -586,7 +584,6 @@ const DE: LegalDoc[] = [
         paragraphs: [
           "Du brauchst ein gültiges Discord-Konto und musst die Discord-Nutzungsbedingungen und Community-Richtlinien einhalten. Protogon richtet sich nicht an Personen unter 13 Jahren oder unter dem in deinem Land geltenden Mindestalter.",
           "Um den Bot für einen Server zu konfigurieren, brauchst du Verwaltungsrechte auf diesem Server. Protogon vergibt keine Rechte, die du auf Discord nicht schon hast.",
-          "Um einen Premium-Tarif im Dashboard zu kaufen, musst du mindestens 18 Jahre alt und voll geschäftsfähig sein; Personen unter 18 Jahren nehmen nur teil, wenn ein gesetzlicher Vertreter als Vertragspartner auftritt.",
         ],
       },
       {
@@ -623,7 +620,7 @@ const DE: LegalDoc[] = [
       {
         heading: "6. Verfügbarkeit und Support",
         paragraphs: [
-          "Der kostenlose Tarif wird unentgeltlich und ohne Service-Level-Zusage (SLA) bereitgestellt. Bei kostenpflichtigen Premium-Tarifen SIND die auf der Premium-Seite unter \u201eKaufbedingungen\u201c genannten Zusagen \u2014 Aktivierung spätestens 24 Stunden nach Zahlungsbestätigung und Rückerstattung, wenn der Fehler bei uns liegt \u2014 unsere Pflicht, und du erhältst sie vollständig. Der Bot kann ausfallen, wenn Discord, unser Hosting-Anbieter oder der KI-Dienst eine Störung hat; wir arbeiten daran und informieren im Community-Kanal.",
+          "Alle Funktionen werden unentgeltlich und ohne Service-Level-Zusage (SLA) bereitgestellt; es gibt keinen Kaufvorgang. Der Bot kann ausfallen, wenn Discord, unser Hosting-Anbieter oder der KI-Dienst eine Störung hat; wir arbeiten daran und informieren im Community-Kanal.",
           "Support läuft über unsere Discord-Community. Antwortzeiten hängen von der tatsächlichen Auslastung ab und sind keine vertragliche Pflicht.",
         ],
       },

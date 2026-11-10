@@ -1471,6 +1471,13 @@ export const EN: Record<string, string> = {
   "Ủng hộ": "Support",
   "Ủng hộ nhà phát triển": "Support the developer",
   "Gói Premium": "Premium plans",
+  "Gói Premium tạm ngừng bán — Protogon": "Premium plans temporarily unavailable — Protogon",
+  "Gói Premium của Protogon hiện tạm ngừng bán vì chưa đủ điều kiện pháp lý để giao dịch. Gói Miễn phí vẫn dùng được cho mọi server.":
+    "Protogon Premium plans are temporarily not for sale because selling is not legally possible yet. The free plan remains available for every server.",
+  "Protogon do nhóm RFTV tự bỏ chi phí máy chủ và thời gian duy trì. Mọi tính năng đang mở miễn phí cho mọi server — quyền góp ở đây chỉ để bot có thêm tháng độ ổn định.":
+    "The RFTV team covers Protogon's server costs and maintenance time. Every feature is currently free for every server — donations here simply buy the bot more months of uptime.",
+  "Ủng hộ qua QR là quà tặng cá nhân, không mở khoá tính năng nào. Cần xác nhận thì nhắn trong Discord.":
+    "A QR donation is a personal gift and does not unlock any feature. Message us on Discord if you need confirmation.",
   Mới: "New",
   "Giữ cho Protogon mở cửa miễn phí": "Keep Protogon free and open",
   "Protogon do nhóm RFTV tự bỏ chi phí máy chủ và thời gian duy trì. Gói Miễn phí vẫn dùng được cho mọi server — quyền góp ở đây KHÔNG nằm trong luồng mua gói Premium, mà để bot có thêm tháng độ ổn định.":
