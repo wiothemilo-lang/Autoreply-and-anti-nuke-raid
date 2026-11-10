@@ -44,13 +44,6 @@
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
-  <!-- Gói Premium: trang công khai để người dùng xem trước tính năng và giá
-       trước khi nó thực sự mở bán. -->
-  <url>
-    <loc>https://protogon.freebuff.app/premium</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
   <url>
     <loc>https://protogon.freebuff.app/monitor</loc>
     <changefreq>hourly</changefreq>
@@ -60,19 +53,19 @@
        lastmod = ngày LEGAL_UPDATED trong src/lib/legalContent.ts. -->
   <url>
     <loc>https://protogon.freebuff.app/terms</loc>
-    <lastmod>2026-10-10</lastmod>
+    <lastmod>2026-11-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://protogon.freebuff.app/privacy</loc>
-    <lastmod>2026-10-10</lastmod>
+    <lastmod>2026-11-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://protogon.freebuff.app/data-deletion</loc>
-    <lastmod>2026-10-10</lastmod>
+    <lastmod>2026-11-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

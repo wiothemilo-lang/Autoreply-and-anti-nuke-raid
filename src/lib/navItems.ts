@@ -1,7 +1,6 @@
 import {
   Activity,
   BarChart3,
-  Crown,
   Heart,
   Home,
   LayoutDashboard,
@@ -70,10 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: "Ủng hộ",
-    items: [
-      { to: "/donate", icon: Heart, label: "Ủng hộ nhà phát triển" },
-      { to: "/premium", icon: Crown, label: "Gói Premium", accent: true },
-    ],
+    items: [{ to: "/donate", icon: Heart, label: "Ủng hộ nhà phát triển" }],
   },
 ];
 

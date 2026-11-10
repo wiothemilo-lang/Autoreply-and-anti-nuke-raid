@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 import NotFound from "./pages/NotFound";
@@ -40,7 +40,6 @@ const StatsPage = lazy(() => import("./pages/StatsPage"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 const DonatePage = lazy(() => import("./pages/DonatePage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
-const PremiumPage = lazy(() => import("./pages/PremiumPage"));
 
 function RouteMetadataSync({ lang }: { lang: "vi" | "en" | "de" }) {
   const { pathname } = useLocation();
@@ -164,11 +163,14 @@ export default function App() {
           <Route path="/privacy" element={<LegalPage slug="privacy" />} />
           <Route path="/data-deletion" element={<LegalPage slug="data-deletion" />} />
           <Route path="/monitor" element={<Monitor />} />
-          {/* Ủng hộ nhà phát triển + xem trước gói Premium. Cả hai trang công
-                khai: ai cũng đọc được, kể cả khách chưa đăng nhập. */}
+          {/* Ủng hộ nhà phát triển. Trang công khai: ai cũng đọc được, kể cả
+                khách chưa đăng nhập. */}
           <Route path="/donate" element={<DonatePage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
-          <Route path="/premium" element={<PremiumPage />} />
+          {/* /premium tạm ẩn vì chưa thể bán hợp pháp: route vẫn giữ để link cũ
+              và link quay về từ cổng thanh toán không 404, nhưng đưa thẳng về
+              trang chủ. Hosting cũng redirect 301 (vercel.json + Dockerfile.web). */}
+          <Route path="/premium" element={<Navigate to="/" replace />} />
           {/* Trang tính năng công khai (SEO quốc tế, nội dung 3 thứ tiếng). */}
           <Route path="/features" element={<FeaturesPage />} />
           {/* Alias dễ nhớ của trang giám sát — không nhân bản component: cùng

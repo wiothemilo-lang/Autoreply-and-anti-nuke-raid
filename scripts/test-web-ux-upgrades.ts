@@ -1542,7 +1542,7 @@ console.log("── #17 friendlyConvexError ──");
   );
 
   // Trang /donate còn lại cũng phải dùng helper (không còn regex cũ).
-  for (const rel of ["pages/DonatePage.tsx", "pages/PremiumPage.tsx", "pages/FeedbackPage.tsx"]) {
+  for (const rel of ["pages/DonatePage.tsx", "pages/FeedbackPage.tsx"]) {
     const src = readFileSync(new URL(`../src/${rel}`, import.meta.url), "utf8");
     check(
       `${rel} bóc lỗi qua friendlyConvexError (không còn regex Uncaught riêng lẻ)`,

@@ -37,6 +37,7 @@ import {
   setRestoreOptions,
 } from "../convex/backup";
 import { getBotConfig } from "../convex/guilds";
+import { PLAN_LIMITS_ENABLED } from "../convex/plans";
 import { computeBotKey } from "../convex/botAuth";
 import { reassembleBackupJsonForRead } from "../convex/backupChunks";
 import { generateRestoreKey, normalizeRestoreKey } from "../convex/backupKeys";
@@ -1081,22 +1082,39 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
           createdAt: Date.now(),
           authVersion: 1,
         });
-        let planErr = "";
-        try {
-          await setRetentionWebHandler(free.ctx as any, {
+        if (!PLAN_LIMITS_ENABLED) {
+          // Công tắc giới hạn theo gói đang TẮT (11/2026): mọi server dùng trần
+          // cao nhất, nên 10 bản/30 ngày phải LƯU được thay vì báo nâng gói.
+          const res = await setRetentionWebHandler(free.ctx as any, {
             token: "tok2",
             guildId: "g2",
             keepCount: 10,
             keepDays: 30,
           });
-        } catch (e: any) {
-          planErr = e?.message ?? "";
+          check(
+            "giới hạn gói đang tắt: Miễn phí giữ được 10 bản/30 ngày",
+            res.keepCount === 10 && res.keepDays === 30,
+            JSON.stringify(res),
+          );
+        } else {
+          let planErr = "";
+          try {
+            await setRetentionWebHandler(free.ctx as any, {
+              token: "tok2",
+              guildId: "g2",
+              keepCount: 10,
+              keepDays: 30,
+            });
+          } catch (e: any) {
+            planErr = e?.message ?? "";
+          }
+          check(
+            "gói Miễn phí: xin 10 bản/30 ngày bị chặn kèm đường nâng gói",
+            /Gói Miễn phí cho tối đa 3 bản backup giữ lại/.test(planErr) &&
+              /Đồng hành/.test(planErr),
+            planErr || "(KHÔNG ném lỗi)",
+          );
         }
-        check(
-          "gói Miễn phí: xin 10 bản/30 ngày bị chặn kèm đường nâng gói",
-          /Gói Miễn phí cho tối đa 3 bản backup giữ lại/.test(planErr) && /Đồng hành/.test(planErr),
-          planErr || "(KHÔNG ném lỗi)",
-        );
       }
     }
   }

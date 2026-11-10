@@ -71,11 +71,11 @@
       "match": "exact",
       "seoKind": "premium",
       "visibility": "public",
-      "index": true,
-      "sitemap": true,
-      "spaFallback": true,
-      "redirect": null,
-      "note": "future paid tiers - page is honest about not being on sale yet"
+      "index": false,
+      "sitemap": false,
+      "spaFallback": false,
+      "redirect": "/",
+      "note": "temporarily hidden: selling is not legally possible yet - permanent redirect to home, never indexed, never in sitemap"
     },
     {
       "path": "/feedback",

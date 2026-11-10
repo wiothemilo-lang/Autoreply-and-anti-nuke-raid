@@ -66,9 +66,9 @@ const COPY: Record<Lang, Copy> = {
         "Gửi báo lỗi, đề xuất tính năng hoặc góp ý cho bot Protogon — không cần tài khoản Discord, góp ý đi thẳng tới người làm bot.",
     },
     premium: {
-      title: "Gói Premium — Protogon",
+      title: "Gói Premium tạm ngừng bán — Protogon",
       description:
-        "Các gói Premium của Protogon: nâng hạn mức rule tự trả lời, từ khoá cấm, bản backup giữ lại và số ngày lưu backup cho TỪNG server. Gói Miễn phí vẫn dùng được cho mọi server.",
+        "Gói Premium của Protogon hiện tạm ngừng bán vì chưa đủ điều kiện pháp lý để giao dịch. Gói Miễn phí vẫn dùng được cho mọi server.",
     },
     auth: {
       title: "Đăng nhập — Protogon",
@@ -129,9 +129,9 @@ const COPY: Record<Lang, Copy> = {
         "Report a bug, suggest a feature, or send general feedback about the Protogon bot — no Discord account needed, it goes straight to the developer.",
     },
     premium: {
-      title: "Premium plans — Protogon",
+      title: "Premium plans temporarily unavailable — Protogon",
       description:
-        "Protogon premium plans raise the limits on auto-reply rules, banned keywords, backups kept, and backup retention days, chosen per server. The free plan still works for every server.",
+        "Protogon Premium plans are temporarily not for sale because selling is not legally possible yet. The free plan remains available for every server.",
     },
     auth: {
       title: "Sign in — Protogon",
@@ -193,9 +193,9 @@ const COPY: Record<Lang, Copy> = {
         "Fehler melden, Funktionen vorschlagen oder allgemeines Feedback zum Protogon-Bot senden — ohne Discord-Konto, direkt an den Entwickler.",
     },
     premium: {
-      title: "Premium-Tarife — Protogon",
+      title: "Premium-Tarife vorübergehend nicht erhältlich — Protogon",
       description:
-        "Protogon Premium-Tarife heben die Limits für Auto-Antwort-Regeln, gesperrte Wörter, aufbewahrte Backups und Aufbewahrungstage – pro Server gewählt. Der kostenlose Tarif bleibt für jeden Server nutzbar.",
+        "Die Premium-Tarife von Protogon sind vorübergehend nicht käuflich, da ein Verkauf derzeit rechtlich nicht möglich ist. Der kostenlose Tarif bleibt für jeden Server verfügbar.",
     },
     auth: {
       title: "Anmelden — Protogon",

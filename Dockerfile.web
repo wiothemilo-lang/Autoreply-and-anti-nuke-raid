@@ -74,13 +74,19 @@ RUN printf '%s\n' \
   "    include /etc/nginx/security-headers.conf;" \
   "    return 301 /monitor;" \
   "  }" \
+  "  # /premium tạm ẩn vì chưa thể bán hợp pháp: redirect VĨNH VIỄN về trang" \
+  "  # chủ, không tự phục vụ trang. Vẫn giữ route React để link cũ không 404." \
+  "  location = /premium {" \
+  "    include /etc/nginx/security-headers.conf;" \
+  "    return 301 /;" \
+  "  }" \
   "  # Route CÔNG KHAI (indexable): SPA fallback, KHÔNG noindex." \
   "  # Mọi trang công khai đều phải nằm ở đây — thiếu một URL là trang đó 404" \
   "  # khi mở trực tiếp/tải lại (bug thật 28/09: /features chỉ có route React," \
   "  # không có ở vercel.json lẫn nginx). Bộ test scripts/test-web-contracts.cjs" \
   "  # suy danh sách này từ src/lib/routes.json — thêm route công khai mà quên" \
   "  # sửa cả hai hosting sẽ bị CI chặn." \
-  "  location ~ ^/(features|monitor|terms|privacy|data-deletion|donate|feedback|premium)/?$ {" \
+  "  location ~ ^/(features|monitor|terms|privacy|data-deletion|donate|feedback)/?$ {" \
   "    try_files /index.html =404;" \
   "    include /etc/nginx/security-headers.conf;" \
   "  }" \

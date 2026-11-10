@@ -26,7 +26,10 @@
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
   ],
-  "redirects": [{ "source": "/status", "destination": "/monitor", "permanent": true }],
+  "redirects": [
+    { "source": "/status", "destination": "/monitor", "permanent": true },
+    { "source": "/premium", "destination": "/", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/features", "destination": "/index.html" },
     { "source": "/auth", "destination": "/index.html" },
@@ -37,7 +40,6 @@
     { "source": "/monitor", "destination": "/index.html" },
     { "source": "/donate", "destination": "/index.html" },
     { "source": "/feedback", "destination": "/index.html" },
-    { "source": "/premium", "destination": "/index.html" },
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/stats", "destination": "/index.html" },
     { "source": "/dashboard", "destination": "/index.html" },
