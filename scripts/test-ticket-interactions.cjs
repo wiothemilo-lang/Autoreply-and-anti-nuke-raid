@@ -61,7 +61,6 @@ const T = {
   myTicketGone: "MY_TICKET_GONE",
   errUnknown: "ERR_UNKNOWN",
   errNoPerm: "ERR_NO_PERM",
-  errHierarchy: "ERR_HIERARCHY",
   errChannelsFull: "ERR_CHANNELS_FULL",
   errCooldown: "ERR_COOLDOWN_{h}h",
   errMaxOpen: "ERR_MAX_{n}/{max}",
@@ -595,22 +594,6 @@ Module._load = function (request, parent) {
   {
     reset();
     configs.set("g1", { ticketEnabled: true, ticketStaffRoleId: "r-staff" });
-    await run({ isButton: true, customId: "ticket_unclaim:t1" });
-    check(
-      "nút bỏ nhận: gọi botUnclaimTicket",
-      !!mutationNamed("bot_writes:botUnclaimTicket") && lastReply() === T.unclaimDone,
-    );
-  }
-  {
-    reset();
-    configs.set("g1", { ticketEnabled: true, ticketStaffRoleId: "r-staff" });
-    ctl.unclaimThrows = true;
-    await run({ isButton: true, customId: "ticket_unclaim:t1" });
-    check("nút bỏ nhận: mutation lỗi → báo lỗi chung", lastReply() === T.errUnknown);
-  }
-  {
-    reset();
-    configs.set("g1", { ticketEnabled: true, ticketStaffRoleId: "r-staff" });
     await run({ isButton: true, customId: "ticket_close_reason" });
     // Không có ":" → parseTicketId trả null → handler bỏ qua im lặng, không
     // mở modal sai (modal cần ticketId để biết đóng ticket nào).
@@ -703,10 +686,7 @@ Module._load = function (request, parent) {
     reset();
     configs.set("g1", { ticketEnabled: true, ticketStaffRoleId: "r-staff" });
     await run({ isButton: true, customId: "ticket_zzz:t1" });
-    check(
-      "nút lạ → báo ticket không còn trong hệ thống",
-      lastReply().includes("không còn trong hệ thống"),
-    );
+    check("nút lạ → báo ticket không còn trong hệ thống", lastReply() === T.errTicketGone);
   }
 
   // ═════════ MODAL ĐÓNG KÈM LÝ DO ═════════
@@ -1065,18 +1045,6 @@ Module._load = function (request, parent) {
       JSON.stringify(ctl.modLogs.map((e) => e.d?.description)),
     );
   }
-  {
-    reset();
-    configs.set("g1", { ticketEnabled: true, ticketStaffRoleId: "r-staff" });
-    ctl.ticketRow = { status: "open", openerId: "u-opener" };
-    await run({ isButton: true, customId: "ticket_unclaim:t1" });
-    check(
-      "nút Bỏ nhận: ghi mod log",
-      ctl.modLogs.length === 1 && String(ctl.modLogs[0].d?.title).includes("Bỏ nhận"),
-      JSON.stringify(ctl.modLogs.map((e) => e.d?.title)),
-    );
-  }
-
   // ═════════ LỆNH /ticket ═════════
   {
     reset();
@@ -1219,13 +1187,6 @@ Module._load = function (request, parent) {
     ctl.openResult = { ok: false, code: "errAlreadyOpen", channelId: "ch-old" };
     await run({ isChatInputCommand: true, commandName: "ticket", subcommand: "open" });
     check("/ticket: đã có ticket mở → trỏ kênh cũ", lastReply() === "ERR_ALREADY_<#ch-old>");
-  }
-  {
-    reset();
-    configs.set("g1", { ticketEnabled: true });
-    ctl.openResult = { ok: false, code: "errHierarchy" };
-    await run({ isChatInputCommand: true, commandName: "ticket", subcommand: "open" });
-    check("/ticket: bot thấp hơn người mở → báo thứ bậc", lastReply() === T.errHierarchy);
   }
   {
     reset();

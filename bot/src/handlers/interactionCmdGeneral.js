@@ -8,6 +8,7 @@
 // tham số — interactionCreate.js gọi theo tên lệnh. Comment giữ nguyên.
 
 const { EmbedBuilder, Colors } = require("discord.js");
+const { buildHeatEmbed } = require("../heat");
 const { canManageGuild, canManageWithConfig } = require("../util");
 const { needPerm } = require("./interactionCommon");
 const { reportInteractive } = require("./incidentReport");
@@ -334,59 +335,7 @@ async function badword(store, interaction, guild) {
 /** `/heat` — nhiệt độ vi phạm + top thành viên nóng nhất. */
 async function heat(store, interaction, guild) {
   const config = await store.getConfig(guild.id);
-  const s = {
-    enabled: config?.heatEnabled !== false,
-    decayPerMin: config?.heatDecayPerMin ?? 3,
-    warnAt: config?.heatWarnAt ?? 25,
-    timeoutAt: config?.heatTimeoutAt ?? 40,
-    kickAt: config?.heatKickAt ?? 70,
-    banAt: config?.heatBanAt ?? 90,
-    repeatMultiplier: config?.heatRepeatMultiplier ?? 2,
-    repeatWindowMin: config?.heatRepeatWindowMin ?? 30,
-    warnStrikeLimit: config?.warnStrikeLimit ?? 3,
-    warnStrikeWindowMin: config?.warnStrikeWindowMin ?? 60,
-    warnStrikePunish: config?.warnStrikePunish ?? "timeout",
-  };
-  const top = config?.heatStates || [];
-  const safety = config?.safetyPercent ?? 100;
-  const tier = (heat) =>
-    heat >= s.banAt
-      ? "🚫 Ban"
-      : heat >= s.kickAt
-        ? "👢 Kick"
-        : heat >= s.timeoutAt
-          ? "⏸️ Tạm khóa"
-          : "⚠️ Theo dõi";
-  const embed = new EmbedBuilder()
-    .setColor(safety >= 70 ? Colors.Green : safety >= 40 ? Colors.Yellow : Colors.Red)
-    .setTitle(`🌡️ Nhiệt độ vi phạm: ${safety}% an toàn`)
-    .setDescription(
-      [
-        s.enabled
-          ? `Hệ thống nhiệt **đang bật** — giảm ${s.decayPerMin} điểm/phút, tái phạm tăng **x${s.repeatMultiplier}** trong ${s.repeatWindowMin} phút.`
-          : `Hệ thống nhiệt **đang tắt**.`,
-        `Ngưỡng: cảnh báo **${s.warnAt}** · tạm khóa **${s.timeoutAt}** · kick **${s.kickAt}** · ban **${s.banAt}** (tối đa 100).`,
-        s.warnStrikeLimit
-          ? `Warn tích lũy: **${s.warnStrikeLimit}** lần trong ${s.warnStrikeWindowMin} phút → **${s.warnStrikePunish}**.`
-          : `Warn tích lũy: **đang tắt**.`,
-      ].join("\n"),
-    );
-  if (top.length > 0) {
-    embed.addFields({
-      name: "Thành viên nóng nhất",
-      value: top
-        .slice(0, 10)
-        .map((h) => `<@${h.userId}> — **${h.heat}/100** — ${tier(h.heat)}`)
-        .join("\n")
-        .slice(0, 1024),
-    });
-  } else {
-    embed.addFields({
-      name: "Thành viên nóng nhất",
-      value: "Chưa có vi phạm nào — server rất an toàn 🎉",
-    });
-  }
-  return interaction.reply({ embeds: [embed], ephemeral: true });
+  return interaction.reply({ embeds: [buildHeatEmbed(config)], ephemeral: true });
 }
 
 module.exports = {

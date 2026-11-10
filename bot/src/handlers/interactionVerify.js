@@ -9,7 +9,7 @@
 const { EmbedBuilder, Colors } = require("discord.js");
 const { genCaptcha, setCode } = require("../captchaStore");
 const { registerSweep } = require("../sweeper");
-const { analyzeNewMember, executePunishment, buildRiskEmbed } = require("../altDetection");
+const { enforceAltGate } = require("../altDetection");
 
 // Rate limiting for verify attempts: Map<userId, { attempts: number, lastAttemptAt: number }>
 // Trạng thái rate-limit xác minh (3 lần / 10 phút cho mỗi user). Hiện chưa có
@@ -136,70 +136,20 @@ async function handleVerifyConfirm(store, interaction) {
   }
   try {
     // === ALT DETECTION AT VERIFY GATE (Double Counter style) ===
+    // Dùng chung một cổng với join/captcha — không chép lại chuỗi phạt.
     if (config.altDetectionEnabled) {
       try {
-        const analysis = await analyzeNewMember(member, config, store);
-        const maxRisk = config.altMaxRiskScore ?? 70;
-        if (analysis.riskScore >= maxRisk && analysis.action !== "pass") {
-          // Execute punishment instead of verifying
-          const punishResult = await executePunishment(member, analysis, config);
-
-          // FIX: Fail-open — if punishment failed, allow verify anyway
-          // instead of leaving user stuck (can't verify, can't be punished)
-          if (!punishResult.executed) {
-            console.log(
-              `[verify:alt] ${guild.name}/${member.user.username} — punish FAILED (${punishResult.reason}), allowing verify (fail-open)`,
-            );
-            // Fall through to normal verify flow
-          } else {
-            // Đánh dấu đã bị phạt để lần join sau đối chiếu (evasion detect).
-            await store.client
-              .mutation("altDetection:markJoinPunished", {
-                guildId: guild.id,
-                userId: member.id,
-                action: punishResult.action,
-              })
-              .catch(() => {});
-
-            // Reply to user with reason
-            await interaction
-              .reply({
-                content: `❌ **Xác minh bị từ chối.** Tài khoản của bạn được đánh giá là có rủi ro cao (**${analysis.riskScore}/100**). Đã xử lý: ${punishResult.action}`,
-                ephemeral: true,
-              })
-              .catch(() => {});
-
-            // Log to mod channel
-            const { sendLog } = require("../util");
-            const embed = buildRiskEmbed(member, analysis, punishResult);
-            embed.setTitle("🚫 Alt Detected at Verify Gate");
-            embed.setDescription(
-              `<@${member.id}> tried to verify but was blocked as alt account.\n\n` +
-                `**Risk Score:** ${analysis.riskScore}/100\n` +
-                `**Factors:** ${analysis.riskFactors.join(", ")}`,
-            );
-            await sendLog(guild, config, embed).catch(() => {});
-
-            // Record as antinuke event
-            await store.client
-              .mutation("bot_writes:botRecordAntinukeEvent", {
-                guildId: guild.id,
-                module: "altDetection",
-                executorId: member.id,
-                executorName: member.user.username,
-                action: `${punishResult.action} at verify gate — risk: ${analysis.riskScore}/100 — ${analysis.riskFactors.join(", ")}`,
-                count: 1,
-                windowSeconds: 60,
-                threshold: 1,
-                punish: analysis.action,
-              })
-              .catch(() => {});
-
-            console.log(
-              `[verify:alt] ${guild.name}/${member.user.username} BLOCKED at verify — risk=${analysis.riskScore} action=${punishResult.action}`,
-            );
-            return;
-          }
+        const { analysis, punishResult, blocked } = await enforceAltGate(member, config, store, {
+          gate: "verify",
+        });
+        if (blocked) {
+          await interaction
+            .reply({
+              content: `❌ **Xác minh bị từ chối.** Tài khoản của bạn được đánh giá là có rủi ro cao (**${analysis.riskScore}/100**). Đã xử lý: ${punishResult.action}`,
+              ephemeral: true,
+            })
+            .catch(() => {});
+          return;
         }
       } catch (e) {
         console.error(`[verify:alt] ${guild.id}:`, e.message);

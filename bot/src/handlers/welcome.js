@@ -28,10 +28,6 @@ const lang = require("./lang");
 // không cần cài module native `@napi-rs/canvas`.
 const cardMod = require("./welcomeCard");
 
-/** Mặc định EN (tương thích cũ) — luồng thật dùng lang.*Default(serverLang) theo ngôn ngữ server. */
-const WELCOME_DEFAULT = lang.welcomeDefault("en");
-const GOODBYE_DEFAULT = lang.goodbyeDefault("en");
-
 /** Trần placeholder phải bền vững: tuổi account 4 chữ số, boost nhỏ. */
 function accountAgeDays(member) {
   const ts = member.user?.createdTimestamp;
@@ -343,8 +339,6 @@ async function handleGoodbye(client, store, member) {
 module.exports = {
   handleWelcome,
   handleGoodbye,
-  WELCOME_DEFAULT,
-  GOODBYE_DEFAULT,
   _fillTemplateForTest: fillTemplate,
   _sliceSafeForTest: sliceSafe,
   _pickTemplateForTest: pickTemplate,

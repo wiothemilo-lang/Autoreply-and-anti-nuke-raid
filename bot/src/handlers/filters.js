@@ -2,13 +2,8 @@ const { PermissionFlagsBits } = require("discord.js");
 const { sendCaseLog } = require("../caseLog");
 const { heatSettings, punishMember, choosePunish } = require("../heat");
 const { actionsOf, cleanupMessages } = require("../moduleActions");
-const { automodEnabled, MODULE_LABELS: SHARED_MODULE_LABELS } = require("./antinuke/shared");
+const { automodEnabled, MODULE_LABELS } = require("./antinuke/shared");
 const { registerSweep } = require("../sweeper");
-
-// badword/invite/attachment/malware đã có trong nhãn chung của antinuke — dùng
-// lại để sửa nhãn một chỗ là cả log antinuke lẫn log filter đổi theo. Chỉ
-// `mention` là riêng của bộ lọc nội dung.
-const MODULE_LABELS = { ...SHARED_MODULE_LABELS, mention: "Spam mention" };
 
 const INVITE_RE = /(?:discord\.(?:gg|me)\/|discord(?:app)?\.com\/invite\/)[a-zA-Z0-9_-]+/gi;
 
@@ -650,7 +645,6 @@ function sweepMessageBuckets(now = Date.now()) {
 registerSweep("filters", () => sweepMessageBuckets(), 5 * 60_000);
 
 module.exports = scanMessage;
-module.exports.MODULE_LABELS = MODULE_LABELS;
 module.exports.findMaliciousLink = findMaliciousLink;
 module.exports.findDangerousAttachment = findDangerousAttachment;
 module.exports.findLearnedThreat = findLearnedThreat;

@@ -46,8 +46,10 @@ async function backup(store, interaction, guild) {
     return interaction.reply({ embeds: [embed], ephemeral: true });
   }
 
+  // Mọi subcommand còn lại đều ghi cấu hình hoặc khôi phục → cần quyền quản lý.
+  if (!canManageGuild(interaction.member)) return needPerm(interaction);
+
   if (sub === "restore") {
-    if (!canManageGuild(interaction.member)) return needPerm(interaction);
     const idx = interaction.options.getInteger("index", true);
     const list = await store.client.query("backup:listGuild", { guildId }).catch(() => null);
     const backup = list && list[idx - 1];
@@ -76,7 +78,6 @@ async function backup(store, interaction, guild) {
   // thật role/kênh/emoji/sticker/tin và báo từng sai lệch so với số đã lưu.
   // KHÔNG gọi mutation, KHÔNG tạo gì — verify không đụng guild.
   if (sub === "verify") {
-    if (!canManageGuild(interaction.member)) return needPerm(interaction);
     const idx = interaction.options.getInteger("index", true);
     // botAuditBackups trả NỘI DUNG đầy đủ (đã ghép chunk) + checksum —
     // listGuild cố tình bỏ backupJson nên KHÔNG kiểm tra được gì.
@@ -104,7 +105,6 @@ async function backup(store, interaction, guild) {
   }
 
   if (sub === "auto") {
-    if (!canManageGuild(interaction.member)) return needPerm(interaction);
     const days = interaction.options.getInteger("days", true);
     if (days !== 0 && (days < 2 || days > 30)) {
       return interaction.reply({
@@ -131,7 +131,6 @@ async function backup(store, interaction, guild) {
   // `days` bỏ trống thì GIỮ NGUYÊN quy tắc tuổi đang có: người dùng chỉ
   // muốn đổi số bản không vô tình xoá luôn giới hạn tuổi họ đã đặt.
   if (sub === "keep") {
-    if (!canManageGuild(interaction.member)) return needPerm(interaction);
     const count = interaction.options.getInteger("count", true);
     if (count < 2 || count > 50) {
       return interaction.reply({
@@ -177,7 +176,6 @@ async function backup(store, interaction, guild) {
 
   // /backup now — mặc định đẩy lên GitHub (token của chủ bot, dùng chung mọi server)
   if (sub === "now") {
-    if (!canManageGuild(interaction.member)) return needPerm(interaction);
     const github = interaction.options.getBoolean("github") ?? true;
     try {
       await store.client.mutation("bot_writes:botSetBackupRequest", {

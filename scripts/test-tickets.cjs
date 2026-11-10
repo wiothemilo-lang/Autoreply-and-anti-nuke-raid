@@ -314,19 +314,6 @@ check(
     lang.ticketText("de").btnClose,
   ]).size === 3,
 );
-check(
-  "ticketKind vi/en/de khác nhau",
-  new Set([
-    lang.ticketKind("vi", "appeal"),
-    lang.ticketKind("en", "appeal"),
-    lang.ticketKind("de", "appeal"),
-  ]).size === 3,
-);
-check(
-  "ticketKind loại lạ → fallback EN",
-  lang.ticketKind("xx", "zzz") === lang.ticketKind("en", "zzz"),
-);
-
 // Tất cả placeholder {…} trong bản dịch phải khớp bản VI — lệch là lỗi runtime
 // khi người dùng đọc thấy "{p0}" thay vì số thật.
 console.log("\n── placeholder khớp giữa 3 ngôn ngữ ──");

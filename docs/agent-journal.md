@@ -9,8 +9,11 @@
   `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk backup
   lớn; dedupe `useGuildPlan`/`useSessionMe`; gom hook watch job của `BackupPanel`;
   tách `HaimiyaChat` media helpers; `SiteNav` tách `PagesPanel`; bỏ monkey-patch
-  `globalThis.fetch` trong `ai.js`; xoá voice-IP dead code trong `altDetection.js`;
-  gộp `processDetection` của `antinuke/audit.js`; tách `ticketActionButton`.
+  `globalThis.fetch` trong `ai.js`; gộp `processDetection` của `antinuke/audit.js`;
+  tách `ticketActionButton`. Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
+  (~110 dòng trùng), `externalApp.js` 4 khối punish (~60 dòng), verify panel 3 bản
+  (prefix/setup/hidden), facade `handlers/backup.js`; `botUnclaimTicket` phía Convex
+  giờ orphan (đợt 3).
 
 - 🔎 **botKeySeed 06/10 08:49:33 — đã thu hẹp, chưa chốt danh tính.** Xác nhận
   xoay qua `botBootstrapAction:requestBotKey` (chỉ đường này ghi
@@ -60,6 +63,16 @@
   backup gấp hạ cấp thành việc nên làm khi rảnh (env vẫn nên lưu + xoay 2
   key lộ vì đã vào screenshot). Runbook dự phòng vẫn giữ ở
   `docs/t3-devbox.md` mục 7.
+
+---
+
+## 2026-11-10 (7) — Dọn code rác đợt 2/5: handlers + commands
+
+- ✅ **10 agent audit `handlers/**` + `commands/**`** → xoá nhánh `ticket_unclaim` (không builder nào phát customId; legacy button rơi về "ticket không còn"), 12 key `TICKET_TEXT` không đọc ×3 ngôn ngữ + `TICKET_KINDS`/`ticketKind`, `errHierarchy` khỏi `renderError`; gom **`enforceAltGate()`** vào `altDetection.js` thay 3 bản chép ở join/verify/captcha (~120→35 dòng); gom `buildHeatEmbed()` (prefix từng bỏ clamp), `closedEmbed()`, `parsePairs()`, `collectGuildMeta()`, `resolveDmGuild()`.
+- 🐛 **Bug thật**: `describeGuildError` nhận mã `30003` (giới hạn **pin**) thành trần kênh → chạm 500 kênh báo "đã đạt giới hạn" sai; đổi sang `30013` + test chặn. Locale DE của `/language` hiện "Tiếng Việt" cho tiếng Đức → "German". Bỏ subcommand `status` bắt buộc của `/heat` (không có nhánh riêng, chỉ làm tốn 1 bước).
+- 📁 Sửa thêm: `antinuke/audit.js` bỏ 3 return key chết + gộp fetch executor, `index.js` re-export `IMMEDIATE_BOT_NUKE` (test A4 từng luôn xanh giả), `interactionCmdMod` bỏ wrapper `lockCommand`, `interactionCmdBackup` hoist guard quyền, `prefix.js` bỏ require trùng/ternary vô nghĩa/`user` trùng `author`.
+- 🧪 Kiểm chứng: **89/89 CJS** (137,0s) · **31/31 TS** (4,2s) · typecheck · lint · format:check · 10 cổng tĩnh sạch (convex-contract 102 function). Diff **+391 / −645** (35 file). Test cập nhật: mock `enforceAltGate` (3 suite), `30013`, bỏ case unclaim/errHierarchy.
+- ▶️ Tiếp theo: PR `refactor/dead-code-handlers`; đợt 3/5 — `convex/` (function không client gọi, field/index chết, `botUnclaimTicket` orphan).
 
 ---
 

@@ -110,22 +110,6 @@ function langForUser(interactionOrUser, guildLike = null) {
   return "vi";
 }
 
-/** Nhãn 2 loại ticket theo ngôn ngữ (ticket "khiếu nại" vs "hỗ trợ chung"). */
-const TICKET_KINDS = {
-  vi: {
-    appeal: "Khiếu nại",
-    support: "Hỗ trợ chung",
-  },
-  en: { appeal: "Appeal", support: "General support" },
-  de: { appeal: "Beschwerde", support: "Allgemeiner Support" },
-};
-
-/** Nhãn loại ticket (lạ → EN). */
-function ticketKind(lang, kind) {
-  const table = TICKET_KINDS[lang] || TICKET_KINDS.en;
-  return table[kind] || TICKET_KINDS.en[kind] || kind;
-}
-
 /**
  * Chuỗi ticket theo ngôn ngữ NGƯỜI DÙNG.
  *
@@ -158,15 +142,11 @@ const TICKET_TEXT = {
     errNoCategory: "❌ Chủ server chưa cấu hình nơi chứa ticket.",
     errNoPerm: "❌ Bot cần quyền **Quản lý kênh** để mở ticket.",
     errBotAccount: "❌ Tài khoản bot không thể mở ticket.",
-    errNoGuild: "❌ Lệnh này chỉ hoạt động trong server.",
-    errBanned:
-      "❌ Bạn đang bị ban nên không thể dùng lệnh này. Nếu đã nhận DM từ bot, hãy bấm nút **Mở khiếu nại** trong đó.",
     errCooldown: "⏳ Bạn vừa mở ticket. Hãy chờ khoảng {h} giờ rồi thử lại.",
     errMaxOpen:
       "❌ Server hiện đang có {n} ticket mở — vượt giới hạn ({max}). Vui lòng chờ staff xử lý.",
     errAlreadyOpen: "ℹ️ Bạn đã có một ticket đang mở: {ch}.",
     errRequiredFields: "❌ Bạn cần điền: {fields}",
-    errHierarchy: "❌ Bot cần role cao hơn bạn để cấp quyền xem kênh ticket.",
     errChannelsFull: "❌ Server đã đạt giới hạn 500 kênh của Discord — không thể tạo ticket mới.",
     errNoStaff: "❌ Chủ server chưa cấu hình role staff xử lý ticket.",
     /** Bản ghi không còn / đã đóng — KHÔNG phải lỗi quyền. */
@@ -183,16 +163,12 @@ const TICKET_TEXT = {
     closedTitle: "Đã đóng",
     closedBy: "Đóng bởi",
     closeNote: "Ghi chú khi đóng",
-    unbannedNote: "✅ Đã gỡ ban cho {user}.",
     notBanned: "ℹ️ {user} hiện không bị ban trong server này.",
     aiLabel: "Ghi chú của staff",
     aiPlaceholder: "Tóm tắt ngắn tình hình (tiếng Việt hoặc ngôn ngữ bạn muốn)…",
-    aiThinking: "🧠 AI đang đọc ticket…",
     aiEmpty: "Cần nội dung để AI đọc.",
-    closedNotice: "🔒 Ticket đã đóng. Bạn không thể gửi tin nhắn nữa.",
     btnCloseReason: "Đóng kèm lý do",
     btnClaim: "Nhận việc",
-    btnUnclaim: "Bỏ nhận",
     panelTitle: "Hỗ trợ #{n} · {user}",
     panelPing: "Đã gọi {roles} — vui lòng phản hồi.",
     panelIdle: "Kênh này tự đóng sau {h} giờ không ai trả lời.",
@@ -200,7 +176,6 @@ const TICKET_TEXT = {
     claimTaken: "🔒 Ticket đã có {staff} nhận từ trước.",
     claimMine: "✅ Bạn đã nhận ticket này.",
     claimClosed: "🔒 Ticket này đã đóng — không cần nhận việc nữa.",
-    unclaimDone: "✅ Đã bỏ nhận — ai cũng có thể nhận lại.",
     reasonModalTitle: "Đóng ticket kèm lý do",
     reasonModalLabel: "Lý do đóng (staff và người mở đều thấy)",
     reasonModalPlaceholder: "Ví dụ: đã gỡ ban, giải quyết xong.",
@@ -213,12 +188,9 @@ const TICKET_TEXT = {
       "Kênh này đã chạm giới hạn tin nhắn nên bot đóng lại. Nội dung đã được lưu đầy đủ.",
     autoClosedBody:
       "Kênh không có hoạt động nào trong {h} giờ nên bot tự đóng. Kênh sẽ bị xoá sau {g} giờ — nội dung được lưu lại để staff tra cứu.",
-    deletedTitle: "Đã lưu và xoá kênh",
-    deletedBody: "Kênh đã bị xoá. Toàn bộ nội dung đã được lưu lại cho ban quản trị.",
     langSet: "✅ Đã đặt ngôn ngữ sang **{name}**.",
     langCurrent: "Ngôn ngữ hiện tại của bạn: **{name}**.",
     langDetected: "(tự nhận ra: {name})",
-    langAutoNotice: "Mình chưa biết bạn dùng ngôn ngữ nào — nhập `/language` để chọn.",
     // ── Panel MỞ ticket (nút trong kênh công khai) ──
     openPanelTitle: "Cần trợ giúp?",
     openPanelBody:
@@ -231,7 +203,6 @@ const TICKET_TEXT = {
     openBodyPlaceholderSupport: "Mô tả ngắn gọn vấn đề của bạn…",
     openEvidenceLabel: "Bằng chứng (ảnh chụp, link, tên người) — tuỳ chọn",
     openEvidencePlaceholder: "Dán link ảnh/tin nhắn, hoặc bỏ trống nếu chưa có…",
-    openHint: "💡 Trả lời ngay trong kênh ticket vẫn được nhé — nhân viên sẽ thấy và phản hồi bạn.",
     // Nút cho CHÍNH người mở đóng ticket (thân thiện hơn: không bắt phải chờ staff).
     btnCloseOwn: "Tôi tự đóng",
     closeOwnDone: "✅ Đã đóng ticket. Cảm ơn bạn đã báo lại!",
@@ -264,15 +235,11 @@ const TICKET_TEXT = {
     errNoCategory: "❌ The server owner has not set a ticket category yet.",
     errNoPerm: "❌ The bot needs **Manage Channels** to open tickets.",
     errBotAccount: "❌ Bot accounts cannot open tickets.",
-    errNoGuild: "❌ This command only works inside a server.",
-    errBanned:
-      "❌ You are banned from this server, so you cannot use this command. If the bot sent you a DM, press **Open appeal** there.",
     errCooldown: "⏳ You opened a ticket recently. Please try again in about {h} hour(s).",
     errMaxOpen:
       "❌ This server has {n} open ticket(s) — over the limit ({max}). Please wait for staff.",
     errAlreadyOpen: "ℹ️ You already have an open ticket: {ch}.",
     errRequiredFields: "❌ You need to fill in: {fields}",
-    errHierarchy: "❌ The bot needs a higher role than you to grant channel access.",
     errChannelsFull: "❌ This server hit Discord's 500 channel limit — cannot create a ticket.",
     errNoStaff: "❌ The server owner has not set a staff role for tickets.",
     errTicketGone: "⚠️ This ticket is no longer open (already closed or no longer tracked).",
@@ -288,16 +255,12 @@ const TICKET_TEXT = {
     closedTitle: "Closed",
     closedBy: "Closed by",
     closeNote: "Closing note",
-    unbannedNote: "✅ Unbanned {user}.",
     notBanned: "ℹ️ {user} is not currently banned in this server.",
     aiLabel: "Staff note",
     aiPlaceholder: "Short summary of the situation (any language)…",
-    aiThinking: "🧠 AI is reading the ticket…",
     aiEmpty: "Nothing for the AI to read.",
-    closedNotice: "🔒 This ticket is closed. You can no longer send messages here.",
     btnCloseReason: "Close with reason",
     btnClaim: "Claim",
-    btnUnclaim: "Unclaim",
     panelTitle: "Support #{n} · {user}",
     panelPing: "{roles} has been notified — please respond.",
     panelIdle: "This channel closes automatically after {h} hours without a reply.",
@@ -305,7 +268,6 @@ const TICKET_TEXT = {
     claimTaken: "🔒 This ticket was already claimed by {staff}.",
     claimMine: "✅ You claimed this ticket.",
     claimClosed: "🔒 This ticket is already closed — nothing left to claim.",
-    unclaimDone: "✅ Unclaimed — anyone can claim it again.",
     reasonModalTitle: "Close ticket with a reason",
     reasonModalLabel: "Reason for closing (staff and the opener both see it)",
     reasonModalPlaceholder: "Example: unbanned, everything resolved.",
@@ -318,12 +280,9 @@ const TICKET_TEXT = {
       "This channel hit the message limit, so the bot closed it. Everything has been saved.",
     autoClosedBody:
       "No activity for {h} hours, so the bot closed this channel. It will be deleted after {g} hours — the conversation is saved for staff.",
-    deletedTitle: "Saved and deleted",
-    deletedBody: "This channel was deleted. The full conversation is saved for the moderators.",
     langSet: "✅ Language set to **{name}**.",
     langCurrent: "Your current language: **{name}**.",
     langDetected: "(detected: {name})",
-    langAutoNotice: "I don't know your language yet — type `/language` to pick one.",
     openPanelTitle: "Need help?",
     openPanelBody:
       "Tap a button below and tell us what happened — the bot will open a **private channel** only you and the staff can see.\n\n• A question or something to report → **Support**\n• You think a punishment was a mistake → **Appeal**\n\nYou can only have **one open ticket at a time**; just keep talking in that channel if you need more.",
@@ -335,8 +294,6 @@ const TICKET_TEXT = {
     openBodyPlaceholderSupport: "Describe your issue in a few words…",
     openEvidenceLabel: "Evidence (screenshots, links, names) — optional",
     openEvidencePlaceholder: "Paste image/message links, or leave empty if you don't have any…",
-    openHint:
-      "💡 You can reply right in the ticket channel too — staff will see it and get back to you.",
     btnCloseOwn: "Close it myself",
     closeOwnDone: "✅ Ticket closed. Thanks for letting us know!",
     closeOwnDenied:
@@ -368,16 +325,12 @@ const TICKET_TEXT = {
     errNoCategory: "❌ Der Serverbesitzer hat noch keine Ticket-Kategorie festgelegt.",
     errNoPerm: "❌ Der Bot braucht **Kanäle verwalten**, um Tickets zu eröffnen.",
     errBotAccount: "❌ Bot-Konten können keine Tickets eröffnen.",
-    errNoGuild: "❌ Dieser Befehl funktioniert nur auf einem Server.",
-    errBanned:
-      "❌ Du bist auf diesem Server gesperrt und kannst den Befehl nicht nutzen. Falls der Bot dir eine DM geschickt hat, drücke dort auf **Beschwerde eröffnen**.",
     errCooldown:
       "⏳ Du hast kürzlich ein Ticket eröffnet. Bitte versuche es in etwa {h} Stunde(n) erneut.",
     errMaxOpen:
       "❌ Auf diesem Server sind {n} Ticket(s) offen — über dem Limit ({max}). Bitte warte auf das Team.",
     errAlreadyOpen: "ℹ️ Du hast bereits ein offenes Ticket: {ch}.",
     errRequiredFields: "❌ Du musst ausfüllen: {fields}",
-    errHierarchy: "❌ Der Bot braucht eine höhere Rolle als du, um Kanalzugriff zu geben.",
     errChannelsFull: "❌ Dieser Server hat das Discord-Limit von 500 Kanälen erreicht.",
     errNoStaff: "❌ Der Serverbesitzer hat noch keine Staff-Rolle für Tickets festgelegt.",
     errTicketGone:
@@ -396,16 +349,12 @@ const TICKET_TEXT = {
     closedTitle: "Geschlossen",
     closedBy: "Geschlossen von",
     closeNote: "Abschlussnotiz",
-    unbannedNote: "✅ {user} wurde entbannt.",
     notBanned: "ℹ️ {user} ist derzeit nicht auf diesem Server gesperrt.",
     aiLabel: "Team-Notiz",
     aiPlaceholder: "Kurze Zusammenfassung der Lage (beliebige Sprache)…",
-    aiThinking: "🧠 Die KI liest das Ticket…",
     aiEmpty: "Nichts für die KI zum Lesen.",
-    closedNotice: "🔒 Dieses Ticket ist geschlossen. Du kannst hier keine Nachrichten mehr senden.",
     btnCloseReason: "Mit Grund schließen",
     btnClaim: "Übernehmen",
-    btnUnclaim: "Freigeben",
     panelTitle: "Support #{n} · {user}",
     panelPing: "{roles} wurde benachrichtigt — bitte antworte zeitnah.",
     panelIdle: "Dieser Kanal schließt sich automatisch nach {h} Stunden ohne Antwort.",
@@ -413,7 +362,6 @@ const TICKET_TEXT = {
     claimTaken: "🔒 Dieses Ticket wurde bereits von {staff} übernommen.",
     claimMine: "✅ Du hast dieses Ticket übernommen.",
     claimClosed: "🔒 Dieses Ticket ist bereits geschlossen — nichts mehr zu übernehmen.",
-    unclaimDone: "✅ Freigegeben — es kann wieder übernommen werden.",
     reasonModalTitle: "Ticket mit Grund schließen",
     reasonModalLabel: "Grund für das Schließen (für Team und Ersteller sichtbar)",
     reasonModalPlaceholder: "Beispiel: entbannt, alles geklärt.",
@@ -426,13 +374,9 @@ const TICKET_TEXT = {
       "Dieser Kanal hat das Nachrichtenlimit erreicht, daher wurde er geschlossen. Alles wurde gespeichert.",
     autoClosedBody:
       "{h} Stunden ohne Aktivität, deshalb hat der Bot den Kanal geschlossen. Er wird nach {g} Stunden gelöscht — das Gespräch bleibt für das Team gespeichert.",
-    deletedTitle: "Gesichert und gelöscht",
-    deletedBody:
-      "Dieser Kanal wurde gelöscht. Das gesamte Gespräch ist für die Moderation gespeichert.",
     langSet: "✅ Sprache auf **{name}** gesetzt.",
     langCurrent: "Deine aktuelle Sprache: **{name}**.",
     langDetected: "(erkannt: {name})",
-    langAutoNotice: "Ich kenne deine Sprache noch nicht — tippe `/language`, um eine zu wählen.",
     openPanelTitle: "Hilfe gebraucht?",
     openPanelBody:
       "Klick unten auf eine Schaltfläche und schilder dein Anliegen — der Bot öffnet einen **privaten Kanal**, den nur du und das Team sehen.\n\n• Frage oder etwas zu melden → **Support**\n• Eine Strafe war zu Unrecht → **Anfechten**\n\nDu kannst nur **ein offenes Ticket** haben; schreib einfach im selben Kanal weiter.",
@@ -444,7 +388,6 @@ const TICKET_TEXT = {
     openBodyPlaceholderSupport: "Beschreib dein Anliegen kurz…",
     openEvidenceLabel: "Beweise (Screenshots, Links, Namen) — optional",
     openEvidencePlaceholder: "Bild-/Nachrichtenlinks einfügen oder leer lassen…",
-    openHint: "💡 Du kannst direkt im Ticket-Kanal antworten — das Team sieht es und meldet sich.",
     btnCloseOwn: "Selbst schließen",
     closeOwnDone: "✅ Ticket geschlossen. Danke für deine Meldung!",
     closeOwnDenied:
@@ -559,9 +502,7 @@ module.exports = {
   welcomeDefault,
   goodbyeDefault,
   cardLabels,
-  ticketKind,
   ticketText,
-  TICKET_KINDS,
   TICKET_TEXT,
   LANG_NAMES,
   langName,

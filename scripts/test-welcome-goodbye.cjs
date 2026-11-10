@@ -50,13 +50,13 @@ const welcome = require("../bot/src/handlers/welcome");
 const {
   handleWelcome,
   handleGoodbye,
-  WELCOME_DEFAULT,
-  GOODBYE_DEFAULT,
   _fillTemplateForTest,
   _memberDaysForTest,
   _resetGreetingProblemCacheForTest,
 } = welcome;
 const lang = require("../bot/src/handlers/lang");
+const WELCOME_DEFAULT = lang.welcomeDefault("en");
+const GOODBYE_DEFAULT = lang.goodbyeDefault("en");
 
 let pass = 0,
   fail = 0;

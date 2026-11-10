@@ -136,6 +136,33 @@ const altMock = {
     return altAnalysis;
   },
   executePunishment: async () => punishResult,
+  async enforceAltGate(member, _config, store, { gate } = {}) {
+    altAnalysisCalls++;
+    if (ctl.altAnalysisThrows) throw new Error("AI analysis fail");
+    const analysis = altAnalysis;
+    if (!analysis || analysis.action === "pass") {
+      return { analysis, punishResult: null, blocked: false };
+    }
+    const result = punishResult;
+    if (!result?.executed) return { analysis, punishResult: result, blocked: false };
+    await store.client.mutation("altDetection:markJoinPunished", {
+      guildId: member.guild?.id ?? "g1",
+      userId: member.id,
+      action: result.action,
+    });
+    await store.client.mutation("bot_writes:botRecordAntinukeEvent", {
+      guildId: member.guild?.id ?? "g1",
+      module: "altDetection",
+      executorId: member.id,
+      executorName: member.user?.username,
+      action: `${result.action} at ${gate}`,
+      count: 1,
+      windowSeconds: 60,
+      threshold: 1,
+      punish: analysis.action,
+    });
+    return { analysis, punishResult: result, blocked: true };
+  },
   buildRiskEmbed: () => ({
     data: {},
     setTitle() {

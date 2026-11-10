@@ -5,7 +5,8 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require("discord.js");
-const { canManageGuild, isAdmin, canManageWithConfig } = require("../util");
+const { canManageGuild, canManageWithConfig } = require("../util");
+const { buildHeatEmbed } = require("../heat");
 const {
   parseDuration,
   canMod,
@@ -21,6 +22,7 @@ const {
 
 const { isLocked, markLocked, unlockGuild } = require("../lockdown");
 const { emojiKeyOf } = require("../handlers/hidden");
+const { parsePairs } = require("../handlers/interactionCmdCommunity");
 const { verifyBackup, formatVerifyReport } = require("../backupAudit");
 const { reportInteractive } = require("../handlers/incidentReport");
 const researchHandlers = require("../handlers/researchCommands");
@@ -41,9 +43,8 @@ async function handleResearch(client, message, args, config, store) {
     channel: message.channel,
     member: message.member,
     author: message.author,
-    user: message.author,
     args,
-    reply: (payload) => message.reply(typeof payload === "string" ? payload : payload),
+    reply: (payload) => message.reply(payload),
   });
 }
 
@@ -53,8 +54,7 @@ async function handleReport(client, message, args, config, store) {
     guild: message.guild,
     channel: message.channel,
     author: message.author,
-    user: message.author,
-    reply: (payload) => message.reply(typeof payload === "string" ? payload : payload),
+    reply: (payload) => message.reply(payload),
     options: {
       getString: (name) => (name === "note" || name === "ghichu" ? args.join(" ") || null : null),
     },
@@ -133,12 +133,10 @@ async function handlePing(client, message) {
 async function handleHealth(client, message, _args, config) {
   const ai = require("../ai");
   const ws = Math.round(client.ws.ping);
-  const { canManageWithConfig } = require("../util");
   if (!canManageWithConfig(message.member, config)) {
     return message.reply("⚠️ Lệnh này dành cho mod/admin.");
   }
   const stats = typeof ai.aiStats === "function" ? ai.aiStats() : null;
-  const { EmbedBuilder, Colors } = require("discord.js");
   const embed = new EmbedBuilder()
     .setColor(Colors.Aqua)
     .setTitle("🩺 Sức khỏe Protogon")
@@ -304,17 +302,16 @@ async function handleAntinuke(client, message, args, config, store) {
     return message.reply({ embeds: [embed] });
   }
 
-  if (!canManageGuild(message.member) && !isAdmin(message.member)) return noPerm(message);
+  if (!canManageGuild(message.member)) return noPerm(message);
 
   if (sub === "unlock") {
+    const cfg = await store.getConfig(message.guild.id);
     if (!isLocked(message.guild.id)) {
-      const cfg = await store.getConfig(message.guild.id);
       if (!cfg?.lockdownUntil || cfg.lockdownUntil <= Date.now()) {
         return message.reply("Server hiện không ở trạng thái khóa kênh.");
       }
       markLocked(message.guild.id);
     }
-    const cfg = await store.getConfig(message.guild.id);
     await unlockGuild(client, message.guild, cfg, store);
     return message.reply("🔓 Đã mở khóa kênh.");
   }
@@ -420,59 +417,7 @@ async function handleBadword(client, message, args, config, store) {
 }
 
 async function handleHeat(client, message, args, config, _store) {
-  const s = {
-    enabled: config.heatEnabled !== false,
-    decayPerMin: config.heatDecayPerMin ?? 3,
-    warnAt: config.heatWarnAt ?? 25,
-    timeoutAt: config.heatTimeoutAt ?? 40,
-    kickAt: config.heatKickAt ?? 70,
-    banAt: config.heatBanAt ?? 90,
-    repeatMultiplier: config.heatRepeatMultiplier ?? 2,
-    repeatWindowMin: config.heatRepeatWindowMin ?? 30,
-    warnStrikeLimit: config.warnStrikeLimit ?? 3,
-    warnStrikeWindowMin: config.warnStrikeWindowMin ?? 60,
-    warnStrikePunish: config.warnStrikePunish ?? "timeout",
-  };
-  const top = config.heatStates || [];
-  const safety = config.safetyPercent ?? 100;
-  const tier = (heat) =>
-    heat >= s.banAt
-      ? "🚫 Ban"
-      : heat >= s.kickAt
-        ? "👢 Kick"
-        : heat >= s.timeoutAt
-          ? "⏸️ Tạm khóa"
-          : "⚠️ Theo dõi";
-  const embed = new EmbedBuilder()
-    .setColor(safety >= 70 ? Colors.Green : safety >= 40 ? Colors.Yellow : Colors.Red)
-    .setTitle(`🌡️ Nhiệt độ vi phạm: ${safety}% an toàn`)
-    .setDescription(
-      [
-        s.enabled
-          ? `Hệ thống nhiệt **đang bật** — giảm ${s.decayPerMin} điểm/phút, tái phạm tăng **x${s.repeatMultiplier}** trong ${s.repeatWindowMin} phút.`
-          : `Hệ thống nhiệt **đang tắt**.`,
-        `Ngưỡng: cảnh báo **${s.warnAt}** · tạm khóa **${s.timeoutAt}** · kick **${s.kickAt}** · ban **${s.banAt}** (tối đa 100).`,
-        s.warnStrikeLimit
-          ? `Warn tích lũy: **${s.warnStrikeLimit}** lần trong ${s.warnStrikeWindowMin} phút → **${s.warnStrikePunish}**.`
-          : `Warn tích lũy: **đang tắt**.`,
-      ].join("\n"),
-    );
-  if (top.length > 0) {
-    embed.addFields({
-      name: "Thành viên nóng nhất",
-      value: top
-        .slice(0, 10)
-        .map((h) => `<@${h.userId}> — **${h.heat}/100** — ${tier(h.heat)}`)
-        .join("\n")
-        .slice(0, 1024),
-    });
-  } else {
-    embed.addFields({
-      name: "Thành viên nóng nhất",
-      value: "Chưa có vi phạm nào — server rất an toàn 🎉",
-    });
-  }
-  return message.reply({ embeds: [embed] });
+  return message.reply({ embeds: [buildHeatEmbed(config)] });
 }
 
 async function handleSetlog(client, message, args, config, store) {
@@ -778,7 +723,7 @@ async function handleReactionRole(client, message, args, config, store) {
     const pairsRaw = parts[2];
     const thumbnail = parts[3] || undefined;
     if (!label) return message.reply("Cần đặt tên cho bảng.");
-    const entries = parseEmojiRolePairs(pairsRaw, message);
+    const entries = parsePairs(pairsRaw, message.guild);
     if (entries.length === 0) {
       return message.reply(
         "Cần ít nhất 1 cặp emoji:role, VD: `!reactionrole create #channel | Tên | Mô tả | ✅:ROLEID ⭐:ROLEID`",
@@ -1121,33 +1066,6 @@ const REACTION_ROLE_HELP =
   "`!reactionrole add <Tên> <emoji> <@role>`\n" +
   "`!reactionrole edit <Tên> | Mô tả mới | Thumbnail mới` (dùng `-` để xóa)\n" +
   "`!reactionrole remove <Tên> <emoji>` · `!reactionrole delete <Tên>`";
-
-/** Phân tích chuỗi "emoji:role emoji:role" (role có thể là ID hoặc <@&id>). */
-function parseEmojiRolePairs(pairsRaw, message) {
-  if (!pairsRaw) return [];
-  const entries = [];
-  const tokens = String(pairsRaw).split(/\s+/).filter(Boolean);
-  for (const token of tokens) {
-    const idx = token.lastIndexOf(":");
-    if (idx <= 0 || idx === token.length - 1) continue;
-    const emoji = token.slice(0, idx).trim();
-    let roleId = token
-      .slice(idx + 1)
-      .trim()
-      .replace(/^<@&(\d+)>$/, "$1");
-    if (!emoji) continue;
-    // Nếu role ghi bằng tên (không phải ID) thì thử tra trong cache.
-    if (!/^\d{15,20}$/.test(roleId) && message) {
-      const role = message.guild.roles.cache.find(
-        (r) => r.name.toLowerCase() === roleId.toLowerCase(),
-      );
-      if (role) roleId = role.id;
-    }
-    if (!/^\d{15,20}$/.test(roleId)) continue;
-    entries.push({ emoji, roleId });
-  }
-  return entries.slice(0, 20);
-}
 
 async function handleVerify(client, message, args, config, store) {
   const sub = (args[0] || "").toLowerCase();

@@ -177,7 +177,7 @@ module.exports = function createAntiNuke(client, store, heat) {
           botAddTimes.set(`${member.guild.id}:${member.id}`, Date.now());
           // Nhớ luôn bot có được miễn trừ lúc thêm hay không — tới lúc bot rời
           // thì roles rỗng, hỏi lại được false và phạt oan bot hợp pháp.
-          void Promise.resolve(markBotExemptOnJoin(member)).catch(() => {});
+          void markBotExemptOnJoin(member);
         }
       } catch {}
       // Cảnh báo bot lạ (suspiciousBotAlert) — chỉ cảnh báo, không phạt.
@@ -197,20 +197,18 @@ module.exports = function createAntiNuke(client, store, heat) {
     // nuke/raid: webhook/thread create+delete, sửa/đổi quyền kênh, sửa role,
     // tự cấp quyền quản trị, gán role/nickname hàng loạt, emoji/sticker, bot add,
     // invite create, đổi cấu hình server.
-    if (typeof client.on === "function" && AuditLogEvent.WebhookCreate !== undefined) {
-      client.on("guildAuditLogEntryCreate", (entry, guild) => {
-        void (async () => {
-          // Raid bằng ứng dụng ngoài (external app): xử lý riêng có AI nhận diện.
-          if (entry.action === AuditLogEvent.IntegrationCreate) {
-            await handleExternalApp(entry, guild);
-            return;
-          }
-          const routed = await routeAuditEntry(entry, guild);
-          if (!routed) return;
-          await handleAuditEntry(entry, guild, routed.module, routed.describeTarget);
-        })().catch((e) => console.error("[antinuke:auditEntry]", e.message));
-      });
-    }
+    client.on("guildAuditLogEntryCreate", (entry, guild) => {
+      void (async () => {
+        // Raid bằng ứng dụng ngoài (external app): xử lý riêng có AI nhận diện.
+        if (entry.action === AuditLogEvent.IntegrationCreate) {
+          await handleExternalApp(entry, guild);
+          return;
+        }
+        const routed = await routeAuditEntry(entry, guild);
+        if (!routed) return;
+        await handleAuditEntry(entry, guild, routed.module, routed.describeTarget);
+      })().catch((e) => console.error("[antinuke:auditEntry]", e.message));
+    });
 
     // Mở khoá/reset heat/gỡ role cách ly + dọn RAM — chu kỳ NHỎ NHẤT (20 giây)
     // nên đây là việc quyết định nhịp quét của vòng sweep CHUNG (đợt #4).
@@ -254,3 +252,4 @@ module.exports.isTrustedBotMember = shared.isTrustedBotMember;
 module.exports.isKnownLoggingBot = shared.isKnownLoggingBot;
 module.exports.botHitAndRunVerdict = shared.botHitAndRunVerdict;
 module.exports.strangeBotVerdict = shared.strangeBotVerdict;
+module.exports.IMMEDIATE_BOT_NUKE = shared.IMMEDIATE_BOT_NUKE;

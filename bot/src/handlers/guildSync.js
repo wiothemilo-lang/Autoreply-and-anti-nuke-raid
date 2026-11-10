@@ -48,6 +48,25 @@ function collectEmojis(g) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Gom kênh/role/emoji + hash — dùng chung cho syncAll và syncOne. */
+function collectGuildMeta(g) {
+  const channels = g.channels.cache
+    .filter((c) => SYNC_CHANNEL_TYPES.includes(c.type))
+    .map((c) => ({ channelId: c.id, name: c.name, type: c.type }));
+  const roles = g.roles.cache
+    .filter((r) => r.name !== "@everyone")
+    .map((r) => ({ roleId: r.id, name: r.name, color: r.color, position: r.position }));
+  const emojis = collectEmojis(g);
+  return {
+    channels,
+    roles,
+    emojis,
+    channelHash: quickHash(JSON.stringify(channels)),
+    roleHash: quickHash(JSON.stringify(roles)),
+    emojiHash: quickHash(JSON.stringify(emojis)),
+  };
+}
+
 async function syncAll(client, store) {
   const guilds = [];
   let memberCount = 0;
@@ -62,21 +81,11 @@ async function syncAll(client, store) {
     });
     memberCount += g.memberCount ?? 0;
 
-    // Only sync channels/roles/emojis every 5 runs (~5 minutes) AND only if changed
+    // Chỉ sync channels/roles/emojis mỗi 5 lượt (~15 phút) VÀ chỉ khi có thay đổi
     const doChannelRole = runCounter % 5 === 0;
     if (!doChannelRole) continue;
 
-    const channels = g.channels.cache
-      .filter((c) => SYNC_CHANNEL_TYPES.includes(c.type))
-      .map((c) => ({ channelId: c.id, name: c.name, type: c.type }));
-    const roles = g.roles.cache
-      .filter((r) => r.name !== "@everyone")
-      .map((r) => ({ roleId: r.id, name: r.name, color: r.color, position: r.position }));
-    const emojis = collectEmojis(g);
-
-    const channelHash = quickHash(JSON.stringify(channels));
-    const roleHash = quickHash(JSON.stringify(roles));
-    const emojiHash = quickHash(JSON.stringify(emojis));
+    const { channels, roles, emojis, channelHash, roleHash, emojiHash } = collectGuildMeta(g);
     const prev = prevGuildData.get(g.id);
 
     // Skip if nothing changed
@@ -202,14 +211,7 @@ async function syncOne(client, store, guildId) {
 
   // Sync channels + roles NGAY LẬP TỨC để web dashboard hiển thị dropdown.
   try {
-    const channels = g.channels.cache
-      .filter((c) => SYNC_CHANNEL_TYPES.includes(c.type))
-      .map((c) => ({ channelId: c.id, name: c.name, type: c.type }));
-    const roles = g.roles.cache
-      .filter((r) => r.name !== "@everyone")
-      .map((r) => ({ roleId: r.id, name: r.name, color: r.color, position: r.position }));
-
-    const emojis = collectEmojis(g);
+    const { channels, roles, emojis, channelHash, roleHash, emojiHash } = collectGuildMeta(g);
 
     if (channels.length > 0) {
       await store.client.mutation("guilds:syncChannels", { guildId, channels });
@@ -220,11 +222,7 @@ async function syncOne(client, store, guildId) {
     // Emoji có thể là danh sách RỖNG hợp lệ (server chưa tạo emoji) — vẫn phải gọi
     // để xoá bản ghi cũ khi owner xoá hết emoji, không thì picker còn emoji ma.
     await store.client.mutation("guilds:syncEmojis", { guildId, emojis });
-    prevGuildData.set(guildId, {
-      channelHash: quickHash(JSON.stringify(channels)),
-      roleHash: quickHash(JSON.stringify(roles)),
-      emojiHash: quickHash(JSON.stringify(emojis)),
-    });
+    prevGuildData.set(guildId, { channelHash, roleHash, emojiHash });
   } catch (err) {
     console.error(`[sync:one:channels] ${guildId}:`, err.message);
   }

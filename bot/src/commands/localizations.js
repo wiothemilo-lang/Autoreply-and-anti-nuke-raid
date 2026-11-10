@@ -200,11 +200,6 @@ const LOCALIZATIONS = {
       "View violation heat and server safety level",
       "Verstoß-Heat und Server-Sicherheit ansehen",
     ],
-    subs: {
-      status: {
-        d: ["View heat & safety status", "Heat- & Sicherheitsstatus ansehen"],
-      },
-    },
   },
   mod: {
     d: [
@@ -528,7 +523,7 @@ const LOCALIZATIONS = {
         choices: {
           vi: ["Tiếng Việt", "Tiếng Việt"],
           en: ["English", "Englisch"],
-          de: ["Tiếng Việt", "Deutsch"],
+          de: ["German", "Deutsch"],
         },
       },
     },

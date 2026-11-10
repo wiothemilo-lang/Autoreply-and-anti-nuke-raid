@@ -35,7 +35,7 @@ const GATEWAY_CRIT_MS = 5 * 60_000;
 const LEVEL_RANK = { ok: 0, warn: 1, critical: 2 };
 
 /**
- * Xếp mức sức khoẻ từ 2 chỉ số. Mức nghiêm trọng nhất thắng.
+ * Xếp mức sức khoẻ từ đĩa + RAM + gateway. Mức nghiêm trọng nhất thắng.
  * Dùng `>=` (không phải `>`): đĩa tròn 92% là vùng nguy hiểm rồi.
  */
 function classifyHealth({ diskUsedPct, rssMb, gatewayConnected, gatewayDisconnectedMs }) {
@@ -91,7 +91,7 @@ function readHostHealth() {
  * - Mức nặng hơn lần trước → DM ngay (đây là thứ chủ bot cần biết nhất).
  * - Đang `critical` mà đã quá 6 giờ kể từ DM gần nhất → DM lại (sự cố kéo dài
  *   vẫn phải được nhắc, nhưng đều đặn chứ không dồn dập).
- * - Không đo được gì cả (không có diskUsedPct lẫn rssMb = 0) → không DM.
+ * - Không đo được đĩa (undefined) thì bỏ qua ngưỡng đĩa; RAM luôn có số.
  */
 function shouldAlert(state, health, now) {
   const prev = state?.level ?? "ok";
@@ -247,14 +247,9 @@ module.exports = {
   DISK_CRIT_PCT,
   RSS_WARN_MB,
   RSS_CRIT_MB,
-  DEFAULT_INTERVAL_MS,
-  ALERT_COOLDOWN_MS,
-  GATEWAY_WARN_MS,
-  GATEWAY_CRIT_MS,
   classifyHealth,
   readHostHealth,
   shouldAlert,
-  buildAlertText,
   checkOnce,
   createGatewayTracker,
   startHealthWatch,

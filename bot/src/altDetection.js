@@ -13,6 +13,8 @@
  *  - Threshold-based risk scoring
  */
 
+const { sendLog } = require("./util");
+
 const DAY_MS = 86_400_000;
 
 /**
@@ -852,10 +854,81 @@ function sweepStaleGuilds(liveGuildIds) {
   return removed;
 }
 
+/**
+ * Cổng alt dùng chung cho 3 điểm vào: join, verify bằng nút, verify bằng mã.
+ *
+ * Trước đây mỗi handler chép lại nguyên chuỗi analyze → punish → mark →
+ * record event → log (3 bản, đã lệch nhau về tiêu đề/nội dung log). Hàm này
+ * giữ ĐÚNG thứ tự đó, fail-open khi phạt lỗi (người thật không bị kẹt).
+ *
+ * Trả `{ analysis, punishResult, blocked }`; handler tự quyết câu trả lời
+ * cho người dùng. `analysis` truyền sẵn khi nơi gọi đã phân tích rồi (join
+ * gate cần analysis cho burst detection trước đó).
+ */
+async function enforceAltGate(member, config, store, { gate = "join", analysis } = {}) {
+  const result = analysis ?? (await analyzeNewMember(member, config, store));
+  if (result.action === "pass") return { analysis: result, punishResult: null, blocked: false };
+
+  let punishResult;
+  try {
+    punishResult = await executePunishment(member, result, config);
+  } catch (err) {
+    console.error(`[altDetect:${gate}:punish] ${member.guild.id}/${member.id}:`, err.message);
+    return { analysis: result, punishResult: null, blocked: false };
+  }
+  if (!punishResult?.executed) {
+    console.log(
+      `[altDetect:${gate}] ${member.guild.name}/${member.user.username} — punish FAILED (${punishResult?.reason}), allowing (fail-open)`,
+    );
+    return { analysis: result, punishResult, blocked: false };
+  }
+
+  await store.client
+    .mutation("altDetection:markJoinPunished", {
+      guildId: member.guild.id,
+      userId: member.id,
+      action: punishResult.action,
+    })
+    .catch((e) => console.error(`[altDetect:${gate}:mark]`, e.message));
+
+  await store.client
+    .mutation("bot_writes:botRecordAntinukeEvent", {
+      guildId: member.guild.id,
+      module: "altDetection",
+      executorId: member.id,
+      executorName: member.user.username,
+      action: `${punishResult.action} at ${gate} — risk: ${result.riskScore}/100 — ${result.riskFactors.join(", ")}`,
+      count: 1,
+      windowSeconds: 60,
+      threshold: 1,
+      punish: result.action,
+    })
+    .catch((e) => console.error(`[altDetect:${gate}:event]`, e.message));
+
+  const embed = buildRiskEmbed(member, result, punishResult);
+  if (gate !== "join") {
+    embed.setTitle(
+      `🚫 Alt Detected at Verify Gate${gate === "verify-captcha" ? " (Captcha)" : ""}`,
+    );
+    embed.setDescription(
+      `<@${member.id}> tried to verify but was blocked as alt account.\n\n` +
+        `**Risk Score:** ${result.riskScore}/100\n` +
+        `**Factors:** ${result.riskFactors.join(", ")}`,
+    );
+  }
+  await sendLog(member.guild, config, embed).catch(() => {});
+
+  console.log(
+    `[altDetect:${gate}] ${member.guild.name}/${member.user.username} BLOCKED — risk=${result.riskScore} action=${punishResult.action}`,
+  );
+  return { analysis: result, punishResult, blocked: true };
+}
+
 module.exports = {
   analyzeNewMember,
   executePunishment,
   buildRiskEmbed,
+  enforceAltGate,
   usernameSimilarity,
   isGeneratedUsername,
   // Upgrade D: Burst Detection
