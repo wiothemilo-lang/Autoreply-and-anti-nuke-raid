@@ -165,14 +165,12 @@ interface LangContextValue {
   /** Dịch chuỗi VI (key) — component dùng hook này để tự re-render khi đổi ngôn ngữ.
    *  Hỗ trợ biến {ten}: t("Đã lưu {n} rule", { n }). */
   t: (s: string, vars?: Record<string, string | number>) => string;
-  dateLocale: () => string;
 }
 
 const LangContext = createContext<LangContextValue>({
   lang: "vi",
   setLang: () => {},
   t: (s) => s,
-  dateLocale: () => "vi-VN",
 });
 
 export function LangProvider({ children }: { children: ReactNode }) {
@@ -248,7 +246,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
     // dictVersion đổi khi từ điển vừa nạp xong → t() đổi identity để consumer vẽ lại.
     [lang, dictVersion],
   );
-  const value = useMemo(() => ({ lang, setLang, t, dateLocale }), [lang, setLang, t]);
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
 
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>;
 }

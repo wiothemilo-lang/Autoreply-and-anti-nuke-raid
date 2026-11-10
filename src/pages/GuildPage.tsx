@@ -413,7 +413,7 @@ export default function GuildPage() {
         </Suspense>
         {paletteOpen && (
           <Suspense fallback={null}>
-            <CommandPalette open onOpenChange={setPaletteOpen} items={commands} />
+            <CommandPalette onOpenChange={setPaletteOpen} items={commands} />
           </Suspense>
         )}
         <div className="relative z-10">

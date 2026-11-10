@@ -63,7 +63,7 @@ function formatDateTime(ts: number): string {
  * hơn thật vì dữ liệu bị cắt.
  */
 function PeriodComparisonCard({ cmp }: { cmp: PeriodComparison }) {
-  const rows: { label: string; now: number; before: number; invert?: boolean }[] = [
+  const rows: { label: string; now: number; before: number }[] = [
     { label: "Sự cố", now: cmp.current.incidents, before: cmp.previous.incidents },
     { label: "Lượt bị chặn", now: cmp.current.blocked, before: cmp.previous.blocked },
     { label: "Sự kiện", now: cmp.current.events, before: cmp.previous.events },

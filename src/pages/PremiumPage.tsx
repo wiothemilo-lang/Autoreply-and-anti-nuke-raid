@@ -49,7 +49,6 @@ import { api } from "../../convex/_generated/api";
  * SĐT nhận tiền ZaloPay của chủ bot — điền vào để hiển thị dưới mã QR.
  * Để trống thì dòng SĐT bị ẨN (không bao giờ lộ số sai cho khách mua).
  */
-const TRANSFER_PHONE = "";
 
 /** Mã QR nhận tiền (cùng ảnh với /donate — ví cá nhân, quét được mọi app). */
 const QR_SRC = "/payment.jpg";
@@ -293,14 +292,6 @@ export default function PremiumPage() {
         <main id="main" tabIndex={-1} className="mx-auto max-w-5xl px-6 pb-16 pt-12">
           {/* Kết quả thanh toán ?order= + lỗi tạo đơn. */}
           <PaymentReturn token={token} />
-          {payError && (
-            <div
-              role="alert"
-              className="mt-6 rounded-2xl border border-border bg-card p-4 text-center text-sm text-foreground"
-            >
-              {payError}
-            </div>
-          )}
 
           {/* Hero */}
           <header className="text-center">
@@ -411,11 +402,6 @@ export default function PremiumPage() {
                   <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                     {translate("Chủ ví: NGUYEN DUY KHIEM — kiểm tra đúng tên trước khi chuyển")}
                   </p>
-                  {TRANSFER_PHONE && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {translate("SĐT nhận tiền")}: <b className="font-mono">{TRANSFER_PHONE}</b>
-                    </p>
-                  )}
                 </div>
 
                 <figure className="mx-auto w-full max-w-xs">

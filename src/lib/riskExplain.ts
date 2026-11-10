@@ -59,9 +59,6 @@ export type SignalStrength = "strong" | "weak" | "positive";
  */
 const PREFIX_STRIP_RE = /^[❌⚠✅]\ufe0f?\s*/;
 
-/** Ký hiệu nào ứng với mức nào — dùng chung cho web lẫn thống kê. */
-export const RISK_PREFIX_RE = PREFIX_STRIP_RE;
-
 /**
  * Tách tín hiệu thành `{ mã, nhãn, mức }`.
  *

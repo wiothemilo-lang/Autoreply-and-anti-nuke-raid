@@ -57,7 +57,7 @@ export function finishBootOverlay(): void {
  * Gỡ một phần tử overlay cụ thể — tách riêng để test browser có gọi trực tiếp
  * mà không cần dựng lại toàn bộ khung preloader.
  */
-export function dismissOverlayElement(overlay: Element): void {
+function dismissOverlayElement(overlay: Element): void {
   if (overlay.classList.contains("is-done")) return;
   // CSS index.html: #boot.is-done { opacity: 0; visibility: hidden; }
   overlay.classList.add("is-done");

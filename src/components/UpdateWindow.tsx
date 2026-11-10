@@ -11,12 +11,10 @@ export default function UpdateWindow({
   lastUpdate,
   nextUpdate,
   onRefresh,
-  showRefresh = false,
 }: {
   lastUpdate: number | null;
   nextUpdate: number | null;
   onRefresh?: () => void;
-  showRefresh?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-border bg-secondary/40 p-4">
@@ -52,7 +50,7 @@ export default function UpdateWindow({
         </b>
         .
       </p>
-      {showRefresh && onRefresh && (
+      {onRefresh && (
         <button
           onClick={onRefresh}
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"

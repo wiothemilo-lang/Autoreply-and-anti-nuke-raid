@@ -91,7 +91,7 @@ function AdminContent() {
   // Thông báo cập nhật + nhãn "bản cập nhật hiện tại" — feed CÔNG KHÔNG (cùng
   // query mà UpdateNotice dùng cho mọi khách) để admin sửa đúng bài người dùng
   // đang thấy; danh sách đầy đủ (kể cả bài đã ẩn) lấy qua adminList.
-  const feed = useQuery(api.announcements.publicFeed);
+  const feed = useQuery(api.announcements.publicFeed, isAdmin === false ? "skip" : {});
   const notices = useQuery(api.announcements.adminList, isAdmin === true ? { token } : "skip");
   const saveNotice = useMutation(api.announcements.save);
   const removeNotice = useMutation(api.announcements.remove);
@@ -318,12 +318,7 @@ function AdminContent() {
               thẻ bị cắt giữa hai cột, mb tạo khoảng cách (space-y không áp
               được cho column children). */}
           <div className="min-w-0 columns-1 gap-4 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
-            <UpdateWindow
-              lastUpdate={lastUpdate}
-              nextUpdate={nextUpdate}
-              onRefresh={refresh}
-              showRefresh
-            />
+            <UpdateWindow lastUpdate={lastUpdate} nextUpdate={nextUpdate} onRefresh={refresh} />
             <SelfDiagnoseCard
               diag={diag}
               onToggle={(enabled) =>

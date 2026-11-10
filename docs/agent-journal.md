@@ -5,12 +5,14 @@
 - 📋 **Nợ sau 5 đợt audit (50 subagent)** — chưa làm vì cần đổi schema/hành vi hoặc
   rủi ro trung bình: fallback `bot_tick` thiếu `jobs.ticketPanels`/`jobs.tickets`
   (ticket đứng im âm thầm khi batch lỗi ≥10 phút); retention ticket trong
-  `bot_tick`; `analytics.stats` subscription luôn mount ở StatsPage;
-  `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk backup
-  lớn; dedupe `useGuildPlan`/`useSessionMe`; gom hook watch job của `BackupPanel`;
-  tách `HaimiyaChat` media helpers; `SiteNav` tách `PagesPanel`; bỏ monkey-patch
-  `globalThis.fetch` trong `ai.js`; gộp `processDetection` của `antinuke/audit.js`;
-  tách `ticketActionButton`. Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
+  `bot_tick`; `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk
+  backup lớn; dedupe `useGuildPlan`/`useSessionMe`; gom hook watch job của
+  `BackupPanel` (214 dòng, 3 bản `judgeJobWatch`); tách `HaimiyaChat` media helpers;
+  `SiteNav` tách `PagesPanel` + theme store; bỏ monkey-patch `globalThis.fetch`
+  trong `ai.js`; gộp `processDetection` của `antinuke/audit.js`; tách
+  `ticketActionButton`; `AdminCard` (16 card shell), `TicketKindsCard` render loop,
+  `formatDateTime` 6 bản, `@radix-ui/react-switch` chưa dùng, `src/shaders/threeui.css`
+  0 importer, i18n key EN/DE trùng 21+20 key, `plans.catalog()` chưa trả giá/rank. Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
   (~110 dòng trùng), `externalApp.js` 4 khối punish (~60 dòng), verify panel 3 bản
   (prefix/setup/hidden), facade `handlers/backup.js`. Đợt 3 còn nợ: `ticketActivity`
   chỉ nhận category cha (auto-close nhầm ticket theo kind), fallback `bot_tick` thiếu
@@ -68,6 +70,15 @@
   `docs/t3-devbox.md` mục 7.
 
 ---
+
+## 2026-11-10 (9) — Dọn code rác đợt 4/5: web
+
+- ✅ **10 agent audit `src/`** → bỏ **prop/export chết** đã grep 0 consumer: `PanelErrorBoundary.resetKey` (+`componentDidUpdate`), `SectionBoundary.fallback`, `CommandPalette.open` (+effect reset + `listRef`), `CountUp.durationMs`, `UpdateWindow.showRefresh`, `Button.loading` (+`Loader2`, `aria-busy`), variant `destructive`, size `icon-lg`, `CardFooter`, `DialogTrigger`/`DialogClose`, `SelectGroup`/`SelectLabel`, `PERM_MANAGE_GUILD`/`hasPermission`, `RISK_PREFIX_RE`, `HEAT_DEFAULTS.max`, `SERVER_THEMES.swatch2`, `dateLocale`, `BackendPing.lastOkAt`, `MonitorIncident`, `DUR`, `dismissOverlayElement`, `HaimiyaChat` re-export `HaimiyaAvatar` + param `withImages`.
+- 🐛 **Bug thật**: `GuildIncidents` khai `invert?: boolean` cho 4 dòng so sánh nhưng không dòng nào set/đọc → xoá; `PremiumPage` render `payError` **hai lần** (banner đầu trang + banner trong form) và hằng `TRANSFER_PHONE = ""` luôn rỗng; `VerifyPanel` cho gõ 2000 ký tự trong khi server cắt 1000; `Monitor` chart ép `min = Math.min(...samples, 0)` nên trục luôn bắt đầu 0 kể cả khi mọi mẫu cao; `Admin` mount `announcements.publicFeed` cho cả khách không phải admin (dữ liệu không bao giờ render); `StatsPage` giữ subscription `plans.guildPlan` + bảng heat khi tab ẩn.
+- 📁 Gom/nhỏ: `SettingsPanel` một mảng `WEBHOOK_EVENT_TYPES` thay literal lặp; `HaimiyaChat` dùng `MAX_IMAGES` thay 4 literal `3`; `CommandPalette` bỏ `useRef`/`useEffect` không còn dùng.
+- ⏭️ **Bỏ qua có chủ đích** (rủi ro trung bình, ghi nợ): `BackupPanel` gom `useJobWatch` (~180 dòng), `AdminCard` 16 shell, tách `PagesPanel` khỏi `SiteNav`, i18n key trùng, `plans.catalog()` trả giá/rank, `useGuildPlan`/`useSessionMe`, `formatDateTime` 6 bản.
+- 🧪 Kiểm chứng: **89/89 CJS** (151,2s) · **31/31 TS** (5,7s) · typecheck · lint · format:check · 10 cổng tĩnh sạch. Diff **+54 / −172** (31 file).
+- ▶️ Tiếp theo: PR `refactor/dead-code-web`; đợt 5/5 — `scripts/` + test + config/docs.
 
 ## 2026-11-10 (8) — Dọn code rác đợt 3/5: convex
 

@@ -40,10 +40,7 @@ import "./switch.css";
  *     Một chỗ dùng `<Label htmlFor="test-mention">` nên phải gắn id vào nút
  *     bên trong bằng effect.
  */
-export type SwitchProps = Omit<
-  React.ComponentPropsWithoutRef<"span">,
-  "onChange" | "defaultValue"
-> & {
+type SwitchProps = Omit<React.ComponentPropsWithoutRef<"span">, "onChange" | "defaultValue"> & {
   checked: boolean;
   /**
    * Trả `false` (hoặc Promise resolve `false`) = lưu THẤT BẠI → tự trả công tắc

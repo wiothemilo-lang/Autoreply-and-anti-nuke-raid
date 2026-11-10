@@ -2,8 +2,6 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
-  /** Hiển thị khi phần này lỗi — mặc định ẩn hẳn phần đó. */
-  fallback?: ReactNode;
 }
 
 interface State {
@@ -27,7 +25,7 @@ export default class SectionBoundary extends Component<Props, State> {
   }
 
   render() {
-    if (this.state.error) return this.props.fallback ?? null;
+    if (this.state.error) return null;
     return this.props.children;
   }
 }

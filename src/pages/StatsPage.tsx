@@ -159,18 +159,22 @@ export default function StatsPage() {
     if (!guildId && managed.length > 0) setGuildId(managed[0].discordId);
   }, [guildId, managed]);
 
+  // Tab ẩn → huỷ subscription bảng xếp hạng + tổng hôm nay. Bot ghi heat mỗi
+  // tick nên một tab /stats bỏ quên trong tab ẩn vẫn ngốn lượt đọc Convex.
+  const visible = usePageVisible();
+
   // TRẦN theo gói (P4): `heatTopRows` = 10 (Miễn phí) / 30 / 50. Hỏi đúng bằng
   // hạn mức của gói đang áp cho server này — server cũng cắt đúng trần đó.
   const plan = useQuery(
     api.plans.guildPlan,
-    token && guildId ? ({ token, guildId } as { token: string; guildId: string }) : "skip",
+    visible && token && guildId
+      ? ({ token, guildId } as { token: string; guildId: string })
+      : "skip",
   ) as { limits: { heatTopRows: number } } | null | undefined;
   const topN = plan?.limits?.heatTopRows ?? 10;
 
   // Tab ẩn → huỷ subscription bảng xếp hạng + tổng hôm nay. Bot ghi heat mỗi
   // tick nên một tab /stats bỏ quên trong tab ẩn vẫn ngốn lượt đọc Convex.
-  const visible = usePageVisible();
-
   const rows = useQuery(
     api.reports.heatLeaderboard,
     visible && token && guildId

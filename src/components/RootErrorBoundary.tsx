@@ -14,7 +14,7 @@ import { translate } from "../lib/i18n";
  *     loader/render của route ném).
  * Tách phần NHÌN ra một chỗ để hai lớp không lệch giao diện.
  */
-export function ErrorScreen() {
+function ErrorScreen() {
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
       <div className="relative flex max-w-lg flex-col items-center">

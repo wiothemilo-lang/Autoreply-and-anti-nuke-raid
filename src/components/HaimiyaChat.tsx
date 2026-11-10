@@ -3,7 +3,6 @@ import { useAction } from "convex/react";
 import { ImagePlus, Send, Sparkles, X } from "lucide-react";
 import { HaimiyaAvatar } from "./HaimiyaAvatar";
 
-export { HaimiyaAvatar } from "./HaimiyaAvatar";
 import { useReducedMotion } from "framer-motion";
 import { api } from "../../convex/_generated/api";
 import { getSessionToken } from "../lib/discord";
@@ -243,9 +242,9 @@ export default function HaimiyaChat({
   const msgSeqRef = useRef(0);
   const nextMsgId = () => `m${Date.now().toString(36)}-${msgSeqRef.current++}`;
 
-  function send(text: string, withImages?: string[]) {
+  function send(text: string) {
     const q = text.trim();
-    const imgs = (withImages ?? pending).slice(0, 3);
+    const imgs = pending.slice(0, MAX_IMAGES);
     if ((!q && imgs.length === 0) || typing) return;
     setMessages((m) => [
       ...m,
@@ -259,7 +258,6 @@ export default function HaimiyaChat({
     setInput("");
     setPending([]);
     setTyping(true);
-    window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(
       async () => {
         // Lượt cuối phải CÓ nội dung: gửi ảnh mà không gõ chữ thì `q` rỗng,
@@ -275,16 +273,7 @@ export default function HaimiyaChat({
           history,
           imgs.length ? imgs.map((dataUrl) => ({ dataUrl })) : undefined,
         );
-        if (aiReply?.startsWith("[giới-hạn]")) {
-          setMessages((m) => [
-            ...m,
-            {
-              id: nextMsgId(),
-              role: "haimiya",
-              text: aiReply.replace("[giới-hạn] ", "⏳ "),
-            },
-          ]);
-        } else if (aiReply?.startsWith("[đăng-nhập]")) {
+        if (aiReply?.startsWith("[đăng-nhập]")) {
           setMessages((m) => [
             ...m,
             {
@@ -484,7 +473,7 @@ export default function HaimiyaChat({
               const f = e.dataTransfer.files?.[0];
               if (!f || typing) return;
               fileToDataUrls(f)
-                .then((urls) => setPending((p) => [...p, ...urls].slice(0, 3)))
+                .then((urls) => setPending((p) => [...p, ...urls].slice(0, MAX_IMAGES)))
                 .catch((err) =>
                   setMessages((m) => [
                     ...m,
@@ -524,15 +513,15 @@ export default function HaimiyaChat({
               multiple
               hidden
               onChange={(e) => {
-                const files = [...(e.target.files ?? [])].slice(0, 3);
+                const files = [...(e.target.files ?? [])].slice(0, MAX_IMAGES);
                 e.target.value = "";
                 if (files.length === 0 || typing) return;
                 Promise.allSettled(files.map(fileToDataUrls)).then((results) => {
                   const urls = results
                     .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
-                    .slice(0, 3);
+                    .slice(0, MAX_IMAGES);
                   const errors = results.filter((r) => r.status === "rejected");
-                  setPending((p) => [...p, ...urls].slice(0, 3));
+                  setPending((p) => [...p, ...urls].slice(0, MAX_IMAGES));
                   if (errors.length)
                     setMessages((m) => [
                       ...m,
@@ -548,7 +537,7 @@ export default function HaimiyaChat({
             <div className="flex items-center gap-2 rounded-xl border border-border bg-background/70 px-3 py-2 focus-within:border-primary/50">
               <button
                 onClick={() => fileRef.current?.click()}
-                disabled={typing || pending.length >= 3}
+                disabled={typing || pending.length >= MAX_IMAGES}
                 aria-label={translate("Gửi ảnh hoặc video")}
                 title={translate(
                   "Gửi ảnh (jpg/png/webp) hoặc video ≤50MB — Haimiya sẽ xem giúp bạn",
@@ -570,7 +559,7 @@ export default function HaimiyaChat({
                   if (f) {
                     e.preventDefault();
                     fileToDataUrls(f)
-                      .then((urls) => setPending((p) => [...p, ...urls].slice(0, 3)))
+                      .then((urls) => setPending((p) => [...p, ...urls].slice(0, MAX_IMAGES)))
                       .catch(() => {});
                   }
                 }}

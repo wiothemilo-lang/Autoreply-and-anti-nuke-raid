@@ -37,6 +37,7 @@ import { getSessionToken } from "../../lib/discord";
 import { translate } from "../../lib/i18n";
 const TOKEN = () => getSessionToken();
 const DEFAULT_WEBHOOK_EVENT_TYPES = ["antinuke", "mod", "join", "leave", "general"];
+const WEBHOOK_EVENT_TYPES = [...DEFAULT_WEBHOOK_EVENT_TYPES, "all"];
 
 export default function SettingsPanel({ data }: { data: GuildData }) {
   const updateSettings = useMutation(api.guilds.updateSettings);
@@ -495,7 +496,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                   <div className="grid gap-1.5">
                     <Label>{translate("Loại sự kiện nhận log")}</Label>
                     <div className="flex flex-wrap gap-2">
-                      {["antinuke", "mod", "join", "leave", "general", "all"].map((et) => (
+                      {WEBHOOK_EVENT_TYPES.map((et) => (
                         <button
                           key={et}
                           type="button"

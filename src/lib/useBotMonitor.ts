@@ -36,7 +36,7 @@ export const INCIDENT_SLOW = 1200;
  */
 export const SYNC_INTERVAL_MS = BOT_SYNC_INTERVAL_MS;
 
-export interface MonitorIncident {
+interface MonitorIncident {
   time: number;
   text: string;
 }
@@ -75,8 +75,6 @@ async function pingBackend(): Promise<number> {
 /** Kết quả ping backend gần nhất — nguồn tin của thẻ "Backend (dữ liệu)". */
 export interface BackendPing {
   state: "ok" | "down" | "checking";
-  /** Lần ping thành công gần nhất (ms epoch) — undefined khi chưa ping được lần nào. */
-  lastOkAt?: number;
 }
 
 export interface BotMonitor {
@@ -118,7 +116,7 @@ export function useBotMonitor(intervalMs = 5000, enabled = true): BotMonitor {
     try {
       const ms = await pingBackend();
       setLatency(ms);
-      setBackendPing({ state: "ok", lastOkAt: Date.now() });
+      setBackendPing({ state: "ok" });
       setHistory((h) => [...h.slice(-29), ms]);
       if (ms > INCIDENT_SLOW) {
         setIncidents((arr) =>

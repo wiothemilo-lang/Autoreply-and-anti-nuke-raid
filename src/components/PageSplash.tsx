@@ -3,7 +3,7 @@ import { translate } from "../lib/i18n";
 import { Skeleton } from "./ui/skeleton";
 import LoadingRipple from "./LoadingRipple";
 
-export interface PageSplashProps {
+interface PageSplashProps {
   className?: string;
   label?: string;
   minHeight?: string;

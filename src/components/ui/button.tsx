@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Loader2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
@@ -16,8 +15,6 @@ const buttonVariants = cva(
         ghost: "text-foreground hover:bg-accent hover:text-accent-foreground active:scale-[0.98]",
         outline:
           "border border-border bg-background text-foreground shadow-sm hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground hover:shadow",
-        destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:-translate-y-0.5 hover:bg-destructive/90 hover:shadow",
         danger:
           "bg-danger text-danger-foreground shadow-sm hover:-translate-y-0.5 hover:bg-danger/90 hover:shadow",
       },
@@ -27,7 +24,6 @@ const buttonVariants = cva(
         lg: "h-11 rounded-md px-8 text-base",
         icon: "h-9 w-9",
         "icon-sm": "h-8 w-8",
-        "icon-lg": "h-10 w-10",
       },
     },
     defaultVariants: {
@@ -37,25 +33,14 @@ const buttonVariants = cva(
   },
 );
 
-export interface ButtonProps
+interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
-  loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
-    {
-      className,
-      variant,
-      size,
-      asChild = false,
-      loading = false,
-      disabled,
-      children,
-      type = "button",
-      ...props
-    },
+    { className, variant, size, asChild = false, disabled, children, type = "button", ...props },
     ref,
   ) => {
     if (asChild) {
@@ -66,18 +51,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       );
     }
 
-    const isDisabled = disabled || loading;
-
     return (
       <button
         ref={ref}
         type={type}
-        disabled={isDisabled}
-        aria-busy={loading ? "true" : undefined}
+        disabled={disabled}
         className={cn(buttonVariants({ variant, size, className }))}
         {...props}
       >
-        {loading && <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />}
         {children}
       </button>
     );
@@ -85,4 +66,4 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = "Button";
 
-export { Button, buttonVariants };
+export { Button };
