@@ -1,4 +1,5 @@
 import { query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { buildHiddenJobs } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
@@ -218,6 +219,25 @@ export const getPendingJobs = query({
         .query("tickets")
         .withIndex("by_guildId", (q) => q.eq("guildId", g.discordId))
         .collect();
+      // 9 field chung của mọi job ticket — chỉ khác status + vài field đóng.
+      const jobOf = (
+        t: Doc<"tickets">,
+        status: "autoClose" | "closeChannel" | "purge",
+        extra: Record<string, unknown> = {},
+      ) => ({
+        guildId: g.discordId,
+        ticketId: t._id,
+        channelId: t.channelId,
+        number: t.number ?? 0,
+        kind: t.kind,
+        openerId: t.openerId,
+        status,
+        idleHours,
+        closeGraceHours,
+        lastActivityAt: t.lastActivityAt ?? t.createdAt,
+        closedAt: 0,
+        ...extra,
+      });
       for (const t of rows) {
         if (t.status === "open") {
           // ⚠️ Kiểm NGÂN SÁCH TIN TRƯỚC đồng hồ im lặng: kênh đang bị spam thì
@@ -229,35 +249,10 @@ export const getPendingJobs = query({
             if (idleHours <= 0) continue;
             const last = t.lastActivityAt ?? t.createdAt;
             if (nowMs - last < idleHours * 3_600_000) continue;
-            tickets.push({
-              guildId: g.discordId,
-              ticketId: t._id,
-              channelId: t.channelId,
-              number: t.number ?? 0,
-              kind: t.kind,
-              openerId: t.openerId,
-              status: "autoClose",
-              idleHours,
-              closeGraceHours,
-              lastActivityAt: t.lastActivityAt ?? t.createdAt,
-              closedAt: 0,
-            });
+            tickets.push(jobOf(t, "autoClose"));
             continue;
           }
-          tickets.push({
-            guildId: g.discordId,
-            ticketId: t._id,
-            channelId: t.channelId,
-            number: t.number ?? 0,
-            kind: t.kind,
-            openerId: t.openerId,
-            status: "autoClose",
-            closeCause: "budget",
-            idleHours,
-            closeGraceHours,
-            lastActivityAt: t.lastActivityAt ?? t.createdAt,
-            closedAt: 0,
-          });
+          tickets.push(jobOf(t, "autoClose", { closeCause: "budget" }));
         } else if (t.status === "closed") {
           // ⚠️ KHÔNG `continue` khi transcript đã lưu — đó là cách khiến kênh
           // ticket treo VĨNH VIỄN: `runPurge` lưu transcript xong mới xoá
@@ -271,38 +266,22 @@ export const getPendingJobs = query({
           // tức dashboard đóng ticket xong thì kênh vẫn còn tên cũ + quyền cũ
           // tới 24h (lỗi thật 28/09/2026).
           if (!t.channelClosedAt && t.channelId && t.channelId !== "pending") {
-            tickets.push({
-              guildId: g.discordId,
-              ticketId: t._id,
-              channelId: t.channelId,
-              number: t.number ?? 0,
-              kind: t.kind,
-              openerId: t.openerId,
-              status: "closeChannel",
-              idleHours,
-              closeGraceHours,
-              lastActivityAt: t.lastActivityAt ?? t.createdAt,
-              closedAt: t.closedAt ?? 0,
-              closeReason: t.closeReason ?? undefined,
-            });
+            tickets.push(
+              jobOf(t, "closeChannel", {
+                closedAt: t.closedAt ?? 0,
+                closeReason: t.closeReason ?? undefined,
+              }),
+            );
             continue;
           }
           const closed = t.closedAt ?? 0;
           if (!closed || nowMs - closed < closeGraceHours * 3_600_000) continue;
-          tickets.push({
-            guildId: g.discordId,
-            ticketId: t._id,
-            channelId: t.channelId,
-            number: t.number ?? 0,
-            kind: t.kind,
-            openerId: t.openerId,
-            status: "purge",
-            idleHours,
-            closeGraceHours,
-            lastActivityAt: t.lastActivityAt ?? t.createdAt,
-            closedAt: closed,
-            transcriptReady: !!t.transcriptStorageId,
-          });
+          tickets.push(
+            jobOf(t, "purge", {
+              closedAt: closed,
+              transcriptReady: !!t.transcriptStorageId,
+            }),
+          );
         }
       }
     }

@@ -5,14 +5,12 @@
  * `botSyncGuilds` (mutation gộp sync + heartbeat, có allowlist riêng trong
  * `scripts/check-settings-signal.cjs`) vẫn ở `convex/guilds.ts`; các function
  * còn lại tách thân hàm sang đây. Wrapper + validator giữ NGUYÊN ở file gốc —
- * hợp đồng tên (`guilds:botHeartbeat`…) không đổi. Chỉ tách file.
+ * hợp đồng tên (`guilds:botGuildStats`…) không đổi. Chỉ tách file.
  */
 import { v } from "convex/values";
 import type { ObjectType } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { requireBotKeyStrict } from "../botAuth";
-import { getUserByToken } from "../auth";
-import { getBotStatus, isBotOwnerUser } from "../hidden";
 
 /**
  * Bot lấy danh sách guild ID bot đang ở (1 query — dùng bởi scripts/audit-backups.cjs).
@@ -48,24 +46,12 @@ export async function botGuildGoneHandler(ctx: MutationCtx, { botKey, guildId }:
 }
 
 /** Chẩn đoán sức khỏe sync: số guild đang hiển thị / đã ẩn / heartbeat cũ (không lộ id).
- *  Chỉ bot (botKey) hoặc chủ bot đăng nhập web được gọi — trước đây quét toàn bộ
- *  bảng guilds mở công khai, tốn hạn mức mỗi lần gọi. */
-export const botGuildStatsArgs = {
-  botKey: v.optional(v.string()),
-  token: v.optional(v.string()),
-};
+ *  Chỉ bot (botKey) gọi được — trước đây quét toàn bộ bảng guilds mở công khai,
+ *  tốn hạn mức mỗi lần gọi. */
+export const botGuildStatsArgs = { botKey: v.optional(v.string()) };
 export type BotGuildStatsArgs = ObjectType<typeof botGuildStatsArgs>;
-export async function botGuildStatsHandler(ctx: QueryCtx, { botKey, token }: BotGuildStatsArgs) {
-  if (botKey) {
-    await requireBotKeyStrict(ctx, botKey);
-  } else if (token) {
-    const user = await getUserByToken(ctx, token);
-    if (!user) return null;
-    const status = await getBotStatus(ctx);
-    if (!isBotOwnerUser(user, status)) return null;
-  } else {
-    return null;
-  }
+export async function botGuildStatsHandler(ctx: QueryCtx, { botKey }: BotGuildStatsArgs) {
+  await requireBotKeyStrict(ctx, botKey);
   const all = await ctx.db.query("guilds").collect();
   const now = Date.now();
   let inGuild = 0;
@@ -86,53 +72,8 @@ export async function botGuildStatsHandler(ctx: QueryCtx, { botKey, token }: Bot
     inGuild,
     gone,
     staleInGuild,
-    now,
     oldestHeartbeat,
   };
-}
-
-export const botHeartbeatArgs = {
-  guildCount: v.number(),
-  memberCount: v.number(),
-  version: v.string(),
-  ownerName: v.optional(v.string()),
-  ownerAvatarUrl: v.optional(v.string()),
-  /** Chìa khóa bot (botAuth) — chỉ bot có OWNER_SEED mới tính được. */
-  botKey: v.optional(v.string()),
-};
-export type BotHeartbeatArgs = ObjectType<typeof botHeartbeatArgs>;
-export async function botHeartbeatHandler(ctx: MutationCtx, args: BotHeartbeatArgs) {
-  await requireBotKeyStrict(ctx, args.botKey);
-  const now = Date.now();
-  const existing = await ctx.db
-    .query("botStatus")
-    .withIndex("by_kind", (q) => q.eq("kind", "status"))
-    .first();
-  const patch: Record<string, unknown> = {
-    online: true,
-    guildCount: args.guildCount,
-    memberCount: args.memberCount,
-    lastHeartbeat: now,
-    version: args.version,
-  };
-  if (args.ownerName !== undefined) patch.ownerName = args.ownerName.slice(0, 120);
-  if (args.ownerAvatarUrl !== undefined) patch.ownerAvatarUrl = args.ownerAvatarUrl.slice(0, 2000);
-  if (existing) {
-    await ctx.db.patch(existing._id, patch);
-  } else {
-    await ctx.db.insert("botStatus", {
-      kind: "status",
-      online: true,
-      guildCount: args.guildCount,
-      memberCount: args.memberCount,
-      lastHeartbeat: now,
-      startedAt: now,
-      version: args.version,
-      ownerName: args.ownerName?.slice(0, 120),
-      ownerAvatarUrl: args.ownerAvatarUrl?.slice(0, 2000),
-    });
-  }
-  return { ok: true };
 }
 
 export const syncChannelsArgs = {

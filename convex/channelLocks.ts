@@ -1,7 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireBotKeyStrict } from "./botAuth";
-import { getUserByToken, guildAccessibleBy } from "./auth";
 
 /**
  * channelLocks.ts — dữ liệu lệnh `/lock` (khoá chat thủ công của chủ server).
@@ -44,32 +43,6 @@ export const botDueChannelLocks = query({
  * Chỉ chủ server có quyền quản lý mới xem được: `until` của từng kênh là thông
  * tin vận hành nội bộ, và bảng này là bản ghi ai đã khoá việc gì.
  */
-export const listChannelLocks = query({
-  args: { token: v.string(), guildId: v.string() },
-  handler: async (ctx, { token, guildId }) => {
-    const user = await getUserByToken(ctx, token);
-    const guild = await ctx.db
-      .query("guilds")
-      .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
-      .first();
-    if (!user || !guild || !guildAccessibleBy(user, guild))
-      throw new Error("Không có quyền quản lý server này");
-    const rows = await ctx.db
-      .query("channelLocks")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .collect();
-    return rows.map((r) => ({
-      channelId: r.channelId,
-      roleId: r.roleId,
-      kind: r.kind,
-      until: r.until ?? null,
-      reason: r.reason ?? null,
-      lockedBy: r.lockedBy ?? null,
-      lockedAt: r.lockedAt,
-    }));
-  },
-});
-
 /** Bot đọc toàn bộ khoá của một server (dùng trước khi khoá để bỏ qua kênh đã khoá). */
 export const botChannelLocks = query({
   args: { guildId: v.string(), botKey: v.optional(v.string()) },

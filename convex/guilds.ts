@@ -37,8 +37,6 @@ import {
   botGuildGoneHandler,
   botGuildStatsArgs,
   botGuildStatsHandler,
-  botHeartbeatArgs,
-  botHeartbeatHandler,
   syncChannelsArgs,
   syncChannelsHandler,
   syncRolesArgs,
@@ -1109,7 +1107,7 @@ export const botSyncGuilds = mutation({
     trustedFullList: v.optional(v.boolean()),
     /**
      * TỐI ƯU USAGE: trạng thái toàn cục bot (heartbeat) gộp vào mutation này —
-     * bot chỉ cần 1 call/phút thay vì 2 (botSyncGuilds + botHeartbeat riêng).
+     * bot chỉ cần 1 call/phút thay vì 2 (botSyncGuilds + heartbeat riêng).
      */
     globalStatus: v.optional(
       v.object({
@@ -1233,7 +1231,7 @@ export const botSyncGuilds = mutation({
           });
         }
       } else {
-        const id = await ctx.db.insert("guilds", {
+        await ctx.db.insert("guilds", {
           discordId: g.id,
           name: g.name,
           icon: g.icon,
@@ -1305,7 +1303,6 @@ export const botSyncGuilds = mutation({
             updatedAt: now,
           });
         }
-        void id;
       }
     }
     // Guilds the bot left are no longer synced — CHỈ khi danh sách được xác nhận đầy
@@ -1326,8 +1323,8 @@ export const botSyncGuilds = mutation({
         await ctx.db.patch(guild._id, { botInGuild: false, updatedAt: now });
       }
     }
-    // Heartbeat toàn cục gộp chung (TỐI ƯU USAGE): cùng logic guilds:botHeartbeat
-    // nhưng không tốn thêm 1 function call/phút riêng biệt nữa.
+    // Heartbeat toàn cục gộp chung (TỐI ƯU USAGE): không tốn thêm 1 function
+    // call/phút riêng biệt nữa.
     if (globalStatus) {
       const status = await ctx.db
         .query("botStatus")
@@ -1382,11 +1379,6 @@ export const botGuildGone = mutation({
 export const botGuildStats = query({
   args: botGuildStatsArgs,
   handler: botGuildStatsHandler,
-});
-
-export const botHeartbeat = mutation({
-  args: botHeartbeatArgs,
-  handler: botHeartbeatHandler,
 });
 
 export const syncChannels = mutation({

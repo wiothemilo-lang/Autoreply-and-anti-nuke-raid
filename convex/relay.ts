@@ -2,7 +2,6 @@ import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { requireBotKeyStrict } from "./botAuth";
 import { getUserByToken, canManageGuild } from "./auth";
-import { getBotStatus, isBotOwnerUser } from "./hidden";
 
 /**
  * Threat Relay — chia sẻ chữ ký raid GIỮA CÁC SERVER dùng chung bot (Đợt 6).
@@ -35,7 +34,6 @@ const RATE_WINDOW_MS = 60_000;
 const MIN_WEIGHT_AGED = 2;
 const MAX_SOURCE_HASHES = 100;
 const MAX_STATUS_SCAN = 10_000;
-const MAX_OWNER_SCAN = 1_000;
 const MAX_DISTRIBUTABLE_SCAN = MAX_FETCH * 8;
 const MAX_CLEANUP_BATCH = 500;
 
@@ -226,32 +224,6 @@ export const relayStatus = query({
         return acc;
       }, {}),
     };
-  },
-});
-
-/** Web — xem danh sách signature đang hoạt động (Admin panel). */
-export const relaySignatures = query({
-  args: { token: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { token, limit }) => {
-    const user = await getUserByToken(ctx, token);
-    if (!user) return null;
-    const status = await getBotStatus(ctx);
-    if (!isBotOwnerUser(user, status)) return null;
-    const now = Date.now();
-    const all = await ctx.db
-      .query("relaySignatures")
-      .withIndex("by_createdAt", (q) => q.gt("createdAt", now - TTL_MS))
-      .order("desc")
-      .take(MAX_OWNER_SCAN);
-    return all
-      .sort((a, b) => effectiveWeight(b) - effectiveWeight(a) || b.lastSeenAt - a.lastSeenAt)
-      .slice(0, Math.min(100, Math.max(1, limit ?? 30)))
-      .map((s) => ({
-        kind: s.kind,
-        value: s.value,
-        weight: effectiveWeight(s),
-        ageMinutes: Math.floor((now - s.createdAt) / 60_000),
-      }));
   },
 });
 

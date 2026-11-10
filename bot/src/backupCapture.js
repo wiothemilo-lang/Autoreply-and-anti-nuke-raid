@@ -586,7 +586,7 @@ async function runBackup(client, store, guildId, opts = {}) {
   }
 
   // Clear pending flag + cập nhật lastBackupAt (khi store thành công) để
-  // botGetDueAuto không kích hoạt lại tức thì sau khi backup xong.
+  // Cron không kích hoạt lại tức thì sau khi backup xong.
   const cleared = await store.client
     .mutation("bot_writes:botClearBackup", {
       guildId,

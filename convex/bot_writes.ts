@@ -97,8 +97,6 @@ import {
   botSetTicketChannelHandler,
   botClaimTicketArgs,
   botClaimTicketHandler,
-  botUnclaimTicketArgs,
-  botUnclaimTicketHandler,
   botMarkTicketChannelClosedArgs,
   botMarkTicketChannelClosedHandler,
   botTouchTicketsArgs,
@@ -290,11 +288,6 @@ export const botSetTicketChannel = mutation({
 export const botClaimTicket = mutation({
   args: botClaimTicketArgs,
   handler: botClaimTicketHandler,
-});
-
-export const botUnclaimTicket = mutation({
-  args: botUnclaimTicketArgs,
-  handler: botUnclaimTicketHandler,
 });
 
 export const botMarkTicketChannelClosed = mutation({

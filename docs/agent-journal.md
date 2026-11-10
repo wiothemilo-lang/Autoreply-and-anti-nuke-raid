@@ -12,8 +12,11 @@
   `globalThis.fetch` trong `ai.js`; gộp `processDetection` của `antinuke/audit.js`;
   tách `ticketActionButton`. Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
   (~110 dòng trùng), `externalApp.js` 4 khối punish (~60 dòng), verify panel 3 bản
-  (prefix/setup/hidden), facade `handlers/backup.js`; `botUnclaimTicket` phía Convex
-  giờ orphan (đợt 3).
+  (prefix/setup/hidden), facade `handlers/backup.js`. Đợt 3 còn nợ: `ticketActivity`
+  chỉ nhận category cha (auto-close nhầm ticket theo kind), fallback `bot_tick` thiếu
+  ticket, `guildStats` `take(1000)` cắt mất ngày cũ khi raid, hidden panel/giveaway
+  trùng web↔bot, `getGuild`/`getBotConfig` phình field chết, 4 bản chọn entitlement
+  lệch tie-break.
 
 - 🔎 **botKeySeed 06/10 08:49:33 — đã thu hẹp, chưa chốt danh tính.** Xác nhận
   xoay qua `botBootstrapAction:requestBotKey` (chỉ đường này ghi
@@ -65,6 +68,14 @@
   `docs/t3-devbox.md` mục 7.
 
 ---
+
+## 2026-11-10 (8) — Dọn code rác đợt 3/5: convex
+
+- ✅ **10 agent audit `convex/`** → xoá **24 export không caller**: cả `audit.ts` (record/getLog/getGuildAnalytics/getBackupAnalytics — 180 dòng, 0 ref), 3 action AI trùng (`classifyViolation`/`analyzeRaid`/`analyzeExternalApp` — bot dùng `bot/src/ai.js`), `botUnclaimTicket`, `guilds:botHeartbeat`, `backup:botGetDueAuto`, `threatIntel:sampleStats`, `relaySignatures`, `payments:{getPaymentForReturn,history}`, `sessionHardening:newSessionInternal`, `requireBotKey` (cửa hậu back-compat), `channelLocks:listChannelLocks`, `ticketKinds:botKinds`, `KEY_PREFIX`.
+- 🐛 **Bug thật**: `exportGuildCsv` ghi **cap+1 dòng** (lấy thêm 1 dòng chỉ để biết còn nữa nhưng không cắt trước khi ghép CSV) và cột "Ghi chú" luôn rỗng; `analytics.stats` đọc `take(5000)` trong khi trần thật ~450; `getResearchHistory` có nhánh `isOwner` không bao giờ sai; `botBootstrapAction` so `computeBotKey(botKey) !== seed` sau khi gán `seed = computeBotKey(botKey)`.
+- 📁 Gom trùng: `cleanKeywords`/`cleanChannels` (autoreplies), `findDefaultWebhook` (3 bản), `jobOf()` cho 4 literal job ticket trong `bot_tick`, `clipField` trong `ticketKinds`, `ensureBotStatus` chưa gom (nợ); `guildStats.StatEvent.punish` + `incidents.reason` là field ghi-không-đọc → xoá.
+- 🧪 Kiểm chứng: **89/89 CJS** (143,1s) · **31/31 TS** (5,2s) · typecheck · lint · format:check · 10 cổng tĩnh sạch (convex-contract **509 export**, −24). Test cập nhật: bỏ case `botKinds`/`listChannelLocks`/classifyViolation, nới check `relaySignatures`; CSV chưa có suite riêng → ghi nợ test.
+- ▶️ Tiếp theo: PR `refactor/dead-code-convex`; đợt 4/5 — `src/` web (bundle + hook trùng + panel chết).
 
 ## 2026-11-10 (7) — Dọn code rác đợt 2/5: handlers + commands
 

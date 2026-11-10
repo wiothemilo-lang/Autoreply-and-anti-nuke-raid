@@ -66,17 +66,10 @@ const { ConvexHttpClient } = require("../bot/node_modules/convex/browser");
     }
   }
 
-  // AI có cấu hình không? (1 lần gọi thử với dữ liệu giả — vô hại)
+  // AI có cấu hình không? (chỉ đọc cờ — KHÔNG gọi model, không lộ key)
   try {
-    const ai = await client.action("haimiya:analyzeExternalApp", {
-      guildId: "check",
-      count: 2,
-      windowSeconds: 15,
-      threshold: 2,
-      appProfile: "1. TestApp — bởi nobody",
-      recentJoins: 0,
-    });
-    console.log("\nAI analyzeExternalApp (thử):", JSON.stringify(ai));
+    const ai = await client.action("haimiya:aiStatus", {});
+    console.log("\nAI status:", JSON.stringify(ai));
   } catch (err) {
     console.log("\nAI check lỗi:", err.message);
   }

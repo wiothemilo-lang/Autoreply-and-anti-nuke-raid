@@ -88,7 +88,7 @@ export const updateModule = mutation({
       await ctx.db.patch(mod._id, patch);
     } else {
       const { actions, strongest } = normalizeActions(args.actions);
-      const punish = args.punish ?? strongest ?? "kick";
+      const punish = args.punish ?? strongest;
       await ctx.db.insert("antinukeModules", {
         guildId: args.guildId,
         module: args.module,
@@ -163,7 +163,6 @@ export const externalAppRaids = query({
   args: {
     token: v.string(),
     guildId: v.string(),
-    refresh: v.optional(v.number()),
   },
   handler: async (ctx, { token, guildId }) => {
     const user = await getUserByToken(ctx, token);

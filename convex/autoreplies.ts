@@ -13,6 +13,30 @@ async function assertManage(ctx: MutationCtx, token: string, guildId: string) {
   return guild!;
 }
 
+/** Chuẩn hoá danh sách từ khóa (trim, bỏ rỗng, bỏ trùng, trần 30). */
+function cleanKeywords(list: string[]) {
+  return [
+    ...new Set(
+      list
+        .map((k: string) => k.trim().slice(0, 60))
+        .filter(Boolean)
+        .slice(0, 30),
+    ),
+  ];
+}
+
+/** Chuẩn hoá danh sách kênh (chỉ snowflake, bỏ trùng, trần 100). */
+function cleanChannels(list: string[]) {
+  return [
+    ...new Set(
+      list
+        .map((c: string) => c.trim())
+        .filter((c: string) => /^\d{15,20}$/.test(c))
+        .slice(0, 100),
+    ),
+  ];
+}
+
 /** Giới hạn dữ liệu rule auto reply: chống phình document + spam lưu trữ. */
 const MAX_RULES_PER_GUILD = 50;
 
@@ -22,23 +46,9 @@ function cleanRuleInput(input: {
   channels: string[];
   cooldownSeconds: number;
 }) {
-  const keywords = [
-    ...new Set(
-      input.keywords
-        .map((k) => k.trim().slice(0, 60))
-        .filter(Boolean)
-        .slice(0, 30),
-    ),
-  ];
+  const keywords = cleanKeywords(input.keywords);
   const response = input.response.trim().slice(0, 2000);
-  const channels = [
-    ...new Set(
-      input.channels
-        .map((c) => c.trim())
-        .filter((c) => /^\d{15,20}$/.test(c))
-        .slice(0, 100),
-    ),
-  ];
+  const channels = cleanChannels(input.channels);
   if (!response) throw new Error("Nội dung trả lời không được để trống");
   return {
     keywords,
@@ -134,30 +144,12 @@ export const update = mutation({
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
     if (args.name !== undefined) patch.name = args.name;
     if (args.triggerType !== undefined) patch.triggerType = args.triggerType;
-    if (args.keywords !== undefined) {
-      patch.keywords = [
-        ...new Set(
-          args.keywords
-            .map((k) => k.trim().slice(0, 60))
-            .filter(Boolean)
-            .slice(0, 30),
-        ),
-      ];
-    }
+    if (args.keywords !== undefined) patch.keywords = cleanKeywords(args.keywords);
     if (args.response !== undefined) {
       if (!args.response.trim()) throw new Error("Nội dung trả lời không được để trống");
       patch.response = args.response.trim().slice(0, 2000);
     }
-    if (args.channels !== undefined) {
-      patch.channels = [
-        ...new Set(
-          args.channels
-            .map((c) => c.trim())
-            .filter((c) => /^\d{15,20}$/.test(c))
-            .slice(0, 100),
-        ),
-      ];
-    }
+    if (args.channels !== undefined) patch.channels = cleanChannels(args.channels);
     if (args.cooldownSeconds !== undefined) {
       patch.cooldownSeconds = Math.max(0, Math.min(86400, args.cooldownSeconds));
     }

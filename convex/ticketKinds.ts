@@ -22,7 +22,6 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { canManageGuild, getUserByToken } from "./auth";
-import { requireBotKeyStrict } from "./botAuth";
 
 /** Trần số loại mỗi server (Discord tối đa 5 nút/hàng; 10 loại = 2 hàng). */
 export const MAX_KINDS = 10;
@@ -145,24 +144,12 @@ function cleanKind(input: {
   return {
     key,
     label,
-    description:
-      String(input.description ?? "")
-        .trim()
-        .slice(0, DESC_MAX) || undefined,
+    description: clipField(input.description, DESC_MAX),
     emoji: emoji || undefined,
     color: color || undefined,
-    question:
-      String(input.question ?? "")
-        .trim()
-        .slice(0, MODAL_LABEL_MAX) || undefined,
-    questionPlaceholder:
-      String(input.questionPlaceholder ?? "")
-        .trim()
-        .slice(0, PLACEHOLDER_MAX) || undefined,
-    evidenceQuestion:
-      String(input.evidenceQuestion ?? "")
-        .trim()
-        .slice(0, MODAL_LABEL_MAX) || undefined,
+    question: clipField(input.question, MODAL_LABEL_MAX),
+    questionPlaceholder: clipField(input.questionPlaceholder, PLACEHOLDER_MAX),
+    evidenceQuestion: clipField(input.evidenceQuestion, MODAL_LABEL_MAX),
     staffRoleIds,
     fields,
   };
@@ -392,21 +379,5 @@ export const swapKindOrder = mutation({
     }
     await ctx.db.patch(guild._id, { settingsChangedAt: Date.now() });
     return { ok: true };
-  },
-});
-
-/**
- * BOT đọc danh sách loại ĐANG BẬT.
- *
- * Query riêng (không nhét vào `getBotConfig`) vì đây là danh sách CHỈ ĐỌC khi
- * dựng panel — dùng để render UI, không quyết định hàng rào chống spam. Nhưng
- * vẫn phải qua `requireBotKeyStrict` như mọi query bot khác: không có nó thì
- * bất kỳ ai cũng đọc được cấu hình ticket của mọi server.
- */
-export const botKinds = query({
-  args: { guildId: v.string(), botKey: v.optional(v.string()) },
-  handler: async (ctx, { guildId, botKey }) => {
-    await requireBotKeyStrict(ctx, botKey);
-    return loadKinds(ctx, guildId, false);
   },
 });

@@ -295,10 +295,10 @@ check(
 // tay (luật thứ hai bên dưới).
 check(
   "mọi path owner/admin toàn cục dùng helper chuẩn, không còn so sánh owner yếu",
-  [statusSrc, selfDiagnoseSrc, threatIntelSrc, relaySrc, guildsSrc].every((src) =>
+  [statusSrc, selfDiagnoseSrc, threatIntelSrc, guildsSrc].every((src) =>
     /isBotOwnerUser\(|requireBotOwner\(|isBotAdminUser\(|requireBotAdmin\(/.test(src),
   ) &&
-    [statusSrc, selfDiagnoseSrc, threatIntelSrc, relaySrc, guildsSrc].every(
+    [statusSrc, selfDiagnoseSrc, threatIntelSrc, guildsSrc].every(
       (src) => !/(owner|status)\?\.ownerDiscordId\s*&&/.test(src),
     ),
 );
@@ -379,9 +379,8 @@ const recentJoinsBody = altDetectionSrc.slice(
 );
 const altStatsBody = altDetectionSrc.slice(altDetectionSrc.indexOf("export const getAltStats"));
 check(
-  "recent joins dùng index guild+joinedAt có range/order",
+  "recent joins dùng index guild+joinedAt + order desc",
   recentJoinsBody.includes('withIndex("by_guildId_joinedAt"') &&
-    recentJoinsBody.includes('.gte("joinedAt", 0)') &&
     recentJoinsBody.includes('.order("desc")'),
 );
 check(

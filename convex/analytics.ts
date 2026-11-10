@@ -154,7 +154,7 @@ export const stats = query({
     const rows = await ctx.db
       .query("pageViews")
       .withIndex("by_day", (q) => q.gte("day", cutoff30))
-      .take(5_000);
+      .take(1_000);
 
     let total7d = 0;
     let total30d = 0;
