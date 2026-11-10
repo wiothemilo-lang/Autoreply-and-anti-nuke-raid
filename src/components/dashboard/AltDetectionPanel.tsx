@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import {
   AlertTriangle,
   Fingerprint,
@@ -125,7 +126,7 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
       toast.success(next ? translate("Đã bật Alt Detection") : translate("Đã tắt Alt Detection"));
       return true;
     } catch (e: unknown) {
-      toast.error((e as Error).message);
+      toastConvexError(e, translate("Lưu thất bại"));
       return false; // Switch tự trả núm về giá trị thật
     } finally {
       setSaving(false);
@@ -140,9 +141,13 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
         guildId,
         altPunish: punish as "kick" | "ban" | "timeout" | "verify",
       });
-      toast.success(`Da doi hinh phat thanh ${punish}`);
+      toast.success(
+        translate("Đã đổi hình phạt thành {p0}", {
+          p0: PUNISH_OPTIONS.find((o) => o.value === punish)?.label ?? punish,
+        }),
+      );
     } catch (e: unknown) {
-      toast.error((e as Error).message);
+      toastConvexError(e, translate("Lưu thất bại"));
     } finally {
       setSaving(false);
     }
@@ -157,9 +162,9 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
     setSaving(true);
     try {
       await updateConfig({ token, guildId, altMaxRiskScore: value });
-      toast.success(`Nguong rui ro: ${value}/100`);
+      toast.success(translate("Ngưỡng rủi ro: {p0}/100", { p0: value }));
     } catch (e: unknown) {
-      toast.error((e as Error).message);
+      toastConvexError(e, translate("Lưu thất bại"));
     } finally {
       setSaving(false);
       setDraftRisk(null);
@@ -177,7 +182,7 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
       );
       return true;
     } catch (e: unknown) {
-      toast.error((e as Error).message);
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     } finally {
       setSaving(false);
@@ -193,9 +198,9 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
         altVpnMode: mode as "strict" | "warn" | "off",
         vpnBlockEnabled: mode === "strict",
       });
-      toast.success(`Che do VPN: ${mode}`);
+      toast.success(translate("Chế độ VPN: {p0}", { p0: mode }));
     } catch (e: unknown) {
-      toast.error((e as Error).message);
+      toastConvexError(e, translate("Lưu thất bại"));
     }
     setSaving(false);
   }

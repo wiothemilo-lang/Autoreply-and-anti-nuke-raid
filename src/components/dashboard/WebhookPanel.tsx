@@ -20,6 +20,8 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import { toast } from "sonner";
+import { friendlyConvexError } from "../../lib/convexError";
+import { toastConvexError } from "../../lib/toastError";
 import type { GuildData } from "../../lib/types";
 import { getSessionToken } from "../../lib/discord";
 
@@ -294,7 +296,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
       setResult({ ok: true, msg: translate("Đã gửi thành công! Kiểm tra kênh Discord.") });
       toast.success(translate("Gửi thành công!"));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = friendlyConvexError(e, translate("Gửi thất bại"));
       setResult({ ok: false, msg });
       toast.error(msg);
     } finally {
@@ -352,7 +354,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                     translate(v ? "Đã bật webhook mặc định" : "Đã tắt webhook mặc định"),
                   );
                 } catch (e: unknown) {
-                  toast.error(String(e));
+                  toastConvexError(e, translate("Lưu thất bại"));
                 }
               }}
             />

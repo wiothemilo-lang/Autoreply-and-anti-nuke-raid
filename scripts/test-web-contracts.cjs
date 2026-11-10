@@ -1919,18 +1919,20 @@ check(
   (welcomeSrc.match(/useUnsavedChanges\(/g) ?? []).length >= 3,
 );
 
-// Ô nhập số của AutoModPanel: thuộc tính max của <input> KHÔNG chặn gõ tay
-// (999 vẫn qua), và backend clamp về 99 → UI hiện 99 trong khi server lưu 99,
-// hai bên lệch nhau mà người dùng không có cách nào biết. Bắt buộc kiểm cả
-// trần khi commit chứ không chỉ kiểm min.
+// Ô nhập số dùng chung (components/dashboard/ModuleCard.tsx → ModuleNumber):
+// thuộc tính max của <input> KHÔNG chặn gõ tay (999 vẫn qua), và backend clamp
+// về 99 → UI hiện 999 trong khi server lưu 99, hai bên lệch nhau mà người dùng
+// không có cách nào biết. Bắt buộc kiểm cả trần khi commit chứ không chỉ min.
+// Trước 10/11/2026 hàm này copy 4 bản, chỉ bản AutoModPanel kiểm trần.
 const automodSrc = files.get("components/dashboard/AutoModPanel.tsx") ?? "";
-const numberInputFn = automodSrc.slice(
-  automodSrc.indexOf("onBlur={() => {"),
-  automodSrc.indexOf('e.key === "Enter"'),
+const moduleCardForNumber = files.get("components/dashboard/ModuleCard.tsx") ?? "";
+const moduleNumberFn = moduleCardForNumber.slice(
+  moduleCardForNumber.indexOf("onBlur={() => {"),
+  moduleCardForNumber.indexOf('e.key === "Enter"'),
 );
 check(
-  "AutoModPanel NumberInput kiểm cả trần `max` khi commit (không chỉ kiểm min)",
-  /max !== undefined && n > max/.test(numberInputFn),
+  "ModuleNumber (dùng chung) kiểm cả trần `max` khi commit (không chỉ kiểm min)",
+  /max !== undefined && n > max/.test(moduleNumberFn),
 );
 
 // Cùng file: setTiers/setRepeat/setStrikes ghi TRƯỚC khi mutation xong và
@@ -3289,6 +3291,89 @@ check(
     /<source type="image\/webp" srcSet="\/payment\.webp" \/>/.test(
       files.get("pages/DonatePage.tsx") ?? "",
     ),
+);
+
+// ─── Đợt 4 (10/11/2026): gộp ô số, gọt adapter Switch, báo lỗi Convex ──────
+// ModuleNumber từng copy 4 bản và trôi khác nhau: chỉ AutoModPanel kiểm trần,
+// 3 bản còn lại cho gõ 999 rồi UI hiện "đã lưu" trong khi server clamp.
+const batch4ModuleCardSrc = files.get("components/dashboard/ModuleCard.tsx") ?? "";
+check(
+  "ModuleNumber chỉ định nghĩa MỘT chỗ và có kiểm trần",
+  /export function ModuleNumber\(/.test(batch4ModuleCardSrc) &&
+    /max !== undefined && n > max/.test(batch4ModuleCardSrc) &&
+    ["AntiNukePanel", "AutoModPanel", "JoinGatePanel"].every((name) =>
+      /import ModuleCard, \{ ModuleNumber \}|import \{ ModuleNumber \}/.test(
+        files.get(`components/dashboard/${name}.tsx`) ?? "",
+      ),
+    ) &&
+    ["AntiNukePanel", "AutoModPanel", "JoinGatePanel"].every(
+      (name) =>
+        !/function ModuleNumber\(/.test(files.get(`components/dashboard/${name}.tsx`) ?? ""),
+    ),
+);
+
+// Switch: 6 prop collection-era trùng default + `label` không call site nào dùng.
+const batch4SwitchSrc = files.get("components/ui/switch.tsx") ?? "";
+const batch4SwitchCss = fs.readFileSync(path.join(SRC, "components/ui/switch.css"), "utf8");
+check(
+  "Switch chỉ còn prop thật dùng (không label/mode/size/opacity/hue/saturation/brightness)",
+  !/label\?:/.test(batch4SwitchSrc) &&
+    !/mode="auto"/.test(batch4SwitchSrc) &&
+    !/size=\{1\}/.test(batch4SwitchSrc) &&
+    !/\.threeui-switch--captioned\s*\{/.test(batch4SwitchCss) &&
+    !/content: "Bật"/.test(batch4SwitchCss),
+);
+
+check(
+  "AutoModPanel đặt tên đúng file, không trùng ModerationPanel",
+  /export default function AutoModPanel\(/.test(
+    files.get("components/dashboard/AutoModPanel.tsx") ?? "",
+  ),
+);
+
+// Lỗi Convex production bị mask thành "[Request ID…] Server Error" — mọi chỗ
+// hiển thị lỗi trong 4 file này phải đi qua friendlyConvexError/toastConvexError.
+for (const [name, path] of [
+  ["Admin", "pages/Admin.tsx"],
+  ["WebhookPanel", "components/dashboard/WebhookPanel.tsx"],
+  ["AltDetectionPanel", "components/dashboard/AltDetectionPanel.tsx"],
+  ["VerifyPanel", "components/dashboard/VerifyPanel.tsx"],
+]) {
+  const src = files.get(path) ?? "";
+  check(
+    `${name} không để envelope Convex lọt ra UI`,
+    !/String\(e\)/.test(src) &&
+      !/\(e as Error\)\.message/.test(src) &&
+      !/catch\(\(\) => \{\}\)/.test(src) &&
+      /toastConvexError|friendlyConvexError/.test(src),
+  );
+}
+
+const batch4PremiumSrc = files.get("pages/PremiumPage.tsx") ?? "";
+check(
+  "PremiumPage khoá guildPlan theo server tự chọn (khách 1 server thấy banner)",
+  /const effectiveServer = server \|\|/.test(batch4PremiumSrc) &&
+    /token && effectiveServer \? \{ token, guildId: effectiveServer \}/.test(batch4PremiumSrc) &&
+    !/token && server \? \{ token, guildId: server \}/.test(batch4PremiumSrc),
+);
+
+check(
+  "clearLegacyDiscordAccess không ném SecurityError lúc bootstrap",
+  /export function clearLegacyDiscordAccess\(\): void \{\s*try \{/.test(
+    files.get("lib/discord.ts") ?? "",
+  ),
+);
+
+// Trước 10/11/2026 default là 4000ms: quên truyền tham số ở call site mới là
+// preloader đứng 4 giây dù app đã sẵn sàng. Từ điển tới muộn hơn thì
+// dictListeners tự vẽ lại, nên cap ngắn không mất bản dịch.
+const prepDefaultMs = Number(
+  ((files.get("lib/i18n.tsx") ?? "").match(/prepareInitialLanguage\(timeoutMs = (\d+)\)/) ?? [])[1],
+);
+check(
+  "prepareInitialLanguage mặc định ≤500ms (không kéo preloader 4 giây)",
+  prepDefaultMs > 0 && prepDefaultMs <= 500,
+  `default=${prepDefaultMs}ms`,
 );
 
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);

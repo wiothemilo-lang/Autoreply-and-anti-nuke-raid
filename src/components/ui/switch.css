@@ -54,22 +54,10 @@
 }
 
 /* Hàng cấu hình đã có nhãn của riêng nó; caption của toggle chỉ lặp lại nhãn
-   đó. Muốn bật lại thì thêm class `threeui-switch--captioned`. */
+   đó nên ẩn hẳn. (Bản cũ còn nhánh `--captioned` + dịch "On/Off" bằng
+   ::after, nhưng không chỗ nào bật class đó — đã xoá 25 dòng chết.) */
 .threeui-switch .modern-toggle__caption {
   display: none;
-}
-
-.threeui-switch--captioned {
-  height: auto;
-  width: clamp(180px, 40vw, 320px);
-}
-
-.threeui-switch--captioned > .modern-toggle {
-  padding: 20px 0;
-}
-
-.threeui-switch--captioned .modern-toggle__caption {
-  display: flex;
 }
 
 /* 2. Màu. Bản gốc hardcode #2f6bff (sáng) và #3b7bff (tối); ta trỏ về token
@@ -92,24 +80,7 @@
   --modern-toggle-mark: hsl(var(--toggle-accent-mark));
 }
 
-/* 3. Tiếng Việt. "On"/"Off" nằm thẳng trong JSX nên không dịch được bằng prop
-      (mà sửa ModernToggle.tsx là phá SHA-256). Thay bằng ::after theo
-      data-state mà file nguồn đã set sẵn. */
-.modern-toggle__caption b {
-  font-size: 0;
-}
-
-.modern-toggle[data-state="on"] .modern-toggle__caption b::after {
-  content: "Bật";
-  font-size: clamp(11px, 0.85cqw, 16px);
-}
-
-.modern-toggle[data-state="off"] .modern-toggle__caption b::after {
-  content: "Tắt";
-  font-size: clamp(11px, 0.85cqw, 16px);
-}
-
-/* 4. Trạng thái khoá. Component gốc không có prop `disabled`, nên ta khoá ở
+/* 3. Trạng thái khoá. Component gốc không có prop `disabled`, nên ta khoá ở
       cả ba lớp: chặn pointer ở đây, chặn onChange trong switch.tsx, và set
       button.disabled thật trong effect của switch.tsx. */
 .threeui-switch--disabled {

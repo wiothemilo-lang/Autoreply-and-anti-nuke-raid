@@ -90,7 +90,14 @@ const ACTION_STYLE: Record<string, string> = {
   purgeMessages: "bg-foreground/10 text-foreground border border-foreground/20",
 };
 
-function ModuleNumber({
+/**
+ * Ô số dùng chung cho MỌI panel cấu hình (Chống nuke, AutoMod, Join Gate).
+ *
+ * Vì sao gộp một chỗ: bản sao ở 4 file từng trôi khác nhau — chỉ AutoModPanel
+ * kiểm trần, 3 bản còn lại cho gõ 999 rồi UI hiện "đã lưu" trong khi server
+ * clamp về trần thật. `<input max>` chỉ chặn spinner, KHÔNG chặn gõ tay.
+ */
+export function ModuleNumber({
   value,
   min,
   max,
@@ -120,7 +127,9 @@ function ModuleNumber({
       onBlur={() => {
         setFocused(false);
         const n = Number(v);
-        if (!Number.isNaN(n) && n >= min) onCommit(Math.round(n));
+        // Ngoài miền → không commit; effect trên tự đồng bộ lại giá trị server.
+        if (Number.isNaN(n) || n < min || (max !== undefined && n > max)) return;
+        onCommit(Math.round(n));
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();

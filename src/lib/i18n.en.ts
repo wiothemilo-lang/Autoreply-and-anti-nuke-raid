@@ -224,6 +224,9 @@ export const EN: Record<string, string> = {
   "Yếu tố rủi ro phổ biến": "Most common risk factors",
   "Đã bật Alt Detection": "Alt Detection enabled",
   "Đã tắt Alt Detection": "Alt Detection disabled",
+  "Đã đổi hình phạt thành {p0}": "Punishment changed to {p0}",
+  "Ngưỡng rủi ro: {p0}/100": "Risk threshold: {p0}/100",
+  "Chế độ VPN: {p0}": "VPN mode: {p0}",
   /* ==== Chuỗi render thẳng (trước đây trôi tiếng Việt ra UI khi chọn EN/DE)
      + default prop của MultiSelect — 28/09/2026 ==== */
   "Phát hiện và chặn alt account, VPN/Proxy khi thành viên mới tham gia server.":

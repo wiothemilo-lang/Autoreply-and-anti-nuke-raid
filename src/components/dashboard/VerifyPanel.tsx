@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import {
   BadgeCheck,
   Eye,
@@ -65,7 +66,7 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
       try {
         await updateSettings({ token: TOKEN(), guildId: g.discordId, ...patch });
       } catch (e: unknown) {
-        toast.error(String(e));
+        toastConvexError(e, translate("Lưu thất bại"));
       }
     },
     [g.discordId, updateSettings],
@@ -104,7 +105,7 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
       await updateSettings({ token: TOKEN(), guildId: g.discordId, ...p });
       if (msg) toast.success(msg);
     } catch (e: unknown) {
-      toast.error(String(e));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 

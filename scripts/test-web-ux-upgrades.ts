@@ -66,9 +66,21 @@ import { DE_LABELS } from "../src/lib/i18n.de.labels";
 
 let pass = 0;
 let fail = 0;
-const check = (label: string, ok: boolean) => {
-  console.log(ok ? `  ✅ ${label}` : `  ❌ ${label}`);
-  if (ok) pass++;
+/**
+ * `ok` nhận cả boolean lẫn hàm. Nhận hàm là để assertion nhiều bước (try/catch,
+ * tính toán) viết gọn tại chỗ — TRƯỚC ĐÂY nhận boolean nên 4 check
+ * `planAvatarResize` truyền hàm đã luôn xanh dù logic sai (hàm là truthy).
+ * Hàm ném lỗi cũng tính là FAIL, không làm sập suite.
+ */
+const check = (label: string, ok: boolean | (() => boolean), detail?: string) => {
+  let passed: boolean;
+  try {
+    passed = typeof ok === "function" ? ok() : ok;
+  } catch {
+    passed = false;
+  }
+  console.log(passed ? `  ✅ ${label}` : `  ❌ ${label}${detail ? ` — ${detail}` : ""}`);
+  if (passed) pass++;
   else fail++;
 };
 
