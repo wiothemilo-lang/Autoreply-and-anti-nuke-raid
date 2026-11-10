@@ -2140,7 +2140,6 @@ check(
 // Nay module tự tích luỹ (agg), chỉ dùng prom-client cho đầu ra `/metrics`.
 const metricsSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "metrics.js"), "utf8");
 const runtimeSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "metricsRuntime.js"), "utf8");
-const logIdSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "logId.js"), "utf8");
 const convexClientSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "convex.js"), "utf8");
 const aiSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "ai.js"), "utf8");
 const botIndexSrc = fs.readFileSync(path.join(ROOT, "bot", "src", "index.js"), "utf8");
@@ -2176,10 +2175,6 @@ check(
 check(
   "metricsRuntime in /metrics ra stdout và có nút tắt METRICS=0",
   /render\(\)/.test(runtimeSrc) && /METRICS/.test(runtimeSrc),
-);
-check(
-  "logId.js dual-write (dòng text + dòng JSON có tiền tố lọc được)",
-  /AsyncLocalStorage/.test(logIdSrc) && /JSON_PREFIX/.test(logIdSrc),
 );
 check(
   "withRetry đo TẬP TRUNG mọi lời gọi Convex (không rải từng chỗ gọi)",

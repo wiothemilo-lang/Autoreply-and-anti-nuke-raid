@@ -10,32 +10,6 @@ const { normalizeBackupFile } = require("./backupNormalize");
 const { restoreCore } = require("./backupRestore");
 const { computeChecksum } = require("./backupUtils");
 
-/** Tải nội dung file import từ Convex file storage (URL botGetPending trả về). */
-async function readImportContent(item) {
-  if (item.importFileUrl) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 60_000);
-    try {
-      const res = await fetch(item.importFileUrl, { signal: ctrl.signal });
-      if (res.ok) return await res.text();
-      throw new Error(
-        `Không tải được file backup từ đám mây (HTTP ${res.status}) — hãy thử tải lại file`,
-      );
-    } catch (e) {
-      if (e?.name === "AbortError" || e?.code === "ABORT_ERR") {
-        throw new Error("Tải file backup từ đám mây quá lâu (> 60 giây) — hãy thử lại", {
-          cause: e,
-        });
-      }
-      throw e;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  if (item.fileContent) return item.fileContent; // fallback yêu cầu cũ lưu nội dung trực tiếp
-  throw new Error("Không lấy được file backup từ đám mây — hãy thử tải lại file");
-}
-
 /**
  * Làm gọn bản backup lưu lại trong guildBackups: bỏ blob base64 nặng (media
  * trong tin nhắn + raw emoji/sticker) — chỉ giữ URL/link. Bản lưu này chỉ để
@@ -115,7 +89,6 @@ async function runImportRestore(client, store, guildId, fileContent, fileName, {
 }
 
 module.exports = {
-  readImportContent,
   slimBackupForStore,
   runImportRestore,
 };

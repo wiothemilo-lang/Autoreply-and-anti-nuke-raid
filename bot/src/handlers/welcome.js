@@ -349,10 +349,7 @@ module.exports = {
   _sliceSafeForTest: sliceSafe,
   _pickTemplateForTest: pickTemplate,
   _embedColorForTest: embedColor,
-  _safeUrlForTest: safeUrl,
   _buildPayloadForTest: buildPayload,
-  _buildCardForTest: buildCard,
   _memberDaysForTest: memberDays,
-  _reportGreetingProblemForTest: reportGreetingProblem,
   _resetGreetingProblemCacheForTest: () => _warnedAt.clear(),
 };

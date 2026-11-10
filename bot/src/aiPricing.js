@@ -87,7 +87,6 @@ const PRICING = {
 };
 
 /** Ngày mà bảng giá được rà lại. Quá hạn thì báo mềm, không chặn. */
-const STALE_AFTER_DAYS = 90;
 
 /** Hạn mức/ngày (USD). `0` = không đặt trần. Mặc định 2 USD/ngày. */
 const DEFAULT_DAILY_BUDGET_USD = 2;
@@ -127,10 +126,6 @@ function pricingAgeDays(now = Date.now()) {
 }
 
 /** Bảng giá của một provider, hoặc null nếu chưa biết. */
-function priceOf(label) {
-  return PRICING[label] ?? null;
-}
-
 /** Provider này có trả phí không? `null` = chưa biết → coi như CÓ THỂ có. */
 function isPaid(label) {
   const p = PRICING[label];
@@ -303,8 +298,6 @@ function __resetForTest() {
 }
 
 module.exports = {
-  PRICING,
-  priceOf,
   isPaid,
   estimateCost,
   recordUsage,
@@ -314,8 +307,6 @@ module.exports = {
   overBudget,
   shouldDeprioritizeForBudget,
   budgetSummary,
-  pricingAgeDays,
-  STALE_AFTER_DAYS,
   DEFAULT_DAILY_BUDGET_USD,
   __resetForTest,
 };

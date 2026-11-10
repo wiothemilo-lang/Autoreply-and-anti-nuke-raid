@@ -18,7 +18,6 @@ const MALICIOUS_DOMAINS = [
   "discordnitro.ru",
   "discord-gift.ru",
   "discordnitro.gift",
-  "nitro-gift.ru",
   "nitrogift.ru",
   "discordgift.site",
   "discord-giveaway.com",
@@ -259,7 +258,6 @@ const BENIGN_LINK_HOSTS = new Set([
   "gitlab.io",
   "docs.google.com",
   "drive.google.com",
-  "discord.gg",
 ]);
 
 /** Link đầu tiên trong nội dung có domain KHÔNG nằm trong danh sách lành tính.
@@ -318,7 +316,7 @@ function findMaliciousLink(content) {
   if (findSuspiciousLink(content)) {
     if (SCAM_STRONG_RE.test(content))
       return { kind: "scam-keyword", value: "nội dung lừa đảo kèm link" };
-    const urls = content.match(/https?:\/\/[^\s<>"]+|www\.[^\s<>"]+/gi) || [];
+    // Dùng lại `urls` đã match ở đầu hàm — không quét lại cùng nội dung.
     const hasScammyTld = urls.some((u) =>
       SCAMMY_TLD_RE.test(u.replace(/^https?:\/\//i, "").replace(/^www\./i, "")),
     );

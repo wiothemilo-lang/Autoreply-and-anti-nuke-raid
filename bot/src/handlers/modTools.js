@@ -1,4 +1,3 @@
-const { PermissionFlagsBits } = require("discord.js");
 const { canManageWithConfig } = require("../util");
 const { sendCaseLog, CASE_LABEL } = require("../caseLog");
 const timeoutWatch = require("../timeoutWatch");
@@ -313,5 +312,4 @@ module.exports = {
   unbanMember,
   unwarnMember,
   logModAction,
-  PermissionFlagsBits,
 };

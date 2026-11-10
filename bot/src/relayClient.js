@@ -39,7 +39,7 @@ function stateFor(guildId) {
   }
   let state = byGuild.get(guildId);
   if (!state) {
-    state = { lastFetchAt: 0, lastAttemptAt: 0, retryAt: 0, loading: false, signatures: [] };
+    state = { lastFetchAt: 0, retryAt: 0, loading: false, signatures: [] };
     byGuild.set(guildId, state);
   }
   return state;
@@ -87,7 +87,6 @@ function refreshSignatures(guildId) {
   }
   const storeRef = store;
   state.loading = true;
-  state.lastAttemptAt = now;
   let request;
   try {
     request = storeRef.client.query("relay:botGetRelaySignatures", { guildId });

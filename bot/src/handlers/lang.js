@@ -469,9 +469,8 @@ function ticketText(lang) {
 }
 
 /**
- * Tên ngôn ngữ hiển thị thếb cho `/language` và tin nhắn xác nhận.
- * Tách riêng từ mã ngôn ngữ (ánh hành / từ đề quốc tế) để tránh
- * nhãn đẻ không cửa đẻ dối với chương trình chèa.
+ * Tên ngôn ngữ hiển thị cho `/language` và tin nhắn xác nhận.
+ * Tách riêng khỏi mã ngôn ngữ để nhãn hiển thị không lẫn với khoá i18n.
  */
 const LANG_NAMES = {
   vi: "Tiếng Việt",

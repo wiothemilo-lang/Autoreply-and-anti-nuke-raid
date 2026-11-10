@@ -92,17 +92,6 @@ registerSweeper("config-cache", () => store.pruneCache(new Set(client.guilds.cac
 registerSweeper("owner-alert", () =>
   require("./handlers/antinuke/ownerAlert").pruneCache(new Set(client.guilds.cache.keys())),
 );
-registerSweeper("voice-presence", () => {
-  let removed = 0;
-  const live = new Set(client.guilds.cache.keys());
-  for (const guildId of [...voicePresenceMap.keys()]) {
-    if (!live.has(guildId)) {
-      voicePresenceMap.delete(guildId);
-      removed++;
-    }
-  }
-  return removed;
-});
 
 client.once("clientReady", async () => {
   console.log(`✅ Protogon đã online: ${client.user.tag} — ${client.guilds.cache.size} server`);
@@ -446,51 +435,6 @@ client.on("guildDelete", (guild) => {
   guildSync
     .markGone(client, store, guild.id)
     .catch((e) => console.error(`[guildDelete:sync] ${guild.id}:`, e.message));
-});
-
-// --- Voice Presence Tracking (weaker signal, NO fake IP) ---
-// Discord does NOT expose individual user IPs via the API.
-// Previous code used region:channelId as a pseudo-IP which caused MASSIVE
-// false positives — ALL users in the same voice channel were flagged as
-// "IP-linked" adding +30 risk score to innocent members.
-//
-// Replacement: track voice channel co-presence as a WEAK signal only.
-// We only flag when the SAME user joins voice from a NEW guild join
-// within a short window (not just co-presence).
-const voicePresenceMap = new Map(); // guildId -> Map<channelId, Set<userId>>
-
-client.on("voiceStateUpdate", (oldState, newState) => {
-  if (!oldState.channelId && newState.channelId && newState.member) {
-    const guildId = newState.guild.id;
-    const channelId = newState.channelId;
-    const userId = newState.member.id;
-
-    void (async () => {
-      try {
-        const config = await store.getConfig(guildId);
-        if (!config?.altDetectionEnabled) return;
-        // Track presence for monitoring only — NO IP linking
-        if (!voicePresenceMap.has(guildId)) voicePresenceMap.set(guildId, new Map());
-        const guildMap = voicePresenceMap.get(guildId);
-        if (!guildMap.has(channelId)) guildMap.set(channelId, new Set());
-        guildMap.get(channelId).add(userId);
-      } catch {}
-    })();
-  }
-  // Remove user from presence when they leave voice
-  if (oldState.channelId && !newState.channelId && oldState.member) {
-    const guildId = oldState.guild.id;
-    const channelId = oldState.channelId;
-    const userId = oldState.member.id;
-    const guildMap = voicePresenceMap.get(guildId);
-    if (guildMap) {
-      const chSet = guildMap.get(channelId);
-      if (chSet) {
-        chSet.delete(userId);
-        if (chSet.size === 0) guildMap.delete(channelId);
-      }
-    }
-  }
 });
 
 // --- Upgrade C: Periodic Auto-scan Members ---

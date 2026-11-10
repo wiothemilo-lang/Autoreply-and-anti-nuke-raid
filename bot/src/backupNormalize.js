@@ -849,10 +849,7 @@ function normalizeBackupFile(content) {
 }
 
 module.exports = {
-  MAX_DECOMPRESSED_BYTES,
   countMessages,
-  pickFirst,
-  parsePermissions,
   normalizeEmoji,
   normalizeSticker,
   normalizeBackupFile,

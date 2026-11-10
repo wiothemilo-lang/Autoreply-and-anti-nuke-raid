@@ -349,6 +349,8 @@ function makeGuild({ failChannelSend = false, noChannel = false, full = false } 
         panels: [],
         giveaways: [],
         dmRequested: true,
+        dmTargetUserId: "u1",
+        dmMessage: "hi",
         defaultWebhook: null,
       },
     ]);

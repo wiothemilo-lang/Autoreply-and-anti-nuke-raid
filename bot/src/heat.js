@@ -556,10 +556,7 @@ module.exports = {
   HeatTracker,
   heatSettings,
   tierFor,
-  TIER_STRENGTH,
-  HEAT_MAX,
   punishMember,
   choosePunish,
   heatSummary,
-  actionBudget,
 };

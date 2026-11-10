@@ -569,7 +569,6 @@ function cooldownMinutesLeft(lastOpenedAt, cooldownHours, now = Date.now()) {
    ══════════════════════════════════════════════════════════════════════ */
 
 /** Mặc định: không ai chat 24 giờ thì bot tự đóng. */
-const IDLE_HOURS_DEFAULT = 24;
 
 /** Trần 30 ngày — quá dài thì tiền điện kênh đến vô ích. */
 const IDLE_HOURS_MAX = 720;
@@ -703,7 +702,7 @@ function parsePanelColor(hex, fallback) {
  * đó trong tin nhắn riêng của người dùng.
  */
 function sanitizeCloseReason(text) {
-  return clip(escapeMentions(String(text ?? "").trim()), CLOSE_REASON_MAX);
+  return sanitizeBody(String(text ?? ""), CLOSE_REASON_MAX);
 }
 
 /**
@@ -730,12 +729,10 @@ module.exports = {
   BODY_MAX,
   EVIDENCE_MAX,
   CHANNEL_NAME_MAX,
-  DEFAULTS,
   ZERO_WIDTH,
   escapeMentions,
   clip,
   sanitizeBody,
-  stripDiacritics,
   sanitizeChannelName,
   buildChannelName,
   buildChannelNameFromTemplate,
@@ -746,12 +743,10 @@ module.exports = {
   KIND_LABEL_MAX,
   KIND_MODAL_LABEL_MAX,
   KIND_PLACEHOLDER_MAX,
-  KIND_DESC_MAX,
   MAX_KIND_EXTRA_FIELDS,
   EXTRA_VALUE_MAX,
   defaultTicketKinds,
   normalizeKinds,
-  normalizeExtraFields,
   findKind,
   normalizeKind,
   staffRoleIdsForKind,
@@ -762,11 +757,7 @@ module.exports = {
   isStaff,
   buildOpenPayload,
   cooldownMinutesLeft,
-  IDLE_HOURS_DEFAULT,
-  IDLE_HOURS_MAX,
-  CLOSE_GRACE_DEFAULT,
   CLOSE_REASON_MAX,
-  PANEL_MAX,
   normalizeIdleHours,
   normalizeGraceHours,
   isIdleExpired,

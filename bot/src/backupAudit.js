@@ -15,6 +15,7 @@
 
 const zlib = require("zlib");
 const crypto = require("crypto");
+const { computeChecksum } = require("./backupUtils");
 
 /** Nguồn backup hợp lệ mà bot ghi qua đường chuẩn. */
 const VALID_SOURCES = new Set(["backup", "import", "clone"]);
@@ -99,7 +100,7 @@ function classifyBackup(row) {
   // Checksum: SHA-256 của JSON THÔ (trước nén/mã hóa — bot ghi checksum của
   // JSON.stringify(snapshot)). Có checksum mà lệch → dữ liệu bị thay đổi.
   if (row.backupChecksum) {
-    const recomputed = computeChecksumFromUnpacked(unpackBackupJson(row.backupJson).json);
+    const recomputed = computeChecksumFromUnpacked(json);
     if (recomputed && recomputed !== row.backupChecksum) {
       reasons.push("checksum không khớp nội dung");
       return { verdict: "suspect", reasons };
@@ -115,11 +116,6 @@ function classifyBackup(row) {
   }
   if (reasons.length > 0) return { verdict: "suspect", reasons };
   return { verdict: "real", reasons: [] };
-}
-
-/** SHA-256 hex của chuỗi (khớp backupUtils.computeChecksum). */
-function computeChecksum(str) {
-  return crypto.createHash("sha256").update(str).digest("hex");
 }
 
 /** Checksum của snapshot đã bung: băm lại JSON.stringify với key ổn định. */

@@ -5,19 +5,13 @@
  *  1. Tuổi tài khoản (Discord flags, creation date)
  *  2. Tương đồng username với account đã có trong server
  *  3. Pattern tài khoản tạo đại trà (username ngẫu nhiên, không avatar)
- *  4. VPN/Proxy detection (qua ip-api.com — free, 45 req/min)
  *  5. Behavioral correlation (join time proximity + shared signals)
  *  6. Cross-reference với danh sách đã ban trong server
  *
  * Inspired by Double Counter's approach:
- *  - IP fingerprinting (best-effort qua voice region khi có thể)
  *  - Account behavior analysis
  *  - Threshold-based risk scoring
  */
-
-const https = require("https");
-const http = require("http");
-const { registerSweep } = require("./sweeper");
 
 const DAY_MS = 86_400_000;
 
@@ -92,11 +86,10 @@ function usernameSimilarity(u1, u2) {
   const b = u2.toLowerCase().replace(/[^a-z0-9]/g, "");
   // REQUIRE minimum 5 chars to avoid false positives on short/common names —
   // đặt TRƯỚC check trùng hoàn toàn: trước đây "mai"/"mai" (tên phổ biến 3-4
-  // ký tự) vẫn trả 100 và scanGuildForAlts (không có guard riêng) ghép oan
+  // ký tự) vẫn trả 100 và bộ quét alt (không có guard riêng) ghép oan
   // 2 người lạ trùng tên ngắn.
   if (a.length < 5 || b.length < 5) return 0;
   if (a === b) return 100;
-  if (!a || !b) return 0;
 
   // SKIP Discord default names like "User123456"
   if (/^user\d+$/i.test(a) || /^user\d+$/i.test(b)) return 0;
@@ -180,63 +173,15 @@ function isGeneratedUsername(username) {
   return { generated: false, pattern: null };
 }
 
-// ——— Utility: HTTP GET (for VPN check) ———
-function httpGet(url) {
-  return new Promise((resolve) => {
-    const mod = url.startsWith("https") ? https : http;
-    const req = mod.get(url, { timeout: 5000 }, (res) => {
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch {
-          resolve(null);
-        }
-      });
-    });
-    req.on("error", () => resolve(null));
-    req.on("timeout", () => {
-      req.destroy();
-      resolve(null);
-    });
-  });
-}
-
-// ——— VPN Detection ———
-/**
- * Check if IP is VPN/Proxy via ip-api.com (free tier: 45 req/min).
- * Returns { isVPN, country, org, query }.
- */
-async function checkVPN(ip) {
-  if (!ip) return { isVPN: false, country: null, org: null };
-  // ip-api.com không check VPN được ở free tier, dùng ipinfo
-  // Nhưng tốt hơn là dùng proxycheck.io free (50 req/month)
-  // Fallback: chỉ check basic signals
-  try {
-    const data = await httpGet(`http://ip-api.com/json/${ip}?fields=status,country,org,isp,proxy`);
-    if (data?.status === "success") {
-      return {
-        isVPN: data.proxy === true,
-        country: data.country || null,
-        org: data.org || data.isp || null,
-        query: data.query || null,
-      };
-    }
-  } catch {}
-  return { isVPN: false, country: null, org: null };
-}
-
 // ——— Core: Analyze a new member ———
 /**
  * Phân tích tài khoản mới join và trả về risk analysis.
  *
  * @param {Object} member — Discord.js GuildMember
  * @param {Object} config — guild alt detection config
- * @param {Function} getConfig — store.getConfig(guildId)
  * @returns {{ riskScore, riskFactors, action, isVPN, ipCountry, ipOrg, linkedUserId, similarityScore }}
  */
-async function analyzeNewMember(member, config, getConfig, store) {
+async function analyzeNewMember(member, config, store) {
   const factors = [];
   let riskScore = 0;
   let positiveScore = 0; // Positive signals REDUCE risk
@@ -685,89 +630,6 @@ function buildRiskEmbed(member, analysis, punishResult) {
 }
 
 // ============================================================
-// UPGRADE A: Voice IP Fingerprinting
-// ============================================================
-// Map<guildId, Map<userId, { ip, country, joinedAt }>>
-const voiceIpMap = new Map();
-// Map<guildId, Map<ip, Set<userId>>> — reverse lookup: IP -> users
-const ipToUsers = new Map();
-
-/**
- * Track voice IP when a user joins a voice channel.
- * Discord reveals the user's IP when they connect to voice.
- * We use this to link accounts sharing the same IP.
- */
-function trackVoiceIp(guildId, userId, ip, country) {
-  if (!ip || !guildId || !userId) return;
-  // Normalize IP
-  const normalizedIp = ip.trim();
-  if (!normalizedIp) return;
-
-  if (!voiceIpMap.has(guildId)) voiceIpMap.set(guildId, new Map());
-  if (!ipToUsers.has(guildId)) ipToUsers.set(guildId, new Map());
-
-  const guildUsers = voiceIpMap.get(guildId);
-  const guildIps = ipToUsers.get(guildId);
-
-  // Remove old IP mapping if exists
-  const oldData = guildUsers.get(userId);
-  if (oldData && oldData.ip !== normalizedIp) {
-    const oldSet = guildIps.get(oldData.ip);
-    if (oldSet) {
-      oldSet.delete(userId);
-      if (oldSet.size === 0) guildIps.delete(oldData.ip);
-    }
-  }
-
-  // Set new mapping
-  guildUsers.set(userId, { ip: normalizedIp, country, joinedAt: Date.now() });
-  if (!guildIps.has(normalizedIp)) guildIps.set(normalizedIp, new Set());
-  guildIps.get(normalizedIp).add(userId);
-}
-
-/**
- * Get all user IDs sharing the same IP as the given user.
- * Returns [{ userId, sharedIp }] or empty array.
- */
-function getIpLinkedAccounts(guildId, userId) {
-  const guildUsers = voiceIpMap.get(guildId);
-  if (!guildUsers) return [];
-  const userData = guildUsers.get(userId);
-  if (!userData) return [];
-
-  const guildIps = ipToUsers.get(guildId);
-  if (!guildIps) return [];
-  const sameIpUsers = guildIps.get(userData.ip);
-  if (!sameIpUsers) return [];
-
-  return Array.from(sameIpUsers)
-    .filter((id) => id !== userId)
-    .map((id) => ({ userId: id, sharedIp: userData.ip }));
-}
-
-/**
- * Get all known IPs for a guild (for stats).
- */
-function getGuildVoiceIps(guildId) {
-  const guildIps = ipToUsers.get(guildId);
-  if (!guildIps) return [];
-  const result = [];
-  for (const [ip, users] of guildIps) {
-    result.push({ ip, userCount: users.size, userIds: Array.from(users) });
-  }
-  return result;
-}
-
-/**
- * Get IP data for a specific user.
- */
-function getUserVoiceIp(guildId, userId) {
-  const guildUsers = voiceIpMap.get(guildId);
-  if (!guildUsers) return null;
-  return guildUsers.get(userId) ?? null;
-}
-
-// ============================================================
 // UPGRADE D: Burst Detection + Auto-Lockdown
 // ============================================================
 // Map<guildId, { joins: [{ userId, riskScore, joinedAt }], lastAlertAt }>
@@ -886,30 +748,7 @@ function compareAltPair(a, b, threshold, results) {
 }
 
 /** Gộp link voice-IP, khử trùng lặp, sắp xếp theo độ tương đồng giảm dần. */
-function finalizeAltLinks(results, members, guild) {
-  // Also check IP-linked accounts
-  for (const member of members) {
-    const ipLinks = getIpLinkedAccounts(guild.id, member.id);
-    for (const link of ipLinks) {
-      // Avoid duplicates
-      const alreadyFound = results.some(
-        (r) =>
-          (r.userId1 === member.id && r.userId2 === link.userId) ||
-          (r.userId1 === link.userId && r.userId2 === member.id),
-      );
-      if (!alreadyFound) {
-        results.push({
-          userId1: member.id,
-          userId2: link.userId,
-          username1: member.user.username,
-          username2: "(voice IP)",
-          similarity: 100,
-          reason: `shared_voice_ip`,
-        });
-      }
-    }
-  }
-
+function finalizeAltLinks(results) {
   // Deduplicate and sort by similarity
   const seen = new Set();
   const unique = [];
@@ -921,19 +760,6 @@ function finalizeAltLinks(results, members, guild) {
     }
   }
   return unique.sort((a, b) => b.similarity - a.similarity);
-}
-
-function scanGuildForAlts(guild, config) {
-  const results = [];
-  const threshold = config?.altSimilarityThreshold ?? 70;
-  const members = Array.from(guild.members.cache.values()).filter((m) => !m.user.bot);
-  // Compare each pair (O(n^2) — xem scanGuildForAltsAsync cho bản không chặn bot)
-  for (let i = 0; i < members.length; i++) {
-    for (let j = i + 1; j < members.length; j++) {
-      compareAltPair(members[i], members[j], threshold, results);
-    }
-  }
-  return finalizeAltLinks(results, members, guild);
 }
 
 /**
@@ -949,9 +775,9 @@ const ALT_SCAN_CHUNK = 2000;
 
 /**
  * Quét alt MÀ KHÔNG CHẶN BOT: nhường event loop định kỳ, chặn trần quy mô và
- * deadline. Bản sync `scanGuildForAlts` chạy tuần tự trong vòng lặp mọi guild
- * mỗi 6 giờ — vài guild vài nghìn thành viên là bot đứng hình hàng chục giây,
- * tức đúng lúc có raid thì anti-nuke cũng không chạy.
+ * deadline. Bản sync cũ (chạy tuần tự trong vòng lặp mọi guild) đã xoá hẳn —
+ * vài guild vài nghìn thành viên là bot đứng hình hàng chục giây, đúng lúc có
+ * raid thì anti-nuke cũng không chạy.
  *
  * Trả `{ links, scanned, truncated, total, hitDeadline }` để gọi rõ với người
  * đọc log, không âm thầm bỏ sót cặp.
@@ -988,7 +814,7 @@ async function scanGuildForAltsAsync(
     }
   }
   return {
-    links: finalizeAltLinks(results, members, guild),
+    links: finalizeAltLinks(results),
     // Số thành viên THỰC SỰ đã quét. Trước đây dòng này là
     // `hitDeadline ? members.length : members.length` — hai nhánh giống hệt,
     // nên khi chạm deadline bot vẫn log "quét 2000/2000" dù chỉ mới đi tới
@@ -1003,38 +829,9 @@ async function scanGuildForAltsAsync(
   };
 }
 
-// Dọn dữ liệu voice cũ (mốc 24h) mỗi giờ — qua vòng sweep CHUNG (đợt #4),
-// không tự dựng timer nữa.
-const VOICE_DATA_TTL_MS = 24 * 60 * 60 * 1000;
-
-function sweepVoiceIpMap(now = Date.now()) {
-  const cutoff = now - VOICE_DATA_TTL_MS;
-  let removed = 0;
-  for (const [guildId, users] of voiceIpMap) {
-    for (const [userId, data] of users) {
-      if (data.joinedAt < cutoff) {
-        users.delete(userId);
-        removed += 1;
-        const guildIps = ipToUsers.get(guildId);
-        if (guildIps) {
-          const set = guildIps.get(data.ip);
-          if (set) {
-            set.delete(userId);
-            if (set.size === 0) guildIps.delete(data.ip);
-          }
-        }
-      }
-    }
-    if (users.size === 0) voiceIpMap.delete(guildId);
-  }
-  return removed;
-}
-registerSweep("altDetection", () => sweepVoiceIpMap(), 60 * 60_000);
-
 /**
  * Dọn dữ liệu của guild bot đã rời (memGuard gọi định kỳ): burstTracker giữ
- * { joins: [...] } mãi cho guild đã kick bot; voiceIpMap/ipToUsers của guild
- * rời chỉ được dọn theo TUỔI dữ liệu (24h) chứ không theo guild.
+ * { joins: [...] } mãi cho guild đã kick bot.
  * liveGuildIds là Set discordId hiện tại của client — truyền từ index.js.
  * Trả về số Map con đã dọn.
  */
@@ -1043,13 +840,6 @@ function sweepStaleGuilds(liveGuildIds) {
   for (const guildId of burstTracker.keys()) {
     if (!liveGuildIds.has(guildId)) {
       burstTracker.delete(guildId);
-      removed++;
-    }
-  }
-  for (const guildId of [...voiceIpMap.keys()]) {
-    if (!liveGuildIds.has(guildId)) {
-      voiceIpMap.delete(guildId);
-      ipToUsers.delete(guildId);
       removed++;
     }
   }
@@ -1068,22 +858,11 @@ module.exports = {
   buildRiskEmbed,
   usernameSimilarity,
   isGeneratedUsername,
-  checkVPN,
-  // Upgrade A: Voice IP
-  trackVoiceIp,
-  getIpLinkedAccounts,
-  getGuildVoiceIps,
-  getUserVoiceIp,
   // Upgrade D: Burst Detection
   trackJoinForBurst,
-  // Upgrade C: Auto-scan
-  scanGuildForAlts,
   scanGuildForAltsAsync,
   // Đợt 7: dọn guild đã rời (memGuard)
   sweepStaleGuilds,
   // Cache ban list: guildBanAdd/Remove gọi để bản mới có hiệu lực ngay
   invalidateBanCache,
-  // Đợt #4: dọn dữ liệu voice cũ (qua vòng sweep chung)
-  sweepVoiceIpMap,
-  VOICE_DATA_TTL_MS,
 };

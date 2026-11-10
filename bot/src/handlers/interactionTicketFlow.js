@@ -3,7 +3,7 @@
 //
 // Gồm: nút mở trên panel, modal nội dung, nút trong DM sau ban, modal khiếu nại,
 // nút thao tác trong kênh ticket (nhận/đóng/gỡ ban/ghi chú AI), lệnh `/ticket`
-// và `/ticket cua-toi`, kèm helper `renderError`/`core_isStaff`/`logTicketAction`.
+// và `/ticket cua-toi`, kèm helper `renderError`/`ticketCore.isStaff`/`logTicketAction`.
 //
 // `handlers/interactionCreate.js` chỉ còn định tuyến customId sang các hàm dưới
 // đây; logic ticket nằm trọn ở module này để dễ đọc/sửa.
@@ -189,7 +189,7 @@ async function ticketActionButton(client, store, interaction) {
   // nhánh đóng bên dưới.
   if (
     parsed.action !== "ticket_close_own" &&
-    !core_isStaff(interaction.member, tickets.staffRoleIds(config))
+    !ticketCore.isStaff(interaction.member, tickets.staffRoleIds(config))
   ) {
     return interaction.reply({ content: T.errNoStaff, ephemeral: true });
   }
@@ -219,7 +219,6 @@ async function ticketActionButton(client, store, interaction) {
   // CHỈ 1 người nhận: 3 mod trả lời cùng một khiếu nại là người mở phải đọc
   // 3 câu mâu thuẫn. Người bấm sau bị từ chối kèm tên người đã nhận.
   if (parsed.action === "ticket_claim" || parsed.action === "ticket_unclaim") {
-    if (!parsed.ticketId) return interaction.reply({ content: T.errNoStaff, ephemeral: true });
     if (parsed.action === "ticket_unclaim") {
       try {
         await store.client.mutation("bot_writes:botUnclaimTicket", {
@@ -276,7 +275,6 @@ async function ticketActionButton(client, store, interaction) {
 
   // ── Đóng kèm lý do: mở modal, lý do bắt buộc ──
   if (parsed.action === "ticket_close_reason") {
-    if (!parsed.ticketId) return interaction.reply({ content: T.errNoStaff, ephemeral: true });
     return interaction.showModal(tickets.closeReasonModal(T, parsed.ticketId));
   }
 
@@ -288,9 +286,6 @@ async function ticketActionButton(client, store, interaction) {
     parsed.action === "ticket_unban" ||
     parsed.action === "ticket_close_own"
   ) {
-    if (!parsed.ticketId) {
-      return interaction.reply({ content: T.errNoStaff, ephemeral: true });
-    }
     let row;
     try {
       row = await client.query("tickets:botTicketById", {
@@ -431,11 +426,11 @@ async function ticketCloseReasonModal(client, store, interaction) {
   if (!guild || !ticketId) return;
   const config = await store.getConfig(guild.id);
   const T = lang.ticketText(tickets.langFor(interaction, guild));
-  if (!core_isStaff(interaction.member, tickets.staffRoleIds(config))) {
+  if (!ticketCore.isStaff(interaction.member, tickets.staffRoleIds(config))) {
     return interaction.reply({ content: T.notStaff, ephemeral: true });
   }
   const raw = interaction.fields.getTextInputValue("ticket_close_reason_body");
-  const reason = require("../ticketCore").sanitizeCloseReason(raw);
+  const reason = ticketCore.sanitizeCloseReason(raw);
   if (!reason) {
     return interaction.reply({ content: T.reasonRequired, ephemeral: true });
   }
@@ -502,11 +497,6 @@ async function ticketAiModal(client, store, interaction) {
     console.error(`[tickets] AI note lỗi:`, e.message);
     return interaction.editReply({ content: "❌ AI lỗi: " + e.message });
   }
-}
-
-/** Bọc `core.isStaff` — import lazy để tránh vòng require. */
-function core_isStaff(member, staffIds) {
-  return require("../ticketCore").isStaff(member, staffIds);
 }
 
 /**

@@ -517,7 +517,6 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
 
   // ═══ Hằng số Discord ═══
   console.log("\n── hằng số ──");
-  check("trần kênh Discord = 500", tickets.DISCORD_MAX_CHANNELS === 500);
   check("tên kênh tối đa 100 ký tự", tickets.CHANNEL_NAME_MAX === 100);
 
   // ═══ openTicket: toàn bộ hàng rào + nhánh lỗi trước khi có kênh ═══
@@ -1145,16 +1144,6 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
     check("1 ô nhập, bắt buộc có lý do", field.customId === "ticket_close_reason_body");
     const mEn = tickets.closeReasonModal(lang.ticketText("de"), "T2");
     check("modal đổi ngôn ngữ DE", mEn.title === lang.ticketText("de").reasonModalTitle, mEn.title);
-  }
-
-  console.log("\n── claimedRow ──");
-  {
-    const r = tickets.claimedRow(T, "TID9");
-    check(
-      "nút bỏ nhận mang ticketId",
-      r.components[0].customId === "ticket_unclaim:TID9",
-      r.components[0].customId,
-    );
   }
 
   console.log("\n── closeTicketWithReason ──");

@@ -63,6 +63,15 @@
 
 ---
 
+## 2026-11-10 (6) — Dọn code rác đợt 1/5: bot core + utils
+
+- ✅ **10 agent audit `bot/src` core/utils** → xoá hẳn 2 module không có caller production: `logId.js` (130 dòng, chỉ test đọc) và `backupJobs.js` (`cloneToServer` không lệnh nào gọi); xoá voice-presence map (ghi mà không đọc) + toàn bộ voice-IP/VPN subsystem trong `altDetection.js` (~200 dòng, kể cả `scanGuildForAlts` sync chặn event loop); gom `withTimeout`/`isTimeoutError`/`sleepBackoff` khỏi `resilience.js`; bỏ ~30 export chết ở heat/caseLog/channelLock/ticketCore/backup*/aiPricing/externalAppGuard/util.
+- 📁 Sửa thêm: `joinGate` đọc config MỘT lần (bỏ query thứ hai mỗi join), `hidden` dùng payload batch thay vì query lại mỗi tick, `version.js` mới gom `"v60"` (heartbeat từng ghi `"3.0.0"` khiến dashboard chặn import oan), `convex.js` bỏ `_startedAt`/`_lastHeartbeat`/`action()` chết, `guildSync` chỉ lưu hash, filters bỏ literal trùng.
+- 🧪 Kiểm chứng: **89/89 CJS** (137,4s) · **31/31 TS** (4,2s) · typecheck · lint · format:check · repo-map (43 module bot) · timer-allowlist sạch. Diff: **+103 / −1154 dòng**.
+- ▶️ Tiếp theo: PR `refactor/dead-code-bot-core`; đợt 2/5 — `handlers/` + `commands/` (antinuke, prefix/slash trùng).
+
+---
+
 ## 2026-11-10 (5) — Đợt 5/5 audit 50 subagent: cổng kiểm chứng + bảo trì bot/scripts
 
 - ✅ **10 agent audit `bot/` + `scripts/`** (đợt 5/5, đủ 50/50) → vá lỗi "cổng xanh giả": `test-db-io-balance` `block()` ném lỗi khi thiếu mốc (2 check âm tính từng PASS RỖNG); `test-bot-contracts` cắt theo ranh giới hàm/listener thay comment; `test-backup-pipeline` assert lời gọi `pushBackupToGithub` thật thay comment "Gửi bản ĐÃ NÉN"; 2 suite `check-sync-trust`/`check-research-chain` đổi tên `test-*` để runner thật sự chạy (**87→89 CJS**); gate typecheck đổi `bun tsc -b --noEmit` → `bun run typecheck` (bao cả `convex/`) ở AGENTS/README/commands/docs; `bun tsc` chỉ build 2 project con của root nên lỗi `convex/` từng lọt cổng local.

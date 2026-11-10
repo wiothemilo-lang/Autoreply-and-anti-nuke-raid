@@ -1,5 +1,3 @@
-const core = require("../ticketCore");
-
 /**
  * handlers/ticketActivity.js — đẩy lùi đồng hồ tự đóng khi kênh ticket còn
  * hoạt động.
@@ -58,4 +56,4 @@ async function noteActivity(message, store) {
   }
 }
 
-module.exports = { noteActivity, isTicketChannel, core };
+module.exports = { noteActivity, isTicketChannel };
