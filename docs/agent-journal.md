@@ -1,5 +1,12 @@
 # Nhật ký tiến trình agent
 
+## 2026-11-10 (3) — Đợt 3/5 audit 50 subagent: bundle web
+
+- ✅ **10 agent audit `src/`** (đợt 3/5) → cắt khỏi critical path: bỏ `MotionConfig` khỏi `App.tsx` (chuyển `MotionRoot` xuống 8 trang dùng motion); `HaimiyaChat` nạp lười ở 4 trang + tách `HaimiyaAvatar` khỏi widget; `GuildPage` nạp lười `UnlockPanel`/`CommandPalette`; `switch.tsx` import THẲNG `ModernToggle` → chunk `vendor-three` (115 KB) + `NeuformBatchEffects` (68 KB) biến mất khỏi dist; i18n cap 4s→250ms; router có `errorElement` (lỗi chunk hết bị nuốt); Admin skip query admin-only khi chưa phải admin; StatsPage huỷ subscription heat/today khi tab ẩn; WebP cho cá voi + QR (88→50 KB, 102→35 KB).
+- 📁 File đụng: `src/{App,main}.tsx`, `src/components/{MotionRoot,RootErrorBoundary,HaimiyaAvatar,CommandPalette,HaimiyaChat}.tsx`, `src/components/{landing/shared,dashboard/BrandingPanel,dashboard/UnlockPanel}.tsx`, `src/lib/{commandPalette,hiddenUnlock,usePageVisible,useBotStatus,useBotMonitor}.ts`, `src/pages/{Landing,AuthPage,Dashboard,GuildPage,DonatePage,FeaturesPage,FeedbackPage,PremiumPage,Admin,StatsPage}.tsx`, `public/{brand-whale,payment}.webp`, `scripts/{test-web-contracts,_resolve-shaders}.cjs`, `vite.config.ts`.
+- 🧪 Kiểm chứng: **87/87 CJS** · **31/31 TS** · typecheck · lint · format:check · build 14,9s: critical path ~176 KB gzip (index 35,5 + vendor-react 102,2 + vendor-icons 15,7 + vendor-convex 22,6), `dist` 2,7 MB, KHÔNG còn chunk three/Neuform; `_resolve-shaders` 30 module/18 HTML/three OK; 10 cổng tĩnh sạch. 11 check hợp đồng mới trong `test-web-contracts.cjs` chặn tái phát.
+- ▶️ Tiếp theo: PR `perf/web-bundle`; đợt 4–5/5 — độ dễ đọc/bảo trì web + bot/scripts.
+
 ## 2026-11-10 (2) — Đợt 2/5 audit 50 subagent: hiệu năng bot
 
 - ✅ **10 agent audit `bot/src`** (đợt 2/5) → sửa đường nóng: tick chống CHỒNG (restore dài không mở lượt 2); `getConfig` gộp 5 listener/message thành 1 query in-flight (force không join, invalidate cắt in-flight); metrics bỏ label `getConfig:<guildId>` (hết phình series/log); badWords regex cache theo identity mảng; autoReply thoát sớm khi rỗng + cache keyword lowercase; `logDedupe` cap cứng; `flaggedMessages` bỏ `shift()` O(n); altDetection cache ban list 10' + invalidate khi ban; welcomeCard cache ảnh nền có trần 32 MB; backup bỏ stringify/băm lần 2 + giải phóng chuỗi JSON sau parse; antinuke dọn `staleUnlockSwept`.

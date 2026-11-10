@@ -2882,11 +2882,17 @@ check(
     premiumSrc.includes("termsVersion: catalog?.termsVersion"),
   "thiếu dữ liệu đồng ý/chọn server khi tạo đơn",
 );
+// So khớp trên chuỗi ĐÃ GỘP khoảng trắng: JSX bị Prettier thụt lề lại (vd khi
+// bọc thêm <MotionRoot>) không được làm test đỏ giả.
+const premiumFlat = premiumSrc.replace(/\s+/g, " ");
 check(
   "cảnh báo 'không được cấp tự động' có TRƯỚC khi trả tiền (dưới nút mua + trong hộp xác nhận)",
-  premiumSrc.includes(
-    'translate(\n                      "Gói không được cấp tự động: sau khi chuyển khoản, admin đối soát rồi kích hoạt — chậm nhất 24 giờ.",',
-  ) || (premiumSrc.match(/Gói không được cấp tự động/g) ?? []).length >= 2,
+  premiumFlat.includes(
+    "Gói KHÔNG được cấp tự động — bạn chỉ nhận được sau khi admin kiểm tra và kích hoạt.",
+  ) &&
+    premiumFlat.includes(
+      "Gói không được cấp tự động: sau khi chuyển khoản, admin đối soát rồi kích hoạt — chậm nhất 24 giờ.",
+    ),
   "cảnh báo nhận hàng chậm bị thiếu ở bước mua",
 );
 check(
@@ -3164,6 +3170,125 @@ const csvBtnSrc = files.get("components/dashboard/ExportCsvButton.tsx") ?? "";
 check(
   "ExportCsvButton dịch nhãn + gửi lang hiện tại lên server",
   /translate\(KIND_LABEL\[kind\]\)/.test(csvBtnSrc) && /lang: currentLanguage\(\)/.test(csvBtnSrc),
+);
+
+// ─── R. Đợt 3 (10/11/2026): bundle web — cắt chunk chết khỏi critical path ──
+// Bốn lỗi "vẫn chạy được nên không ai thấy": entry kéo vendor-motion dù trang
+// không animate, chờ từ điển 4s trước khi mount, router thiếu errorElement
+// (lỗi chunk bị nuốt), và import tĩnh widget/panel nặng ở mọi trang.
+const appEntrySrc = files.get("App.tsx") ?? "";
+check(
+  "App.tsx KHÔNG import framer-motion (vendor-motion ra khỏi entry)",
+  !/from\s+["']framer-motion["']/.test(appEntrySrc),
+  "MotionConfig phải nằm ở components/MotionRoot.tsx, mỗi trang tự bọc",
+);
+const motionPages = [
+  "pages/Landing.tsx",
+  "pages/AuthPage.tsx",
+  "pages/Dashboard.tsx",
+  "pages/GuildPage.tsx",
+  "pages/DonatePage.tsx",
+  "pages/FeaturesPage.tsx",
+  "pages/FeedbackPage.tsx",
+  "pages/PremiumPage.tsx",
+];
+check(
+  "mọi trang dùng motion đều bọc <MotionRoot> (giữ reducedMotion cho cả trang)",
+  motionPages.every((rel) => {
+    const src = files.get(rel) ?? "";
+    return (
+      /import MotionRoot from "\.\.\/components\/MotionRoot"/.test(src) && /<MotionRoot>/.test(src)
+    );
+  }),
+  motionPages.filter((rel) => !/<MotionRoot>/.test(files.get(rel) ?? "")).join(", "),
+);
+
+const mainEntrySrc = files.get("main.tsx") ?? "";
+const langCap = /prepareInitialLanguage\(\s*(\d+)\s*\)/.exec(mainEntrySrc);
+check(
+  "main.tsx không chờ từ điển quá 500ms trước khi mount React",
+  langCap !== null && Number(langCap[1]) <= 500,
+  langCap ? `cap = ${langCap[1]}ms` : "prepareInitialLanguage() không truyền cap",
+);
+check(
+  "router có errorElement (lỗi lazy chunk không bị react-router nuốt)",
+  /errorElement:\s*<RouteErrorBoundary\s*\/>/.test(mainEntrySrc) &&
+    /export function RouteErrorBoundary/.test(files.get("components/RootErrorBoundary.tsx") ?? ""),
+);
+
+const lazyChatPages = [
+  "pages/Landing.tsx",
+  "pages/AuthPage.tsx",
+  "pages/Dashboard.tsx",
+  "pages/GuildPage.tsx",
+];
+check(
+  "HaimiyaChat nạp lười ở cả 4 trang (không kéo chat vào chunk đầu)",
+  lazyChatPages.every((rel) => {
+    const src = files.get(rel) ?? "";
+    return (
+      /lazy\(\(\)\s*=>\s*import\("\.\.\/components\/HaimiyaChat"\)\)/.test(src) &&
+      !/import HaimiyaChat from/.test(src)
+    );
+  }),
+  lazyChatPages.filter((rel) => /import HaimiyaChat from/.test(files.get(rel) ?? "")).join(", "),
+);
+
+check(
+  "Switch import THẲNG ModernToggle (không kéo three/Neuform vào build graph)",
+  /import \{ ModernToggle \} from "\.\.\/\.\.\/shaders\/skeuomorphic-toggle\/ModernToggle"/.test(
+    switchSrc,
+  ) &&
+    !/from "\.\.\/\.\.\/shaders\/skeuomorphic-toggle\/SkeuomorphicToggleCollection"/.test(
+      switchSrc,
+    ),
+);
+const resolverSrc = fs.readFileSync(path.join(ROOT, "scripts", "_resolve-shaders.cjs"), "utf8");
+check(
+  "resolver shader vẫn kiểm tra cây vendor từ SkeuomorphicToggleCollection",
+  /SkeuomorphicToggleCollection\.tsx/.test(resolverSrc),
+);
+
+const guildSrc = files.get("pages/GuildPage.tsx") ?? "";
+check(
+  "GuildPage nạp lười UnlockPanel + CommandPalette (chỉ tải khi thật dùng)",
+  /lazy\(\(\)\s*=>\s*import\("\.\.\/components\/dashboard\/UnlockPanel"\)\)/.test(guildSrc) &&
+    /lazy\(\(\)\s*=>\s*import\("\.\.\/components\/CommandPalette"\)\)/.test(guildSrc) &&
+    !/import CommandPalette from/.test(guildSrc),
+);
+check(
+  "avatar Haimiya tách khỏi widget chat (landing/Footer không tải chat)",
+  files.has("components/HaimiyaAvatar.tsx") &&
+    /from "\.\.\/HaimiyaAvatar"/.test(files.get("components/landing/shared.tsx") ?? "") &&
+    /from "\.\.\/HaimiyaAvatar"/.test(files.get("components/dashboard/BrandingPanel.tsx") ?? ""),
+);
+
+const statsSrc = files.get("pages/StatsPage.tsx") ?? "";
+check(
+  "StatsPage huỷ subscription heat/today khi tab ẩn",
+  /usePageVisible\(\)/.test(statsSrc) &&
+    /visible && token && guildId/.test(statsSrc) &&
+    /api\.reports\.heatLeaderboard/.test(statsSrc) &&
+    /api\.guildStats\.todaySummary/.test(statsSrc),
+);
+
+const adminPageSrc = files.get("pages/Admin.tsx") ?? "";
+check(
+  "Admin skip query admin-only khi chưa phải admin",
+  /useBotMonitor\(\s*60000,\s*isAdmin === true,?\s*\)/.test(adminPageSrc) &&
+    /api\.threatIntel\.getSettings, isAdmin === true \? \{ token \} : "skip"/.test(adminPageSrc) &&
+    /api\.selfDiagnose\.getSettings, isAdmin === true \? \{ token \} : "skip"/.test(adminPageSrc),
+);
+
+check(
+  "ảnh QR + cá voi có bản WebP và <picture> giữ fallback gốc",
+  fs.existsSync(path.join(ROOT, "public", "brand-whale.webp")) &&
+    fs.existsSync(path.join(ROOT, "public", "payment.webp")) &&
+    /<source type="image\/webp" srcSet="\/brand-whale\.webp" \/>/.test(landing) &&
+    /src="\/brand-whale\.png"/.test(landing) &&
+    /<source type="image\/webp" srcSet="\/payment\.webp" \/>/.test(
+      files.get("pages/DonatePage.tsx") ?? "",
+    ),
 );
 
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);

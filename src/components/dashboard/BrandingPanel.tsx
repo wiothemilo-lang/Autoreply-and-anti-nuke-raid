@@ -11,7 +11,7 @@ import type { GenericId } from "convex/values";
 import { getSessionToken } from "../../lib/discord";
 import { useBranding } from "../../lib/useBranding";
 import { normalizeAvatarFile } from "../../lib/avatarImage";
-import { HaimiyaAvatar } from "../HaimiyaChat";
+import { HaimiyaAvatar } from "../HaimiyaAvatar";
 import type { GuildData } from "../../lib/types";
 
 import { translate } from "../../lib/i18n";

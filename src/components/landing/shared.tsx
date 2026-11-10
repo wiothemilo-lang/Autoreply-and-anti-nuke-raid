@@ -2,7 +2,7 @@ import { useQuery } from "convex/react";
 import { Link } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
-import { HaimiyaAvatar } from "../HaimiyaChat";
+import { HaimiyaAvatar } from "../HaimiyaAvatar";
 import SectionBoundary from "../SectionBoundary";
 import { useBranding } from "../../lib/useBranding";
 import { getSessionToken } from "../../lib/discord";

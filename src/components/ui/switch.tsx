@@ -2,13 +2,19 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 import { translate } from "../../lib/i18n";
-import { SkeuomorphicToggleCollection } from "../../shaders/skeuomorphic-toggle/SkeuomorphicToggleCollection";
+import { ModernToggle } from "../../shaders/skeuomorphic-toggle/ModernToggle";
 import "./switch.css";
 
 /**
- * Switch — bật/tắt, dựng lại trên `SkeuomorphicToggleCollection` (variant
- * "modern") của ThreeUI: track hairline, núm co giãn theo hướng đi, dấu
- * check↔dash, một vũng sáng mềm.
+ * Switch — bật/tắt, dựng lại trên `ModernToggle` của ThreeUI: track hairline,
+ * núm co giãn theo hướng đi, dấu check↔dash, một vũng sáng mềm.
+ *
+ * Vì sao import THẲNG `ModernToggle` chứ không qua `SkeuomorphicToggleCollection`:
+ * collection là cửa ngõ của cả 4 variant, nên chỉ một import ở đây khiến Rollup
+ * dựng luôn chunk glass/shader/packaged — kéo `three` (~115 KB gzip) và
+ * `NeuformBatchEffects` (~68 KB gzip) vào artifact dù KHÔNG đường render nào
+ * chạm tới. App chỉ dùng variant "modern", nên đi thẳng vào file đó. Cây
+ * `src/shaders/**` vẫn nguyên vẹn cho `scripts/_resolve-shaders.cjs`.
  *
  * Giữ NGUYÊN tên export và hợp đồng cũ (`checked`, `onCheckedChange`,
  * `disabled`, `id`, `aria-label`, `className`) nên 34 chỗ dùng trong các
@@ -17,8 +23,8 @@ import "./switch.css";
  * Ba chỗ component gốc không khớp hợp đồng đó — xử lý ở đây, không sửa một
  * byte nào trong `src/shaders/**` (file nguồn phải giữ đúng SHA-256):
  *
- *  1. KHÔNG CONTROLLED. `SkeuomorphicToggleCollection` chỉ có `defaultOn` +
- *     `onChange`; state nằm trong `ModernToggle`. Trong dashboard state nằm ở
+ *  1. KHÔNG CONTROLLED. `ModernToggle` chỉ có `defaultOn` +
+ *     `onChange`; state nằm trong chính nó. Trong dashboard state nằm ở
  *     Convex nên phải điều khiển từ ngoài. Nối bằng cách CHỈ remount khi giá
  *     trị đổi từ bên ngoài (mốc `emitted` bên dưới).
  *
@@ -141,9 +147,8 @@ const Switch = React.forwardRef<HTMLSpanElement, SwitchProps>(
         className={cn("threeui-switch", disabled && "threeui-switch--disabled", className)}
         {...rest}
       >
-        <SkeuomorphicToggleCollection
+        <ModernToggle
           key={revision}
-          variant="modern"
           mode="auto"
           size={1}
           opacity={1}

@@ -86,9 +86,15 @@ check(
     /\{ \.\.\.DE, \.\.\.DE_PANELS, \.\.\.DE_LABELS \}/.test(dictDe),
 );
 check(
-  "main.tsx chờ từ điển ngôn ngữ ban đầu trước khi vẽ lần đầu (không nháy tiếng Việt)",
-  /await prepareInitialLanguage\(\)/.test(main0) &&
-    main0.indexOf("await prepareInitialLanguage()") < main0.indexOf(".render("),
+  "main.tsx chờ từ điển ngôn ngữ ban đầu trước khi vẽ lần đầu (có trần ≤ 500ms)",
+  (() => {
+    // Cap bắt buộc: chờ vô hạn từng làm preloader đứng 4s khi mạng chậm. Trần
+    // 500ms đủ cho bản đã cache; từ điển tới muộn thì LangProvider tự vẽ lại.
+    const wait = /await prepareInitialLanguage\((\d+)?\)/.exec(main0);
+    if (!wait || wait[1] === undefined) return false;
+    const cap = Number(wait[1]);
+    return cap > 0 && cap <= 500 && main0.indexOf(wait[0]) < main0.indexOf(".render(");
+  })(),
 );
 check("Lưu lựa chọn ngôn ngữ vào localStorage (protogon-lang)", /protogon-lang/.test(i18n));
 check("Cập nhật <html lang> khi đổi ngôn ngữ", /document\.documentElement\.lang = lang/.test(i18n));

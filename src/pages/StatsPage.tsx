@@ -28,6 +28,7 @@ import {
 import { HEAT_DEFAULTS, HEAT_TIER_LABEL } from "../lib/constants";
 import { effectiveHeat, tierOf } from "../components/dashboard/HeatBar";
 import { discordGuildIconUrl, getSessionToken } from "../lib/discord";
+import { usePageVisible } from "../lib/usePageVisible";
 import { explainRiskFactor } from "../lib/riskExplain";
 import { timeAgo } from "../lib/utils";
 import type { MeData } from "../lib/types";
@@ -166,16 +167,22 @@ export default function StatsPage() {
   ) as { limits: { heatTopRows: number } } | null | undefined;
   const topN = plan?.limits?.heatTopRows ?? 10;
 
+  // Tab ẩn → huỷ subscription bảng xếp hạng + tổng hôm nay. Bot ghi heat mỗi
+  // tick nên một tab /stats bỏ quên trong tab ẩn vẫn ngốn lượt đọc Convex.
+  const visible = usePageVisible();
+
   const rows = useQuery(
     api.reports.heatLeaderboard,
-    token && guildId
+    visible && token && guildId
       ? ({ token, guildId, limit: topN } as { token: string; guildId: string; limit: number })
       : "skip",
   ) as HeatRow[] | null | undefined;
 
   const summary = useQuery(
     api.guildStats.todaySummary,
-    token && guildId ? ({ token, guildId } as { token: string; guildId: string }) : "skip",
+    visible && token && guildId
+      ? ({ token, guildId } as { token: string; guildId: string })
+      : "skip",
   ) as Summary | null | undefined;
 
   const selected = managed.find((g) => g.discordId === guildId);

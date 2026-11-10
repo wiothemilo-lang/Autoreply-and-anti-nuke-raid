@@ -101,8 +101,8 @@ export interface BotMonitor {
  * HTTP POST mù và là call thật ⇒ giãn tối thiểu 30s (một tab mở 24/7 chỉ còn
  * ~43k calls/tháng), tab ẩn thì dừng hẳn vòng đo.
  */
-export function useBotMonitor(intervalMs = 5000): BotMonitor {
-  const status = useBotStatus();
+export function useBotMonitor(intervalMs = 5000, enabled = true): BotMonitor {
+  const status = useBotStatus(enabled);
   const [latency, setLatency] = useState<number | null>(null);
   const [history, setHistory] = useState<number[]>([]);
   const [incidents, setIncidents] = useState<MonitorIncident[]>([]);
@@ -135,6 +135,7 @@ export function useBotMonitor(intervalMs = 5000): BotMonitor {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     // LUÔN đăng ký listener TRƯỚC khi kiểm document.hidden. Bản cũ return sớm
     // khi mount lúc tab ẩn → không có listener → hiện lại tab cũng không resume
     // (latency kẹt null). Đồng thời guard cả trong callback interval để một
@@ -153,7 +154,7 @@ export function useBotMonitor(intervalMs = 5000): BotMonitor {
       window.clearInterval(timerRef.current);
       document.removeEventListener("visibilitychange", start);
     };
-  }, [tick, effectiveInterval, nonce]);
+  }, [tick, effectiveInterval, nonce, enabled]);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 

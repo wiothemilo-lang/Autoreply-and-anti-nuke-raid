@@ -9,13 +9,21 @@
  * im lặng của một lần vendor dependency.
  *
  * Chạy: node scripts/_resolve-shaders.cjs
+ *
+ * ENTRY là `SkeuomorphicToggleCollection` (không phải `ui/switch.tsx` nữa):
+ * switch đã import thẳng `ModernToggle` để cắt chunk three khỏi build graph,
+ * nên nếu vẫn bắt đầu từ switch thì script sẽ không còn đi qua glass/shader/
+ * packaged — đúng những file cần kiểm tra nhất.
  */
 const path = require("node:path");
 const fs = require("node:fs");
 const { createServer } = require("vite");
 
 const ROOT = path.join(__dirname, "..");
-const ENTRY = path.join(ROOT, "src/components/ui/switch.tsx");
+const ENTRY = path.join(
+  ROOT,
+  "src/shaders/skeuomorphic-toggle/SkeuomorphicToggleCollection.tsx",
+);
 
 async function main() {
   const server = await createServer({
