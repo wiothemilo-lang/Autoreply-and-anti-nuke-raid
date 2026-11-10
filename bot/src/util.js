@@ -209,11 +209,6 @@ async function sendModLog(
   return await deliverViaWebhooks(guild, eventType, embed, meta, targetChannel);
 }
 
-function mentionRoles(roleIds) {
-  if (!roleIds || roleIds.length === 0) return "không có";
-  return roleIds.map((id) => `<@&${id}>`).join(", ");
-}
-
 module.exports = {
   hasPermission,
   canManageGuild,
@@ -224,6 +219,5 @@ module.exports = {
   sendLog,
   sendModLog,
   inferEventType,
-  mentionRoles,
   Colors,
 };

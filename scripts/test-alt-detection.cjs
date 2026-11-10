@@ -1,12 +1,11 @@
 // Test Alt Detection (bot/src/altDetection.js — 930 dòng, module chống tài khoản phụ):
 //   - Pure functions: usernameSimilarity (chống false positive tên thật VN),
-//     isGeneratedUsername, trackVoiceIp/getIpLinkedAccounts, trackJoinForBurst,
-//     scanGuildForAlts
+//     isGeneratedUsername, trackJoinForBurst, scanGuildForAltsAsync
 //   - analyzeNewMember: các lớp điểm rủi ro + strong signals + chống phạt oan
 //     (safeMode, hạ cấp khi chỉ 1 bằng chứng, monitor_only khi 0 bằng chứng)
 //   - executePunishment: ban/kick/timeout/verify (kèm fallback verify)
 //   - joinGate: whitelist, alt whitelist, burst auto-lockdown, ghi join history
-// Không mạng (checkVPN không gọi — không IP), không DB thật. Chạy:
+// Không mạng, không DB thật. Chạy:
 //   node scripts/test-alt-detection.cjs
 const DJS_MOCK = require("./support/djs-mock-path.cjs");
 
@@ -88,26 +87,6 @@ module.exports = {
     alt.isGeneratedUsername("minhtuan").generated === false,
   );
 
-  // ══════════ 3. Voice IP linking ══════════
-  alt.trackVoiceIp("g1", "u1", "1.2.3.4", "VN");
-  alt.trackVoiceIp("g1", "u2", "1.2.3.4", "VN");
-  alt.trackVoiceIp("g1", "u3", "5.6.7.8", "VN");
-  check(
-    "2 user cùng IP → link với nhau",
-    alt.getIpLinkedAccounts("g1", "u1").some((l) => l.userId === "u2"),
-  );
-  check("user khác IP → không link", alt.getIpLinkedAccounts("g1", "u3").length === 0);
-  alt.trackVoiceIp("g1", "u2", "9.9.9.9", "VN"); // đổi IP
-  check(
-    "user đổi IP → link cũ bị gỡ",
-    !alt.getIpLinkedAccounts("g1", "u1").some((l) => l.userId === "u2"),
-  );
-  check("getUserVoiceIp trả IP hiện tại", alt.getUserVoiceIp("g1", "u2")?.ip === "9.9.9.9");
-  check(
-    "getGuildVoiceIps thống kê theo IP",
-    alt.getGuildVoiceIps("g1").some((s) => s.ip === "1.2.3.4" && s.userCount === 1),
-  );
-
   // ══════════ 4. Burst detection ══════════
   let burst = null;
   for (let i = 0; i < 5; i++) burst = alt.trackJoinForBurst("g-burst", "bu" + i, 60);
@@ -174,14 +153,16 @@ module.exports = {
     mkMember("a2", "raidboss98", { avatar: "av2" }),
     mkMember("a3", "totally-different", { avatar: "av3" }),
   ]);
-  const scanResults = alt.scanGuildForAlts(scanGuild, { altSimilarityThreshold: 70 });
+  const scanResults = await alt.scanGuildForAltsAsync(scanGuild, { altSimilarityThreshold: 70 });
   check(
     "scan tìm ra cặp tên gần giống (raidboss99/98)",
-    scanResults.some((r) => [r.userId1, r.userId2].sort().join() === ["a1", "a2"].sort().join()),
+    scanResults.links.some(
+      (r) => [r.userId1, r.userId2].sort().join() === ["a1", "a2"].sort().join(),
+    ),
   );
   check(
     "scan không ghép người lạ",
-    !scanResults.some((r) => r.userId1 === "a3" || r.userId2 === "a3"),
+    !scanResults.links.some((r) => r.userId1 === "a3" || r.userId2 === "a3"),
   );
 
   // ══════════ 6. analyzeNewMember — alt chắc chắn (2+ strong signals) ══════════
@@ -207,7 +188,6 @@ module.exports = {
   const analysis = await alt.analyzeNewMember(
     altMember,
     { altMaxRiskScore: 40, altPunish: "kick" },
-    async () => null,
     storeOk,
   );
   check("alt (acc <1 ngày + tên trùng hệt member khác) → risk ≥ 40", analysis.riskScore >= 40);
@@ -222,7 +202,6 @@ module.exports = {
   const analysisHuman = await alt.analyzeNewMember(
     humanGuild.members.cache.get("human-1"),
     { altMaxRiskScore: 70 },
-    async () => null,
     storeOk,
   );
   check(
@@ -244,11 +223,11 @@ module.exports = {
       },
     };
     const cfg = { altMaxRiskScore: 70 };
-    await alt.analyzeNewMember(banGuild.members.cache.get("bc-1"), cfg, async () => null, storeOk);
-    await alt.analyzeNewMember(banGuild.members.cache.get("bc-2"), cfg, async () => null, storeOk);
+    await alt.analyzeNewMember(banGuild.members.cache.get("bc-1"), cfg, storeOk);
+    await alt.analyzeNewMember(banGuild.members.cache.get("bc-2"), cfg, storeOk);
     check("2 join liên tiếp → chỉ 1 lần bans.fetch (cache 10 phút)", banFetches === 1);
     alt.invalidateBanCache("g-bancache");
-    await alt.analyzeNewMember(banGuild.members.cache.get("bc-1"), cfg, async () => null, storeOk);
+    await alt.analyzeNewMember(banGuild.members.cache.get("bc-1"), cfg, storeOk);
     check("invalidate sau khi ban → fetch lại ngay", banFetches === 2);
   }
 
@@ -263,7 +242,6 @@ module.exports = {
   const analysisWeak = await alt.analyzeNewMember(
     weakGuild.members.cache.get("weak-1"),
     { altMaxRiskScore: 10, altPunish: "kick", altMinAgeDays: 30 },
-    async () => null,
     storeOk,
   );
   check("chỉ tín hiệu yếu cộng dồn → KHÔNG phạt (monitor_only)", analysisWeak.action === "pass");
@@ -282,7 +260,6 @@ module.exports = {
   const analysisSingle = await alt.analyzeNewMember(
     singleSigGuild.members.cache.get("sus-1"),
     { altMaxRiskScore: 15, altPunish: "ban" },
-    async () => null,
     storeOk,
   );
   check("1 bằng chứng → ban bị HẠ thành kick", analysisSingle.action === "kick");
@@ -296,7 +273,6 @@ module.exports = {
       const a = await alt.analyzeNewMember(
         g.members.cache.get("sus-2"),
         { altMaxRiskScore: 15, altPunish: "kick" },
-        async () => null,
         storeOk,
       );
       return a.action === "timeout";
@@ -310,7 +286,6 @@ module.exports = {
   const unsafe = await alt.analyzeNewMember(
     unsafeGuild.members.cache.get("w1"),
     { altMaxRiskScore: 30, altPunish: "kick", altSafeMode: false },
-    async () => null,
     storeOk,
   );
   check("safeMode=false → hành vi cũ: phạt thẳng", unsafe.action === "kick");
@@ -340,7 +315,6 @@ module.exports = {
   const analysisRejoin = await alt.analyzeNewMember(
     rejoinGuild.members.cache.get("rejoin-1"),
     { altMaxRiskScore: 40, altPunish: "kick" },
-    async () => null,
     storeHistory,
   );
   check(
@@ -455,14 +429,7 @@ module.exports = {
     };
     const guild = mkGuild(1200);
 
-    // 1) Bản sync: event loop KHÔNG chạy được trong lúc quét (chứng cứ bug).
-    let syncTicks = 0;
-    const syncTimer = setInterval(() => syncTicks++, 1);
-    const syncRes = alt.scanGuildForAlts(guild, {});
-    clearInterval(syncTimer);
-    check(`bản sync chặy trọn event loop (ticks=${syncTicks}) — đây chính là lỗi`, syncTicks === 0);
-
-    // 2) Bản async: event loop VẪN chạy trong lúc quét.
+    // Bản async: event loop VẪN chạy trong lúc quét (bản sync chặn bot đã xoá).
     let ticks = 0;
     const timer = setInterval(() => ticks++, 1);
     const pending = alt.scanGuildForAltsAsync(guild, {});
@@ -473,10 +440,6 @@ module.exports = {
     check(
       `bản async nhường event loop (ticks=${ticksWhileRunning} trong lúc quét)`,
       ticksWhileRunning > 0,
-    );
-    check(
-      `bản async cho KẾT QUẢ GIỐNG HỆT bản sync (${res.links.length} vs ${syncRes.length})`,
-      res.links.length === syncRes.length,
     );
     check(
       `1200 thành viên: quét trọn, không cắt (truncated=${res.truncated})`,

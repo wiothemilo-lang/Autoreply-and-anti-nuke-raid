@@ -31,10 +31,9 @@ const { isLocked } = require("../lockdown");
  */
 
 /** Số ký tự Discord cho phép trong tên kênh. */
-const CHANNEL_NAME_MAX = 100;
+const CHANNEL_NAME_MAX = core.CHANNEL_NAME_MAX;
 
 /** Trần kênh Discord (hard limit của nền tảng). */
-const DISCORD_MAX_CHANNELS = 500;
 
 /** customId: <hành động>:<ticketId>. ticketId là _id của Convex. */
 const ID_SEP = ":";
@@ -976,14 +975,6 @@ function panelRows(T, ticketId) {
 }
 
 /** Hàng nút cho người đã nhận (claim rồi) — cho nút "Bỏ nhận". */
-function claimedRow(T, ticketId) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("ticket_unclaim" + ID_SEP + ticketId)
-      .setLabel(T.btnUnclaim)
-      .setStyle(ButtonStyle.Secondary),
-  );
-}
 
 /** Modal "Đóng kèm lý do" — lý do bắt buộc vì staff và người mở đều thấy. */
 function closeReasonModal(T, ticketId) {
@@ -1112,7 +1103,6 @@ async function saveTranscript({ store, guild, channel, ticketId, maxMessages }) 
 
 module.exports = {
   CHANNEL_NAME_MAX,
-  DISCORD_MAX_CHANNELS,
   staffRoleIds,
   langFor,
   actionRow,
@@ -1137,7 +1127,6 @@ module.exports = {
   buildPanel,
   extraRow,
   panelRows,
-  claimedRow,
   closeReasonModal,
   closeTicketWithReason,
   saveTranscript,

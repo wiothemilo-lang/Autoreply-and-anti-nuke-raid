@@ -309,7 +309,7 @@ function buildReportEmbed({
     color,
     fields,
     footer: emergency
-      ? `Protogon · Emergency Alert${requester ? "" : ""}`
+      ? "Protogon · Emergency Alert"
       : `Protogon · Report${requester ? ` · yêu cầu bởi ${requester.username ?? requester.id}` : ""}`,
   });
 }
@@ -367,7 +367,6 @@ async function emergencyRaidAlert(client, store, guild, info = {}) {
     const analysis = parseAnalysis(raw);
 
     const embed = buildReportEmbed({
-      guild,
       analysis,
       events: audit.events,
       modActions: audit.modActions,
@@ -468,7 +467,6 @@ async function reportInteractive(client, store, source) {
     const analysis = parseAnalysis(raw);
 
     const embed = buildReportEmbed({
-      guild,
       analysis,
       events: audit.events,
       modActions: audit.modActions,

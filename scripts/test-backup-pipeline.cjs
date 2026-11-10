@@ -47,7 +47,7 @@ delete process.env.BACKUP_ENCRYPT_KEY;
 
 const backup = require("../bot/src/handlers/backup.js");
 // Vòng quét job thật sự chạy trên production nằm ở tick.js (index.js chỉ gọi
-// setupTick). `pollBackups` cũ trong backupJobs.js đã bị bỏ: không ai gọi, và
+// setupTick). `pollBackups` cũ (backupJobs.js, đã xoá) không ai gọi, và
 // bản sao logic định tuyến job đó từng khiến một bản vá lọt ở bot_tick.
 const { runBackupJobs } = require("../bot/src/tick.js");
 const utils = require("../bot/src/backupUtils.js");
@@ -102,14 +102,6 @@ const check = (label, ok) => {
     check(
       "bot/src/index.js không còn autoBackupInterval/autoBackupSweep (lịch thuộc Convex cron)",
       !idxSrc.includes("autoBackupInterval") && !idxSrc.includes("autoBackupSweep"),
-    );
-    const jobsSrc = fs.readFileSync(
-      path.join(__dirname, "..", "bot", "src", "backupJobs.js"),
-      "utf8",
-    );
-    check(
-      "backupJobs.js không còn autoBackupSweep (một nguồn sự thật phía Convex)",
-      !jobsSrc.includes("autoBackupSweep"),
     );
     const convexSrc = fs.readFileSync(path.join(__dirname, "..", "convex", "backup.ts"), "utf8");
     const sweepBlock = convexSrc.slice(
@@ -202,7 +194,6 @@ const check = (label, ok) => {
     "bot/src/backupRebuild.js",
     "bot/src/backupRestore.js",
     "bot/src/backupImport.js",
-    "bot/src/backupJobs.js",
   ]
     .map((p) => fs.readFileSync(path.join(__dirname, "..", p), "utf8"))
     .join("\n");
@@ -1148,38 +1139,6 @@ const check = (label, ok) => {
     }
   }
 
-  // ══════════ 10. cloneToServer ══════════
-  {
-    // cloneToServer chưa từng có test: chép cấu trúc từ server nguồn sang server đích.
-    const tg = makeTarget();
-    const client = {
-      guilds: {
-        cache: new Map([
-          [SRC, srcGuild],
-          [TGT, tg],
-        ]),
-      },
-    };
-    const st = { client: { mutation: async () => ({ ok: true }) }, getConfig: async () => null };
-    const r = await backup.cloneToServer(client, st, SRC, TGT);
-    check("clone: tạo role ở server đích", r.roleCount === 2, String(r.roleCount));
-    check(
-      "clone: trả tên cả 2 server",
-      r.sourceName === "Server Nguồn" && r.targetName === "Server Đích",
-    );
-    check(
-      "clone: áp bộ lọc thành phần khi được yêu cầu",
-      typeof backup.filterBackupComponents === "function",
-    );
-    let cloneErr = null;
-    try {
-      await backup.cloneToServer(client, st, "khong-ton-tai", TGT);
-    } catch (e) {
-      cloneErr = e;
-    }
-    check("clone: server nguồn không có trong bot → ném lỗi", cloneErr !== null);
-  }
-
   // ══════════ 11. runBackup: lưu Convex, đẩy GitHub, báo lỗi ══════════
   // Đây là luồng CHÍNH của sản phẩm (nút "Backup ngay") mà trước đây không có
   // test end-to-end nào: không ai biết GitHub có được gọi, lỗi lưu Convex có
@@ -1731,39 +1690,6 @@ const check = (label, ok) => {
       JSON.stringify(muts[0]?.args?.guildName),
     );
   }
-  {
-    // Clone có bộ lọc thành phần.
-    const tg = makeTarget();
-    const client = {
-      guilds: {
-        cache: new Map([
-          [SRC, srcGuild],
-          [TGT, tg],
-        ]),
-      },
-    };
-    const st = { client: { mutation: async () => ({ ok: true }) }, getConfig: async () => null };
-    const onlyChannels = backup.filterBackupComponents(
-      (await backup.snapshotWithSettings(client, st, SRC, false)).snapshot,
-      { roles: false, channels: true, emojis: false, stickers: false, messages: false },
-    );
-    const r = await backup.cloneToServer(client, st, SRC, TGT, {
-      componentFilter: {
-        roles: false,
-        channels: true,
-        emojis: false,
-        stickers: false,
-        messages: false,
-      },
-    });
-    check(
-      "clone: áp bộ lọc → không tạo role",
-      r.roleCount === 0 && onlyChannels.roles.length === 0,
-      String(r.roleCount),
-    );
-    check("clone: bộ lọc giữ lại kênh", r.channelCount === 4, String(r.channelCount));
-  }
-
   // ══════════ 15. DRY-RUN: kế hoạch khôi phục KHÔNG đụng server ══════════
   // Khôi phục là việc không hoàn tác được (tạo hàng chục role/kênh, spam tin qua
   // webhook). Dry-run phải cho biết TRƯỚC — nên hợp đồng cứng nhất của hàm này là

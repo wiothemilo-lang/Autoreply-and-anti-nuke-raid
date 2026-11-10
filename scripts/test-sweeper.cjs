@@ -181,36 +181,20 @@ const readBot = (rel) => fs.readFileSync(path.join(BOT, rel), "utf8");
     captcha.verifyCode("g1", "u1", "123456").reason === "no_code",
   );
 
-  // ═══ 6. Hành vi thật: altDetection voice IP ═══
-  const alt = require(path.join(BOT, "altDetection.js"));
-  alt.trackVoiceIp("g1", "u1", "1.2.3.4", "VN");
-  alt.trackVoiceIp("g1", "u2", "1.2.3.4", "VN");
-  check("alt: sweep quá sớm giữ nguyên dữ liệu", alt.sweepVoiceIpMap(Date.now()) === 0);
-  check(
-    "alt: sweep sau 24h dọn hết dữ liệu voice cũ",
-    alt.sweepVoiceIpMap(Date.now() + alt.VOICE_DATA_TTL_MS + 1_000) === 2,
-  );
-  check(
-    "alt: sau sweep không còn user nào theo IP",
-    (alt.getGuildVoiceIps("g1") || []).length === 0,
-  );
-
-  // ═══ 7. 5 module đăng ký đúng tên + đúng chu kỳ ═══
+  // ═══ 6. Các module dọn RAM đăng ký đúng tên + đúng chu kỳ ═══
   sweeper.resetSweeper();
   // Xoá cache require: hai module ở mục 5-6 đã đăng ký lúc require đầu, nạp
   // lại (không xoá cache) sẽ KHÔNG đăng ký lần hai → cổng test báo sai.
-  for (const rel of ["captchaStore.js", "altDetection.js"]) {
+  for (const rel of ["captchaStore.js"]) {
     delete require.cache[require.resolve(path.join(BOT, rel))];
   }
   require(path.join(BOT, "captchaStore.js"));
-  require(path.join(BOT, "altDetection.js"));
   require(path.join(BOT, "handlers", "filters.js"));
   require(path.join(BOT, "handlers", "interactionVerify.js"));
   const registered = Object.fromEntries(sweeper.sweeperState().map((s) => [s.name, s.everyMs]));
   check("filters đăng ký chu kỳ 5 phút", registered.filters === 300_000);
   check("interactionVerify đăng ký chu kỳ 5 phút", registered.interactionVerify === 300_000);
   check("captchaStore đăng ký chu kỳ 5 phút", registered.captchaStore === 300_000);
-  check("altDetection đăng ký chu kỳ 1 giờ", registered.altDetection === 60 * 60_000);
 
   const antinukeSrc = readBot(path.join("handlers", "antinuke", "index.js"));
   check(
@@ -218,7 +202,7 @@ const readBot = (rel) => fs.readFileSync(path.join(BOT, rel), "utf8");
     /registerSweep\(\s*"antinuke"[\s\S]{0,1200}?20_000,?\s*\)/.test(antinukeSrc),
   );
 
-  // ═══ 8. Chặn hồi quy: 5 module KHÔNG được tự dựng setInterval ═══
+  // ═══ 7. Chặn hồi quy: module dọn RAM KHÔNG được tự dựng setInterval ═══
   const RAM_SWEEPERS = [
     "captchaStore.js",
     path.join("handlers", "filters.js"),

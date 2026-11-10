@@ -138,12 +138,7 @@ async function handleVerifyConfirm(store, interaction) {
     // === ALT DETECTION AT VERIFY GATE (Double Counter style) ===
     if (config.altDetectionEnabled) {
       try {
-        const analysis = await analyzeNewMember(
-          member,
-          config,
-          (guildId) => store.getConfig(guildId),
-          store,
-        );
+        const analysis = await analyzeNewMember(member, config, store);
         const maxRisk = config.altMaxRiskScore ?? 70;
         if (analysis.riskScore >= maxRisk && analysis.action !== "pass") {
           // Execute punishment instead of verifying

@@ -27,14 +27,7 @@ const DAY_MS = 86_400_000;
  *  - altMaxRiskScore       ngưỡng risk score
  *  - altPunish             hình phạt (kick/ban/timeout/verify)
  */
-async function assignUnverifiedRole(client, member, store) {
-  let config;
-  try {
-    config = await store.getConfig(member.guild.id);
-  } catch (err) {
-    console.error(`[assignUnverified] ${member.guild.id}:`, err.message);
-    return;
-  }
+async function assignUnverifiedRole(member, config) {
   // Chỉ gán role unverified khi verify đã được setup ĐẦY ĐỦ:
   // bật verify + có kênh verify + có cả role unverified lẫn role verified.
   // Thiếu bất kỳ thành phần nào → thành viên mới sẽ bị kẹt với role unverified
@@ -56,10 +49,6 @@ async function assignUnverifiedRole(client, member, store) {
 
 module.exports = async function joinGate(client, member, store) {
   if (!member?.guild || member.user?.bot) return; // chỉ xét tài khoản người thật
-  // Gán role unverified nếu verify đang bật
-  assignUnverifiedRole(client, member, store).catch((e) =>
-    console.error(`[assignUnverified]`, e.message),
-  );
   let config;
   try {
     config = await store.getConfig(member.guild.id);
@@ -68,6 +57,9 @@ module.exports = async function joinGate(client, member, store) {
     return;
   }
   if (!config) return;
+  // Gán role unverified nếu verify đang bật — dùng CHÍNH config vừa đọc,
+  // không query Convex lần hai cho mỗi lượt join.
+  assignUnverifiedRole(member, config).catch((e) => console.error(`[assignUnverified]`, e.message));
 
   // ==========================================
   // PART 1: Classic Join Gate (existing logic)
@@ -191,7 +183,7 @@ module.exports = async function joinGate(client, member, store) {
   // Run alt analysis — truyền store để đối chiếu lịch sử join (Convex).
   let analysis;
   try {
-    analysis = await analyzeNewMember(member, config, (guildId) => store.getConfig(guildId), store);
+    analysis = await analyzeNewMember(member, config, store);
   } catch (err) {
     console.error(`[altDetect] ${member.guild.id}/${member.id}:`, err.message);
     return;
@@ -243,8 +235,7 @@ module.exports = async function joinGate(client, member, store) {
         if (applied) {
           // Notify log channel — embed chi tiết burst (lockGuild đã gửi embed
           // khoá chung kèm số kênh).
-          const config2 = await store.getConfig(member.guild.id).catch(() => null);
-          if (config2) {
+          if (config) {
             const { logEmbed, sendLog } = require("../util");
             const { Colors } = require("discord.js");
             const burstEmbed = logEmbed({
@@ -265,7 +256,7 @@ module.exports = async function joinGate(client, member, store) {
               ],
               footer: "Protogon Auto-Lockdown",
             });
-            await sendLog(member.guild, config2, burstEmbed);
+            await sendLog(member.guild, config, burstEmbed);
           }
         }
       } catch (e) {

@@ -1,7 +1,7 @@
 // TEST: util.js — lớp dẫn log dùng chung cho MỌI module (anti nuke, join gate,
 // mod tools, lockdown…). Trước đây nó chỉ được chạm gián tiếp nên còn thiếu
 // test cho: đường webhook của log critical, fallback khi webhook hỏng, và các
-// hàm thuần (fillPlaceholders/mentionRoles/canManageWithConfig).
+// hàm thuần (fillPlaceholders/canManageWithConfig).
 //
 // Chạy: node scripts/test-util.cjs
 const DJS_MOCK = require("./support/djs-mock-path.cjs");
@@ -113,12 +113,6 @@ Module._load = function (request, parent) {
       "fillPlaceholders thay {user} + {username}",
       util.fillPlaceholders("{user} xin {username}", { id: "42", username: "nam" }) ===
         "<@42> xin nam",
-    );
-    check("mentionRoles rỗng → 'không có'", util.mentionRoles([]) === "không có");
-    check("mentionRoles null → 'không có'", util.mentionRoles(null) === "không có");
-    check(
-      "mentionRoles nhiều role → nối bằng dấu phẩy",
-      util.mentionRoles(["1", "2"]) === "<@&1>, <@&2>",
     );
     check("hasPermission: không có member → false", util.hasPermission(null, 1n) === false);
     check(

@@ -58,6 +58,20 @@ function fmtTimestamp(ts = Date.now()) {
  * - caseNumber: số case tăng dần của server ("warn | case 30"); bỏ qua khi không có.
  * - extraDescription: các dòng bổ sung phía dưới (vd thời lượng timeout, xóa N ngày…).
  */
+// Hạng mục log chi tiết cho webhook — bảng CỐ ĐỊNH, không dựng lại mỗi case.
+const EVENT_TYPE_OF = {
+  ban: "ban",
+  timeout: "timeout",
+  kick: "kick",
+  warn: "warn",
+  purge: "purge",
+  untimeout: "untimeout",
+  timeout_expired: "timeout",
+  unban: "unban",
+  unwarn: "warn",
+  delete: "mod",
+};
+
 async function sendCaseLog({
   guild,
   guildConfig,
@@ -119,18 +133,6 @@ async function sendCaseLog({
 
   // Hạng mục log chi tiết cho webhook (ban/kick/timeout/warn/purge/unban/untimeout…)
   // + meta để chèn {action} {reason} {user} {mod} vào nội dung kèm của webhook.
-  const EVENT_TYPE_OF = {
-    ban: "ban",
-    timeout: "timeout",
-    kick: "kick",
-    warn: "warn",
-    purge: "purge",
-    untimeout: "untimeout",
-    timeout_expired: "timeout",
-    unban: "unban",
-    unwarn: "warn",
-    delete: "mod",
-  };
   // Kênh gửi ưu tiên kênh thông báo hình phạt (Moderation trên web), rồi log mod, rồi log chung.
   await sendModLog(
     guild,
@@ -151,4 +153,4 @@ async function sendCaseLog({
   return embed;
 }
 
-module.exports = { sendCaseLog, fmtTimestamp, CASE_COLOR, CASE_LABEL, NOTICE_ACTIONS, LEVEL_ORDER };
+module.exports = { sendCaseLog, CASE_LABEL };

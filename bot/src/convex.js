@@ -1,6 +1,7 @@
 const { ConvexHttpClient } = require("convex/browser");
 const metrics = require("./metrics");
 const resilience = require("./resilience");
+const { BOT_VERSION } = require("./version");
 
 // TTL dài (xem CONFIG_TTL_MS bên dưới): cấu hình hiếm khi đổi nên đọc lại theo
 // chu kỳ ngắn chỉ tốn I/O Convex mà không nhanh hơn cho người dùng.
@@ -185,8 +186,6 @@ class ConvexStore {
     // (và 5 chuỗi retry nếu Convex lỗi). Chỉ giữ promise đang bay — xong là xoá.
     this._configInflight = new Map(); // guildId -> Promise<config>
     this.ruleCooldowns = new Map(); // `${guildId}:${ruleId}` -> timestamp
-    this._startedAt = Date.now();
-    this._lastHeartbeat = 0;
     this._heartbeatOk = false;
 
     // Bảo mật: tự động chèn botKey vào MỌI query/mutation/action — Convex phía
@@ -430,11 +429,10 @@ class ConvexStore {
             online: true,
             guildCount,
             memberCount,
-            version: "3.0.0",
+            version: BOT_VERSION,
           }),
         "heartbeat",
       );
-      this._lastHeartbeat = Date.now();
       this._heartbeatOk = true;
     } catch (err) {
       this._heartbeatOk = false;
@@ -495,11 +493,6 @@ class ConvexStore {
   /** Simple query wrapper with retry. */
   async query(name, args) {
     return withRetry(() => this.client.query(name, args), `query:${name}`);
-  }
-
-  /** Simple action wrapper with retry. */
-  async action(name, args) {
-    return withRetry(() => this.client.action(name, args), `action:${name}`);
   }
 }
 

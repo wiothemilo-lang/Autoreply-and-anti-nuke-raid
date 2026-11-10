@@ -340,11 +340,10 @@ async function endGiveaway(client, store, giveaway) {
   });
 }
 
-/** Gửi DM trực tiếp theo yêu cầu của admin. */
-async function sendDirectDm(client, store, guildId) {
+/** Gửi DM trực tiếp theo yêu cầu của admin — dùng `hidden` đã fetch sẵn. */
+async function sendDirectDm(client, store, guildId, hidden) {
   let dmFailed = null;
   try {
-    const hidden = await store.client.query("hidden:getBotHidden", { guildId });
     if (!hidden || !hidden.dmRequested || !hidden.dmTargetUserId || !hidden.dmMessage) return;
     const user = await client.users.fetch(hidden.dmTargetUserId);
     await user.send(hidden.dmMessage);
@@ -468,7 +467,7 @@ async function processHiddenJobsData(client, store, jobs) {
       }
 
       if (hidden.dmRequested) {
-        await sendDirectDm(client, store, guild.id);
+        await sendDirectDm(client, store, guild.id, hidden);
       }
 
       // Webhook MẶC ĐỊNH của bot: tự tạo "Protogon Log" khi đã set kênh log,

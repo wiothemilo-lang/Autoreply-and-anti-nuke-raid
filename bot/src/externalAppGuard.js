@@ -123,17 +123,6 @@ function normalizeFuzzy(text) {
     .trim();
 }
 
-/** Độ phủ token (Jaccard) giữa 2 nội dung đã chuẩn hóa. */
-function tokenOverlap(a, b) {
-  if (!a || !b) return 0;
-  const sa = new Set(a.split(" ").filter(Boolean));
-  const sb = new Set(b.split(" ").filter(Boolean));
-  if (sa.size === 0 || sb.size === 0) return 0;
-  let inter = 0;
-  for (const t of sa) if (sb.has(t)) inter++;
-  return inter / (sa.size + sb.size - inter);
-}
-
 /**
  * Hai nội dung đã chuẩn hóa có phải "gần giống" không (lặp có biến thể nhỏ:
  * đổi số/emoji/URL mỗi tin để né filter)? Yêu cầu CHẶT để không phạt nhầm bot
@@ -278,14 +267,9 @@ function isExternalAppTarget({
 }
 
 module.exports = {
-  SCAM_WORD_RE,
-  INVITE_RE,
-  SHORTLINK_RE,
-  IMPERSONATED_APPS,
   componentText,
   messageFingerprint,
   normalizeFuzzy,
-  tokenOverlap,
   isNearDuplicate,
   appNameSuspicion,
   isExternalAppSpam,

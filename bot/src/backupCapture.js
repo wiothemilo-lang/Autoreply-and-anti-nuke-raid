@@ -583,8 +583,6 @@ async function runBackup(client, store, guildId, opts = {}) {
     githubLine = res?.ok
       ? `đã đẩy GitHub${res.compressed ? " (bản nén zlib — nạp lại bằng bot Protogon)" : ""}: ${res.url || "xem dashboard"}`
       : `GitHub thất bại: ${res?.error || "lỗi"}`;
-  } else if (pushToGithubOpt && !backupId) {
-    githubLine = "lưu Convex thất bại → bỏ qua GitHub";
   }
 
   // Clear pending flag + cập nhật lastBackupAt (khi store thành công) để
@@ -644,14 +642,8 @@ async function runBackup(client, store, guildId, opts = {}) {
 }
 
 module.exports = {
-  snapshotGuild,
   snapshotWithSettings,
   runBackup,
-  captureChannelMessages,
   captureThreads,
-  captureBans,
-  captureInvites,
   captureMemberRoles,
-  pushBackupToGithub,
-  describeStoreFailure,
 };

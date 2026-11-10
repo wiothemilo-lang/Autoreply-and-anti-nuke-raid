@@ -1,4 +1,5 @@
 const { ChannelType } = require("discord.js");
+const { BOT_VERSION } = require("../version");
 
 const SYNC_CHANNEL_TYPES = [
   ChannelType.GuildText,
@@ -22,7 +23,7 @@ function isSyncHealthy() {
 }
 
 // Cache for change detection — avoids redundant mutations
-const prevGuildData = new Map(); // guildId -> { name, icon, memberCount, channelHash, roleHash }
+const prevGuildData = new Map(); // guildId -> { channelHash, roleHash, emojiHash }
 
 /** Simple string hash for change detection (not cryptographic, just fast). */
 function quickHash(str) {
@@ -91,14 +92,7 @@ async function syncAll(client, store) {
       await store.client.mutation("guilds:syncChannels", { guildId: g.id, channels });
       await store.client.mutation("guilds:syncRoles", { guildId: g.id, roles });
       await store.client.mutation("guilds:syncEmojis", { guildId: g.id, emojis });
-      prevGuildData.set(g.id, {
-        name: g.name,
-        icon: g.icon,
-        memberCount: g.memberCount,
-        channelHash,
-        roleHash,
-        emojiHash,
-      });
+      prevGuildData.set(g.id, { channelHash, roleHash, emojiHash });
     } catch (err) {
       console.error(`[sync] ${g.id}:`, err.message);
     }
@@ -167,7 +161,7 @@ async function syncAll(client, store) {
       globalStatus: {
         guildCount: count,
         memberCount,
-        version: "v60",
+        version: BOT_VERSION,
         ownerName,
         ownerAvatarUrl,
         aiHealth,
@@ -227,9 +221,6 @@ async function syncOne(client, store, guildId) {
     // để xoá bản ghi cũ khi owner xoá hết emoji, không thì picker còn emoji ma.
     await store.client.mutation("guilds:syncEmojis", { guildId, emojis });
     prevGuildData.set(guildId, {
-      name: g.name,
-      icon: g.icon,
-      memberCount: g.memberCount,
       channelHash: quickHash(JSON.stringify(channels)),
       roleHash: quickHash(JSON.stringify(roles)),
       emojiHash: quickHash(JSON.stringify(emojis)),

@@ -74,7 +74,7 @@ module.exports = async function onMessageCreate(client, message, store, heat) {
       }
       return;
     }
-    // unknown prefix command — fall through to auto reply for safety? No: ignore.
+    // Lệnh prefix không nhận diện được — bỏ qua (không auto-reply).
     return;
   }
 
@@ -99,12 +99,7 @@ module.exports = async function onMessageCreate(client, message, store, heat) {
                 executePunishment,
                 buildRiskEmbed,
               } = require("../altDetection");
-              const analysis = await analyzeNewMember(
-                member,
-                config,
-                (guildId) => store.getConfig(guildId),
-                store,
-              );
+              const analysis = await analyzeNewMember(member, config, store);
               const maxRisk = config.altMaxRiskScore ?? 70;
               if (analysis.riskScore >= maxRisk && analysis.action !== "pass") {
                 const punishResult = await executePunishment(member, analysis, config);

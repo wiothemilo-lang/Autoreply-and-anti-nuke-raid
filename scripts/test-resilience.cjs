@@ -44,8 +44,6 @@ process.env.CONVEX_URL = "https://vi-du-123.convex.cloud";
 const resilience = require("../bot/src/resilience.js");
 const {
   TimeoutError,
-  isTimeoutError,
-  withTimeout,
   fetchWithTimeout,
   wrapFetch,
   backoffDelayMs,
@@ -68,70 +66,7 @@ function check(label, cond, extra) {
 async function main() {
   const realFetch = globalThis.fetch;
 
-  // ── 1. withTimeout: xong trước hạn thì trả bình thường ──
-  {
-    const t0 = Date.now();
-    const v = await withTimeout(async () => "xong", 5_000, "việc nhanh");
-    check("withTimeout trả đúng giá trị khi kịp hạn", v === "xong");
-    check("việc xong nhanh KHÔNG bị chờ thêm", Date.now() - t0 < 1_000);
-  }
-
-  // ── 2. withTimeout: quá hạn thì ném TimeoutError, có nhãn + số ms ──
-  {
-    let caught = null;
-    const t0 = Date.now();
-    try {
-      await withTimeout(() => new Promise(() => {}), 60, "Convex treo");
-    } catch (e) {
-      caught = e;
-    }
-    check("withTimeout ném lỗi khi quá hạn", caught instanceof TimeoutError, String(caught));
-    check(
-      "lỗi quá hạn nêu ĐÚNG TÊN việc đang treo",
-      /Convex treo/.test(caught?.message ?? ""),
-      caught?.message,
-    );
-    check("lỗi quá hạn nêu ĐÚNG số ms", caught?.timeoutMs === 60, String(caught?.timeoutMs));
-    check(
-      "lỗi quá hạn mang code ETIMEDOUT (withRetry đã coi là đáng thử lại)",
-      caught?.code === "ETIMEDOUT",
-    );
-    check("cắt đúng lúc, không chờ lâu hơn", Date.now() - t0 < 1_000, String(Date.now() - t0));
-    check("isTimeoutError nhận ra lỗi này", isTimeoutError(caught) === true);
-    check("isTimeoutError KHÔNG nhận lỗi khác", isTimeoutError(new Error("lỗi thường")) === false);
-  }
-
-  // ── 3. Promise xong MUỘN sau khi đã quá hạn KHÔNG được làm chết tiến trình ──
-  {
-    let lateResolve = null;
-    const pending = withTimeout(() => new Promise((res) => (lateResolve = res)), 40, "việc chậm");
-    await pending.catch(() => {});
-    // Đẩy kết quả đến muộn — nếu không có `.catch` gắn sẵn thì Node sẽ ném
-    // unhandledRejection và giết tiến trình ở đây.
-    lateResolve("đến muộn");
-    await new Promise((r) => setTimeout(r, 40));
-    check("kết quả đến muộn sau khi quá hạn không gây unhandled rejection", true);
-  }
-
-  // ── 4. fn ném đồng bộ → lỗi gốc đi ra nguyên vẹn (không bị đổi thành timeout) ──
-  {
-    const boom = new Error("lỗi thật");
-    let caught = null;
-    try {
-      await withTimeout(
-        () => {
-          throw boom;
-        },
-        1_000,
-        "việc ném",
-      );
-    } catch (e) {
-      caught = e;
-    }
-    check("fn ném đồng bộ → giữ nguyên lỗi gốc", caught === boom);
-  }
-
-  // ── 5. ms rác → về trần mặc định, KHÔNG phải "chờ vô hạn" ──
+  // ── 1. ms rác → về trần mặc định, KHÔNG phải "chờ vô hạn" ──
   // Kiểm qua `resolveTimeoutMs` (quy tắc thuần) thay vì chờ đủ 15 giây thật:
   // chờ thật làm suite chậm gấp đôi mà không kiểm thêm được gì.
   {
@@ -147,7 +82,7 @@ async function main() {
     check("ms hợp lệ dạng chuỗi số vẫn dùng được", resolveTimeoutMs("300") === 300);
   }
 
-  // ── 6. fetchWithTimeout: ngắt kết nối thật và nêu rõ quá hạn ──
+  // ── 2. fetchWithTimeout: ngắt kết nối thật và nêu rõ quá hạn ──
   {
     const fakeFetch = (url, init) =>
       new Promise((_res, rej) => {
@@ -171,7 +106,7 @@ async function main() {
     check("fetchWithTimeout nêu đúng nhãn", /test/.test(caught?.message ?? ""));
   }
 
-  // ── 7. fetchWithTimeout: giữ nguyên option của caller + đính signal vào ──
+  // ── 3. fetchWithTimeout: giữ nguyên option của caller + đính signal vào ──
   {
     const seen = [];
     const fakeFetch = async (url, init) => {

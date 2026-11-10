@@ -229,5 +229,4 @@ module.exports = {
   runAutoClose,
   runCloseChannel,
   runPurge,
-  TRANSCRIPT_LIMIT,
 };

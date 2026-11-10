@@ -373,8 +373,6 @@ async function processDueLocks(client, store, records) {
 }
 
 module.exports = {
-  MAX_MINUTES,
-  LOCK_KEY,
   parseLockMinutes,
   formatLockDuration,
   channelLockKind,
@@ -385,10 +383,8 @@ module.exports = {
   unlockChannel,
   releaseLocks,
   processDueLocks,
-  fetchChannel,
   botCanManageChannels,
   channelLabel,
-  channelLabelWithId,
   roleLabel,
   lockLogEmbed,
 };

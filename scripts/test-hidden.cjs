@@ -472,7 +472,18 @@ function fireReaction(client, store, reaction, user, removed = false) {
       },
     });
     const dmHidden = { dmRequested: true, dmTargetUserId: "U1", dmMessage: "Chào bạn" };
-    const dmJobs = [{ guildId: "g-dm", panels: [], giveaways: [], dmRequested: true }];
+    // Job batch thật (convex/hidden.ts:buildHiddenJobs) mang sẵn target + nội
+    // dung DM — bot dùng chính payload này, không query lại Convex mỗi tick.
+    const dmJobs = [
+      {
+        guildId: "g-dm",
+        panels: [],
+        giveaways: [],
+        dmRequested: true,
+        dmTargetUserId: "U1",
+        dmMessage: "Chào bạn",
+      },
+    ];
 
     const s1 = makeStore({ hiddenData: dmHidden });
     await hidden.processHiddenJobsData(mkDmClient(false), s1, dmJobs);
@@ -497,10 +508,11 @@ function fireReaction(client, store, reaction, user, removed = false) {
     );
 
     // Chưa có yêu cầu / thiếu target → bỏ qua an toàn, không đụng DB.
+    const noTargetJobs = [{ guildId: "g-dm", panels: [], giveaways: [], dmRequested: true }];
     const s3 = makeStore({ hiddenData: null });
-    await hidden.processHiddenJobsData(mkDmClient(false), s3, dmJobs);
+    await hidden.processHiddenJobsData(mkDmClient(false), s3, noTargetJobs);
     const s4 = makeStore({ hiddenData: { dmRequested: true, dmTargetUserId: null } });
-    await hidden.processHiddenJobsData(mkDmClient(false), s4, dmJobs);
+    await hidden.processHiddenJobsData(mkDmClient(false), s4, noTargetJobs);
     check(
       "DM: thiếu yêu cầu/target → không gửi, chỉ dọn cờ (không báo lỗi)",
       dmSent.length === 1 &&

@@ -217,9 +217,6 @@ async function resolveAttachment(att, index) {
 }
 
 module.exports = {
-  MAX_MEDIA_BYTES,
-  MEDIA_FETCH_TIMEOUT_MS,
-  extFromMime,
   nameFromUrl,
   isPrivateAddress,
   assertSafeRemoteUrl,

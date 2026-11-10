@@ -100,17 +100,6 @@ function codeContextOf(reason) {
   return null;
 }
 
-/** Trích JSON object đầu tiên từ trả lời AI. */
-function parseAiJson(raw) {
-  // PARSE CỨNG HOÁ: dùng extractJson của ai.js — model trả code fence/phẩy
-  // thừa vẫn đọc được (bug cùng loại đã vá ở ai.js + research.js).
-  try {
-    return require("../ai").extractJson(raw);
-  } catch {
-    return null;
-  }
-}
-
 /** Chẩn đoán 1 lỗi: kiểm flag → fingerprint/cooldown → AI → ghi Convex → đăng kênh log. */
 async function diagnoseError(kind, reason) {
   try {
@@ -163,7 +152,7 @@ ${ctx ? `\nĐoạn code tại ${ctx.file}:${ctx.line}:\n${ctx.snippet}` : ""}`;
         ],
         { maxTokens: 900, temperature: 0.2 },
       );
-      const parsed = parseAiJson(raw);
+      const parsed = require("../ai").extractJson(raw);
       if (!parsed) return;
 
       const severity = ["high", "medium", "low"].includes(parsed.severity)

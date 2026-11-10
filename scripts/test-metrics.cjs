@@ -1,7 +1,6 @@
-// Test metrics.js + logId.js — đo lường và log có mã.
+// Test metrics.js — đo lường hệ thống.
 // Không mạng, không DB, không discord.js. Chạy: node scripts/test-metrics.cjs
 const metrics = require("../bot/src/metrics.js");
-const { log, withId, currentId, newId, JSON_PREFIX } = require("../bot/src/logId.js");
 const { startMetrics } = require("../bot/src/metricsRuntime.js");
 
 let pass = 0;
@@ -10,7 +9,6 @@ let fail = 0;
 // để kiểm tra log dual-write — nếu check() dùng console.log thì chính dòng
 // PASS/FAIL cũng bị chặn và ta mất dấu vết ca nào hỏng.
 const realLog = console.log.bind(console);
-const realWarn = console.warn.bind(console);
 function check(label, cond, extra) {
   if (cond) {
     pass++;
@@ -19,13 +17,6 @@ function check(label, cond, extra) {
     fail++;
     realLog("FAIL", label, extra ?? "");
   }
-}
-
-let captured = [];
-console.log = (...args) => captured.push(args);
-console.warn = (...args) => captured.push(args);
-function lines() {
-  return captured.map((a) => a.join(" "));
 }
 
 // Toàn bộ phần kiểm tra bọc trong một hàm async: CommonJS không có top-level
@@ -232,128 +223,6 @@ async function main() {
     );
   }
 
-  // ══════════ logId.js ══════════
-
-  // ── 11. Mã: ngắn, khác nhau, hợp lệ ──
-  {
-    const ids = new Set();
-    for (let i = 0; i < 200; i++) ids.add(newId());
-    check("newId sinh 200 mà không trùng", ids.size === 200, String(ids.size));
-    check(
-      "newId đúng 8 ký tự hex",
-      [...ids].every((id) => /^[0-9a-f]{8}$/.test(id)),
-    );
-    check("ngoài phạm vi thì currentId() = null", currentId() === null);
-  }
-
-  // ── 12. withId gắn mã, và mã sống qua await ──
-  {
-    let seen = null;
-    let deep = null;
-    await withId(async () => {
-      seen = currentId();
-      await new Promise((r) => setTimeout(r, 5));
-      deep = currentId();
-      const deeper = async () => currentId();
-      deep = await deeper();
-    });
-    check("withId gắn mã cho phạm vi bên trong", typeof seen === "string" && seen.length === 8);
-    check("mã sống qua await và qua hàm gọi sâu hơn", deep === seen, `${seen} vs ${deep}`);
-    check("ra khỏi phạm vi thì mã trở lại null", currentId() === null);
-  }
-
-  // ── 13. withId ném lại đúng lỗi gốc ──
-  {
-    const boom = new Error("lỗi gốc");
-    let caught = null;
-    try {
-      await withId(() => {
-        throw boom;
-      });
-    } catch (err) {
-      caught = err;
-    }
-    check("withId ném lại đúng lỗi gốc", caught === boom);
-  }
-
-  // ── 14. Dual-write: một lần log → hai dòng (text + JSON) ──
-  {
-    captured = [];
-    log.info("xin chào", { guildId: "123" });
-    const out = lines();
-    check(
-      "dual-write in DÒNG TEXT cho người đọc",
-      out.some((l) => l.startsWith("[info]")),
-      out[0],
-    );
-    check(
-      "dòng text có dữ liệu kèm theo",
-      out.some((l) => l.includes("xin chào") && l.includes('"guildId":"123"')),
-    );
-    const jsonLines = out.filter((l) => l.startsWith(JSON_PREFIX));
-    check("dual-write in DÒNG JSON cho máy đọc", jsonLines.length === 1, String(jsonLines.length));
-    const parsed = JSON.parse(jsonLines[0].slice(JSON_PREFIX.length));
-    check(
-      "dòng JSON có level/msg/timestamp",
-      parsed.level === "info" && parsed.msg === "xin chào" && !!parsed.ts,
-    );
-    check("dòng JSON có dữ liệu kèm theo", parsed.guildId === "123");
-    check("ngoài phạm vi thì id = null (không bịa mã)", parsed.id === null);
-  }
-
-  // ── 15. Dòng JSON trong phạm vi việc có mang mã ──
-  {
-    captured = [];
-    await withId(async () => {
-      log.warn("có mã", { guildId: "9" });
-    });
-    const out = lines();
-    const text = out.find((l) => l.startsWith("[warn]"));
-    const parsed = JSON.parse(out.find((l) => l.startsWith(JSON_PREFIX)).slice(JSON_PREFIX.length));
-    check("dòng text trong phạm vi có [mã]", /\] \[[0-9a-f]{8}\]/.test(text), text);
-    check(
-      "dòng JSON trong phạm vi có id khớp dòng text",
-      parsed.id && text.includes(`[${parsed.id}]`),
-    );
-  }
-
-  // ── 16. Field khó serialize không được làm mất dòng log ──
-  {
-    captured = [];
-    const circular = {};
-    circular.self = circular;
-    log.error("lỗi khó", { err: new Error("bùng"), vòng: circular, big: 10n });
-    const out = lines();
-    check(
-      "log vẫn in dòng text dù field không serialize được",
-      out.some((l) => l.startsWith("[error]")),
-    );
-    const parsed = JSON.parse(out.find((l) => l.startsWith(JSON_PREFIX)).slice(JSON_PREFIX.length));
-    check(
-      "Error được rút gọn thành name+message",
-      parsed.err?.name === "Error" && parsed.err?.message === "bùng",
-    );
-    check("BigInt được đổi thành chuỗi", parsed.big === "10");
-  }
-
-  // ── 17. Log bao giờ cũng không ném lỗi ra ngoài ──
-  {
-    captured = [];
-    let threw = false;
-    try {
-      log.info(undefined, undefined);
-      log.info("x", null);
-      log.info("y", {});
-    } catch {
-      threw = true;
-    }
-    check("log với tham số rác không ném lỗi", !threw);
-    check(
-      "log với tham số rác vẫn in đủ dòng",
-      lines().filter((l) => l.startsWith("[info]")).length === 3,
-    );
-  }
-
   // ── 18. sampleMemory đặt gauge vùng nhớ ──
   {
     metrics.__resetForTest();
@@ -464,15 +333,11 @@ async function main() {
     );
   }
 
-  console.log = realLog;
-  console.warn = realWarn;
-  realLog(`\nKết quả metrics + logId: ${pass} PASS, ${fail} FAIL`);
+  realLog(`\nKết quả metrics: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 }
 
 main().catch((err) => {
-  console.log = realLog;
-  console.warn = realWarn;
   realLog(`\nLỗi: test-metrics.cjs ném ngoài dự kiến — ${err?.stack ?? err}`);
   process.exit(1);
 });

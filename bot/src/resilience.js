@@ -44,11 +44,6 @@ class TimeoutError extends Error {
   }
 }
 
-/** Có phải lỗi do chính mình chốt thời gian không (phân biệt với lỗi mạng thật). */
-function isTimeoutError(err) {
-  return err instanceof TimeoutError || err?.code === "ETIMEDOUT";
-}
-
 /**
  * Chuẩn hoá trần thời gian: `ms` rác (0, âm, NaN, chuỗi) → trần mặc định.
  *
@@ -59,59 +54,6 @@ function isTimeoutError(err) {
 function resolveTimeoutMs(ms) {
   const n = Number(ms);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_FETCH_TIMEOUT_MS;
-}
-
-/**
- * Chốt thời gian cho một promise (hoặc hàm trả promise).
- *
- * `fn` được GỌI TRONG HÀM NÀY (không nhận promise sẵn): nếu nhận promise sẵn thì
- * lời gọi đã bắt đầu trước khi ta kịp bọc, và promise bị bỏ rơi có thể ném
- * "unhandled rejection" làm chết tiến trình.
- *
- * Khi quá hạn, promise gốc vẫn có thể xong sau đó — đã gắn `.catch` để nó không
- * biến thành unhandled rejection. Không thể "huỷ" một promise chung trong JS;
- * muốn huỷ thật thì phải dùng signal (xem `fetchWithTimeout`).
- */
-function withTimeout(fn, ms, label = "thao tác") {
-  const limit = resolveTimeoutMs(ms);
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new TimeoutError(label, limit));
-    }, limit);
-    // CỐ Ý KHÔNG `unref()`: timer này CHÍNH LÀ cơ chế đang cứu ta. Nếu nó là thứ
-    // duy nhất giữ event loop sống (đúng cảnh treo: không còn việc nào khác) thì
-    // `unref()` khiến Node thoát im lặng trước khi timer cháy — tức là biến
-    // "treo có báo lỗi" thành "chết không dấu vết", hỏng đúng thứ đang cần.
-    // Quy ước ngược lại với các vòng lặp nền (metrics, tick): vòng nền là việc
-    // THỪA nên unref; trần thời gian là việc BẮT BUỘC phải xảy ra.
-
-    let out;
-    try {
-      out = typeof fn === "function" ? fn() : fn;
-    } catch (err) {
-      clearTimeout(timer);
-      settled = true;
-      reject(err);
-      return;
-    }
-    Promise.resolve(out).then(
-      (v) => {
-        clearTimeout(timer);
-        if (settled) return; // đã quá hạn — kết quả đến muộn, bỏ qua
-        settled = true;
-        resolve(v);
-      },
-      (err) => {
-        clearTimeout(timer);
-        if (settled) return;
-        settled = true;
-        reject(err);
-      },
-    );
-  });
 }
 
 /**
@@ -193,20 +135,11 @@ function backoffDelayMs(
   return Math.max(minMs, Math.floor(random() * ceiling));
 }
 
-/** Chờ theo backoff có jitter — dùng trong vòng thử lại. */
-function sleepBackoff(attempt, opts) {
-  return new Promise((r) => setTimeout(r, backoffDelayMs(attempt, opts)));
-}
-
 module.exports = {
   TimeoutError,
-  isTimeoutError,
-  withTimeout,
   fetchWithTimeout,
   wrapFetch,
   backoffDelayMs,
-  sleepBackoff,
-  timeoutSignal,
   resolveTimeoutMs,
   DEFAULT_FETCH_TIMEOUT_MS,
 };

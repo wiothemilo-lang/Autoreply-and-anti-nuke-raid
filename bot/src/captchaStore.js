@@ -5,6 +5,9 @@
 const store = new Map();
 const { registerSweep } = require("./sweeper");
 
+/** Mã sống 5 phút — khai báo trước setCode để không lặp literal. */
+const CAPTCHA_TTL_MS = 5 * 60_000;
+
 function genCaptcha() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -12,7 +15,7 @@ function genCaptcha() {
 function setCode(guildId, userId, code) {
   store.set(`${guildId}:${userId}`, {
     code,
-    expiresAt: Date.now() + 5 * 60_000,
+    expiresAt: Date.now() + CAPTCHA_TTL_MS,
     // Chống brute-force: sai quá MAX_WRONG_ATTEMPTS lần thì mã bị hủy — kẻ
     // đoán mã 6 chữ số trong cửa sổ 5 phút phải xin mã mới (mỗi lần xin mới
     // bị rate-limit 3 lần/10 phút ở nút "Nhận mã xác minh").
@@ -33,12 +36,9 @@ function verifyCode(guildId, userId, input) {
   }
   if (entry.code !== input.trim()) {
     entry.wrongAttempts += 1;
-    if (entry.wrongAttempts >= MAX_WRONG_ATTEMPTS) {
-      // Hủy mã — trả reason "wrong" (thông điệp UX đã hướng dẫn xin mã mới);
-      // kẻ brute-force không phân biệt được lý do hủy.
-      store.delete(key);
-      return { ok: false, reason: "wrong" };
-    }
+    // Hủy mã khi vượt hạn mức — trả reason "wrong" (UX đã hướng dẫn xin mã
+    // mới); kẻ brute-force không phân biệt được lý do hủy.
+    if (entry.wrongAttempts >= MAX_WRONG_ATTEMPTS) store.delete(key);
     return { ok: false, reason: "wrong" };
   }
   store.delete(key);
@@ -47,7 +47,6 @@ function verifyCode(guildId, userId, input) {
 
 // Dọn entry hết hạn mỗi 5 phút — qua vòng sweep CHUNG (đợt #4): module này
 // không tự dựng timer nữa.
-const CAPTCHA_TTL_MS = 5 * 60_000;
 
 function sweepExpiredCaptchas(now = Date.now()) {
   let removed = 0;

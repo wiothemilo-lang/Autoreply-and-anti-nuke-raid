@@ -23,7 +23,6 @@
  *  - backupRebuild.js   — dựng lại role/kênh/tin/emoji/sticker/thread/meta/ban/invite
  *  - backupRestore.js   — dry-run + restoreCore + runRestore
  *  - backupImport.js    — import file .msc/.json từ dashboard
- *  - backupJobs.js      — clone cấu trúc giữa hai server
  *
  * File này giữ nguyên ĐƯỜNG DẪN require (./handlers/backup) và các THUỘC TÍNH
  * export để index.js, tick.js, localSnapshot.js và các test mock theo chuỗi
@@ -31,13 +30,10 @@
  * (module callable); hàm đó đã bị bỏ vì không ai gọi — vòng quét thật là
  * `tick.js:runBackupJobs`. Xem chú thích ở backupJobs.js.
  */
-const { cloneToServer } = require("../backupJobs");
 const {
   runBackup,
   snapshotWithSettings,
   captureThreads,
-  captureBans,
-  captureInvites,
   captureMemberRoles,
 } = require("../backupCapture");
 const { runRestore, planRestoreCore, runRestorePlan } = require("../backupRestore");
@@ -99,8 +95,6 @@ module.exports.applyGuildMeta = applyGuildMeta;
 module.exports.applyBans = applyBans;
 module.exports.applyInvites = applyInvites;
 module.exports.captureThreads = captureThreads;
-module.exports.captureBans = captureBans;
-module.exports.captureInvites = captureInvites;
 module.exports.captureMemberRoles = captureMemberRoles;
 module.exports.replayIntoChannel = replayIntoChannel;
 module.exports.MAX_MESSAGES_PER_THREAD = MAX_MESSAGES_PER_THREAD;
@@ -113,7 +107,6 @@ module.exports.normalizeSticker = normalizeSticker;
 module.exports.sanitizeEmojiName = sanitizeEmojiName;
 module.exports.slimBackupForStore = slimBackupForStore;
 module.exports.MAX_REPLAY_PER_CHANNEL = MAX_REPLAY_PER_CHANNEL;
-module.exports.cloneToServer = cloneToServer;
 module.exports.compressAndEncryptBackup = backupUtils.compressAndEncryptBackup;
 module.exports.decompressAndDecryptBackup = backupUtils.decompressAndDecryptBackup;
 module.exports.filterBackupComponents = backupUtils.filterBackupComponents;
