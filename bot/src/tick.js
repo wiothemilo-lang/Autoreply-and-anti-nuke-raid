@@ -362,7 +362,7 @@ async function runTickOnceInner(client, store, heat) {
     return;
   }
 
-  // ---- Fallback: 3 query riêng (đúng hành vi cũ, chỉ khi batch không dùng được) ----
+  // ---- Fallback: 5 query riêng (chỉ khi batch không dùng được) ----
   try {
     const hiddenJobs = await store.client.query("hidden:getBotHiddenJobs", {});
     await hiddenMod.processHiddenJobsData(client, store, hiddenJobs ?? []);
@@ -374,6 +374,21 @@ async function runTickOnceInner(client, store, heat) {
     await hiddenMod.processVerifyPanelItems(client, store, items ?? []);
   } catch (e) {
     console.error("[tick:verify:fallback]", e?.message || e);
+  }
+  // Ticket phải có đường dự phòng RIÊNG: batch lỗi mà fallback bỏ sót thì panel
+  // mở ticket không được dán, ticket không auto-close/close/purge — đứng im tới
+  // 10 phút mỗi lần lỗi và vô hạn nếu batch hỏng kéo dài (lỗi im lặng 11/2026).
+  try {
+    const panels = await store.client.query("guilds:getTicketSendPanelGuilds", {});
+    await require("./handlers/tickets").processOpenPanelItems(client, store, panels ?? []);
+  } catch (e) {
+    console.error("[tick:ticketPanel:fallback]", e?.message || e);
+  }
+  try {
+    const tickets = await store.client.query("bot_tick:getTicketJobs", {});
+    await require("./handlers/ticketJobs").processTicketJobs(client, store, tickets ?? []);
+  } catch (e) {
+    console.error("[tick:tickets:fallback]", e?.message || e);
   }
   try {
     const pending = await store.client.query("backup:botGetPending", {});

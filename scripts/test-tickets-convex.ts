@@ -39,6 +39,7 @@ import {
   MAX_EXTRA_FIELDS,
 } from "../convex/ticketKinds";
 import { computeBotKey } from "../convex/botAuth";
+import { getTicketJobs } from "../convex/bot_tick";
 
 const listH = (listTickets as any)._handler;
 const summaryH = (ticketSummary as any)._handler;
@@ -60,6 +61,7 @@ const saveKindH = (saveKind as any)._handler;
 const removeKindH = (removeKind as any)._handler;
 const setKindEnabledH = (setKindEnabled as any)._handler;
 const swapOrderH = (swapKindOrder as any)._handler;
+const getTicketJobsH = (getTicketJobs as any)._handler;
 
 let pass = 0;
 let fail = 0;
@@ -1642,6 +1644,72 @@ const throws = async (fn: () => Promise<unknown>) => {
       "ticket không có ô bổ sung vẫn tạo được",
       e.tickets.length === 1 && e.tickets[0].fields === undefined,
     );
+  }
+
+  // ═══ getTicketJobs: đường dự phòng khi batch bot_tick lỗi ═══
+  // Vì sao: fallback của bot từng bỏ sót ticket, nên batch hỏng là panel không
+  // dán + ticket không auto-close/close/purge. Query này phải chọn ĐÚNG bộ job
+  // như batch (dùng chung buildTicketJobs) và phải chặn khi thiếu botKey.
+  console.log("\n── getTicketJobs ──");
+  {
+    const e = makeCtx();
+    const now = Date.now();
+    e.guilds.push(
+      {
+        _id: "G1",
+        discordId: "g1",
+        botInGuild: true,
+        ticketEnabled: true,
+        ticketIdleHours: 24,
+        ticketCloseGraceHours: 24,
+        ticketMessageBudget: 10,
+      },
+      { _id: "G2", discordId: "g2", botInGuild: true, ticketEnabled: false },
+    );
+    e.tickets.push(
+      // Quá 24h im lặng → autoClose.
+      ticket("t-idle", { lastActivityAt: now - 25 * 3_600_000 }),
+      // Còn mới nhưng chạm ngân sách tin nhắn → autoClose với closeCause=budget.
+      ticket("t-budget", { lastActivityAt: now, messageCount: 10 }),
+      // Đóng từ dashboard, kênh chưa thu quyền → closeChannel ngay.
+      ticket("t-close", { status: "closed", channelId: "ch-t-close" }),
+      // Đã thu quyền + quá grace → purge.
+      ticket("t-purge", {
+        status: "closed",
+        channelId: "ch-t-purge",
+        channelClosedAt: 1,
+        closedAt: now - 25 * 3_600_000,
+      }),
+      // Còn mới, chưa chạm ngân sách → không có job.
+      ticket("t-fresh", { lastActivityAt: now }),
+      // Guild tắt ticket → mọi ticket bị bỏ qua.
+      ticket("t-off", { guildId: "g2", lastActivityAt: now - 25 * 3_600_000 }),
+    );
+
+    check(
+      "thiếu botKey → từ chối (không lộ job của mọi server)",
+      await throws(() => getTicketJobsH(e.ctx, {})),
+    );
+
+    const jobs = await getTicketJobsH(e.ctx, { botKey: BOT_KEY });
+    const byId = new Map(jobs.map((j: any) => [j.ticketId, j]));
+    check(
+      "quá idle → autoClose",
+      byId.get("t-idle")?.status === "autoClose" && byId.get("t-idle")?.closeCause === undefined,
+    );
+    check(
+      "chạm ngân sách → autoClose với closeCause=budget",
+      byId.get("t-budget")?.status === "autoClose" && byId.get("t-budget")?.closeCause === "budget",
+    );
+    check("closed chưa thu quyền → closeChannel", byId.get("t-close")?.status === "closeChannel");
+    check("closed quá grace → purge", byId.get("t-purge")?.status === "purge");
+    check("ticket còn mới → không sinh job", !byId.has("t-fresh"));
+    check("guild tắt ticket → không sinh job", !byId.has("t-off"));
+    check(
+      "job mang idleHours/graceHours của server",
+      byId.get("t-idle")?.idleHours === 24 && byId.get("t-idle")?.closeGraceHours === 24,
+    );
+    check("tổng đúng 4 job (không thừa/thiếu)", jobs.length === 4, `nhận ${jobs.length}`);
   }
 
   console.log(`\nKết quả tickets-convex: ${pass} PASS, ${fail} FAIL`);

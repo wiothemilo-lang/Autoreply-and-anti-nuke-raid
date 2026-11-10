@@ -1003,6 +1003,24 @@ export const getVerifySendPanelGuilds = query({
 });
 
 /**
+ * Query: find guilds where ticketSendPanel is true (bot polls this).
+ *
+ * Có đường riêng (không chỉ nằm trong batch `bot_tick:getPendingJobs`) để nhánh
+ * fallback của bot vẫn dán được panel khi batch lỗi — trước đây thiếu, nên bấm
+ * "gửi panel" trên dashboard mà bot im lặng suốt thời gian batch hỏng.
+ */
+export const getTicketSendPanelGuilds = query({
+  args: { botKey: v.optional(v.string()) },
+  handler: async (ctx, { botKey }) => {
+    await requireBotKeyStrict(ctx, botKey);
+    const guilds = await ctx.db.query("guilds").collect();
+    return guilds
+      .filter((g) => g.ticketSendPanel === true && g.ticketEnabled && g.ticketPanelChannelId)
+      .map((g) => ({ guildId: g.discordId, channelId: g.ticketPanelChannelId! }));
+  },
+});
+
+/**
  * Mutation: clear ticketSendPanel flag sau khi bot dán panel mở ticket.
  * Cùng khuôn với `clearVerifySendPanel` — có `error` thì lưu lại để dashboard
  * hiện lý do (im lặng là kiểu lỗi tệ nhất: chủ server bấm xong không hiểu vì

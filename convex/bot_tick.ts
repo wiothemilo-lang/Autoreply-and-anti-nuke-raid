@@ -1,9 +1,125 @@
-import { query } from "./_generated/server";
+import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { buildHiddenJobs } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
 import { reassembleBackupJsonForRead } from "./backupChunks";
+
+/**
+ * Sinh job dọn ticket cho MỘT lượt tick.
+ *
+ * Tách khỏi `getPendingJobs` để query fallback `getTicketJobs` dùng đúng một
+ * nguồn logic: batch hỏng thì bot vẫn đóng/dọn ticket thay vì đứng im.
+ */
+export async function buildTicketJobs(ctx: QueryCtx, guilds: Doc<"guilds">[], nowMs: number) {
+  // ── Job dọn ticket ──
+  // Ba việc, cùng một lượt tick để không tốn thêm vòng query:
+  //   1. closeChannel: ticket `closed` mà kênh CHƯA thu quyền (đóng từ
+  //      dashboard) → thu quyền + đổi tên ngay, không chờ 24h.
+  //   2. autoClose: ticket `open` quá idleHours không ai chat → đóng.
+  //   3. purge: ticket `closed` quá closeGraceHours → lưu transcript rồi
+  //      xoá kênh. KHÔNG tự xoá khi chưa lưu transcript.
+  //
+  // Mỗi ticket gửi kèm idleHours/graceHours CỦA SERVER ĐÓ (vì mỗi chủ
+  // server tuỳ chỉnh khác nhau) — bot không cần gọi thêm getConfig.
+  const tickets: {
+    guildId: string;
+    ticketId: string;
+    channelId: string;
+    number: number;
+    kind: string;
+    openerId: string;
+    status: string;
+    idleHours: number;
+    closeGraceHours: number;
+    /**
+     * Lý do đóng khi status = "autoClose": `idle` = hết giờ im lặng,
+     * `budget` = chạm ngân sách tin nhắn. Bot dùng để đóng đúng câu chữ.
+     */
+    closeCause?: string;
+    lastActivityAt: number;
+    closedAt: number;
+    closeReason?: string;
+    /** Purge: transcript đã nằm trong storage ở lượt trước → chỉ xoá kênh. */
+    transcriptReady?: boolean;
+  }[] = [];
+  for (const g of guilds) {
+    if (!g.ticketEnabled) continue;
+    const idleHours = g.ticketIdleHours ?? 24;
+    const closeGraceHours = g.ticketCloseGraceHours ?? 24;
+    const messageBudget = g.ticketMessageBudget ?? 0;
+    const rows = await ctx.db
+      .query("tickets")
+      .withIndex("by_guildId", (q) => q.eq("guildId", g.discordId))
+      .collect();
+    // 9 field chung của mọi job ticket — chỉ khác status + vài field đóng.
+    const jobOf = (
+      t: Doc<"tickets">,
+      status: "autoClose" | "closeChannel" | "purge",
+      extra: Record<string, unknown> = {},
+    ) => ({
+      guildId: g.discordId,
+      ticketId: t._id,
+      channelId: t.channelId,
+      number: t.number ?? 0,
+      kind: t.kind,
+      openerId: t.openerId,
+      status,
+      idleHours,
+      closeGraceHours,
+      lastActivityAt: t.lastActivityAt ?? t.createdAt,
+      closedAt: 0,
+      ...extra,
+    });
+    for (const t of rows) {
+      if (t.status === "open") {
+        // ⚠️ Kiểm NGÂN SÁCH TIN TRƯỚC đồng hồ im lặng: kênh đang bị spam thì
+        // `lastActivityAt` cứ được đẩy lùi nên nhánh idle KHÔNG BAO GIỜ
+        // chạm ngưỡng — tức hành rào chống spam chỉ có tác dụng khi im lặng,
+        // đúng cái người spam không bao giờ làm.
+        const overBudget = messageBudget > 0 && (t.messageCount ?? 0) >= messageBudget;
+        if (!overBudget) {
+          if (idleHours <= 0) continue;
+          const last = t.lastActivityAt ?? t.createdAt;
+          if (nowMs - last < idleHours * 3_600_000) continue;
+          tickets.push(jobOf(t, "autoClose"));
+          continue;
+        }
+        tickets.push(jobOf(t, "autoClose", { closeCause: "budget" }));
+      } else if (t.status === "closed") {
+        // ⚠️ KHÔNG `continue` khi transcript đã lưu — đó là cách khiến kênh
+        // ticket treo VĨNH VIỄN: `runPurge` lưu transcript xong mới xoá
+        // kênh, nếu `channel.delete()` lỗi (thiếu quyền, rate limit) thì
+        // bản ghi vẫn `closed` + đã có transcript → mọi lượt tick sau đều
+        // bỏ qua, kênh không bao giờ được dọn lần nữa (28/09/2026).
+        // Thay vào đó vẫn sinh job purge với cờ `transcriptReady` để bot
+        // bỏ qua bước lưu (không ghi file mỗi vòng) và chỉ thử xoá kênh.
+        // Kênh CHƯA được thu quyền → khoá ngay ở lượt tick này. Trước
+        // đây nhánh closed chỉ chờ tới lượt purge sau closeGraceHours,
+        // tức dashboard đóng ticket xong thì kênh vẫn còn tên cũ + quyền cũ
+        // tới 24h (lỗi thật 28/09/2026).
+        if (!t.channelClosedAt && t.channelId && t.channelId !== "pending") {
+          tickets.push(
+            jobOf(t, "closeChannel", {
+              closedAt: t.closedAt ?? 0,
+              closeReason: t.closeReason ?? undefined,
+            }),
+          );
+          continue;
+        }
+        const closed = t.closedAt ?? 0;
+        if (!closed || nowMs - closed < closeGraceHours * 3_600_000) continue;
+        tickets.push(
+          jobOf(t, "purge", {
+            closedAt: closed,
+            transcriptReady: !!t.transcriptStorageId,
+          }),
+        );
+      }
+    }
+  }
+  return tickets;
+}
 
 /**
  * Batch TỔNG HỢP cho vòng quét định kỳ của bot (gọi mỗi 2 phút thay vì 3 query
@@ -179,112 +295,9 @@ export const getPendingJobs = query({
       aiReview: !!status?.threatAiReviewRequested,
     };
 
-    // ── Job dọn ticket ──
-    // Ba việc, cùng một lượt tick để không tốn thêm vòng query:
-    //   1. closeChannel: ticket `closed` mà kênh CHƯA thu quyền (đóng từ
-    //      dashboard) → thu quyền + đổi tên ngay, không chờ 24h.
-    //   2. autoClose: ticket `open` quá idleHours không ai chat → đóng.
-    //   3. purge: ticket `closed` quá closeGraceHours → lưu transcript rồi
-    //      xoá kênh. KHÔNG tự xoá khi chưa lưu transcript.
-    //
-    // Mỗi ticket gửi kèm idleHours/graceHours CỦA SERVER ĐÓ (vì mỗi chủ
-    // server tuỳ chỉnh khác nhau) — bot không cần gọi thêm getConfig.
-    const tickets: {
-      guildId: string;
-      ticketId: string;
-      channelId: string;
-      number: number;
-      kind: string;
-      openerId: string;
-      status: string;
-      idleHours: number;
-      closeGraceHours: number;
-      /**
-       * Lý do đóng khi status = "autoClose": `idle` = hết giờ im lặng,
-       * `budget` = chạm ngân sách tin nhắn. Bot dùng để đóng đúng câu chữ.
-       */
-      closeCause?: string;
-      lastActivityAt: number;
-      closedAt: number;
-      closeReason?: string;
-      /** Purge: transcript đã nằm trong storage ở lượt trước → chỉ xoá kênh. */
-      transcriptReady?: boolean;
-    }[] = [];
-    for (const g of guilds) {
-      if (!g.ticketEnabled) continue;
-      const idleHours = g.ticketIdleHours ?? 24;
-      const closeGraceHours = g.ticketCloseGraceHours ?? 24;
-      const messageBudget = g.ticketMessageBudget ?? 0;
-      const rows = await ctx.db
-        .query("tickets")
-        .withIndex("by_guildId", (q) => q.eq("guildId", g.discordId))
-        .collect();
-      // 9 field chung của mọi job ticket — chỉ khác status + vài field đóng.
-      const jobOf = (
-        t: Doc<"tickets">,
-        status: "autoClose" | "closeChannel" | "purge",
-        extra: Record<string, unknown> = {},
-      ) => ({
-        guildId: g.discordId,
-        ticketId: t._id,
-        channelId: t.channelId,
-        number: t.number ?? 0,
-        kind: t.kind,
-        openerId: t.openerId,
-        status,
-        idleHours,
-        closeGraceHours,
-        lastActivityAt: t.lastActivityAt ?? t.createdAt,
-        closedAt: 0,
-        ...extra,
-      });
-      for (const t of rows) {
-        if (t.status === "open") {
-          // ⚠️ Kiểm NGÂN SÁCH TIN TRƯỚC đồng hồ im lặng: kênh đang bị spam thì
-          // `lastActivityAt` cứ được đẩy lùi nên nhánh idle KHÔNG BAO GIỜ
-          // chạm ngưỡng — tức hành rào chống spam chỉ có tác dụng khi im lặng,
-          // đúng cái người spam không bao giờ làm.
-          const overBudget = messageBudget > 0 && (t.messageCount ?? 0) >= messageBudget;
-          if (!overBudget) {
-            if (idleHours <= 0) continue;
-            const last = t.lastActivityAt ?? t.createdAt;
-            if (nowMs - last < idleHours * 3_600_000) continue;
-            tickets.push(jobOf(t, "autoClose"));
-            continue;
-          }
-          tickets.push(jobOf(t, "autoClose", { closeCause: "budget" }));
-        } else if (t.status === "closed") {
-          // ⚠️ KHÔNG `continue` khi transcript đã lưu — đó là cách khiến kênh
-          // ticket treo VĨNH VIỄN: `runPurge` lưu transcript xong mới xoá
-          // kênh, nếu `channel.delete()` lỗi (thiếu quyền, rate limit) thì
-          // bản ghi vẫn `closed` + đã có transcript → mọi lượt tick sau đều
-          // bỏ qua, kênh không bao giờ được dọn lần nữa (28/09/2026).
-          // Thay vào đó vẫn sinh job purge với cờ `transcriptReady` để bot
-          // bỏ qua bước lưu (không ghi file mỗi vòng) và chỉ thử xoá kênh.
-          // Kênh CHƯA được thu quyền → khoá ngay ở lượt tick này. Trước
-          // đây nhánh closed chỉ chờ tới lượt purge sau closeGraceHours,
-          // tức dashboard đóng ticket xong thì kênh vẫn còn tên cũ + quyền cũ
-          // tới 24h (lỗi thật 28/09/2026).
-          if (!t.channelClosedAt && t.channelId && t.channelId !== "pending") {
-            tickets.push(
-              jobOf(t, "closeChannel", {
-                closedAt: t.closedAt ?? 0,
-                closeReason: t.closeReason ?? undefined,
-              }),
-            );
-            continue;
-          }
-          const closed = t.closedAt ?? 0;
-          if (!closed || nowMs - closed < closeGraceHours * 3_600_000) continue;
-          tickets.push(
-            jobOf(t, "purge", {
-              closedAt: closed,
-              transcriptReady: !!t.transcriptStorageId,
-            }),
-          );
-        }
-      }
-    }
+    // Job dọn ticket: tách hàm để query fallback `getTicketJobs` dùng CHUNG
+    // logic — hai bản chọn job riêng sẽ lệch nhau (autoClose/closeChannel/purge).
+    const tickets = await buildTicketJobs(ctx, guilds, nowMs);
 
     // Báo cáo ngày (đợt #4): cờ cron đặt, bot gửi trong tick kế tiếp rồi xoá cờ
     // bằng botSetReportAt. Cờ còn = bot chưa gửi (offline / tắt tạm) — giữ nguyên.
@@ -303,5 +316,25 @@ export const getPendingJobs = query({
       threatFlags,
       tickets,
     };
+  },
+});
+
+/**
+ * Fallback cho `getPendingJobs` khi batch lỗi: CHỈ job ticket.
+ *
+ * Vì sao cần: nhánh fallback của bot từng bỏ sót ticket, nên khi batch hỏng thì
+ * panel mở ticket không được dán và ticket không auto-close/close/purge — đứng
+ * im tới 10 phút mỗi lần lỗi, và vô hạn nếu batch hỏng kéo dài. Dùng CHUNG
+ * `buildTicketJobs` với batch để hai đường không bao giờ chọn job lệch nhau.
+ */
+export const getTicketJobs = query({
+  args: { botKey: v.optional(v.string()) },
+  handler: async (ctx, { botKey }) => {
+    await requireBotKeyStrict(ctx, botKey);
+    const guilds = await ctx.db
+      .query("guilds")
+      .withIndex("by_botInGuild", (q) => q.eq("botInGuild", true))
+      .collect();
+    return buildTicketJobs(ctx, guilds, Date.now());
   },
 });

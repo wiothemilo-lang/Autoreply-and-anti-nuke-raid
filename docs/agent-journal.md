@@ -3,8 +3,7 @@
 ## Đang dở
 
 - 📋 **Nợ sau 5 đợt audit (50 subagent)** — chưa làm vì cần đổi schema/hành vi hoặc
-  rủi ro trung bình: fallback `bot_tick` thiếu `jobs.ticketPanels`/`jobs.tickets`
-  (ticket đứng im âm thầm khi batch lỗi ≥10 phút); retention ticket trong
+  rủi ro trung bình: retention ticket trong
   `bot_tick`; `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk
   backup lớn; dedupe `useGuildPlan`/`useSessionMe`; gom hook watch job của
   `BackupPanel` (214 dòng, 3 bản `judgeJobWatch`); tách `HaimiyaChat` media helpers;
@@ -16,8 +15,8 @@
   ~10 suite; `eslint` chưa phủ `scripts/**/*.ts` (31 suite TS không được lint). Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
   (~110 dòng trùng), `externalApp.js` 4 khối punish (~60 dòng), verify panel 3 bản
   (prefix/setup/hidden), facade `handlers/backup.js`. Đợt 3 còn nợ: `ticketActivity`
-  chỉ nhận category cha (auto-close nhầm ticket theo kind), fallback `bot_tick` thiếu
-  ticket, `guildStats` `take(1000)` cắt mất ngày cũ khi raid, hidden panel/giveaway
+  chỉ nhận category cha (auto-close nhầm ticket theo kind),
+  `guildStats` `take(1000)` cắt mất ngày cũ khi raid, hidden panel/giveaway
   trùng web↔bot, `getGuild`/`getBotConfig` phình field chết, 4 bản chọn entitlement
   lệch tie-break.
 
@@ -71,6 +70,16 @@
   `docs/t3-devbox.md` mục 7.
 
 ---
+
+---
+
+## 2026-11-10 (11) — Vá fallback tick: ticket không còn đứng im khi batch lỗi
+
+- 🐛 **Lỗi**: nhánh fallback của `runTickOnceInner` (`bot/src/tick.js`) chỉ chạy hidden/verify/backup/báo cáo — **bỏ sót `jobs.ticketPanels` và `jobs.tickets`**. Khi `bot_tick:getPendingJobs` lỗi (deploy lệch, quá tải), bot tạm bỏ batch 10 phút mỗi lần ⇒ panel mở ticket không được dán, ticket không auto-close/closeChannel/purge, và **không có log nào** báo ticket đang đứng.
+- ✅ **Sửa**: tách logic chọn job ticket trong `convex/bot_tick.ts` thành `buildTicketJobs(ctx, guilds, nowMs)` dùng CHUNG cho batch và query mới `bot_tick:getTicketJobs`; thêm `guilds:getTicketSendPanelGuilds` (cùng khuôn `getVerifySendPanelGuilds`, cả hai đều `requireBotKeyStrict`). Bot fallback gọi 2 query này qua `processOpenPanelItems`/`processTicketJobs`.
+- 🧪 **Test**: `test-tick.cjs` mock 2 handler + assert CẢ batch lẫn fallback chạm ticket (53 PASS); `test-tickets-convex.ts` seed 6 ticket phủ đủ 4 nhánh autoClose(idle/budget)/closeChannel/purge + guild tắt ticket + thiếu botKey (179 PASS).
+- 🧪 **Kiểm chứng**: 89/89 CJS · 31/31 TS · typecheck · lint · format:check · 9 cổng tĩnh (convex-contract **104 call / 501 export**) — xanh.
+- ▶️ Tiếp theo: `revenueStats` `take(1000)`; `eslint` cho `scripts/**/*.ts`.
 
 ## 2026-11-10 (10) — Dọn code rác đợt 5/5: scripts + test + config + docs
 

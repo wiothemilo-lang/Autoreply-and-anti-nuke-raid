@@ -1,6 +1,7 @@
 // Test vòng tick TỔNG HỢP (bot/src/tick.js):
 //   - runTickOnce: batch bot_tick:getPendingJobs thành công → xử lý hidden/verify/backup;
-//     batch lỗi/không phải object → fallback 3 query riêng; sau lỗi tạm bỏ batch.
+//     batch lỗi/không phải object → fallback 5 query riêng (hidden/verify/ticket
+//     panel/job ticket/backup); sau lỗi tạm bỏ batch.
 //   - runBackupJobs: claim chống trùng, truyền claimAt fencing vào mọi processor,
 //     dispatch backup/restore/import, tải file import (fileContent hoặc URL), báo lỗi đúng loại lên dashboard.
 //   - readImportContent: URL lỗi/timeout/thiếu dữ liệu.
@@ -36,6 +37,8 @@ const calls = {
   webhookCache: [],
   reports: [],
   reportsAll: [],
+  ticketPanels: [],
+  tickets: [],
 };
 let batchResponse = null;
 let batchShouldThrow = false;
@@ -89,6 +92,18 @@ const selfDiagnoseMock = {
     calls.selfDiagnose.push(v);
   },
 };
+// Panel mở ticket + job dọn ticket: mock để khẳng định CẢ batch lẫn fallback đều
+// chạm tới — nhánh fallback từng bỏ sót hai việc này (ticket đứng im khi batch lỗi).
+const ticketsMock = {
+  async processOpenPanelItems(_client, _store, items) {
+    calls.ticketPanels.push(items);
+  },
+};
+const ticketJobsMock = {
+  async processTicketJobs(_client, _store, jobs) {
+    calls.tickets.push(jobs);
+  },
+};
 // Báo cáo ngày (đợt #4): tick xử lý cờ cron qua processReportJobs; batch hỏng thì
 // rơi về runDailyReports (quét theo cache config) như hành vi cũ.
 const dailyReportMock = {
@@ -108,6 +123,8 @@ Module._load = function (request, parent) {
     if (request === "./handlers/backup") return backupMock;
     if (request === "./handlers/selfDiagnose") return selfDiagnoseMock;
     if (request === "./handlers/dailyReport") return dailyReportMock;
+    if (request === "./handlers/tickets") return ticketsMock;
+    if (request === "./handlers/ticketJobs") return ticketJobsMock;
     if (request === "./webhookHub") return webhookMock;
   }
   return origLoad.apply(this, arguments);
@@ -179,6 +196,8 @@ globalThis.fetch = async () => {
       verifyPanels: [{ id: "v1" }],
       backups: [],
       reports: [{ guildId: "rep-g1" }],
+      ticketPanels: [{ guildId: "tp-g1" }],
+      tickets: [{ ticketId: "t1" }],
     };
     await runTickOnce(client, store);
     check("batch thành công → gọi batch query", calls.queries.includes("bot_tick:getPendingJobs"));
@@ -194,6 +213,14 @@ globalThis.fetch = async () => {
     check(
       "batch thành công → xử lý báo cáo ngày từ cờ cron (jobs.reports)",
       calls.reports.length === 1 && calls.reports[0][0].guildId === "rep-g1",
+    );
+    check(
+      "batch thành công → dán panel mở ticket",
+      calls.ticketPanels.length === 1 && calls.ticketPanels[0][0].guildId === "tp-g1",
+    );
+    check(
+      "batch thành công → xử lý job dọn ticket",
+      calls.tickets.length === 1 && calls.tickets[0][0].ticketId === "t1",
     );
     check(
       "batch thành công → KHÔNG dùng fallback",
@@ -258,13 +285,15 @@ globalThis.fetch = async () => {
     check("batch cũ không có settingsChanges → không xóa cache nào", calls.invalidate.length === 0);
   }
 
-  // ── 2. Batch trả null → fallback 3 query ──
+  // ── 2. Batch trả null → fallback 5 query ──
   {
     clear();
     batchResponse = null;
     fallbackQueries = {
       "hidden:getBotHiddenJobs": [{ id: "fh" }],
       "guilds:getVerifySendPanelGuilds": [{ id: "fv" }],
+      "guilds:getTicketSendPanelGuilds": [{ guildId: "ftp-g1" }],
+      "bot_tick:getTicketJobs": [{ ticketId: "ft1" }],
       "backup:botGetPending": [],
     };
     await runTickOnce(client, store);
@@ -277,6 +306,18 @@ globalThis.fetch = async () => {
       calls.queries.includes("guilds:getVerifySendPanelGuilds"),
     );
     check("batch null → fallback backup", calls.queries.includes("backup:botGetPending"));
+    check(
+      "batch null → fallback dán panel mở ticket (không đứng im)",
+      calls.queries.includes("guilds:getTicketSendPanelGuilds") &&
+        calls.ticketPanels.length === 1 &&
+        calls.ticketPanels[0][0].guildId === "ftp-g1",
+    );
+    check(
+      "batch null → fallback job dọn ticket (auto-close/close/purge)",
+      calls.queries.includes("bot_tick:getTicketJobs") &&
+        calls.tickets.length === 1 &&
+        calls.tickets[0][0].ticketId === "ft1",
+    );
     check(
       "batch null → vẫn chạy vòng báo cáo theo cache config (không đứng im)",
       calls.reportsAll.length === 1,
