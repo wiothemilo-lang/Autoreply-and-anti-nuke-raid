@@ -12,15 +12,38 @@ Repo đã có ba nơi nhớ: `docs/repo-map.md` (cấu trúc), `docs/decision-lo
 Vault là nơi **nghĩ trước khi chưng cất**: nháp dài, so sánh phương án, câu hỏi
 mở, ghi chú xuyên dự án.
 
-Ranh giới: vault không nằm trong git, không có trên VPS/CI → không bao giờ là
-nguồn sự thật, không chứa secret, không chứa thứ code phụ thuộc.
+Ranh giới: vault nằm trong working tree tại `second-brain/` nhưng bị loại khỏi
+git (`.gitignore` + `.git/info/exclude`) → không có trên VPS/CI, không bao giờ
+là nguồn sự thật, không chứa secret, không chứa thứ code phụ thuộc.
 
 ## Đường dẫn
 
-`/home/wio/Tài liệu/Obsidian Vault/protogon/`
+`/home/wio/Protogon/second-brain/` (Obsidian mở repo `/home/wio/Protogon`
+làm vault; `second-brain/` là thư mục ghi chú).
 
 Nếu đường dẫn không tồn tại (ví dụ đang chạy trên VPS) → bỏ qua, không tạo lại,
 không coi là lỗi.
+
+## Ưu tiên MCP
+
+Nếu có MCP server `obsidian` (plugin Local REST API with MCP) → dùng tool thay
+vì đọc file:
+
+| Việc               | Tool                                               |
+| ------------------ | -------------------------------------------------- |
+| Liệt kê thư mục    | `obsidian.vault_list`                              |
+| Đọc note           | `obsidian.vault_read`                              |
+| Ghi/overwrite      | `obsidian.vault_write`                             |
+| Sửa một đoạn       | `obsidian.vault_patch`                             |
+| Nối cuối file      | `obsidian.vault_append`                            |
+| Tìm kiếm           | `obsidian.search_simple` / `obsidian.search_query` |
+| Di chuyển/đổi tên  | `obsidian.vault_move`                              |
+| Đang mở file nào   | `obsidian.active_file_get_path`                    |
+| Chạy lệnh Obsidian | `obsidian.command_execute`                         |
+
+Đường dẫn trong tool tính từ **vault root** (`/home/wio/Protogon`), nên note
+phải ghi `second-brain/...`. Không có MCP → dùng đường dẫn filesystem bên trên.
+Cài đặt cho agent khác: `docs/obsidian-mcp.md`.
 
 ## Đọc
 

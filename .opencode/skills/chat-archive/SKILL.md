@@ -16,9 +16,13 @@ KHÔNG thay thế `docs/decision-log.md` hay `docs/agent-journal.md`.
 
 ## Đường dẫn
 
-`/home/wio/Tài liệu/Obsidian Vault/protogon/hoi-thoai/`
+`/home/wio/Protogon/second-brain/hoi-thoai/`
 
 Nếu đường dẫn không tồn tại (đang chạy trên VPS) → bỏ qua, không tạo lại.
+
+Có MCP `obsidian` → ghi bằng `obsidian.vault_write` với path
+`second-brain/hoi-thoai/<tên>.md` (path tính từ vault root `/home/wio/Protogon`).
+Không có MCP → ghi thẳng bằng filesystem. Cài đặt: `docs/obsidian-mcp.md`.
 
 ## Lưu một cuộc trò chuyện
 

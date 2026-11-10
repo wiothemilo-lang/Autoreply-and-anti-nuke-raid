@@ -36,3 +36,9 @@ assets/brand/fonts/
 
 # Báo cáo sinh bởi scripts/update-vps-findings.sh
 docs/vps-audit-*.md
+
+# Obsidian vault cục bộ — .obsidian/plugins/*/data.json chứa API key,
+# second-brain/ là ghi chú cá nhân (nguồn sự thật vẫn là docs/ trong git).
+# Anchor ở root: không để khớp nhầm .opencode/skills/second-brain/.
+/.obsidian/
+/second-brain/
