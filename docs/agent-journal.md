@@ -73,6 +73,22 @@
 
 ---
 
+## 2026-11-10 (14) — Vault thành bộ não thứ hai: bản đồ trí nhớ + onboarding agent
+
+- 🧠 **Vault mở rộng** (`second-brain/`, gitignore): `so-do-tri-nho.md` + `.canvas`
+  (22 node/26 edge) làm hub thấy toàn mạng note; `cho-agent/00-bat-dau.md` +
+  `playbook-ghi-nho.md` cho agent lạ; `kiem-tra-vault.md` là bài kiểm định kỳ.
+- 🧪 **Kiểm chứng**: 21 note · 0 link chết · 0 note mồ côi (BFS từ `00-index`);
+  canvas `JSON.parse` OK; MCP Obsidian chạy thật `vault_list`/`vault_read`/
+  `search_query`/`vault_get_document_map`/`vault_write`→`vault_read`→`vault_delete`.
+- 🔧 **Sửa theo audit**: nối 6 note mới vào `00-index` + `so-do-he-thong` §3;
+  xoá rác `.mcp-smoke-test.md`; playbook hết chép 35,9% template; 3 note cũ hết
+  trạng thái lệch (phiên `đang làm`, `phạm-vi` còn `protogon/`, hash `main` cũ).
+- 🧩 **Skill** `.opencode/skills/second-brain`: thêm bước đọc `so-do-tri-nho` +
+  đường onboarding cho Claude Code/Cursor/Codex.
+- ▶️ Tiếp theo: cài thử 1 client MCP ngoài OpenCode; dùng vault 2–3 phiên rồi
+  cắt nếu không ai đọc; bảng "3 tầng ghi nhớ" còn 3 bản.
+
 ## 2026-11-10 (13) — Ẩn bán Premium + tắt giới hạn theo gói
 
 - ✅ Xong: 2 công tắc `SALES_ENABLED`/`PLAN_LIMITS_ENABLED` trong `convex/plans.ts` (đều `false`); server chặn đơn Premium MỚI ở `createTransferIntent` + `startPayment`, mọi server dùng trần cao nhất; web xoá `PremiumPage`/`PlanCard`, `/premium` redirect 301 về `/`, bỏ khỏi nav/sitemap/llms, sửa Điều khoản 3 ngôn ngữ
