@@ -740,38 +740,11 @@ export const setRetention = mutation({
 });
 
 /**
- * Bot quét mỗi giờ để tìm server đã đến hạn tự động backup
- * (bật lịch 2-30 ngày, chưa có yêu cầu đang chờ, chưa backup trong khoảng thời gian đó).
- */
-export const botGetDueAuto = query({
-  args: { botKey: v.optional(v.string()) },
-  handler: async (ctx, { botKey }) => {
-    await requireBotKeyStrict(ctx, botKey);
-    const now = Date.now();
-    // TỐI ƯU (audit Convex): chỉ guild đang có bot (index by_botInGuild) —
-    // bot rời server thì auto-backup không chạy nữa, không cần lọc lại.
-    const all = await ctx.db
-      .query("guilds")
-      .withIndex("by_botInGuild", (q) => q.eq("botInGuild", true))
-      .collect();
-    const due: { guildId: string; days: number }[] = [];
-    for (const g of all) {
-      const days = g.backupAutoDays ?? 0;
-      if (days <= 0 || !g.botInGuild || g.backupRequested) continue;
-      if (g.lastBackupAt === undefined || now - g.lastBackupAt >= days * 86_400_000) {
-        due.push({ guildId: g.discordId, days });
-      }
-    }
-    return due;
-  },
-});
-
-/**
  * Cron Convex (đợt #4): thay vòng `autoBackupInterval` 1 giờ của bot.
  * Đồng hồ "đến hạn tự động backup" thuộc SERVER — bot chỉ còn thực thi khi cờ
  * `backupRequested` xuất hiện trong batch tick.
  *
- * Gương trung thực của `botGetDueAuto` + `autoBackupSweep` cũ: cùng điều kiện
+ * Gương trung thực của `autoBackupSweep` cũ: cùng điều kiện
  * đến hạn (bật lịch 2–30 ngày, chưa có yêu cầu chờ, chưa backup trong khoảng
  * đó) và cùng cách kế thừa "kèm tin nhắn" từ BẢN GẦN NHẤT (checksum incremental
  * phải cùng chế độ với bản trước, nếu không server không đổi vẫn sinh bản trùng

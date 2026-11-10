@@ -87,9 +87,9 @@ const HEADERS: Record<ExportKind, Record<ExportLang, string[]>> = {
     ],
   },
   heat: {
-    vi: ["Thành viên", "ID", "Điểm nhiệt", "Số lần cảnh báo", "Cập nhật cuối (UTC+0)", "Ghi chú"],
-    en: ["Member", "ID", "Heat", "Warn count", "Last update (UTC+0)", "Note"],
-    de: ["Mitglied", "ID", "Hitze", "Warnungen", "Letzte Aktualisierung (UTC+0)", "Notiz"],
+    vi: ["Thành viên", "ID", "Điểm nhiệt", "Số lần cảnh báo", "Cập nhật cuối (UTC+0)"],
+    en: ["Member", "ID", "Heat", "Warn count", "Last update (UTC+0)"],
+    de: ["Mitglied", "ID", "Hitze", "Warnungen", "Letzte Aktualisierung (UTC+0)"],
   },
 };
 
@@ -183,7 +183,6 @@ async function buildRows(
         h.heat,
         h.warnStrikes ?? 0,
         new Date(h.updatedAt).toISOString(),
-        "",
       ]),
     truncated: alive.length > cap,
   };
@@ -223,7 +222,8 @@ export const exportGuildCsv = query({
     // có hàng nghìn dòng heat — xuất hết không giúp gì mà chỉ tốn I/O.
     const cap = kind === "heat" ? limits.heatTopRows : limits.exportRows;
     const built = await buildRows(ctx, guildId, kind, since, cap, lang ?? "vi");
-    const csv = toCsv(built.header, built.rows);
+    // `buildRows` lấy cap+1 dòng để biết còn nữa — file chỉ được chứa cap dòng.
+    const csv = toCsv(built.header, built.rows.slice(0, cap));
     const stamp = new Date(now).toISOString().slice(0, 10);
 
     return {

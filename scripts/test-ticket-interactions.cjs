@@ -264,8 +264,6 @@ Module._load = function (request, parent) {
       mutation: async (name, args) => {
         ctl.calls.push({ fn: "mutation", name, args });
         if (name === "bot_writes:botClaimTicket" && ctl.claimThrows) throw new Error("claim fail");
-        if (name === "bot_writes:botUnclaimTicket" && ctl.unclaimThrows)
-          throw new Error("unclaim fail");
         if (name === "bot_writes:botCloseTicket" && ctl.closeMutThrows)
           throw new Error("close fail");
         return ctl.claimResult;

@@ -27,7 +27,6 @@ export interface StatEvent {
   action: string;
   count: number;
   createdAt: number;
-  punish?: string;
 }
 
 /** Một lượt join rút gọn (chỉ field cần cho thống kê). */
@@ -232,7 +231,6 @@ export const todaySummary = query({
       action: e.action,
       count: e.count,
       createdAt: e.createdAt,
-      punish: e.punish,
     }));
     const statJoins = joins.map((j) => ({
       createdAt: j.joinedAt,

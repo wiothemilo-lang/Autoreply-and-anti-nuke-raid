@@ -154,8 +154,6 @@ export const PORTABLE_CONFIG_FIELDS = [
   "automodEnabled",
 ] as const;
 
-export type PortableConfigField = (typeof PORTABLE_CONFIG_FIELDS)[number];
-
 const FIELD_SET = new Set<string>(PORTABLE_CONFIG_FIELDS);
 
 /** Field boolean — giá trị khác `boolean` bị loại. */

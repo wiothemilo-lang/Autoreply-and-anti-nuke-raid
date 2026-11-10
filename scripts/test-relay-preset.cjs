@@ -258,7 +258,6 @@ const hashMatch = relaySrc.match(
   check(
     "relay query/cleanup có giới hạn số dòng đọc",
     /MAX_STATUS_SCAN/.test(relaySrc) &&
-      /MAX_OWNER_SCAN/.test(relaySrc) &&
       /MAX_DISTRIBUTABLE_SCAN/.test(relaySrc) &&
       /MAX_CLEANUP_BATCH/.test(relaySrc),
   );

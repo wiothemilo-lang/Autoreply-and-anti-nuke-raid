@@ -46,7 +46,6 @@ export const getSettings = query({
       aiWeeklyEnabled: status?.threatResearchAiWeekly ?? true,
       notifyEnabled: status?.researchNotifyEnabled ?? false,
       lastRunAt: status?.threatResearchLastRunAt ?? null,
-      lastRunAtMs: status?.threatResearchLastRunAt ?? null,
       keywords: status?.threatKeywords ?? [],
       scamPhrases: status?.threatScamPhrases ?? [],
       lastSources: status?.threatResearchLastSources ?? [],
@@ -168,7 +167,7 @@ export const botSetResearchRun = mutation({
       threatResearchLastSourceCount: Math.min(args.sources.length, 8),
     };
     if (args.summary) patch.threatResearchLastSummary = clean(args.summary, 700);
-    if (args.aiUsed !== undefined) patch.threatResearchLastAiUsed = args.aiUsed;
+    patch.threatResearchLastAiUsed = args.aiUsed;
     // Lượt chạy THÀNH CÔNG → xóa lỗi lượt trước (nếu có).
     patch.threatResearchLastError = undefined;
     patch.threatResearchLastErrorAt = undefined;
@@ -266,31 +265,6 @@ export const removeKeyword = mutation({
   },
 });
 
-/** Thống kê mẫu raid đã thu thập (hiển thị trong panel Admin — chỉ chủ bot). */
-export const sampleStats = query({
-  args: { token: v.string() },
-  handler: async (ctx, { token }) => {
-    const user = await getUserByToken(ctx, token);
-    if (!user) return { total: 0, last30d: 0, byModule: [] };
-    const status = await getBotStatus(ctx);
-    if (!isBotAdminUser(user, status)) {
-      return { total: 0, last30d: 0, byModule: [] };
-    }
-    const all = await ctx.db.query("raidSamples").collect();
-    const byModule = new Map<string, number>();
-    for (const s of all) byModule.set(s.module, (byModule.get(s.module) ?? 0) + 1);
-    const last30 = all.filter((s) => s.createdAt > Date.now() - 30 * 24 * 3600 * 1000);
-    return {
-      total: all.length,
-      last30d: last30.length,
-      byModule: [...byModule.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8)
-        .map(([module, count]) => ({ module, count })),
-    };
-  },
-});
-
 /**
  * Web Admin + bot — lịch sử học tập gần đây (bảng researchRuns, 20 row mới).
  * Chủ bot (token) HOẶC bot (botKey) đọc được. 1 query rẻ (index, take 20).
@@ -301,18 +275,14 @@ export const getResearchHistory = query({
     botKey: v.optional(v.string()),
   },
   handler: async (ctx, { token, botKey }) => {
-    let isOwner = false;
     if (token) {
       const user = await getUserByToken(ctx, token);
       if (!user) return [];
       const status = await getBotStatus(ctx);
       if (!isBotAdminUser(user, status)) return [];
-      isOwner = true;
     } else {
       await requireBotKeyStrict(ctx, botKey);
-      isOwner = true;
     }
-    if (!isOwner) return [];
     const rows = await ctx.db
       .query("researchRuns")
       .withIndex("by_createdAt", (q) => q.gt("createdAt", 0))

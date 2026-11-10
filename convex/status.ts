@@ -140,15 +140,6 @@ export const reportCardCapability = mutation({
 });
 
 /**
- * Sức khỏe AI (đợt 12) — tổng hợp aiStats() bot đẩy lên qua botSyncGuilds.
- * CHỈ owner bot đọc được: cửa sổ Admin là khu vực riêng tư, người dùng thường
- * không được thấy provider/model/đếm verdict (tránh lộ hạ tầng AI cho kẻ xấu).
- */
-/**
- * Sức khoẻ máy chủ — CHỈ chủ bot xem được (cửa sổ Admin), vì đây là số liệu
- * hạ tầng: % đĩa, GB trống, RAM. Trang Monitor công khai chỉ nhận MỨC.
- */
-/**
  * HÀNG ĐỢI VIỆC — bao nhiêu việc đang chờ bot xử lý, và việc nào BỊ KẸT.
  *
  * Vì sao cần (đợt #4): từ khi chuyển việc quét sang Convex cron, phần lớn
@@ -160,6 +151,8 @@ export const reportCardCapability = mutation({
  * Ngưỡng `STUCK_AFTER_MS`: tick chạy mỗi 3 phút, nên 15 phút = 5 nhịp mà
  * vẫn chưa xử lý thì coi như kẹt (không phải chỉ nhiễu).
  */
+/** Quá 30 phút không báo sức khoẻ → coi là số liệu cũ. */
+const HOST_HEALTH_STALE_MS = 30 * 60_000;
 const STUCK_AFTER_MS = 15 * 60_000;
 
 export const getJobBacklog = query({
@@ -224,6 +217,10 @@ export const getJobBacklog = query({
   },
 });
 
+/**
+ * Sức khoẻ máy chủ — CHỈ chủ bot xem được (cửa sổ Admin), vì đây là số liệu
+ * hạ tầng: % đĩa, GB trống, RAM. Trang Monitor công khai chỉ nhận MỨC.
+ */
 export const getHostHealth = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
@@ -236,10 +233,15 @@ export const getHostHealth = query({
     if (!isBotAdminUser(user, status)) return null;
     const health = status?.hostHealth;
     if (!health) return null;
-    return { stale: Date.now() - health.reportedAt >= 1_800_000, ...health };
+    return { stale: Date.now() - health.reportedAt >= HOST_HEALTH_STALE_MS, ...health };
   },
 });
 
+/**
+ * Sức khỏe AI (đợt 12) — tổng hợp aiStats() bot đẩy lên qua botSyncGuilds.
+ * CHỈ owner bot đọc được: cửa sổ Admin là khu vực riêng tư, người dùng thường
+ * không được thấy provider/model/đếm verdict (tránh lộ hạ tầng AI cho kẻ xấu).
+ */
 export const getAiHealth = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
@@ -367,7 +369,7 @@ export const botStatus = query({
       // Quá 30 phút không báo lại (bot treo/restart) → null, KHÔNG khoe
       // "critical" cũ: cảnh báo cũ còn treo là cảnh báo sai.
       hostHealth:
-        status.hostHealth && Date.now() - status.hostHealth.reportedAt < 1_800_000
+        status.hostHealth && Date.now() - status.hostHealth.reportedAt < HOST_HEALTH_STALE_MS
           ? status.hostHealth.level
           : null,
     };

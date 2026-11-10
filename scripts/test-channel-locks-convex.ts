@@ -11,7 +11,6 @@ import {
   botSaveChannelLock,
   botReleaseChannelLock,
   botDueChannelLocks,
-  listChannelLocks,
   botChannelLocks,
 } from "../convex/channelLocks";
 import { computeBotKey } from "../convex/botAuth";
@@ -22,7 +21,6 @@ type Row = Record<string, any>;
 const saveH = (botSaveChannelLock as any)._handler;
 const releaseH = (botReleaseChannelLock as any)._handler;
 const dueH = (botDueChannelLocks as any)._handler;
-const listH = (listChannelLocks as any)._handler;
 const forGuildH = (botChannelLocks as any)._handler;
 
 let pass = 0;
@@ -299,7 +297,7 @@ function makeCtx(guildOverrides: Row = {}) {
   }
 
   // ═══ 4. Đọc danh sách ═══
-  console.log("\n── botChannelLocks / listChannelLocks ──");
+  console.log("\n── botChannelLocks ──");
   {
     const { ctx } = makeCtx();
     await save(ctx, {
@@ -317,50 +315,6 @@ function makeCtx(guildOverrides: Row = {}) {
     );
     check("bản ghi trả về có prev để khôi phục", "prev" in rows[0], Object.keys(rows[0]));
   }
-  {
-    const { ctx } = makeCtx();
-    await save(ctx, {
-      guildId: "server-1",
-      channelId: "c1",
-      roleId: "E",
-      kind: "text",
-      prev: null,
-    });
-    const rows = await listH(ctx, { token: "tok", guildId: "server-1" });
-    check("chủ server đọc được", rows.length === 1, rows.length);
-    check("`until` thiếu → null (để UI hiện 'vô hạn')", rows[0].until === null, rows[0]?.until);
-    check("danh sách không lộ prev nội bộ", !("prev" in rows[0]), Object.keys(rows[0]));
-  }
-  {
-    const { ctx } = makeCtx();
-    await save(ctx, {
-      guildId: "server-1",
-      channelId: "c1",
-      roleId: "E",
-      kind: "text",
-      prev: null,
-    });
-    let threw = false;
-    try {
-      await listH(ctx, { token: "sai-token", guildId: "server-1" });
-    } catch {
-      threw = true;
-    }
-    check("token sai → từ chối", threw);
-  }
-  {
-    // Không manage guild → từ chối (bảng này là dữ liệu vận hành nội bộ).
-    const { ctx } = makeCtx();
-    ctx.db.patch("u1", { manageableGuildIds: ["server-khac"] });
-    let threw = false;
-    try {
-      await listH(ctx, { token: "tok", guildId: "server-1" });
-    } catch {
-      threw = true;
-    }
-    check("không manage guild → từ chối", threw);
-  }
-
   // ═══ 5. Bảo mật: thiếu botKey ═══
   console.log("\n── chặn ghi khi thiếu botKey ──");
   {

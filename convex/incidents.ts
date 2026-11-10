@@ -37,7 +37,6 @@ export interface RawIncidentEvent {
   /** Số "đơn vị" bị chặn (antinuke có `count`; modaction tính 1). */
   count: number;
   punish?: string;
-  reason?: string;
 }
 
 export interface Incident {
@@ -176,7 +175,6 @@ export const listForGuild = query({
         targetId: m.targetId ?? undefined,
         targetName: m.targetName ?? undefined,
         count: 1,
-        reason: m.reason ?? undefined,
       })),
     ];
     events.sort((a, b) => a.createdAt - b.createdAt);

@@ -61,30 +61,7 @@ export function computeBotKey(ownerSeed: string): string {
 }
 
 /**
- * Đọc OWNER_SEED từ env của deployment. OWNER_SEED là biến "use node"-independent:
- * query/mutation của Convex đọc được env process thông qua V8 runtime env — thực tế
- * Convex chỉ expose process.env trong actions ("use node"). Do đó seed được lưu
- * trong bảng botStatus (do chủ bot đặt 1 lần qua admin web) thay vì env.
- */
-export async function requireBotKey(
-  ctx: QueryCtx | MutationCtx | ActionCtx,
-  botKey: string | undefined,
-): Promise<void> {
-  // Action không có db trực tiếp — đọc seed qua internal query.
-  const status =
-    "db" in ctx
-      ? await getBotStatus(ctx)
-      : await ctx.runQuery(internal.hidden.getBotStatusInternal);
-  const seed = status?.botKeySeed;
-  // Chưa cài seed → chưa kích hoạt (giữ back-compat với bot cũ).
-  if (!seed) return;
-  if (!botKey || computeBotKey(botKey) !== seed) {
-    throw botKeyRejected("BOT_KEY_INVALID", "Chìa khóa bot không hợp lệ (botKey)");
-  }
-}
-
-/**
- * BẢO MẬT CAO: giống requireBotKey nhưng KHÔNG có back-compat.
+ * BẢO MẬT CAO: KHÔNG có back-compat (khác bản requireBotKey đã xoá).
  * Dùng cho các function hủy diệt nếu bị giả mạo: lưu/xóa/claim backup, đồng bộ
  * guild/kênh/role, ghi nhận chủ sở hữu bot… Khi botKeySeed đã đặt mà caller
  * không có chìa khóa đúng → từ chối tuyệt đối (kể cả khi seed chưa đặt, function
@@ -116,9 +93,6 @@ export async function requireBotKeyStrict(
   return status;
 }
 
-/** Sinh chuỗi botKey từ OWNER_SEED — dùng ở Admin web (chỉ chủ bot) + trên VPS. */
-export { KEY_PREFIX };
-
 /** (internal) Bot hỏi: seed đã cấp phát chưa? Không lộ seed — chỉ trả cờ + applicationId. */
 export const getBotKeyStatusInternal = internalQuery({
   args: {},
@@ -127,7 +101,6 @@ export const getBotKeyStatusInternal = internalQuery({
     return {
       seeded: !!status?.botKeySeed,
       botApplicationId: status?.botApplicationId ?? null,
-      lastBootstrapAt: status?.lastBootstrapAt ?? null,
       // Cần cho guard chống xoay seed ngoài luồng: bot thật còn sống thì
       // heartbeat mới; bot bị từ chối botKey thì heartbeat đã cũ.
       lastHeartbeat: status?.lastHeartbeat ?? null,

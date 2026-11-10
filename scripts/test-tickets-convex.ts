@@ -35,7 +35,6 @@ import {
   removeKind,
   setKindEnabled,
   swapKindOrder,
-  botKinds,
   MAX_KINDS,
   MAX_EXTRA_FIELDS,
 } from "../convex/ticketKinds";
@@ -61,7 +60,6 @@ const saveKindH = (saveKind as any)._handler;
 const removeKindH = (removeKind as any)._handler;
 const setKindEnabledH = (setKindEnabled as any)._handler;
 const swapOrderH = (swapKindOrder as any)._handler;
-const botKindsH = (botKinds as any)._handler;
 
 let pass = 0;
 let fail = 0;
@@ -1427,12 +1425,6 @@ const throws = async (fn: () => Promise<unknown>) => {
       rows.map((r: Row) => r.key).join(",") === "b,c,a",
       rows.map((r: Row) => r.key).join(","),
     );
-    const botRows = await botKindsH(e.ctx, { guildId: "g1", botKey: BOT_KEY });
-    check(
-      "botKinds CHỈ trả loại đang bật (loại tắt không dựng nút)",
-      botRows.map((r: Row) => r.key).join(",") === "b,a",
-      botRows.map((r: Row) => r.key).join(","),
-    );
   }
   {
     // Bật/tắt là hành động thường ngày — phải giữ nguyên cấu hình câu hỏi.
@@ -1533,25 +1525,6 @@ const throws = async (fn: () => Promise<unknown>) => {
       await throws(() => removeKindH(e.ctx, { token: "tok", guildId: "g1", key: "a" })),
     );
   }
-  {
-    // Bot key: không có nó thì bất kỳ ai cũng đọc được cấu hình mọi server.
-    const e = env({ seed: null });
-    e.ticketKinds.push({
-      _id: "a",
-      guildId: "g1",
-      key: "a",
-      label: "A",
-      order: 1,
-      enabled: true,
-      createdAt: 1,
-    });
-    check("botKinds thiếu botKey → chặn", await throws(() => botKindsH(e.ctx, { guildId: "g1" })));
-    check(
-      "botKinds sai botKey → chặn",
-      await throws(() => botKindsH(e.ctx, { guildId: "g1", botKey: "sai" })),
-    );
-  }
-
   // ═══ Ô NHẬP BỔ SUNG (phương án B — 29/09/2026) ═══
   console.log("\n── ticketKinds: ô nhập bổ sung ──");
   {

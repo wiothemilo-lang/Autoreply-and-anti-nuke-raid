@@ -46,16 +46,21 @@ export const getGuildWebhooks = query({
 
 /* ======================== Webhook mặc định ======================== */
 
+/** Webhook mặc định của guild (mỗi guild tối đa một) — dùng chung 3 mutation. */
+async function findDefaultWebhook(ctx: QueryCtx | MutationCtx, guildId: string) {
+  return ctx.db
+    .query("guildWebhooks")
+    .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+    .filter((q) => q.eq(q.field("isDefault"), true))
+    .first();
+}
+
 /** Tắt/mở webhook MẶC ĐỊNH của bot (chỉ chủ server quản lý được). */
 export const toggleDefaultWebhook = mutation({
   args: { token: v.string(), guildId: v.string() },
   handler: async (ctx, { token, guildId }) => {
     const guild = await requireGuild(ctx, token, guildId);
-    const wh = await ctx.db
-      .query("guildWebhooks")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .filter((q) => q.eq(q.field("isDefault"), true))
-      .first();
+    const wh = await findDefaultWebhook(ctx, guildId);
     if (!wh)
       throw new Error("Server chưa có webhook mặc định — set kênh log trong Cài đặt để bot tự tạo");
     await ctx.db.patch(wh._id, { enabled: !wh.enabled, updatedAt: Date.now() });
@@ -110,11 +115,7 @@ export const botDefaultWebhookReady = mutation({
   },
   handler: async (ctx, { botKey, guildId, channelId, discordWebhookId, token }) => {
     await requireBotKeyStrict(ctx, botKey);
-    const existing = await ctx.db
-      .query("guildWebhooks")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .filter((q) => q.eq(q.field("isDefault"), true))
-      .first();
+    const existing = await findDefaultWebhook(ctx, guildId);
     const now = Date.now();
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -177,11 +178,7 @@ export const updateDefaultWebhook = mutation({
   },
   handler: async (ctx, { token, guildId, eventTypes, color, contentTemplate }) => {
     const guild = await requireGuild(ctx, token, guildId);
-    const wh = await ctx.db
-      .query("guildWebhooks")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .filter((q) => q.eq(q.field("isDefault"), true))
-      .first();
+    const wh = await findDefaultWebhook(ctx, guildId);
     if (!wh) throw new Error("Server chưa có webhook mặc định — hãy set kênh log trước");
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
     if (eventTypes !== undefined) {

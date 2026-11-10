@@ -149,18 +149,8 @@ export const heatLeaderboard = query({
   },
 });
 
-/** Danh sách guild đang có bot (dùng cho script chẩn đoán lặp từng guild). */
-export const botListGuildIds = query({
-  args: { botKey: v.optional(v.string()) },
-  handler: async (ctx, { botKey }) => {
-    await requireBotKeyStrict(ctx, botKey);
-    const guilds = await ctx.db.query("guilds").collect();
-    return guilds.filter((g) => g.botInGuild).map((g) => ({ guildId: g.discordId, name: g.name }));
-  },
-});
-
 /** Tất cả sự kiện chống nuke từ mốc `since` (script chẩn đoán: dup-logs, ext-app).
- * Hàm này bị script gọi nhưng chưa từng tồn tại → script luôn lỗi "Unknown function". */
+ */
 export const getDailyEvents = query({
   args: {
     since: v.number(),

@@ -222,7 +222,7 @@ export const getRecentJoins = query({
     const limit = Math.min(args.limit ?? 50, 100);
     const joins = await ctx.db
       .query("memberJoins")
-      .withIndex("by_guildId_joinedAt", (q) => q.eq("guildId", args.guildId).gte("joinedAt", 0))
+      .withIndex("by_guildId_joinedAt", (q) => q.eq("guildId", args.guildId))
       .order("desc")
       .take(limit);
     return joins.map((j) => ({

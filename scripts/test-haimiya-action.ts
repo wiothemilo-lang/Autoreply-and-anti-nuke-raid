@@ -1,14 +1,13 @@
-// TEST Haimiya web — tầng 2: Convex action `haimiya:ask` (AI thật) + `haimiya:classifyViolation`.
+// TEST Haimiya web — tầng 2: Convex action `haimiya:ask` (AI thật) + requireBotKeyStrict.
 // Chạy: bun scripts/test-haimiya-action.ts
 // Gọi TRỰC TIẾP handler của action (handler không dùng ctx) với fetch mock —
 // xác minh provider chain, system prompt, history, fallback offline. Không cần key thật.
-import { ask, classifyViolation } from "../convex/haimiya";
+import { ask } from "../convex/haimiya";
 import { computeBotKey, requireBotKeyStrict } from "../convex/botAuth";
 
 // Convex bọc handler trong function object — lấy handler gốc để gọi trực tiếp.
 const askHandler = (ask as any)._handler;
-const classifyHandler = (classifyViolation as any)._handler;
-if (typeof askHandler !== "function" || typeof classifyHandler !== "function") {
+if (typeof askHandler !== "function") {
   console.error("Không lấy được handler từ Convex action — cấu trúc convex thay đổi?");
   process.exit(1);
 }
@@ -193,51 +192,7 @@ const okReply = async () =>
   check("tin đầu là msg-4 (cắt 4 tin cũ)", hist[0]?.content === "msg-4");
   check("tin cuối là msg-11", hist[hist.length - 1]?.content === "msg-11");
 
-  console.log("\nF) classifyViolation (action cũ trên Convex) vẫn hoạt động đúng:");
-  clearAIEnv();
-  (process.env as any).GROQ_API_KEY = "test-groq";
-  mockFetch(
-    JSON.stringify({
-      classification: "raid",
-      confidence: 0.9,
-      reason: "lặp nội dung",
-      suggestPunish: "ban",
-    }),
-  );
-  // classifyViolation giờ CHỈ bot có botKey được gọi (requireBotKeyStrict).
-  const cls = (await classifyHandler(ctxMock, {
-    guildId: "g1",
-    module: "spam",
-    count: 10,
-    windowSeconds: 10,
-    threshold: 6,
-    sampleMessages: ["aa", "aa", "aa"],
-    recentJoins: 5,
-    memberCount: 1000,
-    botKey: BOT_KEY,
-  })) as any;
-  check("phân loại raid + confidence 0.9", cls.classification === "raid" && cls.confidence === 0.9);
-  check("offline: false", cls.offline === false);
-  check(
-    "prompt có dữ liệu server + mẫu tin nhắn",
-    requests[0]?.system?.includes("raḑ") === false && true,
-  );
-
-  // Không key → BỊ TỪ CHỐI (chính sách strict: không cửa hậu cho client lạ)
-  let rejected = false;
-  try {
-    await classifyHandler(ctxMock, {
-      guildId: "g1",
-      module: "spam",
-      count: 10,
-      windowSeconds: 10,
-      threshold: 6,
-      sampleMessages: [],
-    });
-  } catch {
-    rejected = true;
-  }
-  check("không botKey → bị từ chối (requireBotKeyStrict)", rejected);
+  console.log("\nF) requireBotKeyStrict — mã lỗi máy đọc được:");
 
   // Bug thật 06/10/2026: Convex production CHE thông điệp của Error thường thành
   // "[Request ID: …] Server Error". Bot so khớp câu tiếng Việt không bao giờ

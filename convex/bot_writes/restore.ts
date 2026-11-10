@@ -241,7 +241,7 @@ export async function botClearBackupHandler(
     patch.backupError = undefined;
     patch.backupErrorAt = undefined;
     // Backup đã xử lý xong (kể cả trường hợp bỏ qua vì checksum trùng) —
-    // cập nhật mốc để botGetDueAuto không kích hoạt lại tức thì (chống lặp/spam).
+    // cập nhật mốc để cron không kích hoạt lại tức thì (chống lặp/spam).
     // Store thất bại → KHÔNG cập nhật, để bot thử lại ở vòng quét sau.
     if (storeOk !== false) patch.lastBackupAt = Date.now();
     // Mốc "xong" + lý do (không đổi) cho dashboard báo kết quả cho người dùng.

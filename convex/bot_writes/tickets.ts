@@ -235,26 +235,6 @@ export async function botClaimTicketHandler(ctx: MutationCtx, args: BotClaimTick
   return { ok: true, taken: true, byName: args.staffName ?? null };
 }
 
-/** Bỏ nhận (staff đổi ý / ticket chuyển người) — giải phóng cho người khác nhận. */
-export const botUnclaimTicketArgs = {
-  guildId: v.string(),
-  ticketId: v.string(),
-  botKey: v.optional(v.string()),
-};
-export type BotUnclaimTicketArgs = ObjectType<typeof botUnclaimTicketArgs>;
-
-export async function botUnclaimTicketHandler(ctx: MutationCtx, args: BotUnclaimTicketArgs) {
-  await requireBotKeyStrict(ctx, args.botKey);
-  const ticket = await findGuildTicket(ctx, args.guildId, args.ticketId);
-  if (!ticket) return { ok: true, found: false };
-  await ctx.db.patch(ticket._id, {
-    claimedById: undefined,
-    claimedByName: undefined,
-    claimedAt: undefined,
-  });
-  return { ok: true, found: true };
-}
-
 /**
  * Bot đã thu quyền + đổi tên kênh cho ticket đóng từ DASHBOARD.
  *

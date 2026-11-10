@@ -51,7 +51,6 @@ export const DONATE_MAX_VND = 100_000_000;
 /** Một kỳ Premium = 30 ngày. */
 export const PREMIUM_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 /** Đơn quá tuổi này không gọi create nữa — ZaloPay bắt app_time không quá 15 phút. */
-export const INTENT_TTL_MS = 14 * 60 * 1000;
 /** Trần đơn pending trong 1 giờ mỗi người — chống spam tạo đơn tại ZaloPay. */
 export const PENDING_CAP_PER_HOUR = 3;
 const HOUR_MS = 60 * 60 * 1000;
@@ -526,44 +525,6 @@ export const premiumStatus = query({
   },
 });
 
-/** Trạng thái một đơn của người gọi — trang trả về vẽ trạng thái đầu tiên. */
-export const getPaymentForReturn = query({
-  args: { token: v.string(), appTransId: v.string() },
-  handler: async (ctx, { token, appTransId }) => {
-    const user = await getUserByToken(ctx, token);
-    if (!user) return null;
-    const row = await ctx.db
-      .query("payments")
-      .withIndex("by_appTransId", (q) => q.eq("appTransId", appTransId))
-      .first();
-    if (!row || row.userId !== user._id) return null;
-    return { status: row.status, kind: row.kind, plan: row.plan, amount: row.amount };
-  },
-});
-
-/** 10 đơn gần nhất của người gọi (lịch sử ủng hộ/mua Premium). */
-export const history = query({
-  args: { token: v.string() },
-  handler: async (ctx, { token }) => {
-    const user = await getUserByToken(ctx, token);
-    if (!user) return [];
-    const rows = await ctx.db
-      .query("payments")
-      .withIndex("by_userId_createdAt", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .take(10);
-    return rows.map((p) => ({
-      appTransId: p.appTransId,
-      kind: p.kind,
-      plan: p.plan,
-      amount: p.amount,
-      status: p.status,
-      createdAt: p.createdAt,
-      paidAt: p.paidAt,
-    }));
-  },
-});
-
 // ── LUỒNG CHUYỂN KHOẢN TRỰC TIẾP (QR cá nhân — Plan A) ─────────────────────
 // Vì sao có luồng này: ZaloPay checkout cần appid/key1/key2 (chỉ chủ sở hữu
 // tổ chức cấp được); QR ví cá nhân thì không có webhook — nên "tiền về chưa"
@@ -571,7 +532,7 @@ export const history = query({
 // markPaidInternal (gốc duy nhất, idempotent) — client không bao giờ tự cấp
 // được Premium dù bấm bao nhiêu lần.
 
-/** Đơn QR chuyển khoản có hạn 24h (khác INTENT_TTL_MS 14 phút của ZaloPay). */
+/** Đơn QR chuyển khoản có hạn 24h (ZaloPay dùng expire_duration_seconds riêng). */
 export const TRANSFER_ORDER_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**

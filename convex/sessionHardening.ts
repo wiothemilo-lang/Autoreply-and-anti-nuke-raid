@@ -8,7 +8,6 @@ import { v, type GenericId } from "convex/values";
 import {
   getUserByToken,
   PERM_MANAGE_GUILD,
-  guildAccessibleBy,
   SESSION_TTL_MS,
   CURRENT_SESSION_AUTH_VERSION,
 } from "./auth";
@@ -17,13 +16,9 @@ import {
  * Dọn phiên đã quá hạn (gọi cơ hội khi đăng nhập — không cần cron, không tốn
  * function call định kỳ). Bảng sessions luôn nhỏ → auth query nhanh + rẻ.
  */
-async function purgeExpiredSessions(ctx: MutationCtx, maxDelete = 50): Promise<void> {
+async function purgeExpiredSessions(ctx: MutationCtx): Promise<void> {
   const expiredBefore = Date.now() - SESSION_TTL_MS;
-  const oldest = await ctx.db
-    .query("sessions")
-    .withIndex("by_creation_time")
-    .order("asc")
-    .take(maxDelete);
+  const oldest = await ctx.db.query("sessions").withIndex("by_creation_time").order("asc").take(50);
   for (const s of oldest) {
     if (s.createdAt <= expiredBefore) await ctx.db.delete(s._id);
     else break;
@@ -93,11 +88,6 @@ export const loginInternal = internalMutation({
       }
     }
 
-    const stale = await ctx.db
-      .query("sessions")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
-      .first();
-    if (stale) await ctx.db.delete(stale._id);
     await ctx.db.insert("sessions", {
       token: args.token,
       userId,
@@ -105,32 +95,6 @@ export const loginInternal = internalMutation({
       authVersion: CURRENT_SESSION_AUTH_VERSION,
     });
     return { ok: true };
-  },
-});
-
-/** (internal) Tạo phiên mới cho user đã tồn tại (silent refresh) — server-side only. */
-export const newSessionInternal = internalMutation({
-  args: { discordId: v.string() },
-  handler: async (ctx, { discordId }) => {
-    await purgeExpiredSessions(ctx);
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_discordId", (q) => q.eq("discordId", discordId))
-      .first();
-    if (!user) return null;
-    const tokenBytes = crypto.getRandomValues(new Uint8Array(32));
-    // base64url thủ công (Buffer không có sẵn trong mọi runtime)
-    const b64 = btoa(String.fromCharCode(...tokenBytes))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-    await ctx.db.insert("sessions", {
-      token: b64,
-      userId: user._id,
-      createdAt: Date.now(),
-      authVersion: CURRENT_SESSION_AUTH_VERSION,
-    });
-    return { token: b64 };
   },
 });
 
@@ -187,5 +151,3 @@ export const getUserByTokenInternal = internalQuery({
     return await getUserByToken(ctx, token);
   },
 });
-
-export { guildAccessibleBy };
