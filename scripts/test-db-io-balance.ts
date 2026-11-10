@@ -15,6 +15,7 @@
 //
 // Cổng chống tái diễn chính: ĐẾM số dòng trả về trong 1 lượt steady-state và
 // chặn trần — code cũ (collect ~576 dòng) FAIL cổng này ngay.
+import { readFileSync } from "node:fs";
 import { botRecordMetricsHandler } from "../convex/bot_writes/metrics";
 import { botReportDmError } from "../convex/hidden";
 import { computeBotKey } from "../convex/botAuth";
@@ -295,6 +296,97 @@ console.log("── botReportDmError: guild không tồn tại → không ném �
   const { ctx } = makeCtx();
   const res = await dmReport(ctx, { guildId: "9999", error: "x", botKey: BOT_KEY });
   check("guild lạ → { ok: true }", res?.ok === true);
+}
+
+// ─── Cổng TĨNH: các đường nóng đã bỏ quét toàn bảng (audit chi phí Convex) ───
+// Đây là refactor HIỆU NĂNG, không đổi hành vi — test hành vi ở các suite khác
+// đã phủ. Thứ dễ tái phát nhất là ai đó tiện tay viết lại `.collect()` toàn
+// bảng trên đường mở dashboard / mỗi tick bot, nên khoá đúng hình dạng query.
+const root = new URL("..", import.meta.url).pathname;
+const src = (p: string) => readFileSync(`${root}/${p}`, "utf8");
+const block = (text: string, start: string, end: string) => {
+  const i = text.indexOf(start);
+  if (i < 0) return "";
+  const j = text.indexOf(end, i + start.length);
+  return text.slice(i, j < 0 ? undefined : j);
+};
+
+console.log("── Cổng tĩnh: đường đọc Convex không quét toàn bảng ──");
+{
+  const sessions = src("convex/sessions.ts");
+  const guilds = src("convex/guilds.ts");
+  const me = block(sessions, "export const me = query", "export const ");
+  const listMine = block(guilds, "export const listMine = query", "export const ");
+  check(
+    "sessions.me dùng listBotGuildsForUser (không collect cả bảng guilds)",
+    me.includes("listBotGuildsForUser") && !me.includes('query("guilds")'),
+  );
+  check(
+    "guilds.listMine dùng listBotGuildsForUser (không collect cả bảng guilds)",
+    listMine.includes("listBotGuildsForUser") && !listMine.includes('query("guilds")'),
+  );
+
+  const getGuild = block(guilds, "export const getGuild = query", "export const ");
+  check(
+    "getGuild chỉ đọc panels/giveaways/autoReplies khi là chủ bot",
+    getGuild.includes("const panels = isBotOwner") &&
+      getGuild.includes("const giveaways = isBotOwner") &&
+      getGuild.includes("const autoReplies = isBotOwner"),
+  );
+  check(
+    "getGuild lấy giveaway mới nhất qua index (guildId, createdAt) + take(30)",
+    getGuild.includes('withIndex("by_guildId_createdAt"') && getGuild.includes(".take(30)"),
+  );
+
+  const hidden = src("convex/hidden.ts");
+  check(
+    "hiddenPasswordIsSet tra index by_hiddenPasswordHash thay vì quét guild",
+    hidden.includes('withIndex("by_hiddenPasswordHash")') &&
+      !block(hidden, "export async function hiddenPasswordIsSet", "\n}").includes(
+        "legacyHiddenPasswordGuilds(",
+      ),
+  );
+  check(
+    "buildHiddenJobs nhận guild đã đọc sẵn (bot_tick không quét bảng 2 lần)",
+    hidden.includes("preloadedGuilds") &&
+      src("convex/bot_tick.ts").includes("buildHiddenJobs(ctx, guilds)"),
+  );
+
+  const tickets = src("convex/tickets.ts");
+  const state = block(tickets, "export const botTicketState = query", "export const ");
+  check(
+    "botTicketState lấy ticket mới nhất qua index (guildId, openerId, createdAt)",
+    state.includes('withIndex("by_guildId_openerId_createdAt"') &&
+      state.includes('.order("desc")') &&
+      state.includes(".first()"),
+  );
+  check(
+    "botTicketState KHÔNG collect toàn bộ ticket của người mở",
+    !state.includes('withIndex("by_guildId_openerId",') && !state.includes(".collect()"),
+  );
+
+  const incidents = src("convex/incidents.ts");
+  const incBlock = block(incidents, 'query("incidentMarks")', ";");
+  check(
+    "incidents tra incidentMarks theo (guildId, key), không collect cả bảng",
+    incBlock.includes('withIndex("by_guildId_key"') && !incBlock.includes(".collect()"),
+  );
+
+  check(
+    "reports đưa from/to vào RANGE của index (guildId, createdAt)",
+    src("convex/reports.ts").includes('.gte("createdAt", from ?? 0)') &&
+      src("convex/reports.ts").includes('.lte("createdAt", to ?? Number.MAX_SAFE_INTEGER)'),
+  );
+  check(
+    "payments dọn pending cũ bằng index (userId, status, createdAt)",
+    src("convex/payments.ts").includes('withIndex("by_userId_status_createdAt"'),
+  );
+  check(
+    "schema có đủ index mới cho các đường nóng",
+    ["by_hiddenPasswordHash", "by_guildId_openerId_createdAt", "by_userId_status_createdAt"].every(
+      (name) => src("convex/schema.ts").includes(`.index("${name}"`),
+    ),
+  );
 }
 
 console.log(`\n${pass}/${pass + fail} ✅`);

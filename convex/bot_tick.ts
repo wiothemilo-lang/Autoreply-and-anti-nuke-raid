@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { buildHiddenJobs, getBotStatus } from "./hidden";
+import { buildHiddenJobs } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
 import { reassembleBackupJsonForRead } from "./backupChunks";
 
@@ -21,15 +21,16 @@ import { reassembleBackupJsonForRead } from "./backupChunks";
 export const getPendingJobs = query({
   args: { botKey: v.optional(v.string()) },
   handler: async (ctx, { botKey }) => {
-    await requireBotKeyStrict(ctx, botKey);
-    const hidden = await buildHiddenJobs(ctx);
-
-    // TỐI ƯU (audit Convex): bỏ collect() toàn bảng thứ 2 trong cùng 1 lượt tick
-    // (buildHiddenJobs đã đọc guild đang hoạt động) — dùng index by_botInGuild.
+    // Trả luôn document botStatus — dùng lại cho selfDiagnose/threatFlags bên
+    // dưới thay vì đọc cùng row lần hai.
+    const status = await requireBotKeyStrict(ctx, botKey);
+    // Đọc guild MỘT lần cho cả buildHiddenJobs lẫn các nhánh bên dưới — trước
+    // đây hai chỗ cùng quét `by_botInGuild` trong một lượt tick.
     const guilds = await ctx.db
       .query("guilds")
       .withIndex("by_botInGuild", (q) => q.eq("botInGuild", true))
       .collect();
+    const hidden = await buildHiddenJobs(ctx, guilds);
     const verifyPanels = guilds
       .filter((g) => g.verifySendPanel === true && g.verifyEnabled && g.verifyChannelId)
       .map((g) => ({
@@ -166,7 +167,6 @@ export const getPendingJobs = query({
     // Cấu hình self-diagnose (bot tự chẩn đoán lỗi qua AI) + cờ học thủ công /
     // AI review Threat Intel — đi nhờ batch query sẵn có, bot không cần thêm
     // call mutation "claim mù" mỗi 10 phút nữa (tiết kiệm ~4.3k calls/tháng).
-    const status = await getBotStatus(ctx);
     const selfDiagnose = {
       enabled: status?.selfDiagnoseEnabled ?? false,
     };

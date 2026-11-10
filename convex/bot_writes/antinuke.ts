@@ -418,15 +418,16 @@ export async function botRecordRaidSampleHandler(ctx: MutationCtx, args: BotReco
     createdAt: Date.now(),
   });
   // Chống phình DB: giữ tối đa 500 mẫu/server — đủ làm bộ dữ liệu huấn luyện
-  // mà không làm chậm dashboard.
-  const all = await ctx.db
-    .query("raidSamples")
-    .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", args.guildId))
-    .order("desc")
-    .collect();
-  if (all.length > 500) {
-    const drop = all.slice(500).map((r) => r._id);
-    for (const id of drop) await ctx.db.delete(id);
+  // mà không làm chậm dashboard. Dọn theo xác suất + lô như antinukeEvents:
+  // trước đây MỖI lần ghi collect tới 500 mẫu (kèm mảng apps/punished) chỉ để
+  // kiểm tra vượt trần, tức ~500 reads cho mỗi mẫu raid.
+  if (shouldTrim()) {
+    const newest = await ctx.db
+      .query("raidSamples")
+      .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", args.guildId))
+      .order("desc")
+      .take(500 + TRIM_BATCH);
+    await dropBeyondCap(ctx, newest, 500);
   }
   return { ok: true };
 }

@@ -81,6 +81,10 @@ const INDEX_LAST_FIELD: Record<string, string> = {
   by_guildId_status_createdAt: "createdAt",
   by_guildId_createdAt: "createdAt",
   by_guildId_openerId: "openerId",
+  // Index mới (guildId, openerId, createdAt) — `order("desc").first()` mới là
+  // "lần mở gần nhất" thật; thiếu dòng này thì mock trả thứ tự scan và test
+  // cooldown sẽ xanh giả.
+  by_guildId_openerId_createdAt: "createdAt",
   by_guildId_channelId: "channelId",
 };
 
@@ -173,11 +177,17 @@ function makeCtx(opts: { seed?: string | null } = {}) {
           const ordered = (dir: "asc" | "desc") => {
             if (!lastField) return [...matched];
             const f = lastField;
-            return [...matched].sort((a, b) =>
-              dir === "desc"
-                ? String(b[f]).localeCompare(String(a[f]))
-                : String(a[f]).localeCompare(String(b[f])),
-            );
+            // So SỐ khi cả hai là số — `localeCompare` trên chuỗi xếp "1000"
+            // trước "900", khác hẳn thứ tự index thật của Convex.
+            return [...matched].sort((a, b) => {
+              const av = a[f];
+              const bv = b[f];
+              const cmp =
+                typeof av === "number" && typeof bv === "number"
+                  ? av - bv
+                  : String(av).localeCompare(String(bv));
+              return dir === "desc" ? -cmp : cmp;
+            });
           };
           const read = (list: Row[]) => {
             if (table === "tickets") stats.ticketDocs += list.length;

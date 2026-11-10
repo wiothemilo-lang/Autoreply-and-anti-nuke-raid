@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getUserByToken, guildAccessibleBy } from "./auth";
+import { getUserByToken, listBotGuildsForUser } from "./auth";
 
 /**
  * ĐĂNG NHẬP cũ đã BỊ XÓA khỏi API công khai: mutation `sessions:login` nhận
@@ -33,21 +33,18 @@ export const me = query({
   handler: async (ctx, { token }) => {
     const user = await getUserByToken(ctx, token);
     if (!user) return null;
-    const allGuilds = await ctx.db.query("guilds").collect();
-    // Chỉ hiện server BOT ĐANG Ở TRONG (server đã xóa/kick bot sẽ tự biến mất
-    // sau lượt đồng bộ, thay vì nằm mãi trên dashboard như trước).
-    const guilds = allGuilds
-      .filter((g) => g.botInGuild && guildAccessibleBy(user, g))
-      .map((g) => ({
-        discordId: g.discordId,
-        name: g.name,
-        icon: g.icon ?? null,
-        memberCount: g.memberCount ?? null,
-        prefix: g.prefix,
-        antinukeEnabled: g.antinukeEnabled,
-        botInGuild: g.botInGuild,
-        lastHeartbeat: g.lastHeartbeat ?? null,
-      }));
+    // Chỉ tra server user quản lý (manageableGuildIds) thay vì quét cả bảng —
+    // xem `listBotGuildsForUser`. Server đã kick bot tự biến mất sau lượt sync.
+    const guilds = (await listBotGuildsForUser(ctx, user)).map((g) => ({
+      discordId: g.discordId,
+      name: g.name,
+      icon: g.icon ?? null,
+      memberCount: g.memberCount ?? null,
+      prefix: g.prefix,
+      antinukeEnabled: g.antinukeEnabled,
+      botInGuild: g.botInGuild,
+      lastHeartbeat: g.lastHeartbeat ?? null,
+    }));
     const status = await ctx.db
       .query("botStatus")
       .withIndex("by_kind", (q) => q.eq("kind", "status"))

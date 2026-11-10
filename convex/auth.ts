@@ -49,3 +49,30 @@ export function canManageGuild(
 ) {
   return guildAccessibleBy(user, guild);
 }
+
+/**
+ * Các server user quản lý VÀ bot đang ở trong — tra thẳng theo `by_discordId`.
+ *
+ * Trước đây `sessions.me` + `guilds.listMine` quét TOÀN BỘ bảng `guilds`
+ * (hàng nghìn document ~90 field) rồi lọc trong RAM, dù `manageableGuildIds`
+ * đã là danh sách chính xác (Discord xác nhận lúc đăng nhập). Mỗi tab mở
+ * dashboard chạy query này; quét cả bảng là reads vô ích tăng theo số server
+ * của TOÀN hệ thống, không theo số server của user.
+ *
+ * Giữ thứ tự `manageableGuildIds` (thứ tự Discord trả về) và khử trùng lặp.
+ */
+export async function listBotGuildsForUser(
+  ctx: QueryCtx | MutationCtx,
+  user: { manageableGuildIds?: string[] } | null,
+) {
+  const ids = [...new Set(user?.manageableGuildIds ?? [])];
+  const rows = await Promise.all(
+    ids.map((discordId) =>
+      ctx.db
+        .query("guilds")
+        .withIndex("by_discordId", (q) => q.eq("discordId", discordId))
+        .first(),
+    ),
+  );
+  return rows.filter((g): g is NonNullable<typeof g> => !!g && g.botInGuild);
+}

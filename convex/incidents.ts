@@ -186,12 +186,18 @@ export const listForGuild = query({
     incidents.reverse();
     const top = incidents.slice(0, Math.min(limit ?? 50, 200));
 
-    // Gắn cờ "đã xử lý" từ bảng dấu (khoá tất định → tra 1 lần/server).
-    const marks = await ctx.db
-      .query("incidentMarks")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .collect();
-    const done = new Set(marks.map((m) => m.incidentKey));
+    // Gắn cờ "đã xử lý" — chỉ tra đúng các khoá SẮP TRẢ VỀ (≤200), không
+    // collect toàn bộ dấu của server. Bảng dấu không có retention nên collect
+    // từng tăng vô hạn theo lịch sử server.
+    const marks = await Promise.all(
+      top.map((inc) =>
+        ctx.db
+          .query("incidentMarks")
+          .withIndex("by_guildId_key", (q) => q.eq("guildId", guildId).eq("incidentKey", inc.key))
+          .first(),
+      ),
+    );
+    const done = new Set(marks.filter((m) => m !== null).map((m) => m!.incidentKey));
     return top.map((inc) => ({ ...inc, resolved: done.has(inc.key) }));
   },
 });

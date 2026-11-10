@@ -4,6 +4,7 @@ import {
   type ActionCtx,
   internalQuery,
 } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { getBotStatus } from "./hidden";
 import { sha256Hex } from "./sha256";
@@ -93,7 +94,7 @@ export async function requireBotKey(
 export async function requireBotKeyStrict(
   ctx: QueryCtx | MutationCtx | ActionCtx,
   botKey: string | undefined,
-): Promise<void> {
+): Promise<Doc<"botStatus"> | null> {
   const status =
     "db" in ctx
       ? await getBotStatus(ctx)
@@ -110,6 +111,9 @@ export async function requireBotKeyStrict(
   if (!botKey || computeBotKey(botKey) !== seed) {
     throw botKeyRejected("BOT_KEY_INVALID", "Chìa khóa bot không hợp lệ (botKey)");
   }
+  // Trả document đã đọc để caller dùng lại (bot_tick đọc cờ selfDiagnose/
+  // threatFlags ngay sau đó) — tránh đọc lại cùng row mỗi lượt tick.
+  return status;
 }
 
 /** Sinh chuỗi botKey từ OWNER_SEED — dùng ở Admin web (chỉ chủ bot) + trên VPS. */

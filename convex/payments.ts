@@ -30,7 +30,7 @@ import {
   PLAN_ORDER,
   TERMS_VERSION,
   asPlanId,
-  bestEntitlementForUser,
+  entitlementSnapshotForUser,
   planForGuild,
 } from "./plans";
 import { hmacSha256Hex } from "./sha256";
@@ -301,16 +301,21 @@ export const createIntentInternal = internalMutation({
     if (recent.filter((p) => p.status === "pending").length >= PENDING_CAP_PER_HOUR) {
       throw new Error("Bạn có quá nhiều đơn chưa thanh toán — thử lại sau ít phút nhé.");
     }
+    // Index (userId,status,createdAt): lấy đúng đơn PENDING cũ hơn 24h.
+    // Bản cũ dùng (userId,createdAt).lt(cutoff).take(20) — index tăng dần nên
+    // trả 20 đơn CŨ NHẤT (thường đã paid), còn pending mới hơn 24h không bao
+    // giờ được dọn; đồng thời tốn 20 reads mỗi lần tạo đơn.
     const stale = await ctx.db
       .query("payments")
-      .withIndex("by_userId_createdAt", (q) =>
-        q.eq("userId", user._id).lt("createdAt", now - INTENT_CLEAN_AFTER_MS),
+      .withIndex("by_userId_status_createdAt", (q) =>
+        q
+          .eq("userId", user._id)
+          .eq("status", "pending")
+          .lt("createdAt", now - INTENT_CLEAN_AFTER_MS),
       )
       .take(20);
     for (const p of stale) {
-      if (p.status === "pending") {
-        await ctx.db.patch(p._id, { status: "expired", updatedAt: now });
-      }
+      await ctx.db.patch(p._id, { status: "expired", updatedAt: now });
     }
 
     // Premium: từ chối mua gói thấp hơn quyền đang có TRƯỚC KHI tốn một đơn
@@ -508,14 +513,12 @@ export const premiumStatus = query({
     // Dòng ĐANG hiệu lực + cao nhất (không phải dòng đầu index): người mua nhiều
     // lần / mua cho nhiều server có đơn cũ nằm trước đơn mới — tin `.first()` là
     // gắn nhãn "gói X" cho đơn đã hết hạn.
-    const best = await bestEntitlementForUser(ctx, user._id);
+    // Một lượt collect trả cả best lẫn dòng bất kỳ — trước đây query cùng
+    // index lần hai khi không có gói active.
+    const { best, any } = await entitlementSnapshotForUser(ctx, user._id);
     if (best) {
       return { plan: best.plan, startsAt: best.startsAt, expiresAt: best.expiresAt, active: true };
     }
-    const any = await ctx.db
-      .query("entitlements")
-      .withIndex("by_userId", (q) => q.eq("userId", user._id))
-      .first();
     // Chưa từng mua → null (trang giữ nguyên lời mời mua); từng mua mà hết hạn
     // → trả đơn cuối với active: false để UI nói rõ "đã hết hạn" thay vì im lặng.
     if (!any) return null;

@@ -6,6 +6,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { getUserByToken, canManageGuild } from "./auth";
 import { computeBotKey, requireBotKeyStrict } from "./botAuth";
 import { hashHiddenPassword, hashHiddenPasswordGlobal } from "./sha256";
@@ -264,13 +265,22 @@ async function requireHiddenManage(ctx: QueryCtx | MutationCtx, token: string, g
  * 1 query duy nhất mỗi vòng quét thay vì 2 (tiết kiệm function calls free tier).
  * Bot tự lọc guild mình đang ở.
  */
-export async function buildHiddenJobs(ctx: QueryCtx) {
+export async function buildHiddenJobs(
+  ctx: QueryCtx,
+  /**
+   * Caller (bot_tick) đã đọc danh sách guild trong cùng lượt tick — truyền
+   * vào để KHÔNG quét bảng `guilds` lần thứ hai (G document mỗi 2 phút).
+   */
+  preloadedGuilds?: Doc<"guilds">[],
+) {
   // TỐI ƯU (audit Convex): chỉ duyệt guild ĐANG có bot (index by_botInGuild)
   // thay vì collect() toàn bảng — guild đã rời không bao giờ có việc chờ mới.
-  const guilds = await ctx.db
-    .query("guilds")
-    .withIndex("by_botInGuild", (q) => q.eq("botInGuild", true))
-    .collect();
+  const guilds =
+    preloadedGuilds ??
+    (await ctx.db
+      .query("guilds")
+      .withIndex("by_botInGuild", (q) => q.eq("botInGuild", true))
+      .collect());
   const panels = await ctx.db
     .query("reactionRolePanels")
     .withIndex("by_enabled", (q) => q.eq("enabled", true))
@@ -612,15 +622,32 @@ async function legacyHiddenPasswordGuilds(ctx: QueryCtx | MutationCtx) {
 }
 
 /**
+ * Có hash DI SẢN nào không — chỉ cần biết tồn tại, không cần danh sách.
+ *
+ * Dùng index `by_hiddenPasswordHash`: document không có field không nằm trong
+ * index, nên `.first()` là O(1) thay vì quét toàn bộ guild có bot (~2k doc)
+ * mỗi lần mở GuildPage. Chỉ fallback scan khi index chưa được backfill xong?
+ * Không: index Convex được duyệt trước khi query chạy, nên luôn đủ.
+ */
+async function legacyHiddenPasswordExists(ctx: QueryCtx | MutationCtx): Promise<boolean> {
+  const row = await ctx.db.query("guilds").withIndex("by_hiddenPasswordHash").first();
+  return !!row?.hiddenPasswordHash;
+}
+
+/**
  * Cổng mật khẩu ẩn có đang BẬT không — dùng cho payload dashboard.
  * Đúng ở MỌI server (không phụ thuộc guild nào): bật khi có mật khẩu toàn cục,
  * hoặc khi còn hash di sản ở bất kỳ server nào (lúc đó mật khẩu cũ vẫn phải
  * được nhập, để không có server nào mở toang trong lúc chuyển tiếp).
  */
-export async function hiddenPasswordIsSet(ctx: QueryCtx | MutationCtx): Promise<boolean> {
-  const status = await getBotStatus(ctx);
-  if (status?.hiddenPasswordHash) return true;
-  return (await legacyHiddenPasswordGuilds(ctx)).length > 0;
+export async function hiddenPasswordIsSet(
+  ctx: QueryCtx | MutationCtx,
+  /** Status đã đọc sẵn ở caller (getGuild) — tránh đọc lại cùng document. */
+  status?: Awaited<ReturnType<typeof getBotStatus>>,
+): Promise<boolean> {
+  const resolved = status ?? (await getBotStatus(ctx));
+  if (resolved?.hiddenPasswordHash) return true;
+  return await legacyHiddenPasswordExists(ctx);
 }
 
 /** Xoá mật khẩu tính năng ẩn ở MỌI nơi: bản toàn cục + các hash di sản theo server. */

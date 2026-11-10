@@ -100,7 +100,10 @@ function makeCtx(tables: Record<string, Row[]>) {
         return api;
       };
       return {
-        withIndex(indexName: string, build: (q: any) => any) {
+        // `build` là TUỲ CHỌN: Convex cho phép `withIndex("tên")` không range
+        // (quét cả index). hiddenPasswordIsSet dùng dạng đó để trả lời "có hash
+        // di sản nào không" trong O(1) — mock thiếu nhánh này sẽ nổ.
+        withIndex(indexName: string, build?: (q: any) => any) {
           const conds: [string, unknown][] = [];
           const ranges: [string, "gte" | "lte", number][] = [];
           const q: any = {
@@ -118,7 +121,7 @@ function makeCtx(tables: Record<string, Row[]>) {
               return q;
             },
           };
-          build(q);
+          if (build) build(q);
           const matched = rows
             .filter((r) => conds.every(([f, v]) => r[f] === v))
             .filter((r) =>

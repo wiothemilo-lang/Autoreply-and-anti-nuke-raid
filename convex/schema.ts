@@ -496,7 +496,11 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_discordId", ["discordId"])
-    .index("by_botInGuild", ["botInGuild"]),
+    .index("by_botInGuild", ["botInGuild"])
+    // Hash mật khẩu ẩn DI SẢN (bản cũ lưu theo guild). Hầu hết document không
+    // có field này nên index rất nhỏ; dùng để trả lời "có hash nào không"
+    // trong O(1) thay vì quét toàn bộ guild mỗi lần mở dashboard.
+    .index("by_hiddenPasswordHash", ["hiddenPasswordHash"]),
 
   reactionRolePanels: defineTable({
     guildId: v.string(),
@@ -551,6 +555,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_guildId", ["guildId"])
+    .index("by_guildId_createdAt", ["guildId", "createdAt"])
     .index("by_guildId_endsAt", ["guildId", "endsAt"])
     .index("by_status", ["status"]),
 
@@ -1355,6 +1360,10 @@ export default defineSchema({
     .index("by_guildId_status_createdAt", ["guildId", "status", "createdAt"])
     .index("by_guildId_createdAt", ["guildId", "createdAt"])
     .index("by_guildId_openerId", ["guildId", "openerId"])
+    // Mở ticket cần "lần mở gần nhất của user" — index có `createdAt` cuối
+    // cho phép `order("desc").first()` đọc ĐÚNG 1 document, thay vì collect
+    // toàn bộ ticket của user rồi sort trong RAM.
+    .index("by_guildId_openerId_createdAt", ["guildId", "openerId", "createdAt"])
     /**
      * Tra ticket theo ĐÚNG kênh (mỗi kênh chỉ thuộc 1 ticket).
      *
@@ -1498,6 +1507,7 @@ export default defineSchema({
   })
     .index("by_appTransId", ["appTransId"])
     .index("by_userId_createdAt", ["userId", "createdAt"])
+    .index("by_userId_status_createdAt", ["userId", "status", "createdAt"])
     .index("by_status_createdAt", ["status", "createdAt"]),
 
   /**
