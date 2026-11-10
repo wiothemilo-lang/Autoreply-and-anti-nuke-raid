@@ -254,13 +254,6 @@ const commands = applyLocalizations([
   {
     name: "heat",
     description: "Xem mức nhiệt độ vi phạm và độ an toàn của server",
-    options: [
-      {
-        name: "status",
-        description: "Xem trạng thái nhiệt độ & độ an toàn",
-        type: 1,
-      },
-    ],
   },
   {
     name: "mod",
@@ -824,4 +817,4 @@ const commands = applyLocalizations([
   },
 ]);
 
-module.exports = { commands, applyLocalizations };
+module.exports = { commands };

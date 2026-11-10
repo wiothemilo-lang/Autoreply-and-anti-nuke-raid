@@ -26,14 +26,14 @@ const createNukeRollback = require("./nukeRollback");
 module.exports = function createAntiNukeLayer({ client, store, heat, state, core, ai, raidIntel }) {
   // S4 — ngân sách phá hoại tích lũy per-executor + S3 — rollback từ snapshot.
   const vandalBudget = createVandalBudget();
-  const nukeRollback = createNukeRollback({ client, store });
+  const nukeRollback = createNukeRollback({ store });
 
   /**
    * S4+S3 hook chung: ghi ngân sách phá hoại (cách ly khi vượt hạn mức tích lũy
    * trên cả module) và lên lịch rollback cấu trúc từ snapshot. Gọi SAU khi xử
    * phạt xong 1 vụ (fire-and-forget, không chặn pipeline).
    */
-  async function afterPunishHooks(guild, config, executor, module) {
+  async function afterPunishHooks(guild, executor, module) {
     try {
       if (BUDGET_MODULES.has(module) && executor?.id) {
         const count = vandalBudget.note(guild.id, executor.id);
@@ -152,13 +152,13 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
       }));
     }
     const executor = auditRes.executor;
+    const executorMember = executor
+      ? await guild.members.fetch(executor.id).catch(() => null)
+      : null;
     // `entry.executor` từ audit log là User THÔ — không có roles/permissions,
     // nên isExempt(User) luôn false và admin/mod bị phạt oan ở đường này (đường
     // handleAuditEntry đã fetch member trước nên không dính lỗi tương tự).
     // Phải tra member TRƯỚC khi quyết định miễn trừ.
-    const executorMember = executor
-      ? await guild.members.fetch(executor.id).catch(() => null)
-      : null;
     if (
       executor &&
       (executor.id === client.user.id || isExempt(executorMember ?? executor, moduleCfg, config))
@@ -264,7 +264,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     });
 
     // S4 ngân sách phá hoại + S3 rollback từ snapshot (fire-and-forget).
-    await afterPunishHooks(guild, config, executor, module);
+    await afterPunishHooks(guild, executor, module);
 
     // Raid Intel: săn nguồn cơn (kẻ chủ mưu) + ghi mẫu dữ liệu huấn luyện.
     try {
@@ -306,12 +306,6 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     }
   }
 
-  /**
-   * Bot hit-and-run: bot vừa được thêm (BotAdd) rồi TỰ RỜI trong cửa sổ —
-   * không có audit kick (loại trường hợp mod/bot khác kick), không phải bot
-   * logging hợp pháp, không tin cậy → xử lý qua pipeline chuẩn.
-   */
-
   /** Xử lý sự kiện audit log: tạo webhook / thread hàng loạt (không cần fetch lại). */
   async function handleAuditEntry(entry, guild, module, describeTarget) {
     if (!guild || guild.available === false) return;
@@ -325,6 +319,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     // thang đặc quyền thường ĐANG là mod (có quyền Manage Roles) nên không cho
     // modRoles được miễn module này.
     let exempt = false;
+    let executorMember = null;
     if (executor) {
       if (executor.id === client.user.id) {
         exempt = true;
@@ -342,7 +337,8 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
         // (fetch member sẽ null với bot ngoài server) → guard này bắt tại đây.
         exempt = true;
       } else {
-        const em = await guild.members.fetch(executor.id).catch(() => null);
+        executorMember = await guild.members.fetch(executor.id).catch(() => null);
+        const em = executorMember;
         if (em) {
           if (module === "adminSelfGrant") {
             // Bot tự cấp/quyền admin là vector nuke — KHÔNG miễn cho bot.
@@ -373,9 +369,6 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     // Bot gây hại (vừa được thêm vào server): xử lý NGAY ở lần đầu.
     // Bot tin cậy (xác minh / đã ở lại server >= 7 ngày — Carl-bot, Dyno, Wick…)
     // làm moderation bình thường → đi theo ngưỡng thường, không bị ban oan.
-    const executorMember = executor
-      ? await guild.members.fetch(executor.id).catch(() => null)
-      : null;
     const executorIsHostileBot =
       executor?.bot === true && !isTrustedBotMember(executorMember ?? executor, guild);
     const effectiveThreshold =
@@ -445,7 +438,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     });
 
     // S4 ngân sách phá hoại + S3 rollback từ snapshot (fire-and-forget).
-    await afterPunishHooks(guild, config, executor, module);
+    await afterPunishHooks(guild, executor, module);
 
     // Raid Intel: săn nguồn cơn (kẻ chủ mưu) + ghi mẫu dữ liệu huấn luyện.
     try {
@@ -470,7 +463,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     await sendLog(guild, config, embed);
 
     // BÁO CÁO KHẨN cho các module nuke cấu trúc (ban/kick/xóa kênh hàng loạt…).
-    if (IMMEDIATE_BOT_NUKE.has(module) || module === "massJoin") {
+    if (IMMEDIATE_BOT_NUKE.has(module)) {
       const alertSummary =
         MODULE_LABELS[module] + " — " + count + " lượt trong " + moduleCfg.windowSeconds + "s";
       // DM owner: kênh log kẻ nuke có quyền xoá được — DM thì không. Vụ nuke
@@ -669,13 +662,10 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
   return {
     handleAttributeEvent,
     handleAuditEntry,
-    afterStructuralEvent,
     routeAuditEntry,
     handleMessageBulk,
     tickUnlocks,
     tickHeatResets,
     tickVandalReleases,
-    vandalBudget,
-    nukeRollback,
   };
 };

@@ -183,7 +183,6 @@ module.exports = function createVandalBudget() {
     WINDOW_MS,
     BUDGET_LIMIT,
     ISOLATE_MS,
-    ISOLATE_ROLE_NAME,
     note,
     score,
     maybeIsolate,

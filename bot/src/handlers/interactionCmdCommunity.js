@@ -11,7 +11,10 @@ const { emojiKeyOf } = require("./hidden");
 const { parseDuration, canMod } = require("./modTools");
 const { needPerm } = require("./interactionCommon");
 
-/** Phân tích chuỗi "emoji:role emoji:role" (role là ID hoặc <@&id> hoặc tên role). */
+/**
+ * Phân tích chuỗi "emoji:role emoji:role" (role là ID, <@&id> hoặc tên role).
+ * Dùng chung cho slash `/reactionrole` và prefix `!reactionrole`.
+ */
 function parsePairs(pairsRaw, guild) {
   if (!pairsRaw) return [];
   const entries = [];
@@ -304,4 +307,4 @@ async function reactionrole(store, interaction, guild) {
   return;
 }
 
-module.exports = { giveaway, reactionrole };
+module.exports = { giveaway, reactionrole, parsePairs };

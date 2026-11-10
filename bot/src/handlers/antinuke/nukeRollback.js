@@ -387,5 +387,5 @@ module.exports = function createNukeRollback({ store }) {
     active.clear();
   }
 
-  return { scheduleRollback, runRollback, reset, GRACE_MS, MIN_MISSING, COOLDOWN_MS };
+  return { scheduleRollback, runRollback, reset, GRACE_MS };
 };

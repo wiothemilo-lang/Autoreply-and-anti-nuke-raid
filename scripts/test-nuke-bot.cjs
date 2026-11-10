@@ -80,10 +80,7 @@ console.log("=== A. Bot nuke KHÔNG verify, MỚI vào server → phải bị x�
   check("A3 không phải trusted bot", !isTrustedBotMember(freshEvil, guild));
   check(
     "A4 massBan nằm trong IMMEDIATE_BOT_NUKE",
-    !IMMEDIATE_BOT_NUKE ||
-      IMMEDIATE_BOT_NUKE.has("massBan") ===
-        (typeof IMMEDIATE_BOT_NUKE.has === "function" ? true : true) ||
-      true,
+    IMMEDIATE_BOT_NUKE instanceof Set && IMMEDIATE_BOT_NUKE.has("massBan"),
   );
 }
 

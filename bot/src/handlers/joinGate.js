@@ -1,12 +1,7 @@
 const { Colors } = require("discord.js");
 const { logEmbed, sendLog } = require("../util");
 const { isLocked } = require("../lockdown");
-const {
-  analyzeNewMember,
-  executePunishment,
-  buildRiskEmbed,
-  trackJoinForBurst,
-} = require("../altDetection");
+const { analyzeNewMember, trackJoinForBurst, enforceAltGate } = require("../altDetection");
 
 const DAY_MS = 86_400_000;
 
@@ -265,50 +260,13 @@ module.exports = async function joinGate(client, member, store) {
     }
   } catch {}
 
-  // Execute punishment if risk exceeds threshold
-  let punishResult = null;
-  if (analysis.action !== "pass") {
-    try {
-      punishResult = await executePunishment(member, analysis, config);
-    } catch (err) {
-      console.error(`[altDetect:punish] ${member.guild.id}/${member.id}:`, err.message);
-    }
-
-    // Update the join record with action taken
-    if (punishResult?.executed) {
-      // Đánh dấu record join đã bị phạt → lần join sau với account khác có thể
-      // đối chiếu (rejoin-evasion detection).
-      try {
-        await store.client.mutation("altDetection:markJoinPunished", {
-          guildId: member.guild.id,
-          userId: member.id,
-          action: punishResult.action,
-        });
-      } catch (err) {
-        console.error(`[altDetect:mark] ${member.guild.id}:`, err.message);
-      }
-      try {
-        // Record as antinuke event for the log
-        await store.client.mutation("bot_writes:botRecordAntinukeEvent", {
-          guildId: member.guild.id,
-          module: "altDetection",
-          executorId: member.id,
-          executorName: member.user.username,
-          action: `${punishResult.action} — risk: ${analysis.riskScore}/100 — ${analysis.riskFactors.join("; ")}`,
-          count: 1,
-          windowSeconds: 60,
-          threshold: 1,
-          punish: analysis.action,
-        });
-      } catch (err) {
-        console.error("[altDetect:event]", err.message);
-      }
-
-      // Send log embed
-      const embed = buildRiskEmbed(member, analysis, punishResult);
-      await sendLog(member.guild, config, embed).catch(() => {});
-    }
-  } else if (analysis.riskScore >= 20) {
+  // Cổng alt dùng chung: analysis đã có sẵn từ bước burst detection nên
+  // không phân tích lại; helper lo phạt + ghi dấu + event + log.
+  const { blocked } = await enforceAltGate(member, config, store, {
+    gate: "join",
+    analysis,
+  });
+  if (!blocked && analysis.riskScore >= 20) {
     // Low-risk but notable — log it for analytics (don't punish)
     console.log(
       `[altDetect:monitor] ${member.guild.name}/${member.user.username} — risk=${analysis.riskScore}, monitoring only`,

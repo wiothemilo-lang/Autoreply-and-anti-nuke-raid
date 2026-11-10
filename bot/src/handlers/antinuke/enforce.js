@@ -18,7 +18,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state }) {
    * và tự tăng cấp nếu vượt ngưỡng.
    * Trả về mô tả hành động.
    */
-  async function punishWithHeat(guild, member, moduleCfg, reason, opts = {}) {
+  async function punishWithHeat(guild, member, moduleCfg, reason) {
     const actions = actionsOf(moduleCfg);
     const memberActions = actions.filter((a) => ["warn", "kick", "ban", "timeout"].includes(a));
     if (memberActions.length === 0) {
@@ -26,14 +26,13 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state }) {
         action: "không phạt thành viên (chỉ dọn tin nhắn)",
         caseNumber: undefined,
         chosen: null,
-        heatRes: null,
       };
     }
     const base = memberPunishOf(actions, moduleCfg.punish || "warn");
     // Nuke module: phạt trực tiếp theo cấu hình. BOT (thành viên là bot user) trigger
     // module chống nuke/raid: cũng phạt THẲNG TAY theo cấu hình — bot không cần cộng
-    // nhiệt như người dùng (không "học" sau nhiều lần nhắc nhở). opts.direct tương tự.
-    if (NUKE_MODULES.has(moduleCfg.module) || opts.direct || member?.user?.bot === true) {
+    // nhiệt như người dùng (không "học" sau nhiều lần nhắc nhở).
+    if (NUKE_MODULES.has(moduleCfg.module) || member?.user?.bot === true) {
       const chosen = base;
       const res = await punishMember(
         guild,
@@ -43,9 +42,9 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state }) {
         moduleCfg.timeoutSeconds,
         store,
       );
-      return { action: res.action, caseNumber: res.caseNumber, chosen, heatRes: null };
+      return { action: res.action, caseNumber: res.caseNumber, chosen };
     }
-    const s = heatSettings(configOf(guild.id));
+    const s = heatSettings(lastConfigs.get(guild.id) ?? {});
     const heatRes = await heat.add(
       guild.id,
       member.id,
@@ -56,17 +55,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state }) {
     const chosen = choosePunish(base, heatRes);
     const res = await punishMember(guild, member, chosen, reason, moduleCfg.timeoutSeconds, store);
     if (chosen !== "warn") heat.markPunished(guild.id, member.id);
-    return {
-      action: res.action + heatSummary(heatRes),
-      caseNumber: res.caseNumber,
-      chosen,
-      heatRes,
-    };
-  }
-
-  // Lưu config đã đọc gần nhất để punishWithHeat tái sử dụng (tránh đọc lại DB).
-  function configOf(guildId) {
-    return lastConfigs.get(guildId) ?? {};
+    return { action: res.action + heatSummary(heatRes), caseNumber: res.caseNumber, chosen };
   }
 
   /** Auto-lock channels when a raid is confirmed and lockdown is enabled. */
@@ -76,5 +65,5 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state }) {
     await lockGuild(client, guild, config, store);
   }
 
-  return { punishWithHeat, configOf, maybeLockdown };
+  return { punishWithHeat, maybeLockdown };
 };

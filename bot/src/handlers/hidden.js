@@ -502,5 +502,4 @@ module.exports = {
   processHiddenJobsData,
   processVerifyPanelItems,
   emojiKeyOf,
-  resolveEmoji,
 };

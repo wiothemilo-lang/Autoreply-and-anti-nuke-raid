@@ -104,6 +104,15 @@ async function ticketOpenSubmitModal(client, store, interaction) {
 }
 
 /**
+ * Tra guild cho interaction đến từ DM (nút/modal khiếu nại sau khi bị ban).
+ * DM không có `interaction.guild`, nên phải đi qua cache/fetch.
+ */
+async function resolveDmGuild(client, interaction) {
+  if (interaction.guild) return interaction.guild;
+  return client.guilds.fetch(interaction.channel?.guildId || interaction.guildId).catch(() => null);
+}
+
+/**
  * TICKET — nút "Mở khiếu nại" trong DM sau khi bị ban.
  *
  * Modal KHÔNG có `guild` (nút nằm trong DM) → phải tự tra guild qua
@@ -112,11 +121,7 @@ async function ticketOpenSubmitModal(client, store, interaction) {
  */
 async function ticketOpenDmButton(client, store, interaction) {
   // Cache có thể lỗi thời (bot vừa restart) → fetch tươi.
-  const guild = interaction.guild
-    ? interaction.guild
-    : await client.guilds
-        .fetch(interaction.channel?.guildId || interaction.guildId)
-        .catch(() => null);
+  const guild = await resolveDmGuild(client, interaction);
   // Nút này nằm trong DM → không có guild nào hợp lệ. Trả lời rõ thay vì
   // crash im lặng.
   if (!guild) {
@@ -134,11 +139,7 @@ async function ticketOpenDmButton(client, store, interaction) {
 async function ticketAppealModal(client, store, interaction) {
   const body = interaction.fields.getTextInputValue("ticket_body");
   const evidence = interaction.fields.getTextInputValue("ticket_evidence");
-  const guild = interaction.guild
-    ? interaction.guild
-    : await client.guilds
-        .fetch(interaction.channel?.guildId || interaction.guildId)
-        .catch(() => null);
+  const guild = await resolveDmGuild(client, interaction);
   if (!guild) {
     return interaction.reply({ content: "❌ Không tìm thấy server.", ephemeral: true });
   }
@@ -218,24 +219,7 @@ async function ticketActionButton(client, store, interaction) {
   // ── Nhận việc / bỏ nhận ──
   // CHỈ 1 người nhận: 3 mod trả lời cùng một khiếu nại là người mở phải đọc
   // 3 câu mâu thuẫn. Người bấm sau bị từ chối kèm tên người đã nhận.
-  if (parsed.action === "ticket_claim" || parsed.action === "ticket_unclaim") {
-    if (parsed.action === "ticket_unclaim") {
-      try {
-        await store.client.mutation("bot_writes:botUnclaimTicket", {
-          guildId: guild.id,
-          ticketId: parsed.ticketId,
-        });
-      } catch (e) {
-        console.error(`[tickets] bỏ nhận thất bại:`, e.message);
-        return interaction.reply({ content: T.errUnknown, ephemeral: true });
-      }
-      await logTicketAction(guild, config, {
-        title: "🎫 Bỏ nhận ticket",
-        description: `${interaction.user.username} bỏ nhận ticket trong kênh này.`,
-        color: Colors.Grey,
-      });
-      return interaction.reply({ content: T.unclaimDone, ephemeral: true });
-    }
+  if (parsed.action === "ticket_claim") {
     let res;
     try {
       res = await store.client.mutation("bot_writes:botClaimTicket", {
@@ -385,7 +369,7 @@ async function ticketActionButton(client, store, interaction) {
     });
   }
 
-  return interaction.reply({ content: "⚠️ Ticket không còn trong hệ thống.", ephemeral: true });
+  return interaction.reply({ content: T.errTicketGone, ephemeral: true });
 }
 
 /**
@@ -617,7 +601,6 @@ function renderError(res, T) {
   if (res.code === "errAlreadyOpen" && res.channelId) {
     return T.errAlreadyOpen.replace("{ch}", `<#${res.channelId}>`);
   }
-  if (res.code === "errHierarchy") return T.errHierarchy;
   if (res.code === "MAX_CHANNELS") return T.errChannelsFull;
   return T[res.code] || T.errNoPerm;
 }

@@ -30,11 +30,6 @@ const { isLocked } = require("../lockdown");
  * File này chỉ làm việc với Discord: tạo kênh, gắn quyền, gửi embed.
  */
 
-/** Số ký tự Discord cho phép trong tên kênh. */
-const CHANNEL_NAME_MAX = core.CHANNEL_NAME_MAX;
-
-/** Trần kênh Discord (hard limit của nền tảng). */
-
 /** customId: <hành động>:<ticketId>. ticketId là _id của Convex. */
 const ID_SEP = ":";
 
@@ -94,14 +89,6 @@ function langFor(interaction, guild) {
 }
 
 /**
- * Hàng nút thao tác trong kênh ticket (chỉ staff bấm được).
- *
- * `ticketId` nhét vào customId vì kênh Discord không có nguồn nào khác để bot
- * biết đây là ticket nào — không có state trong RAM, và người dùng có thể
- * dán lại embed vào kênh khác.
- */
-
-/**
  * Lỗi Discord → câu báo tiếng Việt đọc được.
  *
  * Mục tiêu: KHÔNG BAO GIỜ để lỗi thô của Discord lọt ra cho người dùng
@@ -111,7 +98,8 @@ function langFor(interaction, guild) {
 function describeGuildError(e) {
   const code = e?.code ?? e?.rawError?.code;
   const msg = String(e?.message || "");
-  if (code === 30003 || /MAX_CHANNELS/i.test(msg)) return "MAX_CHANNELS";
+  if (code === 30013 || /maximum number of (guild )?channels|MAX_CHANNELS/i.test(msg))
+    return "MAX_CHANNELS";
   if (code === 10003 || /Unknown Channel/i.test(msg)) return "NO_CATEGORY";
   if (code === 50013 || /missing permissions|not allowed to manage/i.test(msg)) {
     return "MISSING_PERM";
@@ -139,7 +127,7 @@ async function createTicketChannel({
   isPublic = false,
 }) {
   const channel = await guild.channels.create({
-    name: channelName.slice(0, CHANNEL_NAME_MAX),
+    name: channelName.slice(0, core.CHANNEL_NAME_MAX),
     type: ChannelType.GuildText,
     parent: category,
     // Slowmode set NGAY LÚC TẠO: sửa sau cũng tốn 1 lượt API, mà bot có thể
@@ -561,7 +549,7 @@ async function closeTicketChannel({ guild, channel, openerId }) {
   }
   try {
     const base = channel.name.replace(/^closed-/, "");
-    const closedName = `closed-${base}`.slice(0, CHANNEL_NAME_MAX);
+    const closedName = `closed-${base}`.slice(0, core.CHANNEL_NAME_MAX);
     await channel.setName(closedName);
   } catch {
     // Tên đã đúng dạng hoặc thiếu quyền — không chặn việc đóng.
@@ -974,8 +962,6 @@ function panelRows(T, ticketId) {
   return [actionRow(T, ticketId), extraRow(T, ticketId)];
 }
 
-/** Hàng nút cho người đã nhận (claim rồi) — cho nút "Bỏ nhận". */
-
 /** Modal "Đóng kèm lý do" — lý do bắt buộc vì staff và người mở đều thấy. */
 function closeReasonModal(T, ticketId) {
   return new ModalBuilder()
@@ -1028,17 +1014,13 @@ async function closeTicketWithReason({
     console.error(`[tickets] ghi trạng thái đóng thất bại ${guild.id}:`, e.message);
   }
   const grace = core.normalizeGraceHours(graceHours);
-  const embed = new EmbedBuilder()
-    .setColor(Colors.Grey)
-    .setTitle(T.closedTitle)
-    .setDescription(
-      reason ? String(T.closedWithReason).replace("{reason}", reason) : String(T.closeNote || ""),
-    )
-    .addFields(
+  const embed = closedEmbed(T, {
+    reason,
+    fields: [
       { name: T.closedBy, value: closedByName || "—", inline: true },
       { name: " ", value: `⏳ ${grace}h`, inline: true },
-    )
-    .setTimestamp(Date.now());
+    ],
+  });
   try {
     await channel.send({ embeds: [embed] });
   } catch {
@@ -1056,6 +1038,22 @@ async function closeTicketWithReason({
  *
  * Trả false khi KHÔNG lưu được — khi đó KHÔNG xoá kênh.
  */
+/**
+ * Embed "đã đóng" dùng chung cho close tay, auto-close và đóng từ dashboard.
+ * Chỉ khác nhau tiêu đề/nội dung/field phụ — màu và cách ghép lý do phải giống.
+ */
+function closedEmbed(T, { title = T.closedTitle, reason, note = T.closeNote, fields = [] } = {}) {
+  const embed = new EmbedBuilder()
+    .setColor(Colors.Grey)
+    .setTitle(title)
+    .setDescription(
+      reason ? String(T.closedWithReason).replace("{reason}", reason) : String(note || ""),
+    )
+    .setTimestamp(Date.now());
+  if (fields.length) embed.addFields(...fields);
+  return embed;
+}
+
 async function saveTranscript({ store, guild, channel, ticketId, maxMessages }) {
   let messages;
   try {
@@ -1102,7 +1100,6 @@ async function saveTranscript({ store, guild, channel, ticketId, maxMessages }) 
 }
 
 module.exports = {
-  CHANNEL_NAME_MAX,
   staffRoleIds,
   langFor,
   actionRow,
@@ -1123,11 +1120,11 @@ module.exports = {
   sendOpenPanel,
   processOpenPanelItems,
   escapePayload,
-  ID_SEP,
   buildPanel,
   extraRow,
   panelRows,
   closeReasonModal,
   closeTicketWithReason,
   saveTranscript,
+  closedEmbed,
 };

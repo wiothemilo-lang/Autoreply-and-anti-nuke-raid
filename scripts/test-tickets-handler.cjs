@@ -121,7 +121,11 @@ check("chuỗi rỗng → null", tickets.parseTicketId("") === null);
 // ═══ describeGuildError: dịch lỗi Discord thành mã đã dịch sẵn ═══
 console.log("\n── describeGuildError ──");
 check("50013 → MISSING_PERM", tickets.describeGuildError({ code: 50013 }) === "MISSING_PERM");
-check("30003 → MAX_CHANNELS", tickets.describeGuildError({ code: 30003 }) === "MAX_CHANNELS");
+check("30013 → MAX_CHANNELS", tickets.describeGuildError({ code: 30013 }) === "MAX_CHANNELS");
+check(
+  "30003 (giới hạn pin) KHÔNG bị nhầm thành trần kênh",
+  tickets.describeGuildError({ code: 30003 }) === "UNKNOWN",
+);
 check("10003 → NO_CATEGORY", tickets.describeGuildError({ code: 10003 }) === "NO_CATEGORY");
 check(
   "message tiếng Anh 'missing permissions' → MISSING_PERM",
@@ -129,7 +133,7 @@ check(
 );
 check(
   "rawError.code được đọc",
-  tickets.describeGuildError({ rawError: { code: 30003 } }) === "MAX_CHANNELS",
+  tickets.describeGuildError({ rawError: { code: 30013 } }) === "MAX_CHANNELS",
 );
 check("lỗi lạ → UNKNOWN", tickets.describeGuildError({ message: "wat" }) === "UNKNOWN");
 check("không có lỗi → UNKNOWN", tickets.describeGuildError(null) === "UNKNOWN");
@@ -289,7 +293,7 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
     // Lỗi tạo kênh phải BÁO LÊN (không nuốt) — openTicket dựa vào đó để ghi
     // openError cho dashboard.
     const boom = new Error("boom");
-    boom.code = 30003;
+    boom.code = 30013;
     const { guild, category } = makeGuild({ createThrows: boom });
     let caught = null;
     try {
@@ -517,7 +521,6 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
 
   // ═══ Hằng số Discord ═══
   console.log("\n── hằng số ──");
-  check("tên kênh tối đa 100 ký tự", tickets.CHANNEL_NAME_MAX === 100);
 
   // ═══ openTicket: toàn bộ hàng rào + nhánh lỗi trước khi có kênh ═══
   // Trước đợt này `openTicket` có 0% coverage: đúng những nhánh quyết định
@@ -921,7 +924,7 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
     // Chạm trần 500 kênh: bản ghi PHẢI được giữ lại kèm openError để staff
     // thấy trên dashboard — xoá dấu vết ở đây là thông tin biến mất im lặng.
     const boom = new Error("Maximum number of channels reached");
-    boom.code = 30003;
+    boom.code = 30013;
     const env = openEnv({ createThrows: boom });
     const r = await run(env);
     const setCall = env.calls.mutations.find((m) => m.name === "bot_writes:botSetTicketChannel");

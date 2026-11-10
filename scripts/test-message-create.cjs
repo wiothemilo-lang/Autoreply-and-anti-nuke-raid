@@ -63,6 +63,33 @@ Module._load = function (request, parent) {
             return this;
           },
         }),
+        // Cổng alt dùng chung — mock giữ đúng chuỗi mutation mà handler cũ gọi.
+        async enforceAltGate(member, _config, store, { gate } = {}) {
+          const analysis = altAnalysis;
+          if (!analysis || analysis.action === "pass") {
+            return { analysis, punishResult: null, blocked: false };
+          }
+          const result = punishResult;
+          if (!result?.executed) return { analysis, punishResult: result, blocked: false };
+          await store.client.mutation("altDetection:markJoinPunished", {
+            guildId: member.guild?.id ?? "g-test",
+            userId: member.id,
+            action: result.action,
+          });
+          await store.client.mutation("bot_writes:botRecordAntinukeEvent", {
+            guildId: member.guild?.id ?? "g-test",
+            module: "altDetection",
+            executorId: member.id,
+            executorName: member.user.username,
+            action: `${result.action} at ${gate}`,
+            count: 1,
+            windowSeconds: 60,
+            threshold: 1,
+            punish: analysis.action,
+          });
+          logCalls.push({ embed: { title: "Alt Detected" } });
+          return { analysis, punishResult: result, blocked: true };
+        },
       };
     }
   }

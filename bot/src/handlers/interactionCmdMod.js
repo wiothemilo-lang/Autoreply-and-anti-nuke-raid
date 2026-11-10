@@ -1,7 +1,7 @@
 // Nhóm lệnh slash "moderation" — tách từ handlers/interactionCreate.js (đợt #5
 // tách monolith — 03/10/2026). Chỉ CHUYỂN CHỖ code, không đổi hành vi.
 //
-// Gồm: /lock (kèm `lockCommand` + danh sách MODULES antinuke) · /antinuke ·
+// Gồm: /lock (kèm danh sách MODULES antinuke) · /antinuke ·
 // /mod. Mỗi hàm lệnh dưới đây CHÍNH LÀ thân `case "..."` cũ, chỉ đổi vỏ thành
 // hàm nhận tham số — interactionCreate.js gọi theo tên lệnh.
 
@@ -32,7 +32,7 @@ const { needPerm, MODULES } = require("./interactionCommon");
  * trị, nhận role và thời lượng — và phải KHÔI PHỤC ĐÚNG quyền cũ (xem
  * `channelLock.js`).
  */
-async function lockCommand(client, store, interaction) {
+async function lock(client, store, interaction) {
   const guild = interaction.guild;
   if (!guild)
     return interaction.reply({ content: "Lệnh này chỉ hoạt động trong server.", ephemeral: true });
@@ -250,11 +250,6 @@ async function lockCommand(client, store, interaction) {
       (notes.length ? `\n` + notes.join("\n") : ""),
     ephemeral: true,
   });
-}
-
-/** `/lock` — điểm vào lệnh. */
-async function lock(client, store, interaction) {
-  return lockCommand(client, store, interaction);
 }
 
 /** `/antinuke` — trạng thái, bật/tắt, module, unlock, lockdown. */

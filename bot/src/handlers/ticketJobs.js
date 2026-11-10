@@ -1,4 +1,3 @@
-const { Colors, EmbedBuilder } = require("discord.js");
 const tickets = require("./tickets");
 const lang = require("./lang");
 
@@ -44,15 +43,12 @@ async function runAutoClose(client, store, job, T) {
   // trạng thái) vì khác nhau duy nhất là câu chữ báo cho người dùng.
   const byBudget = job.closeCause === "budget";
   const title = byBudget ? T.budgetClosedTitle : T.autoClosedTitle;
-  const embed = new EmbedBuilder()
-    .setColor(Colors.Grey)
-    .setTitle(title)
-    .setDescription(
-      String(byBudget ? T.budgetClosedBody : T.autoClosedBody)
-        .replace("{h}", String(job.idleHours))
-        .replace("{g}", String(job.closeGraceHours)),
-    )
-    .setTimestamp(Date.now());
+  const embed = tickets.closedEmbed(T, {
+    title,
+    note: String(byBudget ? T.budgetClosedBody : T.autoClosedBody)
+      .replace("{h}", String(job.idleHours))
+      .replace("{g}", String(job.closeGraceHours)),
+  });
   try {
     await channel.send({ embeds: [embed] });
   } catch {
@@ -99,15 +95,7 @@ async function runCloseChannel(client, store, job, T) {
     await markChannelClosed(store, job);
     return true;
   }
-  const embed = new EmbedBuilder()
-    .setColor(Colors.Grey)
-    .setTitle(T.closedTitle)
-    .setDescription(
-      job.closeReason
-        ? String(T.closedWithReason).replace("{reason}", String(job.closeReason))
-        : String(T.closeNote || ""),
-    )
-    .setTimestamp(Date.now());
+  const embed = tickets.closedEmbed(T, { reason: job.closeReason });
   try {
     await channel.send({ embeds: [embed] });
   } catch {

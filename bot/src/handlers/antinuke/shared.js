@@ -28,6 +28,7 @@ const MODULE_LABELS = {
   massBotAdd: "Thêm bot hàng loạt",
   botHitAndRun: "Bot vào-rồi-rời (hit-and-run)",
   suspiciousBotAlert: "Bot lạ mới vào server",
+  mention: "Spam mention",
   externalAppRaid: "Raid bằng ứng dụng ngoài (External App)",
   massInviteCreate: "Tạo link mời hàng loạt",
   guildTamper: "Đổi cấu hình server",
@@ -62,6 +63,9 @@ const KNOWN_LOGGING_BOTS = [
   "sapphire",
 ];
 
+const normalizeBotName = (s) => (s || "").toLowerCase().replace(/[-_\s]+/g, "");
+const KNOWN_LOGGING_BOT_KEYS = new Set(KNOWN_LOGGING_BOTS.map(normalizeBotName));
+
 function isKnownLoggingBot(executor) {
   // CHỈ miễn trừ BOT thật. Trước đây chỉ so tên nên người dùng đổi username
   // thành "Carl-bot"/"Wick" là được bỏ qua TOÀN BỘ module nuke (mass ban,
@@ -70,9 +74,10 @@ function isKnownLoggingBot(executor) {
   // Chuẩn hóa: lowercase + bỏ dấu ngăn cách (-, _, space) rồi so CHÍNH XÁC —
   // so khớp includes trước đây bị lách bằng tên giả "carlbotfan"/"freecarlbot"
   // (bot nuke mượn tên bot logging để được bỏ qua toàn bộ anti-nuke).
-  const norm = (s) => (s || "").toLowerCase().replace(/[-_\s]+/g, "");
-  const known = new Set(KNOWN_LOGGING_BOTS.map(norm));
-  return known.has(norm(executor?.username)) || known.has(norm(executor?.tag));
+  return (
+    KNOWN_LOGGING_BOT_KEYS.has(normalizeBotName(executor?.username)) ||
+    KNOWN_LOGGING_BOT_KEYS.has(normalizeBotName(executor?.tag))
+  );
 }
 
 // Module nuke/raid: phạt trực tiếp, KHÔNG cộng nhiệt (chỉ có hình phạt gốc).
@@ -453,7 +458,6 @@ module.exports = {
   isTrustedBotMember,
   isExempt,
   automodEnabled,
-  DEFAULT_MODULE_CFG,
   moduleCfgOf,
   memberSuspicionScore,
   joinClusterSuspicion,
