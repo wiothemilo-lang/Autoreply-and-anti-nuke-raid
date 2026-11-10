@@ -308,10 +308,12 @@ function runSelfTest() {
     const files = new Map([...base.entries()].map(([k, v]) => [k, v]));
     c.mutate(files);
     const errs = checkSources(files);
-    const ok = errs.length >= c.expect;
+    // Case "nguồn thật phải SẠCH" (expect 0) phải ĐÚNG 0 — `>= 0` từng làm nó
+    // luôn xanh. Case gieo vi phạm thì chỉ cần bắt được (có thể kèm lỗi phụ).
+    const ok = c.expect === 0 ? errs.length === 0 : errs.length >= c.expect;
     if (!ok) failed++;
     console.log(
-      `${ok ? "✅" : "❌"} self-test: ${c.desc} — mong ≥${c.expect} lỗi, nhận ${errs.length}` +
+      `${ok ? "✅" : "❌"} self-test: ${c.desc} — mong ${c.expect === 0 ? "0" : "≥" + c.expect} lỗi, nhận ${errs.length}` +
         (ok && c.expect > 0 ? ` → ${errs[0].slice(0, 92)}` : ""),
     );
   }

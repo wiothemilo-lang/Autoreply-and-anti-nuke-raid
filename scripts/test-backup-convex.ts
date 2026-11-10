@@ -45,7 +45,6 @@ import { generateRestoreKey, normalizeRestoreKey } from "../convex/backupKeys";
 // với row { kind: "status", botKeySeed }. Không cần monkey-patch module.
 // PROTOCOL ĐÚNG (theo botBootstrapAction): bot giữ KEY THÔ, server lưu
 // botKeySeed = SHA-256("protogon-bot-key::" + key) = computeBotKey(key).
-const SEED = "seed-thật-của-deployment"; // chỉ là chuỗi mô phỏng db
 const BOT_KEY = "key-thô-32-bytes-của-bot"; // bot giữ trong .env BOT_KEY
 const storeHandler = (botStoreBackup as any)._handler;
 const claimHandler = (botClaimBackup as any)._handler;

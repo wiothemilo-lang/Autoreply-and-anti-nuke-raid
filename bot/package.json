@@ -7,9 +7,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "start:gc": "node --expose-gc src/index.js",
     "register": "node src/register-slash.js",
-    "deploy:commands": "node src/register-slash.js",
     "pack:host": "node scripts/pack-host.js"
   },
   "engines": {

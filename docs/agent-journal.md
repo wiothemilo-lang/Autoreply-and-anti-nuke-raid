@@ -11,8 +11,9 @@
   `SiteNav` tách `PagesPanel` + theme store; bỏ monkey-patch `globalThis.fetch`
   trong `ai.js`; gộp `processDetection` của `antinuke/audit.js`; tách
   `ticketActionButton`; `AdminCard` (16 card shell), `TicketKindsCard` render loop,
-  `formatDateTime` 6 bản, `@radix-ui/react-switch` chưa dùng, `src/shaders/threeui.css`
-  0 importer, i18n key EN/DE trùng 21+20 key, `plans.catalog()` chưa trả giá/rank. Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
+  `formatDateTime` 6 bản, i18n key EN/DE trùng 21+20 key, `plans.catalog()` chưa trả
+  giá/rank; test: 97 bản `check()` chép tay, mock discord.js/Convex ctx trùng ở
+  ~10 suite; `eslint` chưa phủ `scripts/**/*.ts` (31 suite TS không được lint). Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
   (~110 dòng trùng), `externalApp.js` 4 khối punish (~60 dòng), verify panel 3 bản
   (prefix/setup/hidden), facade `handlers/backup.js`. Đợt 3 còn nợ: `ticketActivity`
   chỉ nhận category cha (auto-close nhầm ticket theo kind), fallback `bot_tick` thiếu
@@ -70,6 +71,15 @@
   `docs/t3-devbox.md` mục 7.
 
 ---
+
+## 2026-11-10 (10) — Dọn code rác đợt 5/5: scripts + test + config + docs
+
+- ✅ **10 agent audit `scripts/`, test harness, config, docs** → xoá `scripts/build-host-zip.py` (0 caller, superseded bởi `bot/scripts/pack-host.js`, mà bản cũ còn nhúng `.env` + `node_modules` vào zip); `pack-host.js` thêm loại trừ `.bot-key` + `data/` (trước đó zip mang theo botKey thật); xoá `src/shaders/threeui.css` (1.775 dòng / 40KB, 0 importer); bỏ `@radix-ui/react-switch`, `test:bot`, `start:gc`, `deploy:commands`, `allowImportingTsExtensions`, `postcss.config.js` khỏi tsconfig, 4 rule CSS chết.
+- 🛡️ **Cổng bảo vệ yếu đã vá**: guardrails coi `process.env` là đọc file secret (chặn cả `grep` hợp lệ — tái hiện ngay trong phiên này) → chỉ khớp đường dẫn `.env`; cổng deploy còn nhận `bun tsc -b --noemit` (bỏ sót `convex/`) → chỉ nhận `bun run typecheck`; `isFullVerifyRun` không nhận dạng được đúng lệnh gộp trong `verification-loop` (`tail`/`echo`/`2>&1`) → bỏ qua segment lọc output; `run-all-tests` thêm deadline cứng 5s sau kill (chống treo CI), hợp đồng suite fail-closed khi regex không khớp, validate `EXCLUSIVE`/`SLOW_FIRST`; `check-convex-contract` bỏ comment trước khi quét export (**509 → 498 export thật** — 11 `export` nằm trong comment từng được tính); `check-ext-app` thiếu `CONVEX_URL` → exit 1 thay vì xanh im lặng; `smoke:vps` assert AI thật + thêm `KIRA_API_KEY`.
+- 🐛 **Test xanh giả đã sửa**: `test-backup-pipeline` mock trả sai shape (`lastChecksum` thay vì `{backupSnapshotChecksum}`) nên nhánh "server không đổi → bỏ qua" **chưa từng chạy** — nay 169 PASS thật; `test-payments` mock `order("desc")` là no-op nên assert "mới nhất lên đầu" luôn đúng; `test-resource-guard` so `fired === firedBefore` trên boolean + `check(..., true)`; `test-antinuke-state` không seed guild chết cho `appMsgSamples`; `test-property` cộng PASS vô điều kiện sau vòng lặp; `test-resilience` tautology; `test-sweeper` chỉ kiểm `typeof unref` → `hasRef() === false`; `test-guild-sync` chỉ kiểm version là string; `test-rate-guard` chỉ kiểm "có bị chặn" → đúng mốc 31; `test-guild-config-portability`/`test-team-admins` tautology; self-test `check-cron-boundary`/`check-timer-allowlist` dùng `>=` nên case "nguồn sạch" không bao giờ đỏ.
+- 📄 **Docs hết mâu thuẫn**: `AGENTS.md` nói "Convex không deploy tay" trong khi bảng 🟢 cho agent deploy → gộp thành một câu; 2 bullet `check-i18n`/`check-settings-signal` bị dính dòng trước → tách; `repo-map` bỏ `backupJobs.js`, sửa `botKinds`→`listKinds`, sweeper 5→4 module, `audit.ts` thành stub; README sửa `bot-writes:*`→`bot_writes:*` (auth là botKey, không phải deploy key) + `npm install`→`bun install`; `cron-migration` 3→2 vòng, bỏ dòng `voiceIpMap`; 2 tài liệu VPS sửa "pm2 restart thuộc 🟡" → restart CHỈ qua `/deploy`; `bot/README` hết claim "zip gồm cả .env / ~20 KB".
+- 🧪 Kiểm chứng: **89/89 CJS** (137,5s) · **31/31 TS** (4,1s) · typecheck · lint · format:check · 10 cổng tĩnh (kèm `--self-test`) sạch. Diff ~**+180 / −2.500** (gồm 1.775 dòng CSS + 89 dòng Python bị xoá).
+- ▶️ Tiếp theo: PR `refactor/dead-code-scripts`; đóng chiến dịch 50 subagent (5 đợt, PR #91–#95).
 
 ## 2026-11-10 (9) — Dọn code rác đợt 4/5: web
 

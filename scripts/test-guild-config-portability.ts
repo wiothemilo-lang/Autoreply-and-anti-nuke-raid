@@ -169,7 +169,6 @@ console.log("\n── sanitize: loại field lạ, không ghi rác ──");
   check("boolean sai kiểu → invalid", r.invalid.includes("heatEnabled"));
   check("number sai kiểu → invalid", r.invalid.includes("joinGateMinAgeDays"));
   check("mảng sai kiểu → invalid", r.invalid.includes("badWords"));
-  check("không throw", true);
 }
 
 // 6. File rác / sai hình dạng → trả về rỗng, không ném.

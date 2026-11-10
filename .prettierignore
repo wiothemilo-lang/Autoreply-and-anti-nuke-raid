@@ -1,8 +1,6 @@
 # Không format các thứ không phải code nguồn của mình.
-package-lock.json
 bun.lock
 bot/bun.lock
-bot/bun.lockb
 
 # Thư mục sinh ra
 dist/

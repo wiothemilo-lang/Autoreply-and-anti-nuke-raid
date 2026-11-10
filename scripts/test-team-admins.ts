@@ -299,8 +299,8 @@ console.log("── 3. requireBotAdmin / requireBotOwner ──");
   const { ctx } = makeCtx({ teamAdmins: [ADMIN_A] });
   const owner = await requireBotAdmin(ctx as any, { discordId: OWNER });
   check("requireBotAdmin: chủ bot qua", owner?.ownerDiscordId === OWNER);
-  await requireBotAdmin(ctx as any, { discordId: ADMIN_A });
-  check("requireBotAdmin: quản trị viên nhóm qua", true);
+  const admin = await requireBotAdmin(ctx as any, { discordId: ADMIN_A });
+  check("requireBotAdmin: quản trị viên nhóm qua", admin?.ownerDiscordId === OWNER);
   await expectThrow(
     "requireBotAdmin: người lạ bị chặn",
     () => requireBotAdmin(ctx as any, { discordId: STRANGER }),

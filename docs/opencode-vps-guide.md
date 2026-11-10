@@ -622,7 +622,7 @@ Agent được mở quyền chẩn đoán + tự chữa **có kiểm soát** tr�
 | Vùng             | Agent được gì                                                                                                       | Ví dụ                                                                                                                   |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | 🟢 **TỰ LÀM**    | Chẩn đoán read-only + tự sửa rồi tự restart **kiira-retry-proxy** (bắt buộc health check `ok:true` sau khi restart) | `systemctl status`, `journalctl`, `docker ps/logs`, `df`, `free` · sửa proxy → restart → curl `__health`                |
-| 🟡 **HỎI TRƯỚC** | Chẩn đoán xong → in đúng lệnh + nguyên nhân, người dùng tự chạy (hoặc gật)                                          | restart bot, `docker restart`, `kill`, sửa unit file của dịch vụ khác                                                   |
+| 🟡 **HỎI TRƯỚC** | Chẩn đoán xong → in đúng lệnh + nguyên nhân, người dùng tự chạy (hoặc gật)                                          | `pm2 stop/delete`, `docker restart`, `kill`, sửa unit file của dịch vụ khác (restart bot CHỈ qua `/deploy`)             |
 | 🔴 **CẤM**       | Không bao giờ — kể cả "để debug"                                                                                    | `systemctl cat/show`, `docker inspect/exec`, `printenv` (rò secret hạ tầng); `ufw`/`iptables`; `reboot`; `docker prune` |
 
 Hai lớp chặn bảo vệ: `opencode.json` permission (theo tên lệnh) + plugin
@@ -674,7 +674,7 @@ phải restart vì Convex).
 | -------------- | ----------------------------------------------------------------------- | ------------------------------ |
 | Convex backend | CI tự động + agent VPS trong `/deploy` (khi pull có thay đổi `convex/`) | 4 lớp kiểm chứng xanh          |
 | Bot Discord    | Agent trên VPS (`/deploy` → pm2 restart)                                | pull + 4 lớp kiểm chứng xanh   |
-| Dashboard web  | Deploy thủ công qua Dokploy (build Docker)                              | khi cần — front-end ít đổi hơn |
+| Dashboard web  | Deploy thủ công qua Freebuff (hoặc Dokploy nếu tự host)                 | khi cần — front-end ít đổi hơn |
 
 ## Xử lý sự cố
 

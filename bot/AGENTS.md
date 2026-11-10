@@ -16,7 +16,7 @@ Bạn đang ở trong `bot/`. Hợp đồng làm việc **ĐẦY ĐỦ** nằm �
    commit **thiếu** file phía `convex/` khi thay đổi chạm hợp đồng bot ⇄ Convex.
    Luôn `cd ..` rồi mới `git add` / `commit` / `push`.
 3. **Mọi lệnh kiểm chứng chạy từ GỐC repo.** `bun run test`, `bun run test:ts`,
-   `bun tsc -b --noEmit`, `bun run lint`, `bun run format:check`,
+   `bun run typecheck`, `bun run lint`, `bun run format:check`,
    `node scripts/check-convex-contract.cjs`, `node scripts/smoke-vps.cjs`… là
    script của `package.json` ở **gốc**; chạy trong `bot/` sẽ sai hoặc không tồn tại.
 

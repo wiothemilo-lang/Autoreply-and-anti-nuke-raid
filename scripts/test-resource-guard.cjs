@@ -87,8 +87,8 @@ check("dọn burstTracker guild đã rời", removedAlt >= 1);
 check("giữ guild còn sống", alt.sweepStaleGuilds(new Set(["guildAlive"])) === 0);
 
 // Idempotent: guild chết đã dọn thì sweep tiếp không báo thêm
-alt.sweepStaleGuilds(new Set(["guildAlive"]));
-check("sweep alt idempotent", true);
+const sweptAgain = alt.sweepStaleGuilds(new Set(["guildAlive"]));
+check("sweep alt idempotent", sweptAgain === 0, sweptAgain);
 
 /* ── 4. ConvexStore.pruneCache: cache guild đã rời ── */
 process.env.CONVEX_URL = process.env.CONVEX_URL || "https://test-dummy.convex.cloud";
@@ -104,18 +104,18 @@ check("pruneCache idempotent", store.pruneCache(new Set(["guildKeep"])) === 0);
 
 /* ── 5. startMemGuard: timer chạy + dừng sạch ── */
 (async () => {
-  let fired = false;
+  let fired = 0;
   registerSweeper("test-timer", () => {
-    fired = true;
+    fired += 1;
     return 0;
   });
   const stop = startMemGuard(30);
   await new Promise((r) => setTimeout(r, 120));
-  check("startMemGuard chạy định kỳ", fired);
+  check("startMemGuard chạy định kỳ", fired > 0, fired);
   stop();
   const firedBefore = fired;
   await new Promise((r) => setTimeout(r, 120));
-  check("stop() dừng vòng lặp", fired === firedBefore);
+  check("stop() dừng vòng lặp", fired === firedBefore, `${firedBefore} → ${fired}`);
 
   console.log(`\nKết quả resource guard: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);

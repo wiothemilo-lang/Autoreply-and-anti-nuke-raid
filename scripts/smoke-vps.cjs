@@ -56,11 +56,17 @@ for (const [name, why] of REQUIRED_ENV) {
   check(`${name} tồn tại`, typeof v === "string" && v.length > 10, why);
 }
 // AI keys: tùy chọn nhưng cảnh báo khi không có cái nào
-const AI_KEYS = ["GROQ_API_KEY", "NVIDIA_API_KEY", "SAMBANOVA_API_KEY", "OPENAI_API_KEY"];
+const AI_KEYS = [
+  "KIRA_API_KEY",
+  "GROQ_API_KEY",
+  "NVIDIA_API_KEY",
+  "SAMBANOVA_API_KEY",
+  "OPENAI_API_KEY",
+];
 const aiCount = AI_KEYS.filter((k) => process.env[k]).length;
 check(
-  aiCount > 0 ? `Có ${aiCount} AI key` : "AI key (GROQ/NVIDIA/SAMBANOVA/OPENAI)",
-  true,
+  aiCount > 0 ? `Có ${aiCount} AI key` : "AI key (KIRA/GROQ/NVIDIA/SAMBANOVA/OPENAI)",
+  aiCount > 0,
   aiCount > 0
     ? undefined
     : "không bắt buộc — bot chạy được nhưng AI phân loại raid bị tắt (fallback heuristic)",

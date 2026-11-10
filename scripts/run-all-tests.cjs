@@ -97,6 +97,21 @@ const all = fs
   .filter((f) => (TS_MODE ? /^test-.*\.ts$/.test(f) : /^test-.*\.cjs$/.test(f)))
   .sort((a, b) => a.localeCompare(b));
 
+// EXCLUSIVE/SLOW_FIRST trỏ tới tên không còn tồn tại = suite âm thầm rơi vào
+// pool song song (đụng cổng cố định/Chromium) — chặn ngay. Bỏ qua với `--dir`
+// và với repo giả (test-run-all-tests dựng thư mục tạm chỉ có vài suite).
+if (!TS_MODE && !flagValue("--dir") && fs.existsSync(path.join(__dirname, "..", "bot", "src"))) {
+  const names = new Set(all.map(baseName));
+  for (const name of [...EXCLUSIVE, ...SLOW_FIRST]) {
+    if (!names.has(name)) {
+      console.error(
+        `❌ Runner khai suite "${name}" nhưng không có file tương ứng — đổi tên/xoá suite mà quên cập nhật EXCLUSIVE/SLOW_FIRST.`,
+      );
+      process.exit(1);
+    }
+  }
+}
+
 // Không có suite nào = runner mất khả năng phát hiện (glob sai/đổi tên thư mục)
 // → fail to, thay vì in "0/0 suites pass" rồi xanh.
 if (all.length === 0) {
@@ -135,15 +150,21 @@ function checkSuiteContract() {
       return null; // thiếu file (bản rút gọn) → không ép
     }
   };
-  const guard = read(".opencode/plugins/guardrails.js")?.match(
-    /const CONTRACT_SUITES = (\d+);/,
-  )?.[1];
-  const agents = read("AGENTS.md")?.match(/\*\*(\d+) suites\*\*/)?.[1];
+  const guardSrc = read(".opencode/plugins/guardrails.js");
+  const agentsSrc = read("AGENTS.md");
+  const guard = guardSrc?.match(/const CONTRACT_SUITES = (\d+);/)?.[1];
+  const agents = agentsSrc?.match(/\*\*(\d+) suites\*\*/)?.[1];
   const bad = [];
-  if (guard !== undefined && Number(guard) !== all.length) {
+  // File tồn tại mà regex không khớp = ai đó đổi tên/format hằng số → cổng mù.
+  // Phải báo lỗi, không được im lặng coi như "không có hợp đồng".
+  if (guardSrc !== null && guard === undefined) {
+    bad.push(".opencode/plugins/guardrails.js thiếu `const CONTRACT_SUITES = N;`");
+  } else if (guard !== undefined && Number(guard) !== all.length) {
     bad.push(`.opencode/plugins/guardrails.js CONTRACT_SUITES=${guard}`);
   }
-  if (agents !== undefined && Number(agents) !== all.length) {
+  if (agentsSrc !== null && agents === undefined) {
+    bad.push('AGENTS.md thiếu "**N suites**"');
+  } else if (agents !== undefined && Number(agents) !== all.length) {
     bad.push(`AGENTS.md "**${agents} suites**"`);
   }
   if (bad.length > 0) {
@@ -228,6 +249,9 @@ function runSuite(suite) {
     timer = setTimeout(() => {
       timedOut = true;
       killGroup(child);
+      // Tiến trình không chết được (uninterruptible/giữ pipe) vẫn phải kết thúc
+      // suite — nếu không cả pool treo tới hết timeout của job CI.
+      setTimeout(() => finish(1), 5_000).unref();
     }, TIMEOUT_MS);
     child.on("error", (e) => chunks.push(Buffer.from(`\n${e.message}\n`)));
     // `close` chỉ phát khi MỌI stdio đã EOF, mà pipe được mọi con cháu kế thừa: một con cháu đã

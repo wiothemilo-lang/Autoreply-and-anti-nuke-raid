@@ -159,7 +159,7 @@ const readBot = (rel) => fs.readFileSync(path.join(BOT, rel), "utf8");
     "timer quét đúng nhịp TICK_MS (20s)",
     started[0].ms === sweeper.TICK_MS && sweeper.TICK_MS === 20_000,
   );
-  check("timer có unref (không giữ tiến trình)", typeof t1.unref === "function");
+  check("timer có unref (không giữ tiến trình)", t1.hasRef() === false);
   sweeper.stopSweeper();
   global.clearInterval = realClearInterval;
   check("stopSweeper dọn đúng timer đã dựng", cleared === 1);

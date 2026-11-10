@@ -111,10 +111,6 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
-  html.dark body {
-    background: hsl(var(--background)) fixed;
-  }
-
   ::selection {
     background: hsl(0 0% 9%);
     color: hsl(0 0% 100%);
@@ -138,8 +134,7 @@
   @media (max-width: 767px) {
     #root code,
     #root kbd,
-    #root .font-mono,
-    #root .break-anywhere {
+    #root .font-mono {
       overflow-wrap: anywhere;
     }
   }
@@ -161,10 +156,6 @@
   /* Điện thoại tai thỏ: nút nổi không bị chạm vào vùng pin/gestures. */
   @supports (padding: env(safe-area-inset-right)) {
     @media (max-width: 767px) {
-      .floating-safe-right {
-        right: max(1rem, env(safe-area-inset-right));
-        bottom: max(5rem, calc(env(safe-area-inset-bottom) + 5rem));
-      }
     }
   }
 
@@ -238,19 +229,5 @@
     right: -4px;
     background: hsl(0 0% 9%);
     transform: rotate(45deg);
-  }
-
-  /* Mở rộng vùng chạm tới chuẩn ≥44px trên mobile mà không đổi kích thước hiển thị.
-     Dùng cho Switch/toggle nhỏ — Radix vẫn nhận click bình thường vì ::after là phần tử con. */
-  @media (pointer: coarse) {
-    .touch-target {
-      position: relative;
-    }
-    .touch-target::after {
-      content: "";
-      position: absolute;
-      inset: -12px;
-      border-radius: 12px;
-    }
   }
 }

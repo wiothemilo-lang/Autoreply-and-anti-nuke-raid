@@ -81,10 +81,12 @@ thôi. Khi nghi file có thể sửa dở: xem `git diff` trước khi sửa ti�
       thêm/xoá trang/panel/module/Convex function; CI cũng chặn bước này)
 - [ ] `node scripts/check-convex-contract.cjs` — hợp đồng bot ⇄ Convex khớp
       (chỉ khi đổi tên/di chuyển function Convex hoặc thêm/sửa call từ bot;
-      CI cũng chặn bước này) - [ ] `node scripts/check-i18n.cjs` (kèm `--self-test`) — mọi chuỗi người dùng đều có bản EN
+      CI cũng chặn bước này)
+- [ ] `node scripts/check-i18n.cjs` (kèm `--self-test`) — mọi chuỗi người dùng đều có bản EN
       (chỉ khi thêm/sửa chuỗi UI hoặc từ điển `src/lib/i18n.en.ts`; CI cũng
       chặn bước này). Chuỗi UI viết thẳng bằng tiếng Việt rồi bọc
-      `translate("…")` — key chính là chuỗi VI đó- [ ] `node scripts/check-settings-signal.cjs` (kèm `--self-test`) — mọi mutation ghi field bot đọc phải có đường tới bot NGAY: `settingsChangedAt` (dashboard sửa) hoặc nằm trong `CONFIG_WRITE_MUTATIONS` của bot (bot tự ghi → proxy tự xoá cache). Chỉ khi đụng `convex/` (mutation cấu hình) hoặc thêm mutation `bot_writes:*` mới; CI cũng chặn. Thêm mutation cấu hình mới mà quên tín hiệu → thay đổi từ dashboard trễ tới 30 phút (bug thật 23/09)
+      `translate("…")` — key chính là chuỗi VI đó
+- [ ] `node scripts/check-settings-signal.cjs` (kèm `--self-test`) — mọi mutation ghi field bot đọc phải có đường tới bot NGAY: `settingsChangedAt` (dashboard sửa) hoặc nằm trong `CONFIG_WRITE_MUTATIONS` của bot (bot tự ghi → proxy tự xoá cache). Chỉ khi đụng `convex/` (mutation cấu hình) hoặc thêm mutation `bot_writes:*` mới; CI cũng chặn. Thêm mutation cấu hình mới mà quên tín hiệu → thay đổi từ dashboard trễ tới 30 phút (bug thật 23/09)
 - [ ] `node scripts/check-cron-boundary.cjs` (kèm `--self-test`) — cron Convex CHỈ được tính + đặt cờ trên `guilds`: không gọi hàm khác/`fetch`, không nhận `botKey`, không ghi field bot tự ghi (trừ `undefined`). Chỉ khi thêm/sửa cron trong `convex/crons.ts` hoặc thân hàm cron; CI cũng chặn. Cron chạm Discord/RAM/đĩa VPS là hỏng ÂM THẦM (không có tiến trình bot)
 - [ ] `node scripts/check-timer-allowlist.cjs` (kèm `--self-test`) — mọi `setInterval` trong `bot/src/**` phải có trong allowlist kèm lý do, và ngược lại mọi mục allowlist phải còn trong code. Việc dọn/trạng thái trong RAM → `registerSweep` của `bot/src/sweeper.js` (KHÔNG dựng timer riêng). Chỉ khi thêm/xoá/đổi tên timer; CI cũng chặn
 - [ ] `node scripts/check-bot-payload.cjs` (kèm `--self-test`) — chạy VALIDATOR THẬT dựng từ `convex/*.ts` lên PAYLOAD THẬT của bot (`aiStats()`), kiểm đệ quy kèm kiểu dữ liệu. Convex chặn args trước handler và bắt cả field thừa lẫn SAI KIỂU trong object lồng — so tên field là không đủ (đã bỏ lọt bug `reportedAt` 05/10). Chạy được ngay trên VPS sau `git pull`, không cần mạng; CI cũng chặn
@@ -144,8 +146,9 @@ Các lệnh kiểm chứng đã được allow sẵn trong `opencode.json` — c
    ngoài vùng 🟢 → báo cáo kèm lệnh cho người dùng, không mò.
 
    **Deploy bot production** — dùng lệnh `/deploy`, quy trình cứng: pull → kiểm
-   chứng đủ → restart → xác minh sống. Convex backend không deploy tay: CI tự
-   `npx convex deploy` sau mỗi push lên `main` (job deploy chạy sau lint + test).
+   chứng đủ → restart → xác minh sống. Convex backend: CI tự `npx convex deploy`
+   sau mỗi push lên `main` (job deploy chạy sau lint + test); agent VPS cũng
+   deploy được qua `/deploy` khi có `CONVEX_DEPLOY_KEY` (xem bảng vùng 🟢).
 
 4. **Không cài dependency mới khi chưa hỏi.** Bot chạy Bun — ưu tiên thứ đã có trong
    `bot/package.json` / `package.json`. Lưu ý: `bun install` theo đúng lockfile trên máy

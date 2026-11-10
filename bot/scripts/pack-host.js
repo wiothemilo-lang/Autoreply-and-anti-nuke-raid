@@ -3,7 +3,8 @@
  * Tạo file protogon-bot.zip đúng chuẩn để upload lên Wispbyte (wispbyte.com)
  * hoặc bất kỳ host nào nhận zip + tự chạy `npm install`:
  * - Gồm package.json, src/ — host tự chạy `npm install`
- * - KHÔNG gồm node_modules, .git, .env, .env.local/.env.example, *.md
+ * - KHÔNG gồm node_modules, .git, .env, .env.local/.env.example, .bot-key,
+ *   data/ (log + state runtime), *.md
  * - 🔒 KHÔNG bao giờ kèm file .env vào zip (bảo mật: tránh lộ token khi zip
  *   được commit lên repo public). Biến môi trường phải nhập trên panel host.
  */
@@ -27,6 +28,8 @@ if (isWin) {
     ".env",
     ".env.local",
     ".env.example",
+    ".bot-key",
+    "data",
     "protogon-bot.zip",
     "wio-discloud.zip",
   ];
@@ -38,7 +41,7 @@ if (isWin) {
   cmd = `powershell -NoProfile -Command "Compress-Archive -Path ${items} -DestinationPath '${out}' -Force"`;
 } else {
   // zip (macOS/Linux): loại bỏ các thư mục/file không cần
-  cmd = `cd '${root}' && zip -r '${out}' . -x '*node_modules*' -x '*.git*' -x '.env' -x '.env.local' -x '.env.example' -x 'protogon-bot.zip' -x 'wio-discloud.zip' -x '*.md'`;
+  cmd = `cd '${root}' && zip -r '${out}' . -x '*node_modules*' -x '*.git*' -x '.env' -x '.env.local' -x '.env.example' -x '.bot-key' -x 'data/*' -x 'protogon-bot.zip' -x 'wio-discloud.zip' -x '*.md'`;
 }
 
 try {
@@ -50,7 +53,7 @@ try {
 
 const size = (fs.statSync(out).size / 1024 / 1024).toFixed(2);
 console.log(`\n✅ Đã tạo ${out} (${size} MB)`);
-console.log("   → 🔒 File .env KHÔNG được kèm vào zip (bảo mật).");
+console.log("   → 🔒 .env và .bot-key KHÔNG được kèm vào zip (bảo mật).");
 console.log(
   "   → Nhập biến môi trường trên panel host (Environment) hoặc tạo bot/.env trên server.",
 );

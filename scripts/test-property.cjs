@@ -66,6 +66,8 @@ function check(label, cond, extra = "") {
     "",
   ];
   const N1 = 300;
+  let badSim = 0;
+  let firstSimErr = "";
   for (let i = 0; i < N1; i++) {
     const a = weirdString(int(0, 30)) || pick(CHARSETS);
     const b = weirdString(int(0, 30)) || pick(CHARSETS);
@@ -74,23 +76,21 @@ function check(label, cond, extra = "") {
       s1 = usernameSimilarity(a, b);
       s2 = usernameSimilarity(b, a);
     } catch (e) {
-      check(`usernameSimilarity không ném (${JSON.stringify([a, b])})`, false, String(e));
-      break;
+      badSim++;
+      firstSimErr ||= `ném với ${JSON.stringify([a, b])}: ${String(e)}`;
+      continue;
     }
     if (!Number.isFinite(s1) || s1 < 0 || s1 > 100) {
-      check(
-        "usernameSimilarity ∈ [0,100] finite",
-        false,
-        `got ${s1} cho ${JSON.stringify([a, b])}`,
-      );
-      break;
+      badSim++;
+      firstSimErr ||= `got ${s1} cho ${JSON.stringify([a, b])}`;
+      continue;
     }
     if (s1 !== s2) {
-      check("usernameSimilarity đối xứng", false, `${JSON.stringify([a, b])} → ${s1} vs ${s2}`);
-      break;
+      badSim++;
+      firstSimErr ||= `không đối xứng ${JSON.stringify([a, b])} → ${s1} vs ${s2}`;
     }
   }
-  check(`usernameSimilarity: ${N1} cặp ngẫu nhiên đạt mọi bất biến`, true);
+  check(`usernameSimilarity: ${N1} cặp ngẫu nhiên đạt mọi bất biến`, badSim === 0, firstSimErr);
   // Đặc điểm định hướng (corner cases có chủ đích):
   check("giống hệt nhau ≥ 90", usernameSimilarity("nguyenvana_2009", "nguyenvana_2009") >= 90);
   check("khác hoàn toàn = 0", usernameSimilarity("abcdef", "xyzuvw") === 0);
@@ -116,6 +116,8 @@ function check(label, cond, extra = "") {
   // ════════ shared.js — chấm điểm member/cluster ════════
   const shared = require("../bot/src/handlers/antinuke/shared");
   const N2 = 300;
+  let badScore = 0;
+  let firstScoreErr = "";
   for (let i = 0; i < N2; i++) {
     const p = {
       id: "u" + i,
@@ -130,15 +132,20 @@ function check(label, cond, extra = "") {
     try {
       score = shared.memberSuspicionScore(p);
     } catch (e) {
-      check(`memberSuspicionScore không ném (p=${JSON.stringify(p)})`, false, String(e));
-      break;
+      badScore++;
+      firstScoreErr ||= `ném với ${JSON.stringify(p)}: ${String(e)}`;
+      continue;
     }
     if (!Number.isInteger(score) || score < 0) {
-      check("memberSuspicionScore ≥ 0 nguyên", false, `got ${score}`);
-      break;
+      badScore++;
+      firstScoreErr ||= `got ${score} cho ${JSON.stringify(p)}`;
     }
   }
-  check(`memberSuspicionScore: ${N2} hồ sơ ngẫu nhiên đạt mọi bất biến`, true);
+  check(
+    `memberSuspicionScore: ${N2} hồ sơ ngẫu nhiên đạt mọi bất biến`,
+    badScore === 0,
+    firstScoreErr,
+  );
 
   // botHitAndRunVerdict — MIRROR testing: khớp predicate tham chiếu 100%
   {

@@ -60,15 +60,16 @@ check(
 // 3. Identity khác không bị ảnh hưởng (bucket tách riêng).
 __resetRateGuardForTest();
 ctx = { auth: { getUserIdentity: async () => "user-B" } };
-allOk = true;
+let firstBlocked = -1;
 for (let i = 0; i < 40; i++) {
-  if (
-    !(await rateLimitPublicAction(ctx, { name: "aiStatus", maxPerMin: 30, globalMaxPerMin: 600 }))
-      .ok
-  )
-    allOk = false;
+  const r = await rateLimitPublicAction(ctx, {
+    name: "aiStatus",
+    maxPerMin: 30,
+    globalMaxPerMin: 600,
+  });
+  if (!r.ok && firstBlocked < 0) firstBlocked = i + 1;
 }
-check("user-B gọi 40 lần chỉ bị chặn từ lần 31", allOk === false); // 31..40 bị chặn
+check("user-B gọi 40 lần chỉ bị chặn từ lần 31", firstBlocked === 31, firstBlocked);
 __resetRateGuardForTest();
 const userC = { auth: { getUserIdentity: async () => "user-C" } };
 allOk = true;

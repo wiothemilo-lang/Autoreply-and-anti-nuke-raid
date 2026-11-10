@@ -119,7 +119,12 @@ function looksLikeSecretAccess(command) {
   const raw = String(command ?? "").toLowerCase();
   // `.env.example` / `.sample` / `.template` / `.dist` là file mẫu, không chứa
   // secret thật — bỏ trước khi dò để không chặn nhầm `cat .env.example`.
-  const cmd = raw.replace(/\.env\.(?:example|sample|template|dist)/g, "");
+  const cmd = raw
+    .replace(/\.env\.(?:example|sample|template|dist)/g, "")
+    // `process.env` / `import.meta.env` / `os.environ` không phải file secret —
+    // trước đây khớp substring ".env" nên mọi lệnh grep "process.env" bị chặn.
+    .replace(/(?:process|import\.meta|deno|meta)\.env/g, "")
+    .replace(/os\.environ/g, "");
   // Đọc trực tiếp file secret qua cat/less/tail/head/grep/sed/awk…
   if (SECRET_HINTS.some((hint) => cmd.includes(hint))) {
     const readers = [
@@ -133,7 +138,6 @@ function looksLikeSecretAccess(command) {
       "xxd",
       "base64 ",
       "strings ",
-      "print ",
       "source ",
       "sed ",
       "awk ",
@@ -236,11 +240,14 @@ const VERIFY_SEGMENTS = [
   /^git status$/,
   /^bun install$/,
   /^bun run test(?: --serial)?$/,
-  /^bun tsc -b --noemit$/, // segment đã lowercase
   /^bun run typecheck$/,
   /^bun run lint$/,
   /^bun run format:check$/,
 ];
+
+// Đoạn chỉ để cắt/lọc output hoặc in nhãn — không phải lớp kiểm chứng, bỏ qua
+// khi xét whitelist (skill verification-loop chạy gộp một dòng với `tail`/`echo`).
+const IGNORABLE_SEGMENTS = /^(?:tail(?: -\d+)?|head(?: -\d+)?|echo\b.*|true)$/;
 
 function isFullVerifyRun(command, output) {
   const text = String(output ?? "");
@@ -252,13 +259,21 @@ function isFullVerifyRun(command, output) {
   }
   if (!/All matched files use Prettier code style!/.test(text)) return false;
 
-  const segments = commandSegments(String(command ?? "")).map((s) => s.trim().toLowerCase());
+  const segments = commandSegments(String(command ?? ""))
+    .map((s) =>
+      s
+        .trim()
+        .toLowerCase()
+        .replace(/\s+2>&1$/, ""),
+    )
+    .filter((s) => s.length > 0);
   if (segments.length === 0) return false;
   const seen = { test: false, tsc: false, lint: false, format: false };
   for (const seg of segments) {
+    if (IGNORABLE_SEGMENTS.test(seg)) continue;
     if (!VERIFY_SEGMENTS.some((re) => re.test(seg))) return false;
     if (/^bun run test(?: --serial)?$/.test(seg)) seen.test = true;
-    else if (/^bun (?:tsc -b --noemit|run typecheck)$/.test(seg)) seen.tsc = true;
+    else if (seg === "bun run typecheck") seen.tsc = true;
     else if (seg === "bun run lint") seen.lint = true;
     else if (seg === "bun run format:check") seen.format = true;
   }

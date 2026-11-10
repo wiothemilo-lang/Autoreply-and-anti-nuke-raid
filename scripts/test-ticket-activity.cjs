@@ -16,20 +16,15 @@ const section = (t) => console.log(`\n── ${t} ──`);
 
 function mkStore(config) {
   const mutations = [];
-  const queries = [];
   return {
     mutations,
-    queries,
     getConfig: async () => config,
     client: {
       mutation: async (name, args) => {
         mutations.push({ name, args });
         return {};
       },
-      query: async (name) => {
-        queries.push(name);
-        return null;
-      },
+      query: async () => null,
     },
   };
 }

@@ -1270,22 +1270,16 @@ const check = (label, ok) => {
       false,
     );
     const st = backupStore({
-      lastChecksum: require("../bot/src/backupUtils.js").computeSnapshotChecksum?.(first) ?? null,
+      lastChecksum: {
+        backupSnapshotChecksum: require("../bot/src/backupUtils.js").computeSnapshotChecksum(first),
+      },
     });
     await backup.runBackup(probe, st, SRC, {});
     // checksum chỉ khớp nếu hàm băm có sẵn; nếu không thì bản này chỉ kiểm lưu bình thường.
     const unchanged = st._log.muts.find(
       (m) => m.name === "bot_writes:botClearBackup" && m.args?.unchanged === true,
     );
-    if (st._lastChecksumUsed) {
-      check("backup: server không đổi → bỏ qua + báo unchanged", !!unchanged);
-    } else {
-      check(
-        "backup: server không đổi → bỏ qua + báo unchanged",
-        true,
-        "(bỏ qua: hàm băm không export)",
-      );
-    }
+    check("backup: server không đổi → bỏ qua + báo unchanged", !!unchanged);
   }
   {
     // Convex không xác nhận clear → dừng, KHÔNG báo cho người dùng "xong".

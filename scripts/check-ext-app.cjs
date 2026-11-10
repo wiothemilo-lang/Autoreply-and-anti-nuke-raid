@@ -4,8 +4,8 @@ const { ConvexHttpClient } = require("../bot/node_modules/convex/browser");
 (async () => {
   const url = process.env.CONVEX_URL;
   if (!url) {
-    console.log("NO CONVEX_URL");
-    return;
+    console.error("NO CONVEX_URL — export CONVEX_URL (bot/.env) rồi chạy lại");
+    process.exit(1);
   }
   const client = new ConvexHttpClient(url);
   if (process.env.CONVEX_DEPLOY_KEY) client.setAdminAuth(process.env.CONVEX_DEPLOY_KEY);

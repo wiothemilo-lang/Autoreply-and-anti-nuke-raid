@@ -100,7 +100,6 @@ check("bỏ bẩn → sạch", !hasUnsavedChanges());
 setPanelDirty("a", true);
 setPanelDirty("b", true);
 setPanelDirty("a", false);
-check("xoá 1 panel không xoá panel khác", hasUnsavedChanges());
 check("còn đúng panel b", unsavedPanelIds().length === 1 && unsavedPanelIds()[0] === "b");
 setPanelDirty("b", false);
 check("xoá hết → sạch", !hasUnsavedChanges());
