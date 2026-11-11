@@ -46,7 +46,7 @@ const FULL_CMD = "bun run test && bun run typecheck && bun run lint && bun run f
 const GREEN_OUT = [
   "✅ test-ai-fallback (0.1s) — PASS case3: all fail → offline an toàn",
   "✅ test-backup-utils (1.3s) — Kết quả backup utils: 37 PASS, 0 FAIL",
-  "✅ 89/89 suites pass (155.7s)",
+  "✅ 90/90 suites pass (155.7s)",
   "All matched files use Prettier code style!",
 ].join("\n");
 
@@ -249,8 +249,8 @@ async function gateAfterRun(command, output, { status = "completed", tool = "she
       check(`giả mạo cổng (${label}) → không mở`, (await gateAfterRun(cmd, GREEN_OUT)) === false);
     }
     check(
-      "output 51/51 (không khớp hợp đồng 89) → không mở",
-      (await gateAfterRun(FULL_CMD, GREEN_OUT.replace("89/89", "51/51"))) === false,
+      "output 51/51 (không khớp hợp đồng 90) → không mở",
+      (await gateAfterRun(FULL_CMD, GREEN_OUT.replace("90/90", "51/51"))) === false,
     );
     check(
       "thiếu dòng Prettier xanh (output bị cắt) → không mở",

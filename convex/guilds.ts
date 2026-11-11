@@ -305,6 +305,11 @@ export const getGuild = query({
         verifyWelcomeDescription: guild.verifyWelcomeDescription ?? null,
         verifyWelcomeColor: guild.verifyWelcomeColor ?? null,
         verifySendPanel: guild.verifySendPanel ?? false,
+        /** Verify web (Double Counter style): thu IP/fingerprint, chặn VPN, link alt. */
+        verifyWebEnabled: guild.verifyWebEnabled ?? false,
+        ipBanAction: guild.ipBanAction ?? "deny",
+        ipBanAcknowledgedAt: guild.ipBanAcknowledgedAt ?? null,
+        ipBanWhitelistHashes: guild.ipBanWhitelistHashes ?? [],
         /** Lỗi gửi panel xác minh gần nhất (bot báo lại — web hiển thị thay vì im lặng). */
         verifyPanelError: guild.verifyPanelError ?? null,
         verifyPanelErrorAt: guild.verifyPanelErrorAt ?? null,
@@ -628,6 +633,10 @@ export const getBotConfig = query({
       verifyWelcomeDescription: guild.verifyWelcomeDescription ?? null,
       verifyWelcomeColor: guild.verifyWelcomeColor ?? null,
       verifySendPanel: guild.verifySendPanel ?? false,
+      /** Verify web: bot dựng link DM + xử lý grant/ban sau khi trình duyệt hoàn tất. */
+      verifyWebEnabled: guild.verifyWebEnabled ?? false,
+      ipBanAction: guild.ipBanAction ?? "deny",
+      ipBanWhitelistHashes: guild.ipBanWhitelistHashes ?? [],
       // Alt account + VPN detection — bot cần đủ các field này để joinGate chạy
       altDetectionEnabled: guild.altDetectionEnabled ?? false,
       vpnBlockEnabled: guild.vpnBlockEnabled ?? false,

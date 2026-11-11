@@ -231,10 +231,18 @@ export interface GuildData {
     rollbackEnabled: boolean;
     /** Verify system: bật xác minh thành viên khi vào server. */
     verifyEnabled: boolean;
-    verifyMethod: "button" | "captcha";
+    verifyMethod: "button" | "captcha" | "web";
     verifyChannelId: string | null;
     unverifiedRoleId: string | null;
     verifiedRoleId: string | null;
+    /** Verify web (Double Counter style): thu IP/fingerprint, chặn VPN, link alt. */
+    verifyWebEnabled: boolean;
+    /** Hành động khi IP đã bị ban cố verify lại: "deny" chỉ từ chối, "ban" ban account. */
+    ipBanAction: "deny" | "ban";
+    /** Mốc admin đã xác nhận hiểu rủi ro ban nhầm (bắt buộc trước khi bật "ban"). */
+    ipBanAcknowledgedAt: number | null;
+    /** Hash IP được miễn ban/deny (64 hex). */
+    ipBanWhitelistHashes: string[];
     /** Verify welcome DM: gửi embed chào mừng qua DM sau khi verify thành công. */
     verifyWelcomeEnabled: boolean;
     verifyWelcomeTitle: string | null;

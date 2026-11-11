@@ -6,5 +6,7 @@ Disallow: /admin
 Disallow: /stats
 Disallow: /discord/callback
 Disallow: /auth
+Disallow: /verify
+Disallow: /verify/
 
 Sitemap: https://protogon.freebuff.app/sitemap.xml

@@ -56,6 +56,21 @@ module.exports = async function joinGate(client, member, store) {
   // không query Convex lần hai cho mỗi lượt join.
   assignUnverifiedRole(member, config).catch((e) => console.error(`[assignUnverified]`, e.message));
 
+  // Xác minh WEB (Double Counter style): tạo phiên + DM link ngay khi vào.
+  // Chạy song song với joinGate cổ điển — joinGate vẫn có thể kick trước, nên
+  // đặt SAU assignUnverifiedRole và KHÔNG chặn các bước khác.
+  if (config.verifyEnabled && config.verifyWebEnabled && config.verifyMethod === "web") {
+    const verifyWeb = require("../verifyWeb");
+    verifyWeb
+      .startVerification(store, member, config)
+      .then((r) => {
+        if (!r.ok && r.reason === "dm_blocked") {
+          console.warn(`[verifyWeb] ${member.guild.id}/${member.id}: không gửi được DM`);
+        }
+      })
+      .catch((e) => console.error("[verifyWeb:join]", e.message));
+  }
+
   // ==========================================
   // PART 1: Classic Join Gate (existing logic)
   // ==========================================

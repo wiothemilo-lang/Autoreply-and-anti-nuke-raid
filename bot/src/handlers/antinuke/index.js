@@ -66,6 +66,13 @@ module.exports = function createAntiNuke(client, store, heat) {
       // Alt Detection cache ban list 10 phút — người vừa bị ban phải có hiệu lực
       // ngay cho join kế tiếp, không chờ hết TTL.
       invalidateBanCache(ban.guild?.id);
+      // Verify web: lưu vào `guildBans` để phát hiện ban evasion khi account mới
+      // trùng tín hiệu. Ban thủ công trên UI Discord cũng đi qua đây.
+      if (ban.guild?.id && ban.user?.id) {
+        require("../../verifyWeb")
+          .syncGuildBan(store, ban.guild.id, ban.user.id, true, "Đồng bộ từ sự kiện ban")
+          .catch(() => {});
+      }
       await handleAttributeEvent({
         guild: ban.guild,
         module: "massBan",
@@ -73,6 +80,14 @@ module.exports = function createAntiNuke(client, store, heat) {
         targetId: ban.user?.id,
         describeTarget: `<@${ban.user?.id}>`,
       }).catch((e) => console.error("[antinuke:ban]", e.message));
+    });
+
+    client.on("guildBanRemove", (ban) => {
+      invalidateBanCache(ban.guild?.id);
+      if (!ban.guild?.id || !ban.user?.id) return;
+      require("../../verifyWeb")
+        .syncGuildBan(store, ban.guild.id, ban.user.id, false, "Đồng bộ từ sự kiện unban")
+        .catch(() => {});
     });
 
     client.on("guildMemberRemove", async (member) => {

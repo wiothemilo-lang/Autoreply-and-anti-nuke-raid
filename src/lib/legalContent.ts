@@ -183,6 +183,7 @@ const VI: LegalDoc[] = [
           "Convex: lưu trữ cơ sở dữ liệu và chạy backend của dashboard.",
           "GitHub: chỉ nhận file backup khi bạn bật đẩy Gist bằng khoá của bạn.",
           "Nhà cung cấp AI: xử lý trích đoạn hội thoại cần thiết khi bạn dùng báo cáo raid hoặc trợ lý Haimiya, phục vụ đúng yêu cầu đó.",
+          "ipapi.is: chỉ nhận địa chỉ IP khi server bật xác minh qua web, để tra VPN/proxy/Tor/datacenter. Không nhận ID Discord, tên người dùng hay bất kỳ dữ liệu định danh nào khác.",
         ],
       },
       {
@@ -213,6 +214,21 @@ const VI: LegalDoc[] = [
           "Mọi câu hỏi hoặc yêu cầu liên quan dữ liệu: gửi trong kênh hỗ trợ của cộng đồng Discord Protogon kèm ID server hoặc ID người dùng liên quan.",
         ],
       },
+      {
+        heading: "10. Xác minh qua web: IP, thiết bị và tài khoản liên quan",
+        paragraphs: [
+          "Khi chủ server bật xác minh qua web (phương thức “Web”), trang xác minh thu một số tín hiệu để chặn tài khoản giả, VPN/proxy và tài khoản phụ. Việc này chỉ xảy ra khi bạn mở link xác minh do bot gửi.",
+        ],
+        bullets: [
+          "Địa chỉ IP: KHÔNG được lưu ở dạng thô. Server băm một chiều (HMAC-SHA-256) bằng khoá bí mật, tách riêng theo từng server, nên cùng một IP ở hai server cho hai giá trị khác nhau và không thể đảo ngược.",
+          "Dấu vết thiết bị/trình duyệt: canvas, WebGL, kích thước màn hình, ngôn ngữ, múi giờ, số nhân CPU và một mã cookie do trang tự đặt — tất cả cũng chỉ được lưu dưới dạng băm.",
+          "Tra cứu mạng: để nhận diện VPN/proxy/Tor/datacenter, IP được gửi tới ipapi.is cho đúng một lượt tra cứu; kết quả lưu theo hash trong 24 giờ. Chúng tôi không gửi ID Discord hay tên người dùng tới dịch vụ này.",
+          "Kiểm tra người thật: trang dùng bẫy ẩn (honeypot), thời gian ở trang tối thiểu và cử động chuột/bàn phím — không dùng captcha hình ảnh.",
+          "Ban theo IP: quản trị viên có thể chặn một hash IP từ 1 đến 90 ngày (mặc định 7). Owner, quản trị viên và bot luôn được miễn; IP dùng chung (CGNAT, mạng di động) chỉ bị từ chối xác minh, không bao giờ tự động ban.",
+          "Thời hạn: phiên xác minh bị xoá 7 ngày sau khi hết hạn; dấu vết thiết bị/IP dùng để phát hiện tài khoản phụ giữ tối đa 24 tháng; bản ghi ban IP tối đa 90 ngày và luôn có ngày hết hạn.",
+          "Tắt tính năng: khi chủ server tắt xác minh web, không có lượt thu tín hiệu mới nào; dữ liệu cũ vẫn xoá được theo trang Lưu trữ & xoá dữ liệu.",
+        ],
+      },
     ],
   },
   {
@@ -239,6 +255,7 @@ const VI: LegalDoc[] = [
           "Hành động hình phạt, điểm nhiệt và cảnh báo: giữ tới khi bạn xoá trong dashboard hoặc xoá dữ liệu server.",
           "Sự kiện chống nuke/raid và lượt vào/rời server: chỉ giữ số bản ghi gần nhất để mod xem lại, bản cũ tự bị loại khi vượt giới hạn.",
           "File backup: giữ theo lịch bạn chọn (2–30 ngày một bản); bản cũ trong bot tự bị xoá khi có bản mới, còn bản trên GitHub Gist do bạn quản lý.",
+          "Xác minh web: phiên xác minh xoá 7 ngày sau khi hết hạn; dấu vết thiết bị/IP dùng để phát hiện tài khoản phụ giữ tối đa 24 tháng; bản ghi ban IP tối đa 90 ngày và luôn có ngày hết hạn.",
         ],
       },
       {
@@ -446,6 +463,7 @@ const EN: LegalDoc[] = [
           "Convex: hosts the database and runs the dashboard backend.",
           "GitHub: receives backup files only when you enable Gist upload with your own key.",
           "AI providers: process the conversation excerpts necessary when you use raid reports or the Haimiya assistant, for that request only.",
+          "ipapi.is: receives only the IP address when a server enables web verification, to look up VPN/proxy/Tor/datacenter. It receives no Discord ID, username, or other identifying data.",
         ],
       },
       {
@@ -476,6 +494,21 @@ const EN: LegalDoc[] = [
           "For any privacy question or request: post in the support channel of the Protogon Discord community with the relevant server ID or user ID.",
         ],
       },
+      {
+        heading: "10. Web verification: IP, device, and related accounts",
+        paragraphs: [
+          "When a server owner enables web verification (the “Web” method), the verification page collects a few signals to block fake accounts, VPNs/proxies, and alt accounts. This happens only when you open the verification link the bot sends you.",
+        ],
+        bullets: [
+          "IP address: never stored in raw form. The server applies a one-way hash (HMAC-SHA-256) with a secret key, scoped per server, so the same IP produces different values on two servers and cannot be reversed.",
+          "Device/browser fingerprint: canvas, WebGL, screen size, languages, timezone, CPU core count, and a cookie ID the page sets itself — all stored only as hashes.",
+          "Network lookup: to identify VPN/proxy/Tor/datacenter, the IP is sent to ipapi.is for that single lookup; the result is cached by hash for 24 hours. We never send your Discord ID or username to this service.",
+          "Human check: the page uses a hidden honeypot field, a minimum time on page, and pointer/keyboard movement — no image captcha.",
+          "IP bans: admins can block an IP hash for 1 to 90 days (7 by default). Owners, administrators, and bots are always exempt; shared IPs (CGNAT, mobile networks) are only denied verification and never auto-banned.",
+          "Retention: verification sessions are deleted 7 days after they expire; device/IP traces used to detect alt accounts are kept for at most 24 months; IP ban records last at most 90 days and always carry an expiry date.",
+          "Turning it off: when the server owner disables web verification, no new signals are collected; existing data can still be deleted through the Retention & Data Deletion page.",
+        ],
+      },
     ],
   },
   {
@@ -502,6 +535,7 @@ const EN: LegalDoc[] = [
           "Punishments, heat scores, and warnings: kept until you clear them in the dashboard or delete the server's data.",
           "Anti-nuke/raid events and join/leave records: only the most recent records are kept for moderator review; older ones are dropped once the cap is reached.",
           "Backup files: kept on the schedule you choose (one every 2–30 days); older copies inside the bot are deleted when a new one is created, while copies on GitHub Gist are yours to manage.",
+          "Web verification: verification sessions are deleted 7 days after they expire; device/IP traces used to detect alt accounts are kept for at most 24 months; IP ban records last at most 90 days and always carry an expiry date.",
         ],
       },
       {
@@ -712,6 +746,7 @@ const DE: LegalDoc[] = [
           "Convex: beherbergt die Datenbank und das Backend des Dashboards.",
           "GitHub: erhält Backup-Dateien nur, wenn du den Gist-Upload mit deinem Schlüssel aktivierst.",
           "KI-Anbieter: verarbeiten die notwendigen Gesprächsausschnitte, wenn du Raid-Berichte oder den Assistenten Haimiya nutzt — nur für diese Anfrage.",
+          "ipapi.is: erhält nur die IP-Adresse, wenn ein Server die Web-Verifizierung aktiviert, um VPN/Proxy/Tor/Rechenzentrum nachzuschlagen. Discord-ID, Nutzername oder andere identifizierende Daten werden nicht übermittelt.",
         ],
       },
       {
@@ -742,6 +777,21 @@ const DE: LegalDoc[] = [
           "Für Datenschutzfragen oder -anträge: im Support-Kanal der Protogon-Discord-Community, mit der betreffenden Server- oder Nutzer-ID.",
         ],
       },
+      {
+        heading: "10. Web-Verifizierung: IP, Gerät und verknüpfte Konten",
+        paragraphs: [
+          "Wenn der Serverbesitzer die Web-Verifizierung aktiviert (Methode „Web“), erfasst die Verifizierungsseite einige Signale, um Fake-Accounts, VPNs/Proxys und Alt-Accounts zu blockieren. Das geschieht nur, wenn du den vom Bot gesendeten Verifizierungslink öffnest.",
+        ],
+        bullets: [
+          "IP-Adresse: wird nie im Rohformat gespeichert. Der Server bildet einen Einweg-Hash (HMAC-SHA-256) mit einem geheimen Schlüssel, getrennt pro Server — dieselbe IP ergibt auf zwei Servern verschiedene Werte und lässt sich nicht zurückrechnen.",
+          "Geräte-/Browser-Fingerabdruck: Canvas, WebGL, Bildschirmgröße, Sprachen, Zeitzone, CPU-Kerne und eine selbst gesetzte Cookie-ID — alles nur als Hash gespeichert.",
+          "Netzwerkabfrage: Zur Erkennung von VPN/Proxy/Tor/Rechenzentrum wird die IP für genau diese eine Abfrage an ipapi.is gesendet; das Ergebnis wird 24 Stunden per Hash zwischengespeichert. Deine Discord-ID oder deinen Nutzernamen senden wir nicht an diesen Dienst.",
+          "Menschlichkeitsprüfung: verstecktes Honeypot-Feld, Mindestverweildauer sowie Maus- und Tastaturbewegung — kein Bild-Captcha.",
+          "IP-Sperren: Admins können einen IP-Hash 1 bis 90 Tage sperren (Standard 7). Owner, Administratoren und Bots sind immer ausgenommen; geteilte IPs (CGNAT, Mobilfunk) werden nur abgelehnt, nie automatisch gebannt.",
+          "Aufbewahrung: Verifizierungssitzungen werden 7 Tage nach Ablauf gelöscht; Geräte-/IP-Spuren zur Alt-Erkennung höchstens 24 Monate; IP-Sperren höchstens 90 Tage und immer mit Ablaufdatum.",
+          "Deaktivierung: Schaltet der Serverbesitzer die Web-Verifizierung ab, werden keine neuen Signale erfasst; bestehende Daten lassen sich über die Seite Aufbewahrung & Löschung löschen.",
+        ],
+      },
     ],
   },
   {
@@ -768,6 +818,7 @@ const DE: LegalDoc[] = [
           "Strafen, Hitzewerte und Verwarnungen: bleiben, bis du sie im Dashboard zurücksetzt oder die Serverdaten gelöscht werden.",
           "Anti-Nuke-/Raid-Ereignisse und Beitritts-/Austrittsdaten: nur die jüngsten Einträge bleiben zur Prüfung; ältere fallen bei Erreichen der Obergrenze weg.",
           "Backup-Dateien: nach deinem Zeitplan (eine alle 2–30 Tage); ältere Kopien im Bot werden bei einer neuen gelöscht, Kopien in GitHub Gist verwaltest du selbst.",
+          "Web-Verifizierung: Verifizierungssitzungen werden 7 Tage nach Ablauf gelöscht; Geräte-/IP-Spuren zur Alt-Erkennung höchstens 24 Monate; IP-Sperren höchstens 90 Tage und immer mit Ablaufdatum.",
         ],
       },
       {

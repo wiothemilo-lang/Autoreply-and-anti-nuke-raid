@@ -43,7 +43,15 @@ export const updateAltConfig = mutation({
     altPunish: v.optional(
       v.union(v.literal("kick"), v.literal("ban"), v.literal("timeout"), v.literal("verify")),
     ),
-    altVpnMode: v.optional(v.union(v.literal("strict"), v.literal("warn"), v.literal("off"))),
+    altVpnMode: v.optional(
+      v.union(
+        v.literal("strict"),
+        v.literal("warn"),
+        v.literal("off"),
+        v.literal("kick"),
+        v.literal("ban"),
+      ),
+    ),
     altWhitelistRoles: v.optional(v.array(v.string())),
     altWhitelistUsers: v.optional(v.array(v.string())),
     altSafeMode: v.optional(v.boolean()),

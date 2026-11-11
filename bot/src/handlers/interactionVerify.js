@@ -117,6 +117,14 @@ async function handleVerifyConfirm(store, interaction) {
       ephemeral: true,
     });
   }
+  // Tương tự với xác minh web: cấp role thẳng sẽ bỏ qua toàn bộ bước thu tín
+  // hiệu/chặn VPN — đúng thứ tính năng này sinh ra để làm.
+  if (config.verifyMethod === "web" && config.verifyWebEnabled) {
+    return interaction.reply({
+      content: "🔐 Server dùng xác minh qua web — hãy bấm nút “Xác minh qua web” trên panel.",
+      ephemeral: true,
+    });
+  }
   const unverifiedRoleId = config.unverifiedRoleId;
   const verifiedRoleId = config.verifiedRoleId;
   if (!unverifiedRoleId || !verifiedRoleId) {
@@ -202,4 +210,57 @@ async function handleVerifyConfirm(store, interaction) {
   return;
 }
 
-module.exports = { handleVerifyRequestCaptcha, handleVerifyConfirm };
+/**
+ * Nút `verify_web_start` — gửi lại link xác minh web qua DM.
+ *
+ * Dùng chung cổng kiểm tra với nút captcha (server bật? có role chưa xác minh?
+ * còn chưa verify?) để hành vi giữa 2 phương thức không lệch nhau.
+ */
+async function handleVerifyWebStart(store, interaction) {
+  const guild = interaction.guild;
+  if (!guild) return;
+  const config = await store.getConfig(guild.id);
+  if (!config?.verifyEnabled || !config.verifyWebEnabled) {
+    return interaction.reply({ content: "❌ Xác minh web đang tắt.", ephemeral: true });
+  }
+  if (config.verifyMethod !== "web") {
+    return interaction.reply({
+      content: "❌ Server không dùng xác minh qua web — hãy bấm nút trên panel mới.",
+      ephemeral: true,
+    });
+  }
+  const unverifiedRoleId = config.unverifiedRoleId;
+  if (!unverifiedRoleId) {
+    return interaction.reply({ content: "❌ Chưa cấu hình role xác minh.", ephemeral: true });
+  }
+  const member =
+    guild.members.cache.get(interaction.user.id) ||
+    (await guild.members.fetch(interaction.user.id).catch(() => null));
+  if (!member) {
+    return interaction.reply({ content: "❌ Không tìm thấy thành viên.", ephemeral: true });
+  }
+  if (!member.roles.cache.has(unverifiedRoleId)) {
+    return interaction.reply({ content: "✅ Bạn đã xác minh rồi!", ephemeral: true });
+  }
+  const verifyWeb = require("../verifyWeb");
+  const result = await verifyWeb.startVerification(store, member, config);
+  if (result.ok) {
+    return interaction.reply({
+      content: "🔐 Đã gửi link xác minh qua DM — mở link và làm theo hướng dẫn.",
+      ephemeral: true,
+    });
+  }
+  if (result.reason === "dm_blocked") {
+    return interaction.reply({
+      content:
+        '❌ Không gửi được DM. Hãy bật "cho phép tin nhắn trực tiếp" từ thành viên server rồi bấm lại sau 1 phút.',
+      ephemeral: true,
+    });
+  }
+  return interaction.reply({
+    content: "❌ Chưa tạo được phiên xác minh — thử lại sau ít phút.",
+    ephemeral: true,
+  });
+}
+
+module.exports = { handleVerifyRequestCaptcha, handleVerifyConfirm, handleVerifyWebStart };

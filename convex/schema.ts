@@ -328,11 +328,26 @@ export default defineSchema({
     dmRequested: v.optional(v.boolean()),
     /** Verify system: bật xác minh thành viên khi vào server. */
     verifyEnabled: v.optional(v.boolean()),
-    /** Phương thức xác minh: "button" (bấm nút) hoặc "captcha" (nhập mã DM). */
-    verifyMethod: v.optional(v.union(v.literal("button"), v.literal("captcha"))),
+    /**
+     * Phương thức xác minh: "button" (bấm nút), "captcha" (nhập mã DM) hoặc
+     * "web" (trang verify thu IP/fingerprint — Double Counter style).
+     */
+    verifyMethod: v.optional(v.union(v.literal("button"), v.literal("captcha"), v.literal("web"))),
     verifyChannelId: v.optional(v.string()),
     unverifiedRoleId: v.optional(v.string()),
     verifiedRoleId: v.optional(v.string()),
+    /** Cờ bật luồng verify web; tắt = giữ nguyên hành vi button/captcha cũ. */
+    verifyWebEnabled: v.optional(v.boolean()),
+    /**
+     * Hành động khi IP đã bị ban cố verify lại. "ban" = ban account (đã chốt
+     * 11/11/2026) — chỉ áp dụng khi IP không phải CGNAT/mobile và user không
+     * phải owner/admin. "deny" = chỉ từ chối.
+     */
+    ipBanAction: v.optional(v.union(v.literal("deny"), v.literal("ban"))),
+    /** Mốc admin đã tick "hiểu rủi ro ban nhầm" — bắt buộc trước khi bật "ban". */
+    ipBanAcknowledgedAt: v.optional(v.number()),
+    /** Whitelist hash IP cụ thể (hash do dashboard hiển thị) — miễn ban/deny. */
+    ipBanWhitelistHashes: v.optional(v.array(v.string())),
     /** Verify welcome DM: gửi embed chào mừng qua DM sau khi verify thành công. */
     verifyWelcomeEnabled: v.optional(v.boolean()),
     verifyWelcomeTitle: v.optional(v.string()),
@@ -360,8 +375,20 @@ export default defineSchema({
     altSimilarityThreshold: v.optional(v.number()),
     /** Thời gian cửa sổ (phút) — 2 account join trong khoảng này + similarity cao = alt suspects. */
     altJoinWindowMinutes: v.optional(v.number()),
-    /** Chế độ kiểm tra VPN: strict (block) | warn (log only) | off. */
-    altVpnMode: v.optional(v.union(v.literal("strict"), v.literal("warn"), v.literal("off"))),
+    /**
+     * Chế độ kiểm tra VPN: off (không xét) | warn (gắn cờ, vẫn cho verify) |
+     * strict (từ chối verify) | kick | ban (từ chối + phạt). Mặc định cũ "off";
+     * khi bật verify web, dashboard gợi ý "strict" theo kiểu Double Counter.
+     */
+    altVpnMode: v.optional(
+      v.union(
+        v.literal("strict"),
+        v.literal("warn"),
+        v.literal("off"),
+        v.literal("kick"),
+        v.literal("ban"),
+      ),
+    ),
     /** Chế độ an toàn: chỉ phạt khi có >= 2 bằng chứng độc lập (chống chặn nhầm). */
     altSafeMode: v.optional(v.boolean()),
     /**
@@ -1218,6 +1245,197 @@ export default defineSchema({
     .index("by_guildId", ["guildId"])
     .index("by_guildId_joinedAt", ["guildId", "joinedAt"])
     .index("by_guildId_riskScore", ["guildId", "riskScore"]),
+
+  /**
+   * verifySessions — một lượt xác minh qua web (Double Counter style).
+   *
+   * KHÔNG lưu token thô: chỉ `tokenHash` = SHA-256(token). Token 256-bit nằm
+   * trong URL gửi qua DM; lộ DB không dùng lại được. Cùng lý do, IP/tín hiệu
+   * chỉ lưu HMAC — xem `convex/verifyCrypto.ts`.
+   */
+  verifySessions: defineTable({
+    tokenHash: v.string(),
+    guildId: v.string(),
+    userId: v.string(),
+    /** Bot xác nhận thành viên này là owner/admin/bot → không bao giờ auto-ban. */
+    privileged: v.optional(v.boolean()),
+    createdAt: v.number(),
+    /** Hết hạn sau 10 phút; token dùng một lần. */
+    expiresAt: v.number(),
+    /** Lúc trình duyệt hoàn tất — null/undefined = chưa dùng. */
+    consumedAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("verified"),
+      v.literal("denied"),
+      v.literal("banned"),
+      v.literal("expired"),
+      v.literal("failed"),
+    ),
+    /** Kết quả chính sách; "ban" khác "deny" ở chỗ bot sẽ ban account. */
+    decision: v.optional(v.union(v.literal("allow"), v.literal("deny"), v.literal("ban"))),
+    /** Nhãn audit ổn định (allow, allow:flagged, deny:kick, ban…). */
+    reason: v.optional(v.string()),
+    /** Hình phạt bot phải áp dụng: kick | ban | timeout | verify (null = không phạt). */
+    punish: v.optional(v.string()),
+    riskScore: v.optional(v.number()),
+    /** Hash IP theo guild + hash global cho đồ thị identity xuyên server. */
+    ipHash: v.optional(v.string()),
+    ipPrefixHash: v.optional(v.string()),
+    globalIpHash: v.optional(v.string()),
+    fingerprintHash: v.optional(v.string()),
+    cookieHash: v.optional(v.string()),
+    uaHash: v.optional(v.string()),
+    /** Kết quả ipapi.is — chỉ lưu nhãn, không lưu IP thô. */
+    country: v.optional(v.string()),
+    asn: v.optional(v.number()),
+    org: v.optional(v.string()),
+    isVpn: v.optional(v.boolean()),
+    isProxy: v.optional(v.boolean()),
+    isTor: v.optional(v.boolean()),
+    isHosting: v.optional(v.boolean()),
+    isMobile: v.optional(v.boolean()),
+    isAbuser: v.optional(v.boolean()),
+    sharedIp: v.optional(v.boolean()),
+    /** Account khác trùng tín hiệu mạnh nhất (nếu có). */
+    linkedUserId: v.optional(v.string()),
+    linkScore: v.optional(v.number()),
+    linkReasons: v.optional(v.array(v.string())),
+    consentVersion: v.optional(v.string()),
+    /** Bot đã cấp role/áp dụng hình phạt xong — dùng để chống xử lý lặp. */
+    grantAppliedAt: v.optional(v.number()),
+    grantAttempts: v.optional(v.number()),
+    /** Còn việc cho bot làm (cấp role / kick / ban / timeout). Index để tick quét rẻ. */
+    grantPending: v.optional(v.boolean()),
+    /** Lý do kỹ thuật khi status = failed (không trả nguyên văn cho người dùng). */
+    failureCode: v.optional(v.string()),
+  })
+    .index("by_tokenHash", ["tokenHash"])
+    .index("by_guildId_userId_createdAt", ["guildId", "userId", "createdAt"])
+    .index("by_guildId_createdAt", ["guildId", "createdAt"])
+    .index("by_guildId_status", ["guildId", "status"])
+    .index("by_grantPending", ["grantPending"])
+    .index("by_expiresAt", ["expiresAt"]),
+
+  /**
+   * verifySignals — đồ thị identity toàn cục (kiểu Double Counter): một dòng
+   * cho mỗi (loại tín hiệu, hash, user). IP/cookie/fingerprint/UA đều là HMAC
+   * với `IP_HASH_SECRET`; không có giá trị thô nào trong bảng.
+   */
+  verifySignals: defineTable({
+    kind: v.union(
+      v.literal("ip"),
+      v.literal("fingerprint"),
+      v.literal("cookie"),
+      v.literal("userAgent"),
+    ),
+    valueHash: v.string(),
+    userId: v.string(),
+    guildId: v.string(),
+    firstSeenAt: v.number(),
+    lastSeenAt: v.number(),
+    hits: v.number(),
+    lastSessionId: v.optional(v.id("verifySessions")),
+  })
+    .index("by_kind_valueHash", ["kind", "valueHash"])
+    .index("by_kind_valueHash_userId", ["kind", "valueHash", "userId"])
+    .index("by_guildId_userId", ["guildId", "userId"])
+    .index("by_lastSeenAt", ["lastSeenAt"]),
+
+  /**
+   * verifyLinks — cạnh giữa hai account trong cùng guild. `score` cộng từ
+   * nhiều tín hiệu; `status` do ngưỡng quyết định, admin có thể dismiss.
+   */
+  verifyLinks: defineTable({
+    guildId: v.string(),
+    userId: v.string(),
+    linkedUserId: v.string(),
+    score: v.number(),
+    reasons: v.array(v.string()),
+    status: v.union(v.literal("candidate"), v.literal("confirmed"), v.literal("dismissed")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastSignalAt: v.number(),
+  })
+    .index("by_guildId_userId", ["guildId", "userId"])
+    .index("by_guildId_linkedUserId", ["guildId", "linkedUserId"])
+    .index("by_guildId_score", ["guildId", "score"]),
+
+  /** verifyAudit — log bất biến của quyết định verify (ai/khi nào/vì sao). */
+  verifyAudit: defineTable({
+    guildId: v.string(),
+    userId: v.optional(v.string()),
+    sessionId: v.optional(v.id("verifySessions")),
+    action: v.string(),
+    actor: v.string(),
+    reason: v.optional(v.string()),
+    details: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_guildId_createdAt", ["guildId", "createdAt"])
+    .index("by_sessionId", ["sessionId"]),
+
+  /**
+   * ipBans — ban theo hash IP, KHÔNG lưu IP thô. Mọi bản ghi BẮT BUỘC có
+   * `expiresAt` (trần 90 ngày): không có "ban vĩnh viễn" để tránh án treo
+   * vĩnh viễn trên IP động/CGNAT.
+   */
+  ipBans: defineTable({
+    guildId: v.string(),
+    ipHash: v.string(),
+    ipPrefixHash: v.optional(v.string()),
+    scope: v.union(v.literal("ip"), v.literal("prefix")),
+    reason: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    evidenceUserId: v.optional(v.string()),
+    evidenceSessionId: v.optional(v.id("verifySessions")),
+    active: v.boolean(),
+    source: v.optional(v.union(v.literal("manual"), v.literal("auto"))),
+  })
+    .index("by_guildId_ipHash", ["guildId", "ipHash"])
+    .index("by_guildId_ipPrefixHash", ["guildId", "ipPrefixHash"])
+    .index("by_guildId_expiresAt", ["guildId", "expiresAt"])
+    .index("by_guildId_active", ["guildId", "active"])
+    .index("by_expiresAt", ["expiresAt"]),
+
+  /** ipIntelCache — cache kết quả ipapi.is theo hash global (không theo IP thô). */
+  ipIntelCache: defineTable({
+    ipHash: v.string(),
+    provider: v.string(),
+    country: v.optional(v.string()),
+    asn: v.optional(v.number()),
+    org: v.optional(v.string()),
+    isVpn: v.boolean(),
+    isProxy: v.optional(v.boolean()),
+    isTor: v.optional(v.boolean()),
+    isHosting: v.optional(v.boolean()),
+    isMobile: v.optional(v.boolean()),
+    isAbuser: v.optional(v.boolean()),
+    checkedAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_ipHash", ["ipHash"])
+    .index("by_expiresAt", ["expiresAt"]),
+
+  /**
+   * guildBans — bản sao nhẹ danh sách ban của guild do bot đồng bộ.
+   * Dùng để phát hiện ban evasion khi account mới trùng tín hiệu với người đã
+   * bị ban. `source` phân biệt sự kiện trực tiếp với lần quét bù.
+   */
+  guildBans: defineTable({
+    guildId: v.string(),
+    userId: v.string(),
+    active: v.boolean(),
+    reason: v.optional(v.string()),
+    bannedAt: v.number(),
+    syncedAt: v.number(),
+    source: v.union(v.literal("event"), v.literal("sync")),
+  })
+    .index("by_guildId_userId", ["guildId", "userId"])
+    .index("by_guildId_active", ["guildId", "active"])
+    .index("by_userId", ["userId"]),
 
   /**
    * researchRuns — lịch sử học tập của bot (Threat Intel). 1 row = 1 lượt nghiên

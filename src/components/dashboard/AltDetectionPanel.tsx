@@ -38,6 +38,8 @@ const VPN_MODES = [
   { value: "off", label: "Tắt", desc: "Không kiểm tra VPN" },
   { value: "warn", label: "Cảnh báo", desc: "Ghi log VPN nhưng không chặn" },
   { value: "strict", label: "Nghiêm ngặt", desc: "Chặn VPN/Proxy ngay lập tức" },
+  { value: "kick", label: "Kick", desc: "Chặn và đuổi khỏi server" },
+  { value: "ban", label: "Ban", desc: "Chặn và cấm vĩnh viễn" },
 ] as const;
 
 function riskColor(score: number) {
@@ -195,7 +197,7 @@ export default function AltDetectionPanel({ data }: { data: GuildData }) {
       await updateConfig({
         token,
         guildId,
-        altVpnMode: mode as "strict" | "warn" | "off",
+        altVpnMode: mode as "strict" | "warn" | "off" | "kick" | "ban",
         vpnBlockEnabled: mode === "strict",
       });
       toast.success(translate("Chế độ VPN: {p0}", { p0: mode }));

@@ -33,6 +33,9 @@ module.exports = async function onInteractionCreate(client, interaction, store, 
     if (interaction.customId === "verify_confirm") {
       return verifyFlow.handleVerifyConfirm(store, interaction);
     }
+    if (interaction.customId === "verify_web_start") {
+      return verifyFlow.handleVerifyWebStart(store, interaction);
+    }
     // ─── TICKET: nút mở khiếu nại trong DM sau ban ───
     if (interaction.customId.startsWith("ticket_open:")) {
       return ticketFlow.ticketOpenButton(client, store, interaction);

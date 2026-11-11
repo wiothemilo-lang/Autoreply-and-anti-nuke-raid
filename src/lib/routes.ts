@@ -37,7 +37,8 @@ export type RouteSeoKind =
   | "dashboard"
   | "stats"
   | "admin"
-  | "callback";
+  | "callback"
+  | "verify";
 
 export type RouteVisibility = "public" | "private";
 export type RouteMatch = "exact" | "prefix";

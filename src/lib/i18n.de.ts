@@ -1712,4 +1712,98 @@ export const DE: Record<string, string> = {
   Ẩn: "Ausblenden",
   Hiện: "Anzeigen",
   Xoá: "Löschen",
+
+  /* ==== WEB-VERIFIZIERUNG (Double-Counter-Stil) — 11.11.2026 ==== */
+  "Xác minh thành viên": "Mitgliederverifizierung",
+  "Đang kiểm tra link…": "Link wird geprüft…",
+  "Bấm nút bên dưới để xác minh và nhận quyền truy cập server. Quá trình mất vài giây.":
+    "Klicke unten, um dich zu verifizieren und Zugriff auf den Server zu erhalten. Es dauert wenige Sekunden.",
+  "Chúng tôi kiểm tra thiết bị và kết nối để chặn tài khoản giả, VPN và tài khoản phụ.":
+    "Wir prüfen Gerät und Verbindung, um Fake-Accounts, VPNs und Alt-Accounts zu blockieren.",
+  "Địa chỉ IP không được lưu — chỉ lưu giá trị băm một chiều không thể đảo ngược.":
+    "Die IP-Adresse wird nicht gespeichert — nur ein nicht umkehrbarer Einweg-Hash.",
+  "Xác minh ngay": "Jetzt verifizieren",
+  "Khi bấm, bạn đồng ý với": "Mit dem Klick stimmst du der",
+  "Chính sách quyền riêng tư": "Datenschutzerklärung",
+  "Đang xác minh…": "Wird verifiziert…",
+  "Xác minh thành công!": "Verifizierung erfolgreich!",
+  "Bạn đã có quyền truy cập server. Quay lại Discord — role sẽ được cấp trong vài giây.":
+    "Du hast jetzt Zugriff auf den Server. Zurück zu Discord — die Rolle wird in wenigen Sekunden vergeben.",
+  "Chưa thể xác minh": "Verifizierung nicht möglich",
+  "Truy cập bị chặn": "Zugriff blockiert",
+  "Tài khoản hoặc kết nối này đã bị chặn khỏi server. Nếu bạn cho rằng đây là nhầm lẫn, hãy liên hệ quản trị server.":
+    "Dieses Konto oder diese Verbindung ist vom Server blockiert. Wenn du glaubst, dass das ein Fehler ist, kontaktiere den Server-Administrator.",
+  "Không xác minh được": "Verifizierung fehlgeschlagen",
+  "Link không hợp lệ hoặc đã được dùng.": "Der Link ist ungültig oder wurde bereits verwendet.",
+  "Nếu bạn là người thật, hãy thử lại và không dùng công cụ tự động.":
+    "Wenn du ein echter Mensch bist, versuche es ohne automatisierte Tools erneut.",
+  "Link đã hết hạn — hãy bấm lại nút xác minh trong Discord.":
+    "Der Link ist abgelaufen — klicke in Discord erneut auf den Verifizieren-Button.",
+  "Link này đã được dùng rồi. Nếu cần xác minh lại, hãy bấm nút trong Discord.":
+    "Dieser Link wurde bereits verwendet. Um erneut zu verifizieren, klicke in Discord auf den Button.",
+  "Link không hợp lệ. Hãy bấm nút xác minh trong Discord để nhận link mới.":
+    "Ungültiger Link. Klicke in Discord auf den Verifizieren-Button, um einen neuen zu erhalten.",
+  "Server chưa cấu hình xong tính năng xác minh — hãy báo quản trị server.":
+    "Der Server hat die Verifizierung noch nicht eingerichtet — bitte informiere den Administrator.",
+  "Không xác định được kết nối của bạn — hãy thử lại bằng mạng khác.":
+    "Deine Verbindung konnte nicht ermittelt werden — versuche es in einem anderen Netzwerk.",
+  "Bạn thao tác quá nhanh — chờ một phút rồi thử lại.":
+    "Du bist zu schnell — warte eine Minute und versuche es erneut.",
+  "Trang này không được phép gửi yêu cầu xác minh.":
+    "Diese Seite darf keine Verifizierungsanfragen senden.",
+  "Có lỗi xảy ra — hãy thử lại sau ít phút.":
+    "Etwas ist schiefgelaufen — versuche es in einigen Minuten erneut.",
+  "Không kết nối được máy chủ — kiểm tra mạng rồi thử lại.":
+    "Server nicht erreichbar — prüfe deine Verbindung und versuche es erneut.",
+  "Đã xác minh": "Verifiziert",
+  "Đã ban": "Gebannt",
+  "Từ chối": "Abgelehnt",
+  "Hết hạn": "Abgelaufen",
+  "Khi IP đã bị chặn cố xác minh lại": "Wenn eine gesperrte IP erneut verifizieren will",
+  "Bot bỏ qua owner, admin và bot. IP dùng chung (CGNAT/mạng di động) chỉ bị từ chối, không bao giờ tự ban.":
+    "Der Bot überspringt Owner, Admins und Bots. Geteilte IPs (CGNAT/Mobilfunk) werden nur abgelehnt, nie automatisch gebannt.",
+  "Chỉ từ chối": "Nur ablehnen",
+  "Ban tài khoản": "Konto bannen",
+  "Bạn đã xác nhận rủi ro ban nhầm": "Du hast das Risiko von Fehlbans bestätigt",
+  "Tự động ban khi IP đã bị chặn có thể ban nhầm người dùng chung mạng (CGNAT, wifi công cộng, mạng di động). Bot đã bỏ qua các trường hợp này, nhưng rủi ro vẫn còn. Bạn hiểu và muốn bật?":
+    "Automatisches Bannen einer gesperrten IP kann unschuldige Nutzer treffen, die das Netzwerk teilen (CGNAT, öffentliches WLAN, Mobilfunk). Der Bot überspringt diese Fälle bereits, aber ein Risiko bleibt. Verstehst du das und möchtest du es aktivieren?",
+  "Đã bật: ban tài khoản khi IP bị chặn": "Aktiviert: Konto bannen, wenn die IP gesperrt ist",
+  "Đã đổi: chỉ từ chối xác minh": "Geändert: Verifizierung nur ablehnen",
+  "IP đang bị chặn": "Gesperrte IPs",
+  "Hết hạn trong 24 giờ": "Läuft in 24 Stunden ab",
+  "Nhật ký xác minh gần nhất": "Letzte Verifizierungen",
+  "Chưa có lượt xác minh nào. Link sẽ được gửi qua DM khi thành viên vào server.":
+    "Noch keine Verifizierungen. Der Link wird per DM gesendet, wenn ein Mitglied beitritt.",
+  "IP dùng chung": "Geteilte IP",
+  "Tài khoản liên quan (alt)": "Verknüpfte Konten (Alts)",
+  "Chưa phát hiện cặp tài khoản nào trùng tín hiệu.":
+    "Keine Konten mit übereinstimmenden Signalen gefunden.",
+  "Chưa có IP nào bị chặn. Bạn có thể ban từ nhật ký phía trên.":
+    "Noch keine gesperrten IPs. Du kannst oben im Protokoll bannen.",
+  Gỡ: "Entfernen",
+  "Ban IP": "IP bannen",
+  "Ban từ nhật ký xác minh": "Ban aus dem Verifizierungsprotokoll",
+  "Đã ban IP của lượt xác minh này (7 ngày)": "IP dieser Verifizierung gebannt (7 Tage)",
+  "Ban thất bại": "Bannen fehlgeschlagen",
+  "Đã gỡ lệnh ban IP": "IP-Sperre entfernt",
+  "Gỡ thất bại": "Entfernen fehlgeschlagen",
+  "trùng dấu vết thiết bị": "übereinstimmender Gerätefingerabdruck",
+  "trùng cookie": "übereinstimmendes Cookie",
+  "trùng IP": "übereinstimmende IP",
+  "trùng trình duyệt": "übereinstimmender Browser",
+  "trùng tài khoản đã bị ban": "übereinstimmendes gebanntes Konto",
+  "IP đã bị chặn": "IP bereits gesperrt",
+  proxy: "Proxy",
+  datacenter: "Rechenzentrum",
+  Datacenter: "Rechenzentrum",
+  "— bot gửi link qua DM; trang web kiểm tra thiết bị/kết nối, chặn VPN và tài khoản phụ.":
+    "— der Bot sendet einen Link per DM; die Webseite prüft Gerät/Verbindung, blockiert VPNs und Alt-Accounts.",
+  "🛡️ Web — kiểm tra IP/thiết bị (Double Counter)": "🛡️ Web — prüft IP/Gerät (Double Counter)",
+  "Chặn và đuổi khỏi server": "Blockieren und vom Server werfen",
+  "Chặn và cấm vĩnh viễn": "Blockieren und dauerhaft bannen",
+  "Xác minh thành viên — Protogon": "Mitgliederverifizierung — Protogon",
+  "Xác minh thành viên qua web: kiểm tra thiết bị và kết nối để chặn tài khoản giả, VPN và tài khoản phụ.":
+    "Webbasierte Mitgliederverifizierung: prüft Geräte- und Verbindungssignale, um Fake-Accounts, VPNs und Alt-Accounts zu blockieren.",
+  "Kết nối hoặc thiết bị của bạn bị đánh giá là rủi ro. Hãy tắt VPN/proxy rồi thử lại, hoặc liên hệ quản trị server.":
+    "Deine Verbindung oder dein Gerät wurde als riskant eingestuft. Schalte VPN/Proxy aus und versuche es erneut oder kontaktiere den Server-Administrator.",
 };

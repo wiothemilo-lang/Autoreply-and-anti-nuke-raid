@@ -60,7 +60,7 @@ RUN printf '%s\n' \
   "  index index.html;" \
   "  include /etc/nginx/security-headers.conf;" \
   "  # Route RIÊNG TƯ (cần đăng nhập): SPA fallback + noindex." \
-  "  location ~ ^/(auth|discord/callback|admin|stats|dashboard)(/.*)?/?$ {" \
+  "  location ~ ^/(auth|discord/callback|admin|stats|dashboard|verify)(/.*)?/?$ {" \
   "    try_files /index.html =404;" \
   "    include /etc/nginx/security-headers.conf;" \
   "    add_header X-Robots-Tag \"noindex, nofollow\" always;" \

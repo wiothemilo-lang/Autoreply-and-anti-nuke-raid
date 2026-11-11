@@ -18,7 +18,7 @@
       ]
     },
     {
-      "source": "/(auth|discord/callback|admin|stats|dashboard)(/.*)?",
+      "source": "/(auth|discord/callback|admin|stats|dashboard|verify)(/.*)?",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {
@@ -40,6 +40,7 @@
     { "source": "/monitor", "destination": "/index.html" },
     { "source": "/donate", "destination": "/index.html" },
     { "source": "/feedback", "destination": "/index.html" },
+    { "source": "/verify/:path*", "destination": "/index.html" },
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/stats", "destination": "/index.html" },
     { "source": "/dashboard", "destination": "/index.html" },

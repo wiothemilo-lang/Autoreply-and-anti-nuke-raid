@@ -493,3 +493,37 @@ _Thiết kế đã chốt provider (ipapi.is), cách lưu (chỉ hash HMAC), hà
 trúng IP ban (từ chối + auto-ban kèm chốt chống false positive) và nơi đặt
 trang verify (SPA Vercel). Tài liệu này không thay đổi runtime; pha 1 chỉ thêm
 bảng/helper/cron, chưa thu thập IP thật._
+
+## 9. Trạng thái triển khai (11/11/2026)
+
+Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch phía trên:
+
+| Thành phần              | File                                     | Ghi chú                                                                                                                              |
+| ----------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Token + băm IP/tín hiệu | `convex/verifyCrypto.ts`                 | Token 256-bit base64url; DB chỉ lưu SHA-256(token). HMAC tách miền `guild-ip` / `global-ip` / `signal`.                              |
+| Quyết định              | `convex/verifyPolicy.ts`                 | Thuần, không DB/mạng. Thứ tự: IP ban → ban evasion → VPN → link mềm → allow.                                                         |
+| Phiên + đồ thị + grant  | `convex/verify.ts`                       | `botCreateSession`, `finalize`, `botPendingGrants`/`botClaimGrant`/`botFinishGrant`, `listSessions`, `listLinks`, `botRunRetention`. |
+| IP intel                | `convex/verifyActions.ts` (`"use node"`) | Đọc `IP_HASH_SECRET` + `IPINTEL_API_KEY`, cache 24h theo hash global. Thiếu key → vẫn verify, chỉ mất phần VPN.                      |
+| Ban IP                  | `convex/verifyBans.ts`                   | 1..90 ngày (mặc định 7), không ban vĩnh viễn; `botSyncGuildBan` + `botReplaceGuildBans`.                                             |
+| HTTP                    | `convex/http.ts`                         | `POST /verify/complete` — IP đọc từ `x-forwarded-for`, CORS allowlist, trần tần suất dùng chung `geoGuard`.                          |
+| Bot                     | `bot/src/verifyWeb.js`                   | Tạo phiên + DM link, thi hành grant, đồng bộ ban, bảo trì 1 lần/ngày trong tick.                                                     |
+| Web                     | `src/pages/VerifyPage.tsx`               | Fingerprint canvas/WebGL + cookie first-party; honeypot + dwell ≥1.5s + `navigator.webdriver`.                                       |
+
+### Biến môi trường
+
+| Biến              | Nơi đặt          | Bắt buộc       | Thiếu thì sao                                                |
+| ----------------- | ---------------- | -------------- | ------------------------------------------------------------ |
+| `IP_HASH_SECRET`  | Convex env       | Có (để thu IP) | Phiên bị đánh `failed: missing_secret`; KHÔNG ghi hash rỗng. |
+| `IPINTEL_API_KEY` | Convex env       | Không          | Không phát hiện VPN/proxy/Tor; mọi tín hiệu khác vẫn chạy.   |
+| `DASHBOARD_URL`   | env bot trên VPS | Không          | Mặc định `https://protogon.freebuff.app` — link trong DM.    |
+
+### Khác kế hoạch ban đầu (có chủ đích)
+
+- **TTL phiên 10 phút**, không phải 15 — đủ cho một lượt bấm link, ngắn hơn thì
+  link rò ra ngoài ít giá trị hơn.
+- **Rate-limit tầng HTTP** dùng chung `geoGuard` (20/phút/IP, 300/phút toàn cục)
+  thay vì bảng đếm DB: Convex free tier không đáng để thêm 3 reads mỗi lượt.
+- **Không có `vpnFailClosed`**: provider lỗi → intel `null` → coi như sạch. Chặn
+  toàn bộ người dùng khi ipapi.is sập là đánh đổi tệ hơn.
+- **`/verify/complete` trả lý do công khai** (`allowed`/`flagged`/`blocked`/
+  `banned`), KHÔNG trả `linkedUserId` hay mã lý do chi tiết.
