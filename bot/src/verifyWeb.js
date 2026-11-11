@@ -89,6 +89,38 @@ async function createSession(store, member) {
   }
 }
 
+/**
+ * Payload hiển thị chung cho DM và tin nhắn ephemeral trong kênh.
+ *
+ * Vì sao tách: cùng một nội dung nhưng kênh hiển thị cần ghi rõ "link riêng
+ * chỉ bạn thấy" — người dùng phải biết token không công khai. Nội dung nêu
+ * đúng dữ liệu được xử lý (IP thô không lưu, IP gửi một lần tới ipapi.is) để
+ * consent trên trang web không phải lần đầu họ nghe về việc này.
+ */
+function buildVerifyMessage(member, session, { ephemeral = false } = {}) {
+  const minutes = Math.max(1, Math.round((session.expiresAt - Date.now()) / 60_000));
+  const embed = new EmbedBuilder()
+    .setColor(Colors.Blurple)
+    .setTitle("🔐 Xác minh để vào server")
+    .setDescription(
+      `Chào **${member.user?.username ?? "bạn"}**! Nhấn nút bên dưới để xác minh và nhận quyền truy cập **${member.guild.name}**.\n\n` +
+        "Trang xác minh sẽ kiểm tra kết nối và thiết bị để chặn tài khoản giả, VPN và tài khoản phụ. " +
+        "IP thô **không được lưu** — chỉ lưu giá trị băm một chiều tách theo server. " +
+        "IP được gửi **một lần** tới ipapi.is để tra VPN/proxy/Tor.",
+    )
+    .setFooter({
+      text: ephemeral
+        ? `Link riêng chỉ bạn thấy · hết hạn sau ${minutes} phút · dùng một lần`
+        : `Link hết hạn sau ${minutes} phút · dùng một lần`,
+    });
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel("Xác minh ngay").setStyle(ButtonStyle.Link).setURL(session.url),
+  );
+
+  return { embeds: [embed], components: [row] };
+}
+
 /** Gửi DM chứa link verify. Trả false khi người dùng chặn DM. */
 async function sendVerifyDm(member, config, session) {
   if (!member || !session) return false;
@@ -96,23 +128,8 @@ async function sendVerifyDm(member, config, session) {
   if (Date.now() - last < DM_COOLDOWN_MS) return false;
   dmSentAt.set(member.id, Date.now());
 
-  const minutes = Math.max(1, Math.round((session.expiresAt - Date.now()) / 60_000));
-  const embed = new EmbedBuilder()
-    .setColor(Colors.Blurple)
-    .setTitle("🔐 Xác minh để vào server")
-    .setDescription(
-      `Chào **${member.user?.username ?? "bạn"}**! Nhấn nút bên dưới để xác minh và nhận quyền truy cập **${member.guild.name}**.\n\n` +
-        "Trang xác minh sẽ tự kiểm tra kết nối và thiết bị của bạn để chặn tài khoản giả, VPN và các tài khoản phụ. " +
-        "Chúng tôi **không lưu địa chỉ IP** — chỉ lưu giá trị băm một chiều.",
-    )
-    .setFooter({ text: `Link hết hạn sau ${minutes} phút · dùng một lần` });
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel("Xác minh ngay").setStyle(ButtonStyle.Link).setURL(session.url),
-  );
-
   try {
-    await member.send({ embeds: [embed], components: [row] });
+    await member.send(buildVerifyMessage(member, session));
     return true;
   } catch {
     return false;
@@ -128,11 +145,13 @@ async function startVerification(store, member, config) {
 }
 
 /**
- * Nhắc thành viên mới mở DM khi bot không gửi được link.
+ * Nhắc thành viên nhận link khi bot không gửi được DM.
  *
  * KHÔNG đăng link/token vào kênh công khai — làm vậy bất kỳ ai đọc kênh cũng
- * xác minh thay được. Chỉ gửi mention + nút mở lại luồng DM (`verify_web_start`);
- * nút này tạo link mới và gửi riêng khi người dùng đã mở DM.
+ * xác minh thay được. Chỉ gửi mention + nút `verify_web_start`; khi bấm, bot
+ * trả link trong tin nhắn ephemeral (chỉ người bấm thấy), không phụ thuộc DM.
+ * Đây là đường thoát cho người chặn DM — trước đây họ bị kẹt vì nút cũ vẫn đòi
+ * mở DM.
  */
 async function notifyOpenDm(member, config) {
   const channelId = config?.verifyChannelId;
@@ -147,13 +166,13 @@ async function notifyOpenDm(member, config) {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId("verify_web_start")
-        .setLabel("Tôi đã mở DM — gửi link")
+        .setLabel("Nhận link xác minh")
         .setStyle(ButtonStyle.Primary),
     );
     await channel.send({
       content:
-        `<@${member.id}> Bot chưa gửi được link xác minh vì bạn đang chặn tin nhắn trực tiếp. ` +
-        "Hãy mở **DM từ thành viên server** rồi bấm nút bên dưới để nhận link riêng.",
+        `<@${member.id}> Bot chưa gửi được link xác minh qua tin nhắn trực tiếp. ` +
+        "Bấm nút bên dưới để nhận link **riêng trong kênh này** — chỉ bạn nhìn thấy.",
       components: [row],
       allowedMentions: { users: [member.id] },
     });
@@ -393,6 +412,7 @@ async function resyncGuildBans(store, guild) {
 module.exports = {
   DASHBOARD_URL,
   applyGrant,
+  buildVerifyMessage,
   createSession,
   grantVerified,
   isPrivileged,

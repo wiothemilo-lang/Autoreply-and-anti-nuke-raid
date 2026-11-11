@@ -1722,6 +1722,19 @@ export const DE: Record<string, string> = {
     "Wir prüfen Gerät und Verbindung, um Fake-Accounts, VPNs und Alt-Accounts zu blockieren.",
   "Địa chỉ IP không được lưu — chỉ lưu giá trị băm một chiều không thể đảo ngược.":
     "Die IP-Adresse wird nicht gespeichert — nur ein nicht umkehrbarer Einweg-Hash.",
+  "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server. IP được gửi một lần tới ipapi.is để tra VPN/proxy/Tor.":
+    "Die rohe IP wird nicht gespeichert; nur ein serverbezogener HMAC-SHA-256-Wert bleibt. Die IP wird einmalig an ipapi.is für die VPN-/Proxy-/Tor-Abfrage gesendet.",
+  "Kết quả có thể được quyết định tự động theo cấu hình server; bạn có thể khiếu nại qua kênh hỗ trợ.":
+    "Das Ergebnis kann je nach Serverkonfiguration automatisch entschieden werden; du kannst über den Support-Kanal Einspruch einlegen.",
+  "và việc thu IP/thiết bị, gửi IP tới ipapi.is để xác minh.":
+    "sowie in die Erhebung von IP-/Gerätedaten und die Übermittlung der IP an ipapi.is zur Verifizierung.",
+  "IP thô không được lưu — chỉ lưu giá trị băm một chiều tách theo từng server.":
+    "Die rohe IP wird nicht gespeichert — nur ein serverbezogener Einweg-Hash.",
+  "— bot mở link riêng trong kênh (hoặc gửi DM); trang web kiểm tra thiết bị/kết nối, chặn VPN và tài khoản phụ.":
+    "— der Bot öffnet einen privaten Link im Kanal (oder sendet eine DM); die Webseite prüft Gerät/Verbindung, blockiert VPNs und Alt-Accounts.",
+  "Trước khi bật xác minh web": "Vor dem Aktivieren der Web-Verifizierung",
+  "Trang xác minh thu IP và tín hiệu thiết bị, gửi IP một lần tới ipapi.is và có thể ra quyết định tự động. Hãy thông báo cho thành viên và chỉ bật khi bạn có căn cứ pháp lý.":
+    "Die Verifizierungsseite erfasst IP- und Gerätesignale, sendet die IP einmalig an ipapi.is und kann automatisierte Entscheidungen treffen. Informiere die Mitglieder und aktiviere sie nur mit Rechtsgrundlage.",
   "Xác minh ngay": "Jetzt verifizieren",
 
   "Chính sách quyền riêng tư": "Datenschutzerklärung",

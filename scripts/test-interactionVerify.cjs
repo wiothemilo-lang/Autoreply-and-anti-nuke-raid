@@ -37,9 +37,11 @@ const ctl = {
   analysis: { riskScore: 0, action: "pass", riskFactors: [] },
   analysisThrows: false,
   punish: { executed: false },
-  // Kết quả verifyWeb.startVerification trả về (test điều khiển từng nhánh).
-  webResult: { ok: true, reason: "sent", url: "https://x/verify/t" },
+  // Phiên + kết quả gửi DM do test điều khiển (handler dùng createSession).
+  webSession: { url: "https://x/verify/t", expiresAt: Date.now() + 600_000 },
+  webDmResult: true,
   webCalls: 0,
+  dmCalls: 0,
 };
 const calls = {
   captchaSet: [],
@@ -65,9 +67,17 @@ const utilMock = {
 // verifyWeb là module RIÊNG (đã có suite riêng test-verify-web-bot). Ở đây chỉ
 // cần biết handler gọi nó đúng lúc và phản ứng đúng với từng kết quả.
 const verifyWebMock = {
-  startVerification: async () => {
+  createSession: async () => {
     ctl.webCalls += 1;
-    return ctl.webResult;
+    return ctl.webSession;
+  },
+  buildVerifyMessage: () => ({
+    embeds: [{ data: { title: "🔐 Xác minh để vào server" } }],
+    components: [{ components: [{ url: "https://x/verify/t" }] }],
+  }),
+  sendVerifyDm: async () => {
+    ctl.dmCalls += 1;
+    return ctl.webDmResult;
   },
 };
 const altMock = {
@@ -760,32 +770,40 @@ const sweepFn = () => calls.sweeps.get("interactionVerify").fn();
       );
     }
 
-    // Gửi thành công.
+    // Gửi thành công: link nằm ngay trong ephemeral, không phải chờ DM.
     {
-      ctl.webResult = { ok: true, reason: "sent", url: "https://x/verify/t" };
+      ctl.webSession = { url: "https://x/verify/t", expiresAt: Date.now() + 600_000 };
+      ctl.webDmResult = true;
+      const before = ctl.dmCalls;
       const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w6")), userId: "w6" });
       await verify.handleVerifyWebStart(mkStore(webConfig), inter);
+      const reply = inter._replies[0];
       check(
-        "webStart: gửi được → báo đã gửi link qua DM",
-        /Đã gửi link xác minh qua DM/.test(inter._replies[0].content),
+        "webStart: trả link ngay trong ephemeral",
+        reply?.ephemeral === true &&
+          reply.components?.[0]?.components?.[0]?.url === "https://x/verify/t",
       );
+      check("webStart: vẫn gửi thêm DM nếu được", ctl.dmCalls === before + 1);
     }
 
-    // Người dùng chặn DM — phải hướng dẫn bật DM, không phải "thử lại sau".
+    // Người dùng chặn DM — link ephemeral vẫn hoạt động, không còn bế tắc.
     {
-      ctl.webResult = { ok: false, reason: "dm_blocked" };
+      ctl.webSession = { url: "https://x/verify/t", expiresAt: Date.now() + 600_000 };
+      ctl.webDmResult = false;
       const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w7")), userId: "w7" });
       await verify.handleVerifyWebStart(mkStore(webConfig), inter);
+      const reply = inter._replies[0];
       check(
-        "webStart: DM bị chặn → hướng dẫn bật DM + chờ 1 phút",
-        /Không gửi được DM/.test(inter._replies[0].content) &&
-          /1 phút/.test(inter._replies[0].content),
+        "webStart: DM bị chặn vẫn có link riêng trong kênh",
+        reply?.ephemeral === true &&
+          reply.components?.[0]?.components?.[0]?.url === "https://x/verify/t" &&
+          !/Không gửi được DM/.test(reply.content ?? ""),
       );
     }
 
-    // Lỗi khác (Convex chưa đồng bộ, server lỗi…) → câu chung, không lộ chi tiết.
+    // Lỗi tạo phiên (Convex chưa đồng bộ, server lỗi…) → câu chung, không lộ chi tiết.
     {
-      ctl.webResult = { ok: false, reason: "session_failed" };
+      ctl.webSession = null;
       const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w8")), userId: "w8" });
       await verify.handleVerifyWebStart(mkStore(webConfig), inter);
       check(

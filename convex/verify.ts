@@ -425,7 +425,6 @@ export const finalize = internalMutation({
     tokenHash: v.string(),
     ipHash: v.string(),
     ipPrefixHash: v.optional(v.string()),
-    globalIpHash: v.string(),
     fingerprintHash: v.optional(v.string()),
     cookieHash: v.optional(v.string()),
     uaHash: v.optional(v.string()),
@@ -529,7 +528,6 @@ export const finalize = internalMutation({
       riskScore: result.riskScore,
       ipHash: args.ipHash,
       ipPrefixHash: args.ipPrefixHash,
-      globalIpHash: args.globalIpHash,
       fingerprintHash: args.fingerprintHash,
       cookieHash: args.cookieHash,
       uaHash: args.uaHash,
@@ -968,9 +966,12 @@ export const botRunRetention = mutation({
       deleted++;
     }
 
+    // Cache ipapi.is chỉ có giá trị 24h. Xoá NGAY khi hết hạn thay vì giữ
+    // thêm 30 ngày: đây là dữ liệu suy ra từ IP, không có lý do lưu lâu hơn
+    // thời hạn đã công bố.
     const expiredIntel = await ctx.db
       .query("ipIntelCache")
-      .withIndex("by_expiresAt", (q) => q.lt("expiresAt", now - 30 * DAY))
+      .withIndex("by_expiresAt", (q) => q.lt("expiresAt", now))
       .take(200);
     for (const row of expiredIntel) {
       await ctx.db.delete(row._id);

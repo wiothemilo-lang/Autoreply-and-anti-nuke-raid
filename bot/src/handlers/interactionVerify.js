@@ -211,7 +211,12 @@ async function handleVerifyConfirm(store, interaction) {
 }
 
 /**
- * Nút `verify_web_start` — gửi lại link xác minh web qua DM.
+ * Nút `verify_web_start` — mở link xác minh web.
+ *
+ * Link được trả NGAY trong tin nhắn ephemeral (chỉ người bấm thấy), rồi mới
+ * gửi thêm DM nếu được. Trước đây chỉ gửi DM: người chặn DM từ thành viên
+ * server bị kẹt hẳn, dù họ sẵn sàng xác minh. Ephemeral vẫn giữ token riêng
+ * tư — không đăng link công khai vào kênh.
  *
  * Dùng chung cổng kiểm tra với nút captcha (server bật? có role chưa xác minh?
  * còn chưa verify?) để hành vi giữa 2 phương thức không lệch nhau.
@@ -243,24 +248,21 @@ async function handleVerifyWebStart(store, interaction) {
     return interaction.reply({ content: "✅ Bạn đã xác minh rồi!", ephemeral: true });
   }
   const verifyWeb = require("../verifyWeb");
-  const result = await verifyWeb.startVerification(store, member, config);
-  if (result.ok) {
+  const session = await verifyWeb.createSession(store, member);
+  if (!session) {
     return interaction.reply({
-      content: "🔐 Đã gửi link xác minh qua DM — mở link và làm theo hướng dẫn.",
+      content: "❌ Chưa tạo được phiên xác minh — thử lại sau ít phút.",
       ephemeral: true,
     });
   }
-  if (result.reason === "dm_blocked") {
-    return interaction.reply({
-      content:
-        '❌ Không gửi được DM. Hãy bật "cho phép tin nhắn trực tiếp" từ thành viên server rồi bấm lại sau 1 phút.',
-      ephemeral: true,
-    });
-  }
-  return interaction.reply({
-    content: "❌ Chưa tạo được phiên xác minh — thử lại sau ít phút.",
+  // Link trong ephemeral: người chặn DM vẫn xác minh được ngay tại kênh.
+  await interaction.reply({
+    ...verifyWeb.buildVerifyMessage(member, session, { ephemeral: true }),
     ephemeral: true,
   });
+  // DM chỉ là kênh phụ (mở trên điện thoại/máy khác). Lỗi DM không được làm
+  // hỏng luồng chính — người dùng đã có link trong tin nhắn ephemeral.
+  verifyWeb.sendVerifyDm(member, config, session).catch(() => {});
 }
 
 module.exports = { handleVerifyRequestCaptcha, handleVerifyConfirm, handleVerifyWebStart };

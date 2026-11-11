@@ -177,7 +177,7 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
                 <b>Captcha</b>{" "}
                 {translate("— bot gửi mã qua DM, thành viên nhập lại mã trong kênh.")} <b>Web</b>{" "}
                 {translate(
-                  "— bot gửi link qua DM; trang web kiểm tra thiết bị/kết nối, chặn VPN và tài khoản phụ.",
+                  "— bot mở link riêng trong kênh (hoặc gửi DM); trang web kiểm tra thiết bị/kết nối, chặn VPN và tài khoản phụ.",
                 )}
               </p>
             </div>
@@ -203,6 +203,27 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
               {translate("🛡️ Web — kiểm tra IP/thiết bị (Double Counter)")}
             </option>
           </select>
+        </div>
+      )}
+
+      {/* Nghĩa vụ của chủ server: thông báo + căn cứ pháp lý trước khi thu IP.
+          Đặt ngay dưới bộ chọn phương thức để người bật tính năng đọc trước. */}
+      {g.verifyEnabled && g.verifyMethod === "web" && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+          <p className="font-semibold text-foreground">{translate("Trước khi bật xác minh web")}</p>
+          <p className="mt-1">
+            {translate(
+              "Trang xác minh thu IP và tín hiệu thiết bị, gửi IP một lần tới ipapi.is và có thể ra quyết định tự động. Hãy thông báo cho thành viên và chỉ bật khi bạn có căn cứ pháp lý.",
+            )}{" "}
+            <a
+              href="/privacy#muc-13"
+              target="_blank"
+              rel="noreferrer"
+              className="underline hover:text-foreground"
+            >
+              {translate("Chính sách quyền riêng tư")}
+            </a>
+          </p>
         </div>
       )}
 

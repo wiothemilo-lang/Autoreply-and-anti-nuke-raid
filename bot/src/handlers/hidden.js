@@ -406,7 +406,7 @@ async function processVerifyPanelItems(client, store, items) {
           method === "captcha"
             ? "Nhấn nút bên dưới để nhận mã xác minh qua DM, sau đó nhập mã trong kênh này."
             : method === "web"
-              ? "Nhấn nút bên dưới để nhận link xác minh qua DM. Trang xác minh sẽ tự kiểm tra kết nối và thiết bị của bạn."
+              ? "Nhấn nút bên dưới để mở trang xác minh ngay tại đây. Link chỉ bạn nhìn thấy; trang sẽ kiểm tra kết nối và thiết bị của bạn."
               : "Nhấn nút bên dưới để xác minh và vào server.",
         )
         .setFooter({ text: "Protogon · Verify" });

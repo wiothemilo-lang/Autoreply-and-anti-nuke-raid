@@ -97,14 +97,6 @@ export function ipHash(secret: string, guildId: string, ip: string): string {
   return hmacSha256Hex(secret, `guild-ip::${guildId}::${normalized}`);
 }
 
-/** Hash IP miền toàn cục — chỉ dùng cho đồ thị identity xuyên server. */
-export function globalIpHash(secret: string, ip: string): string {
-  const normalized = normalizeIp(ip);
-  if (!secret) throw new Error("Thiếu IP_HASH_SECRET");
-  if (!normalized) throw new Error("IP không hợp lệ");
-  return hmacSha256Hex(secret, `global-ip::${normalized}`);
-}
-
 /**
  * Hash một tín hiệu identity (fingerprint/cookie/user-agent) trong miền toàn
  * cục. `kind` tách miền để cùng một chuỗi ở 2 loại tín hiệu không va nhau.

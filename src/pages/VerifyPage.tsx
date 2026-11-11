@@ -316,7 +316,13 @@ export default function VerifyPage() {
                   <li className="flex items-start gap-2">
                     <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     {translate(
-                      "Địa chỉ IP không được lưu — chỉ lưu giá trị băm một chiều không thể đảo ngược.",
+                      "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server. IP được gửi một lần tới ipapi.is để tra VPN/proxy/Tor.",
+                    )}
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {translate(
+                      "Kết quả có thể được quyết định tự động theo cấu hình server; bạn có thể khiếu nại qua kênh hỗ trợ.",
                     )}
                   </li>
                 </ul>
@@ -341,13 +347,13 @@ export default function VerifyPage() {
                     {translate("Tôi đã đọc và đồng ý với")}{" "}
                     <a
                       className="underline hover:text-foreground"
-                      href="/privacy"
+                      href="/privacy#muc-13"
                       target="_blank"
                       rel="noreferrer"
                     >
                       {translate("Chính sách quyền riêng tư")}
                     </a>{" "}
-                    {translate("và việc kiểm tra thiết bị/kết nối để xác minh.")}
+                    {translate("và việc thu IP/thiết bị, gửi IP tới ipapi.is để xác minh.")}
                   </span>
                 </label>
                 <Button
@@ -359,7 +365,9 @@ export default function VerifyPage() {
                   {translate("Xác minh ngay")}
                 </Button>
                 <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-                  {translate("Chúng tôi không lưu địa chỉ IP — chỉ lưu giá trị băm một chiều.")}
+                  {translate(
+                    "IP thô không được lưu — chỉ lưu giá trị băm một chiều tách theo từng server.",
+                  )}
                 </p>
               </div>
             )}

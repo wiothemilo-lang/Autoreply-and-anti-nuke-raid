@@ -11,7 +11,6 @@ import {
   base64UrlEncode,
   clampBanDays,
   generateVerifyToken,
-  globalIpHash,
   hashVerifyToken,
   ipHash,
   ipPrefixHash,
@@ -66,11 +65,6 @@ check("ipHash tách guild", h1 !== h3);
 check("ipHash 64 hex", /^[0-9a-f]{64}$/.test(h1));
 check("ipHash đổi secret", h1 !== ipHash("secret-khac", "guild-a", ip));
 check("ipHash chuẩn hoá trước khi băm", h1 === ipHash(SECRET, "guild-a", " 203.0.113.9 "));
-
-const g1 = globalIpHash(SECRET, ip);
-check("globalIpHash khác ipHash guild", g1 !== h1);
-check("globalIpHash ổn định giữa guild", g1 === globalIpHash(SECRET, ip));
-check("globalIpHash đổi IP", g1 !== globalIpHash(SECRET, "203.0.113.10"));
 
 // ── Signal hash ──────────────────────────────────────────────────────────────
 const s1 = signalHash(SECRET, "fp", "abc");

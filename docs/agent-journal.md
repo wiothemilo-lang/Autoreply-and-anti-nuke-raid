@@ -2,11 +2,12 @@
 
 ## Đang dở
 
-- 🚧 **Verify web đã merge (PR #102) + vá grant-state (PR #104) nhưng CHƯA bật được**:
+- 🚧 **Verify web: UX + pháp lý đã xong (nhánh `feat/verify-legal-ux`) nhưng CHƯA bật được**:
   cần đặt
   `IP_HASH_SECRET` (bắt buộc — thiếu thì mọi phiên `failed: missing_secret`) và
   `IPINTEL_API_KEY` (khuyến nghị — thiếu thì không phát hiện VPN/proxy/Tor) trong
-  Convex env, `DASHBOARD_URL` trong env bot VPS, rồi mới bật `verifyWebEnabled`.
+  Convex env, `DASHBOARD_URL` trong env bot VPS, chạy curl self-test XFF trên edge
+  production, có DPA/SCC với ipapi.is, rồi mới bật `verifyWebEnabled`.
   Chưa có test tích hợp với ipapi.is thật (chỉ mock `parseIntel` + policy thuần).
 
 - 🔐 **XFF production chưa xác nhận** — backend Convex local trả
@@ -85,6 +86,13 @@
 ---
 
 ---
+
+## 2026-11-12 — Verify web: link tạm thời + chính sách pháp lý đầy đủ
+
+- ✅ Xong: bấm nút → ephemeral reply kèm link `/verify` ngay trong kênh, DM gửi nền (đóng DM không còn ngõ cụt); bỏ `globalIpHash`, cache ipapi.is theo hash guild; chính sách riêng tư 15 mục VI/EN/DE, điều khoản nghĩa vụ chủ server, trang xoá dữ liệu; panel admin nhắc trước khi bật
+- 📁 File đụng: `bot/src/{verifyWeb.js,handlers/interactionVerify.js,handlers/hidden.js}`, `convex/{verify,verifyActions,verifyCrypto,schema}.ts`, `src/{lib/legalContent.ts,pages/VerifyPage.tsx,components/dashboard/VerifyPanel.tsx,lib/i18n.en.ts,lib/i18n.de.ts}`, `docs/{verify-ip-architecture,decision-log}.md`, 4 suite verify
+- 🧪 Kiểm chứng: 90/90 CJS · 34/34 TS · typecheck/lint/format sạch · i18n/repo-map/contract/settings-signal/bot-payload/ai-status OK (dùng `/home/wio/.local/node/bin` vì PATH không có node)
+- ▶️ Tiếp theo: đặt `IP_HASH_SECRET` + `IPINTEL_API_KEY`, chạy curl self-test XFF trên edge, DPA ipapi.is; rồi mới bật `verifyWebEnabled`
 
 ## 2026-11-11 (3) — Tách rate-limit verify khỏi `/geo_lang`
 
