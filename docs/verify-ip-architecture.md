@@ -527,3 +527,20 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
   toàn bộ người dùng khi ipapi.is sập là đánh đổi tệ hơn.
 - **`/verify/complete` trả lý do công khai** (`allowed`/`flagged`/`blocked`/
   `banned`), KHÔNG trả `linkedUserId` hay mã lý do chi tiết.
+
+## 10. Sửa sau review luồng người xác minh (11/11/2026)
+
+- **Web không còn báo "thành công" khi mới xếp việc.** `getSession` trả thêm
+  `grantState` (`pending` / `applied` / `failed`). Trang chỉ hiện "đã cấp quyền"
+  khi bot ghi `grantAppliedAt` sau khi Discord API xác nhận; trước đó hiện
+  "đang cấp quyền" và tự cập nhật reactive.
+- **Deny không còn mặc định kick.** `human_check_failed`, IP ban chế độ
+  "chỉ từ chối", CGNAT/IP dùng chung và VPN `strict` chỉ đóng phiên với
+  `denied_no_action`. Chỉ `altPunish` hoặc `altVpnMode` do admin chọn
+  `kick`/`ban`/`timeout` mới tạo hình phạt.
+- **Lỗi Discord không bị nuốt.** `grantVerified`/ban/kick/timeout trả
+  `applied:false` kèm `retryable`; `botFinishGrant` đưa lỗi tạm thời lại hàng
+  chờ tối đa 5 lượt rồi ghi `grantFailedAt`. `grantAppliedAt` chỉ được ghi khi
+  thao tác Discord thành công.
+- **Nhắc mở DM.** Thành viên mới đóng DM nhận mention trong `verifyChannelId`
+  kèm nút `verify_web_start`; không bao giờ đăng token/link công khai.

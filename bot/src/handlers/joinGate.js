@@ -63,9 +63,12 @@ module.exports = async function joinGate(client, member, store) {
     const verifyWeb = require("../verifyWeb");
     verifyWeb
       .startVerification(store, member, config)
-      .then((r) => {
+      .then(async (r) => {
         if (!r.ok && r.reason === "dm_blocked") {
           console.warn(`[verifyWeb] ${member.guild.id}/${member.id}: không gửi được DM`);
+          // Thành viên mới đóng DM sẽ không biết phải làm gì nếu bot im lặng.
+          // Nhắc trong kênh verify, nhưng KHÔNG đăng token/link công khai.
+          await verifyWeb.notifyOpenDm(member, config);
         }
       })
       .catch((e) => console.error("[verifyWeb:join]", e.message));

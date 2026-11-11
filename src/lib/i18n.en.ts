@@ -1798,9 +1798,16 @@ export const EN: Record<string, string> = {
   "Khi bấm, bạn đồng ý với": "By pressing, you agree to the",
   "Chính sách quyền riêng tư": "Privacy Policy",
   "Đang xác minh…": "Verifying…",
-  "Xác minh thành công!": "Verification successful!",
-  "Bạn đã có quyền truy cập server. Quay lại Discord — role sẽ được cấp trong vài giây.":
-    "You now have access to the server. Go back to Discord — your role is granted within seconds.",
+  "Đã xác minh tín hiệu": "Verification checks passed",
+  "Bot đang cấp quyền truy cập. Trang này sẽ tự cập nhật khi hoàn tất — thường mất tối đa 3 phút.":
+    "The bot is granting access. This page updates automatically when it finishes — usually within 3 minutes.",
+  "Kiểm tra lại": "Check again",
+  "Đã cấp quyền truy cập server": "Server access granted",
+  "Bạn có thể quay lại Discord và bắt đầu trò chuyện.":
+    "You can return to Discord and start chatting.",
+  "Chưa cấp được quyền truy cập": "Access could not be granted",
+  "Tín hiệu xác minh đã được ghi nhận nhưng bot chưa cấp được role. Hãy báo quản trị server để kiểm tra quyền của bot.":
+    "Your verification was recorded, but the bot could not grant the role. Please ask the server administrator to check the bot's permissions.",
   "Chưa thể xác minh": "Could not verify",
   "Kết nối hoặc thiết bị của bạn bị đánh giá là rủi ro. Hãy tắt VPN/proxy rồi thử lại, hoặc liên hệ quản trị server.":
     "Your connection or device was flagged as risky. Turn off your VPN/proxy and try again, or contact the server administrator.",
@@ -1829,6 +1836,8 @@ export const EN: Record<string, string> = {
   "Không kết nối được máy chủ — kiểm tra mạng rồi thử lại.":
     "Could not reach the server — check your connection and try again.",
   "Đã xác minh": "Verified",
+  "Đang cấp quyền": "Granting access",
+  "Cấp quyền lỗi": "Access grant failed",
   "Đã ban": "Banned",
   "Từ chối": "Denied",
   "Hết hạn": "Expired",

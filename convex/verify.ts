@@ -35,6 +35,13 @@ import { decideVerify, type VerifyLink, type VpnMode, type AltPunish } from "./v
 const GRANT_TAKE = 60;
 /** Trần phiên hiển thị trên dashboard mỗi lần đọc. */
 const LIST_TAKE = 100;
+/**
+ * Số lần thử cấp role/tối đa trước khi đánh dấu hỏng hẳn.
+ *
+ * Lỗi mạng/rate-limit có thể tự khỏi; lỗi thiếu quyền thì không. Retry 5 lượt
+ * tick (~15 phút) đủ cho lỗi tạm thời mà không giữ phiên "đang cấp" vô hạn.
+ */
+const MAX_GRANT_ATTEMPTS = 5;
 
 /**
  * Trọng số từng tín hiệu khi tính độ mạnh của một link.
@@ -250,8 +257,20 @@ export const getSession = query({
     // Phiên chưa dùng nhưng quá hạn → trả trạng thái "expired" thay vì lỗi mơ hồ.
     const status =
       session.status === "pending" && session.expiresAt < now ? "expired" : session.status;
+    // "verified" chỉ nghĩa là tín hiệu đã qua; role có thể còn chờ bot tick.
+    // Trang web phải phân biệt 3 trạng thái này, nếu không người dùng thấy
+    // "thành công" trong khi bot chưa hề cấp quyền.
+    const grantState =
+      session.status === "verified"
+        ? session.grantAppliedAt
+          ? ("applied" as const)
+          : session.grantFailedAt
+            ? ("failed" as const)
+            : ("pending" as const)
+        : null;
     return {
       status,
+      grantState,
       guildId: session.guildId,
       guildName: guild?.name ?? "",
       guildIcon: guild?.icon ?? null,
@@ -489,7 +508,10 @@ export const finalize = internalMutation({
 
     const decision = humanFailed ? "deny" : result.decision;
     const reason = humanFailed ? "human_check_failed" : (result.reasons[0] ?? "allow");
-    const punish = humanFailed ? "kick" : result.punish;
+    // Bẫy người-thật chỉ dùng để TỪ CHỐI, không phải để kick: người thật trên
+    // trình duyệt lạ (ẩn danh, chặn JS, mạng chậm) có thể trượt kiểm tra vô
+    // hình. Chỉ hình phạt do admin cấu hình tường minh mới được thi hành.
+    const punish = humanFailed ? null : result.punish;
 
     const topLink = links[0];
     const status = decision === "allow" ? "verified" : decision === "ban" ? "banned" : "denied";
@@ -617,11 +639,19 @@ export const botClaimGrant = mutation({
   },
 });
 
-/** Bot báo đã thi hành xong (hoặc bỏ qua có lý do) → đóng phiên. */
+/**
+ * Bot báo kết quả thi hành.
+ *
+ * `applied=true` CHỈ được gửi khi Discord API đã xác nhận thành công. Lỗi tạm
+ * thời (`retryable=true`) được đưa lại vào hàng chờ tối đa 5 lượt; lỗi vĩnh
+ * viễn hoặc hết lượt thì đóng phiên với `grantFailedAt` để trang verify hiển
+ * thị đúng "chưa cấp được quyền" thay vì treo "đang cấp" mãi.
+ */
 export const botFinishGrant = mutation({
   args: {
     id: v.id("verifySessions"),
     applied: v.boolean(),
+    retryable: v.optional(v.boolean()),
     note: v.optional(v.string()),
     botKey: v.optional(v.string()),
   },
@@ -629,20 +659,29 @@ export const botFinishGrant = mutation({
     await requireBotKeyStrict(ctx, args.botKey);
     const row = await ctx.db.get(args.id);
     if (!row) return { ok: false as const };
+    const now = Date.now();
+    const attempts = row.grantAttempts ?? 1;
+    const retry = !args.applied && args.retryable === true && attempts < MAX_GRANT_ATTEMPTS;
     await ctx.db.patch(args.id, {
-      grantAppliedAt: Date.now(),
-      grantPending: false,
+      grantPending: retry,
+      grantAppliedAt: args.applied ? now : undefined,
+      grantFailedAt: args.applied || retry ? undefined : now,
+      grantError: args.applied ? undefined : (args.note ?? "grant_failed").slice(0, 160),
     });
     await audit(ctx, {
       guildId: row.guildId,
       userId: row.userId,
       sessionId: row._id,
-      action: args.applied ? "verify_grant_applied" : "verify_grant_skipped",
+      action: args.applied
+        ? "verify_grant_applied"
+        : retry
+          ? "verify_grant_retry"
+          : "verify_grant_failed",
       actor: "bot",
       reason: row.reason,
       details: args.note,
     });
-    return { ok: true as const };
+    return { ok: true as const, retry };
   },
 });
 
@@ -681,6 +720,15 @@ export const listSessions = query({
       linkedUserId: row.linkedUserId ?? null,
       linkScore: row.linkScore ?? null,
       linkReasons: row.linkReasons ?? [],
+      /** Admin thấy được phiên nào bot chưa cấp role / cấp lỗi. */
+      grantState:
+        row.status === "verified"
+          ? row.grantAppliedAt
+            ? "applied"
+            : row.grantFailedAt
+              ? "failed"
+              : "pending"
+          : null,
       createdAt: row.createdAt,
       /** 12 ký tự đầu của hash IP — đủ để admin nhận diện, không đủ để đối chiếu ngược. */
       ipHashShort: row.ipHash ? row.ipHash.slice(0, 12) : null,

@@ -128,18 +128,72 @@ async function startVerification(store, member, config) {
 }
 
 /**
+ * Nhắc thành viên mới mở DM khi bot không gửi được link.
+ *
+ * KHÔNG đăng link/token vào kênh công khai — làm vậy bất kỳ ai đọc kênh cũng
+ * xác minh thay được. Chỉ gửi mention + nút mở lại luồng DM (`verify_web_start`);
+ * nút này tạo link mới và gửi riêng khi người dùng đã mở DM.
+ */
+async function notifyOpenDm(member, config) {
+  const channelId = config?.verifyChannelId;
+  if (!member?.guild || !channelId) return false;
+  try {
+    const guild = member.guild;
+    const cached = guild.channels?.cache?.get?.(channelId);
+    const channel =
+      cached ||
+      (guild.channels?.fetch ? await guild.channels.fetch(channelId).catch(() => null) : null);
+    if (!channel?.send) return false;
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("verify_web_start")
+        .setLabel("Tôi đã mở DM — gửi link")
+        .setStyle(ButtonStyle.Primary),
+    );
+    await channel.send({
+      content:
+        `<@${member.id}> Bot chưa gửi được link xác minh vì bạn đang chặn tin nhắn trực tiếp. ` +
+        "Hãy mở **DM từ thành viên server** rồi bấm nút bên dưới để nhận link riêng.",
+      components: [row],
+      allowedMentions: { users: [member.id] },
+    });
+    return true;
+  } catch (e) {
+    console.warn(`[verifyWeb:dmNotice] ${member.guild.id}/${member.id}:`, e?.message || e);
+    return false;
+  }
+}
+
+/**
  * Cấp role đã xác minh + gỡ role chưa xác minh + gửi DM chào mừng.
  * Không dùng `roles.set` — nó xoá sạch role khác của thành viên.
+ *
+ * Trả `ok:false` khi Discord API thực sự từ chối cấp role. Bản cũ `.catch(() => {})`
+ * rồi vẫn trả ok:true khiến dashboard/web báo thành công trong khi người dùng
+ * không có quyền — đúng lỗi "nuốt lỗi Discord" cần chặn.
  */
 async function grantVerified(member, config) {
   const unverifiedRoleId = config?.unverifiedRoleId;
   const verifiedRoleId = config?.verifiedRoleId;
-  if (!verifiedRoleId) return { ok: false, note: "missing_verified_role" };
+  if (!verifiedRoleId) return { ok: false, note: "missing_verified_role", retryable: false };
+  let note = "granted";
   if (unverifiedRoleId && member.roles.cache.has(unverifiedRoleId)) {
-    await member.roles.remove(unverifiedRoleId, "Xác minh web thành công").catch(() => {});
+    try {
+      await member.roles.remove(unverifiedRoleId, "Xác minh web thành công");
+    } catch (e) {
+      // Role verified vẫn có thể cấp được; giữ unverified là lỗi cấu hình cần
+      // admin thấy nhưng không biến một lượt verify thành công thành thất bại.
+      note = "granted_unverified_remove_failed";
+      console.warn(`[verifyWeb:grant] gỡ unverified ${member.guild.id}/${member.id}:`, e?.message);
+    }
   }
   if (!member.roles.cache.has(verifiedRoleId)) {
-    await member.roles.add(verifiedRoleId, "Xác minh web thành công").catch(() => {});
+    try {
+      await member.roles.add(verifiedRoleId, "Xác minh web thành công");
+    } catch (e) {
+      console.error(`[verifyWeb:grant] cấp role ${member.guild.id}/${member.id}:`, e?.message);
+      return { ok: false, note: "role_add_failed", retryable: true };
+    }
   }
   if (config.verifyWelcomeEnabled) {
     try {
@@ -165,7 +219,7 @@ async function grantVerified(member, config) {
       // Người dùng chặn DM — không phải lỗi.
     }
   }
-  return { ok: true, note: "granted" };
+  return { ok: true, note };
 }
 
 /** Lý do ghi vào audit Discord — không chứa hash/IP, chỉ mã quyết định. */
@@ -179,8 +233,9 @@ function punishReason(grant) {
 /**
  * Thi hành một grant đã claim.
  *
- * Trả `{ applied, note }` để `botFinishGrant` ghi audit. Mọi nhánh đều phải
- * trả về — nuốt im lặng làm phiên kẹt `grantPending=false` mà không ai biết.
+ * Trả `{ applied, note, retryable? }` để `botFinishGrant` ghi audit. Mọi nhánh
+ * đều phải trả về — nuốt im lặng làm phiên kẹt `grantPending=false` mà không
+ * ai biết. `applied` chỉ true khi Discord API đã xác nhận thành công.
  */
 async function applyGrant(client, store, grant) {
   const guild = client.guilds.cache.get(grant.guildId);
@@ -190,46 +245,89 @@ async function applyGrant(client, store, grant) {
   const reason = punishReason(grant);
 
   const banById = async () => {
-    await guild.bans.create(grant.userId, { reason, deleteMessageSeconds: 0 }).catch(() => {});
-    return { applied: true, note: "banned" };
+    try {
+      await guild.bans.create(grant.userId, { reason, deleteMessageSeconds: 0 });
+      return { applied: true, note: "banned" };
+    } catch (e) {
+      console.error(`[verifyWeb:ban] ${grant.guildId}/${grant.userId}:`, e?.message);
+      return { applied: false, note: "ban_failed", retryable: true };
+    }
   };
 
   if (grant.decision === "ban" || grant.punish === "ban") return banById();
 
   if (grant.decision === "allow") {
-    if (!member) return { applied: false, note: "left_before_grant" };
+    if (!member) return { applied: false, note: "left_before_grant", retryable: false };
     const result = await grantVerified(member, config);
-    return { applied: result.ok, note: result.note };
+    return {
+      applied: result.ok,
+      note: result.note,
+      retryable: result.retryable === true,
+    };
   }
 
-  // deny
-  if (!member) return { applied: false, note: "left_before_punish" };
+  // Deny không kèm hình phạt = chỉ chặn xác minh, KHÔNG kick. Đây là nhánh
+  // dùng cho IP dùng chung/CGNAT, IP ban chế độ "chỉ từ chối" và bẫy người
+  // thật — những trường hợp không đủ bằng chứng để phạt tài khoản.
+  if (!grant.punish) return { applied: true, note: "denied_no_action" };
+  if (!member) return { applied: false, note: "left_before_punish", retryable: false };
   switch (grant.punish) {
     case "kick":
-      await member.kick(reason).catch(() => {});
-      return { applied: true, note: "kicked" };
+      try {
+        await member.kick(reason);
+        return { applied: true, note: "kicked" };
+      } catch (e) {
+        console.error(`[verifyWeb:kick] ${grant.guildId}/${grant.userId}:`, e?.message);
+        return { applied: false, note: "kick_failed", retryable: true };
+      }
     case "timeout": {
       const minutes = Math.max(1, Math.min(10080, config.altTimeoutMinutes ?? 60));
-      await member.timeout(minutes * 60_000, reason).catch(() => {});
-      return { applied: true, note: "timed_out" };
+      try {
+        await member.timeout(minutes * 60_000, reason);
+        return { applied: true, note: "timed_out" };
+      } catch (e) {
+        console.error(`[verifyWeb:timeout] ${grant.guildId}/${grant.userId}:`, e?.message);
+        return { applied: false, note: "timeout_failed", retryable: true };
+      }
     }
     case "verify": {
       // Ép xác minh lại: gỡ role đã xác minh, gán lại role chưa xác minh.
       const unverified = config.unverifiedRoleId;
-      if (unverified) await member.roles.add(unverified, reason).catch(() => {});
-      if (config.verifiedRoleId)
-        await member.roles.remove(config.verifiedRoleId, reason).catch(() => {});
-      return { applied: true, note: "reverify" };
+      let failed = false;
+      if (unverified) {
+        try {
+          await member.roles.add(unverified, reason);
+        } catch (e) {
+          failed = true;
+          console.error(`[verifyWeb:reverify] ${grant.guildId}/${grant.userId}:`, e?.message);
+        }
+      }
+      if (config.verifiedRoleId) {
+        try {
+          await member.roles.remove(config.verifiedRoleId, reason);
+        } catch (e) {
+          failed = true;
+          console.error(`[verifyWeb:reverify] ${grant.guildId}/${grant.userId}:`, e?.message);
+        }
+      }
+      return failed
+        ? { applied: false, note: "reverify_failed", retryable: true }
+        : { applied: true, note: "reverify" };
     }
     default:
-      // Không cấu hình hình phạt → mặc định kick: thành viên chưa qua cổng mà
-      // vẫn ở trong server là lỗ hổng của cả tính năng.
-      await member.kick(reason).catch(() => {});
-      return { applied: true, note: "kicked_default" };
+      // Giá trị lạ không được biến thành kick: chỉ hành động khi admin đã chọn
+      // hình phạt cụ thể. Deny trần trụi là "không cho verify", không phải "kick".
+      return { applied: true, note: "denied_no_action" };
   }
 }
 
-/** Vòng tick: claim → thi hành → đóng phiên. */
+/**
+ * Vòng tick: claim → thi hành → đóng phiên.
+ *
+ * Lỗi bất ngờ trong `applyGrant` vẫn phải gọi `botFinishGrant` với
+ * `retryable=true`; nếu chỉ log rồi bỏ qua, phiên đã bị claim sẽ nằm chết
+ * (`grantPending=false`) và người dùng không bao giờ nhận được role.
+ */
 async function processVerifyGrants(client, store, grants) {
   if (!Array.isArray(grants) || grants.length === 0) return 0;
   let done = 0;
@@ -237,10 +335,17 @@ async function processVerifyGrants(client, store, grants) {
     try {
       const claim = await store.client.mutation("verify:botClaimGrant", { id: grant.id });
       if (!claim?.ok) continue;
-      const result = await applyGrant(client, store, grant);
+      let result;
+      try {
+        result = await applyGrant(client, store, grant);
+      } catch (e) {
+        console.error(`[verifyWeb:grant] ${grant?.guildId}/${grant?.userId}:`, e?.message || e);
+        result = { applied: false, note: "grant_exception", retryable: true };
+      }
       await store.client.mutation("verify:botFinishGrant", {
         id: grant.id,
         applied: result.applied,
+        retryable: result.retryable === true,
         note: result.note,
       });
       done += 1;
@@ -291,6 +396,7 @@ module.exports = {
   createSession,
   grantVerified,
   isPrivileged,
+  notifyOpenDm,
   processVerifyGrants,
   resyncGuildBans,
   sendVerifyDm,

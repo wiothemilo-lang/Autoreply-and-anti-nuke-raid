@@ -65,6 +65,7 @@ function check(label, cond, detail) {
 /** Member giả tối thiểu: role cache Set + user + guild. */
 function makeMember(id, opts = {}) {
   const roles = new Set(opts.roles ?? []);
+  const channelMessages = [];
   const guild = {
     id: opts.guildId ?? "g1",
     name: opts.guildName ?? "Server Test",
@@ -74,9 +75,26 @@ function makeMember(id, opts = {}) {
     members: { fetch: async () => null },
     bans: {
       create: async (userId, o) => {
+        if (opts.banFails) throw new Error("Missing Permissions");
         guild._banned = { userId, ...o };
       },
     },
+    channels: {
+      cache: new Map([
+        [
+          "verify-channel",
+          {
+            send: async (payload) => {
+              if (opts.channelSendFails) throw new Error("Missing Access");
+              channelMessages.push(payload);
+              return payload;
+            },
+          },
+        ],
+      ]),
+      fetch: async (channelId) => guild.channels.cache.get(channelId) ?? null,
+    },
+    _channelMessages: channelMessages,
   };
   const dms = [];
   // `self` phải tồn tại TRƯỚC khi tạo object: kick/timeout/send là closure đọc
@@ -90,6 +108,7 @@ function makeMember(id, opts = {}) {
     roles: {
       cache: { has: (r) => roles.has(r) },
       add: async (r) => {
+        if (opts.roleAddFails) throw new Error("Missing Permissions");
         roles.add(r);
         (guild._added ??= []).push(r);
       },
@@ -104,6 +123,7 @@ function makeMember(id, opts = {}) {
       return payload;
     },
     kick: async (reason) => {
+      if (opts.kickFails) throw new Error("Missing Permissions");
       self._kicked = reason;
     },
     timeout: async (ms, reason) => {
@@ -294,6 +314,41 @@ function makeStore(config = {}, handlers = {}) {
     check("DM bị chặn → reason dm_blocked", res.ok === false && res.reason === "dm_blocked", res);
   }
 
+  // ══════════ 5b. notifyOpenDm — nhắc mở DM, không lộ token ══════════
+  console.log("\n── notifyOpenDm ──");
+  {
+    const member = makeMember("300000000000000004");
+    const ok = await vw.notifyOpenDm(member, { verifyChannelId: "verify-channel" });
+    check(
+      "gửi được nhắc vào kênh verify",
+      ok === true && member.guild._channelMessages.length === 1,
+    );
+    const msg = member.guild._channelMessages[0];
+    check(
+      "mention đúng người + nút mở lại luồng DM",
+      msg.content.includes(member.id) &&
+        msg.components[0].components[0].customId === "verify_web_start",
+      msg,
+    );
+    check(
+      "KHÔNG đăng link/token vào kênh công khai",
+      !/https?:\/\/|\/verify\//.test(msg.content),
+      msg.content,
+    );
+  }
+  {
+    const member = makeMember("300000000000000005", { channelSendFails: true });
+    const ok = await vw.notifyOpenDm(member, { verifyChannelId: "verify-channel" });
+    check("kênh lỗi/không có quyền → false, không ném", ok === false);
+  }
+  {
+    const member = makeMember("300000000000000006");
+    check(
+      "thiếu verifyChannelId → không gửi",
+      (await vw.notifyOpenDm(member, {})) === false && member.guild._channelMessages.length === 0,
+    );
+  }
+
   // ══════════ 6. grantVerified ══════════
   console.log("\n── grantVerified ──");
   {
@@ -316,6 +371,15 @@ function makeStore(config = {}, handlers = {}) {
     check(
       "thiếu role verified → báo missing_verified_role, không cấp bừa",
       res.ok === false && res.note === "missing_verified_role",
+    );
+  }
+  {
+    const member = makeMember("400000000000000005", { roleAddFails: true });
+    const res = await vw.grantVerified(member, { verifiedRoleId: "verified" });
+    check(
+      "Discord từ chối cấp role → ok=false, retryable",
+      res.ok === false && res.note === "role_add_failed" && res.retryable === true,
+      res,
     );
   }
   {
@@ -365,6 +429,39 @@ function makeStore(config = {}, handlers = {}) {
       "lý do ban không chứa hash/IP",
       !/\b[0-9a-f]{32,}\b/.test(member.guild._banned.reason),
       member.guild._banned.reason,
+    );
+  }
+  {
+    const member = makeMember("500000000000000007", { banFails: true });
+    const client = { guilds: { cache: new Map([["g1", member.guild]]) } };
+    const res = await vw.applyGrant(client, makeStore({}), {
+      guildId: "g1",
+      userId: member.id,
+      decision: "ban",
+      reason: "ip_ban_match",
+      riskScore: 90,
+    });
+    check(
+      "ban Discord lỗi → applied=false, retryable",
+      res.applied === false && res.note === "ban_failed" && res.retryable === true,
+      res,
+    );
+  }
+  {
+    const member = makeMember("500000000000000008", { kickFails: true });
+    member.guild.members = { fetch: async () => member };
+    const client = { guilds: { cache: new Map([["g1", member.guild]]) } };
+    const res = await vw.applyGrant(client, makeStore({}), {
+      guildId: "g1",
+      userId: member.id,
+      decision: "deny",
+      punish: "kick",
+      riskScore: 80,
+    });
+    check(
+      "kick Discord lỗi → applied=false, retryable",
+      res.applied === false && res.note === "kick_failed" && res.retryable === true,
+      res,
     );
   }
   {
@@ -455,15 +552,19 @@ function makeStore(config = {}, handlers = {}) {
         member.roles.cache.has("unverified") &&
         !member.roles.cache.has("verified"),
     );
-    const fallback = await vw.applyGrant(client, makeStore({}), {
+    const noPunish = makeMember("500000000000000009");
+    noPunish.guild.members = { fetch: async () => noPunish };
+    const noPunishClient = { guilds: { cache: new Map([["g1", noPunish.guild]]) } };
+    const fallback = await vw.applyGrant(noPunishClient, makeStore({}), {
       guildId: "g1",
-      userId: member.id,
+      userId: noPunish.id,
       decision: "deny",
       riskScore: 80,
     });
     check(
-      "deny không cấu hình hình phạt → kick mặc định (không để lọt)",
-      fallback.applied === true && fallback.note === "kicked_default",
+      "deny không cấu hình hình phạt → KHÔNG kick",
+      fallback.applied === true && fallback.note === "denied_no_action" && !noPunish._kicked,
+      fallback,
     );
   }
   {
@@ -528,6 +629,26 @@ function makeStore(config = {}, handlers = {}) {
     check(
       "finish ghi applied=true + note",
       finish?.[1].applied === true && finish?.[1].note === "granted",
+      finish,
+    );
+  }
+  {
+    const member = makeMember("600000000000000004", { roleAddFails: true });
+    member.guild.members = { fetch: async () => member };
+    const client = { guilds: { cache: new Map([["g1", member.guild]]) } };
+    const store = makeStore(
+      { verifiedRoleId: "verified" },
+      { "verify:botClaimGrant": () => ({ ok: true }) },
+    );
+    await vw.processVerifyGrants(client, store, [
+      { id: "s-fail", guildId: "g1", userId: member.id, decision: "allow", riskScore: 0 },
+    ]);
+    const finish = store.calls.find(([n]) => n === "verify:botFinishGrant");
+    check(
+      "cấp role lỗi → finish applied=false + retryable=true",
+      finish?.[1].applied === false &&
+        finish?.[1].retryable === true &&
+        finish?.[1].note === "role_add_failed",
       finish,
     );
   }
