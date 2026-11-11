@@ -1302,9 +1302,16 @@ export default defineSchema({
     linkScore: v.optional(v.number()),
     linkReasons: v.optional(v.array(v.string())),
     consentVersion: v.optional(v.string()),
-    /** Bot đã cấp role/áp dụng hình phạt xong — dùng để chống xử lý lặp. */
+    /**
+     * Bot đã thi hành xong THẬT (Discord API trả thành công) — dùng để chống
+     * xử lý lặp và cho trang verify biết role đã được cấp, không chỉ "đã xếp việc".
+     */
     grantAppliedAt: v.optional(v.number()),
     grantAttempts: v.optional(v.number()),
+    /** Lần cuối bot thử nhưng Discord trả lỗi — không bao giờ set khi thành công. */
+    grantFailedAt: v.optional(v.number()),
+    /** Mã kỹ thuật ngắn của lần lỗi gần nhất; KHÔNG trả ra trang verify công khai. */
+    grantError: v.optional(v.string()),
     /** Còn việc cho bot làm (cấp role / kick / ban / timeout). Index để tick quét rẻ. */
     grantPending: v.optional(v.boolean()),
     /** Lý do kỹ thuật khi status = failed (không trả nguyên văn cho người dùng). */

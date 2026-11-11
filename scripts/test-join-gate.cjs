@@ -17,11 +17,26 @@ const TMP_LOCK_STATE = path.join(
   `protogon-join-gate-lockdown-${process.pid}-${Date.now()}.json`,
 );
 process.env.PROTOGON_LOCKDOWN_STATE = TMP_LOCK_STATE;
+const VERIFY_WEB_MOCK = path.join(
+  os.tmpdir(),
+  `protogon-join-gate-verify-web-${process.pid}-${Date.now()}.cjs`,
+);
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
   if (request === "discord.js") return DJS_MOCK;
+  if (request === "../verifyWeb") return VERIFY_WEB_MOCK;
   return origResolve.call(this, request, ...args);
 };
+// Mock verifyWeb: hành vi điều khiển qua `global.__verifyWebMock` để từng test
+// chọn "DM gửi được" / "DM bị chặn" mà không cần Discord thật.
+fs.writeFileSync(
+  VERIFY_WEB_MOCK,
+  `module.exports = {
+  startVerification: async (...args) => global.__verifyWebMock.start(...args),
+  notifyOpenDm: async (...args) => global.__verifyWebMock.notify(...args),
+};
+`,
+);
 fs.writeFileSync(
   DJS_MOCK,
   `class EmbedBuilder {
@@ -438,6 +453,103 @@ module.exports = {
     check("verify thiếu thành phần → không gán role unverified", calls.roleAdds.length === 0);
   }
 
+  // ── 14b. Verify web: DM bị chặn → nhắc mở DM, KHÔNG đăng link ──
+  // Thành viên mới đóng DM trước đây bị bỏ mặc: bot log một dòng rồi thôi, họ
+  // không biết phải mở DM. Nhắc trong kênh verify là đường duy nhất để họ tự
+  // cứu, nhưng link/token TUYỆT ĐỐI không được đăng công khai.
+  {
+    clear();
+    const g = mkGuild("g-verify-dm");
+    configs.set("g-verify-dm", {
+      verifyEnabled: true,
+      verifyWebEnabled: true,
+      verifyMethod: "web",
+      verifyChannelId: "c-verify",
+    });
+    client.guilds.cache.set("g-verify-dm", g);
+    const notified = [];
+    let started = 0;
+    global.__verifyWebMock = {
+      start: async () => {
+        started++;
+        return { ok: false, reason: "dm_blocked" };
+      },
+      notify: async (member, cfg) => {
+        notified.push({ userId: member.id, channelId: cfg.verifyChannelId });
+        return true;
+      },
+    };
+    const m = g.addMember(mkMember("dm-blocked-1", "dongdm"));
+    await joinGate(client, m, store);
+    for (let i = 0; i < 20 && notified.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    check("verify web được khởi động khi join", started === 1);
+    check(
+      "DM bị chặn → nhắc mở DM trong kênh verify",
+      notified.length === 1 &&
+        notified[0].userId === "dm-blocked-1" &&
+        notified[0].channelId === "c-verify",
+      notified,
+    );
+  }
+  {
+    clear();
+    const g = mkGuild("g-verify-dm-ok");
+    configs.set("g-verify-dm-ok", {
+      verifyEnabled: true,
+      verifyWebEnabled: true,
+      verifyMethod: "web",
+      verifyChannelId: "c-verify",
+    });
+    client.guilds.cache.set("g-verify-dm-ok", g);
+    let notified = 0;
+    global.__verifyWebMock = {
+      start: async () => ({ ok: true, reason: "sent" }),
+      notify: async () => {
+        notified++;
+        return true;
+      },
+    };
+    await joinGate(client, g.addMember(mkMember("dm-ok-1", "modm")), store);
+    await new Promise((r) => setTimeout(r, 20));
+    check("DM gửi được → KHÔNG nhắc thừa", notified === 0);
+  }
+  {
+    clear();
+    const g = mkGuild("g-verify-dm-throw");
+    configs.set("g-verify-dm-throw", {
+      verifyEnabled: true,
+      verifyWebEnabled: true,
+      verifyMethod: "web",
+      verifyChannelId: "c-verify",
+    });
+    client.guilds.cache.set("g-verify-dm-throw", g);
+    let notified = 0;
+    global.__verifyWebMock = {
+      start: async () => {
+        throw new Error("Convex timeout");
+      },
+      notify: async () => {
+        notified++;
+        return true;
+      },
+    };
+    const realErr = console.error;
+    console.error = () => {};
+    let threw = false;
+    try {
+      await joinGate(client, g.addMember(mkMember("dm-throw-1", "loi")), store);
+      await new Promise((r) => setTimeout(r, 20));
+    } catch {
+      threw = true;
+    } finally {
+      console.error = realErr;
+    }
+    check("tạo phiên lỗi → không ném ra joinGate, không nhắc sai", !threw && notified === 0);
+  }
+  global.__verifyWebMock = null;
+
   // ── 15. member không có guild / là bot → bỏ qua hoàn toàn ──
   {
     clear();
@@ -766,6 +878,7 @@ module.exports = {
 
   fs.rmSync(TMP_LOCK_STATE, { force: true });
   fs.rmSync(`${TMP_LOCK_STATE}.tmp`, { force: true });
+  fs.rmSync(VERIFY_WEB_MOCK, { force: true });
   console.log(`\nKết quả join gate: ${pass} PASS, ${fail} FAIL`);
   process.exit(fail > 0 ? 1 : 0);
 })();

@@ -30,6 +30,7 @@ type SessionRow = {
   id: string;
   userId: string;
   status: string;
+  grantState: "pending" | "applied" | "failed" | null;
   decision: string | null;
   reason: string | null;
   riskScore: number | null;
@@ -47,7 +48,11 @@ type SessionRow = {
 };
 
 /** Nhãn + màu cho từng kết quả — một nguồn duy nhất cho cả bảng lẫn badge. */
-function statusBadge(status: string) {
+function statusBadge(status: string, grantState: SessionRow["grantState"]) {
+  if (status === "verified" && grantState === "pending")
+    return { label: "Đang cấp quyền", className: "bg-amber-500/10 text-amber-600" };
+  if (status === "verified" && grantState === "failed")
+    return { label: "Cấp quyền lỗi", className: "bg-destructive/10 text-destructive" };
   if (status === "verified")
     return { label: "Đã xác minh", className: "bg-emerald-500/10 text-emerald-600" };
   if (status === "banned")
@@ -217,7 +222,7 @@ export default function VerifyWebCard({ data }: { data: GuildData }) {
           {rows.length > 0 && (
             <div className="space-y-2">
               {rows.map((row) => {
-                const badge = statusBadge(row.status);
+                const badge = statusBadge(row.status, row.grantState);
                 return (
                   <div
                     key={row.id}

@@ -1726,9 +1726,16 @@ export const DE: Record<string, string> = {
   "Khi bấm, bạn đồng ý với": "Mit dem Klick stimmst du der",
   "Chính sách quyền riêng tư": "Datenschutzerklärung",
   "Đang xác minh…": "Wird verifiziert…",
-  "Xác minh thành công!": "Verifizierung erfolgreich!",
-  "Bạn đã có quyền truy cập server. Quay lại Discord — role sẽ được cấp trong vài giây.":
-    "Du hast jetzt Zugriff auf den Server. Zurück zu Discord — die Rolle wird in wenigen Sekunden vergeben.",
+  "Đã xác minh tín hiệu": "Verifizierungsprüfungen bestanden",
+  "Bot đang cấp quyền truy cập. Trang này sẽ tự cập nhật khi hoàn tất — thường mất tối đa 3 phút.":
+    "Der Bot erteilt den Zugriff. Diese Seite aktualisiert sich automatisch — normalerweise innerhalb von 3 Minuten.",
+  "Kiểm tra lại": "Erneut prüfen",
+  "Đã cấp quyền truy cập server": "Serverzugriff gewährt",
+  "Bạn có thể quay lại Discord và bắt đầu trò chuyện.":
+    "Du kannst zu Discord zurückkehren und mit dem Chatten beginnen.",
+  "Chưa cấp được quyền truy cập": "Zugriff konnte nicht gewährt werden",
+  "Tín hiệu xác minh đã được ghi nhận nhưng bot chưa cấp được role. Hãy báo quản trị server để kiểm tra quyền của bot.":
+    "Deine Verifizierung wurde erfasst, aber der Bot konnte die Rolle nicht vergeben. Bitte informiere den Server-Administrator, damit er die Bot-Berechtigungen prüft.",
   "Chưa thể xác minh": "Verifizierung nicht möglich",
   "Truy cập bị chặn": "Zugriff blockiert",
   "Tài khoản hoặc kết nối này đã bị chặn khỏi server. Nếu bạn cho rằng đây là nhầm lẫn, hãy liên hệ quản trị server.":
@@ -1756,6 +1763,8 @@ export const DE: Record<string, string> = {
   "Không kết nối được máy chủ — kiểm tra mạng rồi thử lại.":
     "Server nicht erreichbar — prüfe deine Verbindung und versuche es erneut.",
   "Đã xác minh": "Verifiziert",
+  "Đang cấp quyền": "Zugriff wird erteilt",
+  "Cấp quyền lỗi": "Zugriffserteilung fehlgeschlagen",
   "Đã ban": "Gebannt",
   "Từ chối": "Abgelehnt",
   "Hết hạn": "Abgelaufen",

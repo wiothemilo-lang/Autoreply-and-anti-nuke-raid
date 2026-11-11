@@ -259,6 +259,7 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
       !("tokenHash" in (view ?? {})) && !("ipHash" in (view ?? {})),
     );
     check("token sai → null", (await getSessionH(ctx, { token: "x".repeat(43) })) === null);
+    check("phiên pending chưa có grantState", view?.grantState === null);
   }
 
   // ═══ 5. Verify sạch → allow + grant pending ═══
@@ -271,6 +272,10 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     check("decision allow", res.ok && res.decision === "allow", res);
     check("status verified", row.status === "verified");
     check("grantPending true cho bot", row.grantPending === true);
+    check(
+      "getSession báo đang chờ cấp role, KHÔNG phải đã cấp",
+      (await getSessionH(ctx, { token }))?.grantState === "pending",
+    );
     check("đã ghi ipHash (không phải IP thô)", /^[0-9a-f]{64}$/.test(row.ipHash));
     check(
       "ghi audit",
@@ -300,7 +305,8 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     });
     check("KHÔNG allow dù tín hiệu sạch", res.ok && res.decision === "deny", res);
     check("lý do human_check_failed", tables.verifySessions[0].reason === "human_check_failed");
-    check("vẫn xếp việc cho bot (kick)", tables.verifySessions[0].grantPending === true);
+    check("KHÔNG tự kick vì bẫy người-thật", !tables.verifySessions[0].punish);
+    check("vẫn xếp việc để bot đóng phiên", tables.verifySessions[0].grantPending === true);
   }
 
   // ═══ 8. IP ban + action ban → ban ═══
@@ -343,6 +349,7 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     const res = await runFinalize(ctx, token, sig, { sharedIp: true });
     check("decision deny (KHÔNG ban)", res.ok && res.decision === "deny", res);
     check("status denied", tables.verifySessions[0].status === "denied");
+    check("CGNAT chỉ từ chối, KHÔNG kick", !tables.verifySessions[0].punish);
   }
 
   // ═══ 10. Ban evasion: trùng fingerprint với account đã bị ban ═══
@@ -420,7 +427,67 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     check("claim lần 2 bị từ chối", c2.ok === false);
     await finishH(ctx, { id, applied: true, note: "granted", botKey: BOT_KEY });
     check("finish ghi grantAppliedAt", Boolean(tables.verifySessions[0].grantAppliedAt));
+    check(
+      "getSession chỉ báo applied sau khi bot xác nhận",
+      (await getSessionH(ctx, { token }))?.grantState === "applied",
+    );
     check("không còn trong hàng đợi", (await pendingH(ctx, { botKey: BOT_KEY })).length === 0);
+  }
+
+  // ═══ 12b. Lỗi cấp role tạm thời → retry, không báo thành công ═══
+  console.log("\n── botFinishGrant: lỗi Discord tạm thời ──");
+  {
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true, verifiedRoleId: "999" });
+    const { token } = await newSession(ctx);
+    await runFinalize(ctx, token, signalsFor("203.0.113.41", "fp-g", "ck-g"));
+    const id = tables.verifySessions[0]._id;
+    await claimH(ctx, { id, botKey: BOT_KEY });
+    await finishH(ctx, {
+      id,
+      applied: false,
+      retryable: true,
+      note: "role_add_failed",
+      botKey: BOT_KEY,
+    });
+    check(
+      "lỗi tạm thời giữ grantPending để thử lại",
+      tables.verifySessions[0].grantPending === true,
+    );
+    check("lỗi tạm thời KHÔNG ghi grantAppliedAt", !tables.verifySessions[0].grantAppliedAt);
+    check("lỗi tạm thời chưa đánh dấu hỏng hẳn", !tables.verifySessions[0].grantFailedAt);
+    check(
+      "getSession vẫn báo đang cấp, không báo lỗi",
+      (await getSessionH(ctx, { token }))?.grantState === "pending",
+    );
+    check(
+      "audit ghi retry",
+      tables.verifyAudit.some((r) => r.action === "verify_grant_retry"),
+    );
+  }
+
+  // ═══ 12c. Hết số lần thử → grantFailedAt, không treo vô hạn ═══
+  console.log("\n── botFinishGrant: cạn lượt retry ──");
+  {
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true, verifiedRoleId: "999" });
+    const { token } = await newSession(ctx);
+    await runFinalize(ctx, token, signalsFor("203.0.113.42", "fp-h", "ck-h"));
+    const id = tables.verifySessions[0]._id;
+    for (let i = 0; i < 5; i++) {
+      await claimH(ctx, { id, botKey: BOT_KEY });
+      await finishH(ctx, {
+        id,
+        applied: false,
+        retryable: true,
+        note: "role_add_failed",
+        botKey: BOT_KEY,
+      });
+    }
+    check("cạn lượt → đóng hàng chờ", tables.verifySessions[0].grantPending === false);
+    check("cạn lượt → ghi grantFailedAt", Boolean(tables.verifySessions[0].grantFailedAt));
+    check(
+      "getSession báo failed để web không treo",
+      (await getSessionH(ctx, { token }))?.grantState === "failed",
+    );
   }
 
   // ═══ 13. Bot key sai → từ chối ═══

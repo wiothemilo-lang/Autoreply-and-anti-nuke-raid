@@ -39,7 +39,15 @@ const COOKIE_KEY = "pg_vid";
 const MIN_DWELL_MS = 1500;
 
 type Phase =
-  "loading" | "ready" | "sending" | "allowed" | "flagged" | "blocked" | "banned" | "error";
+  | "loading"
+  | "ready"
+  | "sending"
+  | "granting"
+  | "granted"
+  | "grant_failed"
+  | "blocked"
+  | "banned"
+  | "error";
 
 type CompleteResponse =
   | {
@@ -163,24 +171,37 @@ export default function VerifyPage() {
 
   useEffect(() => {
     if (!session) return;
-    if (session.status !== "pending") {
+    if (session.status === "verified") {
+      // Convex cập nhật reactive: bot cấp role xong → trang tự chuyển từ
+      // "đang cấp" sang "đã cấp". Chỉ grantState="applied" mới là thành công thật.
       setPhase(
-        session.status === "verified"
-          ? "allowed"
-          : session.status === "banned"
-            ? "banned"
-            : session.status === "denied"
-              ? "blocked"
-              : "error",
+        session.grantState === "applied" || session.grantState == null
+          ? "granted"
+          : session.grantState === "failed"
+            ? "grant_failed"
+            : "granting",
       );
       return;
     }
-    setPhase(expired ? "error" : "ready");
-    if (expired) setMessage(translate("Link đã hết hạn — hãy bấm lại nút xác minh trong Discord."));
+    if (session.status === "banned") {
+      setPhase("banned");
+      return;
+    }
+    if (session.status === "denied") {
+      setPhase("blocked");
+      return;
+    }
+    if (session.status === "pending") {
+      setPhase(expired ? "error" : "ready");
+      if (expired)
+        setMessage(translate("Link đã hết hạn — hãy bấm lại nút xác minh trong Discord."));
+      return;
+    }
+    setPhase("error");
   }, [session, expired]);
 
   const submit = useCallback(async () => {
-    if (phase === "sending") return;
+    if (phase === "sending" || phase === "granting" || phase === "granted") return;
     setPhase("sending");
     setMessage("");
 
@@ -213,7 +234,9 @@ export default function VerifyPage() {
         return;
       }
       if (data.decision === "allow") {
-        setPhase(data.flagged ? "flagged" : "allowed");
+        // "allow" chỉ là tín hiệu đã qua. Role do bot cấp ở tick kế tiếp, nên
+        // chưa được nói "thành công" cho tới khi grantState = applied.
+        setPhase("granting");
       } else if (data.decision === "ban") {
         setPhase("banned");
       } else {
@@ -315,13 +338,43 @@ export default function VerifyPage() {
               </div>
             )}
 
-            {(phase === "allowed" || phase === "flagged") && (
+            {phase === "granting" && (
+              <div className="space-y-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </span>
+                <h2 className="text-base font-semibold">{translate("Đã xác minh tín hiệu")}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {translate(
+                    "Bot đang cấp quyền truy cập. Trang này sẽ tự cập nhật khi hoàn tất — thường mất tối đa 3 phút.",
+                  )}
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => window.location.reload()}
+                >
+                  {translate("Kiểm tra lại")}
+                </Button>
+              </div>
+            )}
+
+            {phase === "granted" && (
               <Result
                 tone="ok"
                 icon={<BadgeCheck className="h-6 w-6" />}
-                title={translate("Xác minh thành công!")}
+                title={translate("Đã cấp quyền truy cập server")}
+                body={translate("Bạn có thể quay lại Discord và bắt đầu trò chuyện.")}
+              />
+            )}
+
+            {phase === "grant_failed" && (
+              <Result
+                tone="warn"
+                icon={<ShieldAlert className="h-6 w-6" />}
+                title={translate("Chưa cấp được quyền truy cập")}
                 body={translate(
-                  "Bạn đã có quyền truy cập server. Quay lại Discord — role sẽ được cấp trong vài giây.",
+                  "Tín hiệu xác minh đã được ghi nhận nhưng bot chưa cấp được role. Hãy báo quản trị server để kiểm tra quyền của bot.",
                 )}
               />
             )}
@@ -357,7 +410,7 @@ export default function VerifyPage() {
               />
             )}
 
-            {human === false && phase !== "ready" && phase !== "sending" && phase !== "loading" && (
+            {human === false && (phase === "blocked" || phase === "error") && (
               <p className="mt-4 text-center text-[11px] text-muted-foreground">
                 {translate("Nếu bạn là người thật, hãy thử lại và không dùng công cụ tự động.")}
               </p>
