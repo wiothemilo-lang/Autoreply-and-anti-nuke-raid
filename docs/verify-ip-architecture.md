@@ -498,16 +498,16 @@ bảng/helper/cron, chưa thu thập IP thật._
 
 Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch phía trên:
 
-| Thành phần              | File                                     | Ghi chú                                                                                                                              |
-| ----------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Token + băm IP/tín hiệu | `convex/verifyCrypto.ts`                 | Token 256-bit base64url; DB chỉ lưu SHA-256(token). HMAC tách miền `guild-ip` / `global-ip` / `signal`.                              |
-| Quyết định              | `convex/verifyPolicy.ts`                 | Thuần, không DB/mạng. Thứ tự: IP ban → ban evasion → VPN → link mềm → allow.                                                         |
-| Phiên + đồ thị + grant  | `convex/verify.ts`                       | `botCreateSession`, `finalize`, `botPendingGrants`/`botClaimGrant`/`botFinishGrant`, `listSessions`, `listLinks`, `botRunRetention`. |
-| IP intel                | `convex/verifyActions.ts` (`"use node"`) | Đọc `IP_HASH_SECRET` + `IPINTEL_API_KEY`, cache 24h theo hash global. Thiếu key → vẫn verify, chỉ mất phần VPN.                      |
-| Ban IP                  | `convex/verifyBans.ts`                   | 1..90 ngày (mặc định 7), không ban vĩnh viễn; `botSyncGuildBan` + `botReplaceGuildBans`.                                             |
-| HTTP                    | `convex/http.ts`                         | `POST /verify/complete` — IP đọc từ `x-forwarded-for`, CORS allowlist, trần tần suất dùng chung `geoGuard`.                          |
-| Bot                     | `bot/src/verifyWeb.js`                   | Tạo phiên + DM link, thi hành grant, đồng bộ ban, bảo trì 1 lần/ngày trong tick.                                                     |
-| Web                     | `src/pages/VerifyPage.tsx`               | Fingerprint canvas/WebGL + cookie first-party; honeypot + dwell ≥1.5s + `navigator.webdriver`.                                       |
+| Thành phần              | File                                     | Ghi chú                                                                                                                                   |
+| ----------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Token + băm IP/tín hiệu | `convex/verifyCrypto.ts`                 | Token 256-bit base64url; DB chỉ lưu SHA-256(token). HMAC tách miền `guild-ip` / `global-ip` / `signal`.                                   |
+| Quyết định              | `convex/verifyPolicy.ts`                 | Thuần, không DB/mạng. Thứ tự: IP ban → ban evasion → VPN → link mềm → allow.                                                              |
+| Phiên + đồ thị + grant  | `convex/verify.ts`                       | `botCreateSession`, `finalize`, `botPendingGrants`/`botClaimGrant`/`botFinishGrant`, `listSessions`, `listLinks`, `botRunRetention`.      |
+| IP intel                | `convex/verifyActions.ts` (`"use node"`) | Đọc `IP_HASH_SECRET` + `IPINTEL_API_KEY`, cache 24h theo hash global. Thiếu key → vẫn verify, chỉ mất phần VPN.                           |
+| Ban IP                  | `convex/verifyBans.ts`                   | 1..90 ngày (mặc định 7), không ban vĩnh viễn; `botSyncGuildBan` + `botReplaceGuildBans`.                                                  |
+| HTTP                    | `convex/http.ts`                         | `POST /verify/complete` — IP đọc từ `x-forwarded-for`, CORS allowlist, trần tần suất RIÊNG trong `geoGuard` (không chia với `/geo_lang`). |
+| Bot                     | `bot/src/verifyWeb.js`                   | Tạo phiên + DM link, thi hành grant, đồng bộ ban, bảo trì 1 lần/ngày trong tick.                                                          |
+| Web                     | `src/pages/VerifyPage.tsx`               | Fingerprint canvas/WebGL + cookie first-party; honeypot + dwell ≥1.5s + `navigator.webdriver`.                                            |
 
 ### Biến môi trường
 
@@ -521,8 +521,11 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
 
 - **TTL phiên 10 phút**, không phải 15 — đủ cho một lượt bấm link, ngắn hơn thì
   link rò ra ngoài ít giá trị hơn.
-- **Rate-limit tầng HTTP** dùng chung `geoGuard` (20/phút/IP, 300/phút toàn cục)
-  thay vì bảng đếm DB: Convex free tier không đáng để thêm 3 reads mỗi lượt.
+- **Rate-limit tầng HTTP** nằm trong `geoGuard`: `/geo_lang` 20/phút/IP +
+  300/phút toàn cục, `/verify/complete` 10/phút/IP + 300/phút toàn cục với
+  **bộ đếm riêng** — flood endpoint geo công khai không khoá được đường xác
+  minh. Không dùng bảng đếm DB: Convex free tier không đáng để thêm 3 reads
+  mỗi lượt.
 - **Không có `vpnFailClosed`**: provider lỗi → intel `null` → coi như sạch. Chặn
   toàn bộ người dùng khi ipapi.is sập là đánh đổi tệ hơn.
 - **`/verify/complete` trả lý do công khai** (`allowed`/`flagged`/`blocked`/
@@ -544,3 +547,17 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
   thao tác Discord thành công.
 - **Nhắc mở DM.** Thành viên mới đóng DM nhận mention trong `verifyChannelId`
   kèm nút `verify_web_start`; không bao giờ đăng token/link công khai.
+
+## 11. Sửa sau review bảo mật lại (11/11/2026)
+
+- **`/verify/complete` có bộ đếm rate-limit riêng.** Trước đó nó dùng chung
+  `allowGeoRequest` với `/geo_lang` — endpoint công khai, CORS mở. Flood 300
+  lượt/phút (chỉ cần ~15 IP) vào `/geo_lang` làm mọi lượt xác minh trên instance
+  nhận 429, người thật bị join gate đá ra. Nay `allowVerifyRequest` có Map +
+  trần riêng; test `scripts/test-rate-guard.ts` khoá cả hai chiều độc lập.
+- **Xác minh thực nghiệm giới hạn tin cậy của IP.** Trên backend Convex local,
+  `ctx.meta.getRequestMetadata().ip` và `x-forwarded-for` cùng trả giá trị
+  client gửi — nghĩa là đổi sang `ctx.meta` KHÔNG tự khắc phục giả mạo XFF.
+  Việc edge production có ghi đè XFF hay không phải kiểm bằng request thật tới
+  `*.convex.site`; đến khi xác nhận, coi XFF là ranh giới cần platform bảo đảm.
+  Trần per-IP và ban IP chỉ đáng tin khi edge ghi đè header.
