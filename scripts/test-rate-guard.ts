@@ -5,12 +5,15 @@
 import { rateLimitPublicAction, __resetRateGuardForTest } from "../convex/rateGuard";
 import {
   allowGeoRequest,
+  allowVerifyRequest,
   isPublicIp,
   parseClientIp,
   __resetGeoGuardForTest,
   GEO_MAX_PER_IP_PER_MIN,
   GEO_MAX_GLOBAL_PER_MIN,
   GEO_WINDOW_MS,
+  VERIFY_MAX_PER_IP_PER_MIN,
+  VERIFY_MAX_GLOBAL_PER_MIN,
 } from "../convex/geoGuard";
 import { publicConfig } from "../convex/public";
 import { aiStatus } from "../convex/haimiya";
@@ -293,6 +296,50 @@ check(
   geoBlockedAt === GEO_MAX_GLOBAL_PER_MIN,
   String(geoBlockedAt),
 );
+
+console.log("── geoGuard: /verify/complete có bộ đếm RIÊNG ──");
+
+// 11. Flood /geo_lang tới trần toàn cục KHÔNG được khoá /verify/complete.
+//     Đây là bug thật: dùng chung `allowGeoRequest` thì 300 lượt/phút từ ~15 IP
+//     vào endpoint geo công khai làm mọi người thật nhận 429 khi xác minh.
+__resetGeoGuardForTest();
+let geoFloodBlocked = false;
+for (let i = 0; i < GEO_MAX_GLOBAL_PER_MIN + 20; i++) {
+  const ip = `7.7.${Math.floor(i / 250)}.${i % 250}`;
+  if (!allowGeoRequest(ip, 3000)) {
+    geoFloodBlocked = true;
+    break;
+  }
+}
+check("flood /geo_lang chạm trần toàn cục", geoFloodBlocked);
+check("… nhưng /verify/complete vẫn còn lượt cho IP thật", allowVerifyRequest("5.5.5.5", 3000));
+
+// 12. Trần riêng của verify vẫn hoạt động đúng (không nới vô hạn).
+__resetGeoGuardForTest();
+let verifyAllOk = true;
+for (let i = 0; i < VERIFY_MAX_PER_IP_PER_MIN; i++) {
+  if (!allowVerifyRequest("6.6.6.6", 4000)) verifyAllOk = false;
+}
+check(`/verify/complete: IP gọi ${VERIFY_MAX_PER_IP_PER_MIN} lượt → ok`, verifyAllOk);
+check("/verify/complete: lượt vượt trần cùng IP → chặn", !allowVerifyRequest("6.6.6.6", 4000));
+check("… IP khác vẫn được (bucket riêng)", allowVerifyRequest("8.8.4.4", 4000));
+
+// 13. Tách là hai chiều: flood verify cũng không khoá /geo_lang.
+__resetGeoGuardForTest();
+let verifyBlockedAt = -1;
+for (let i = 0; i <= VERIFY_MAX_GLOBAL_PER_MIN + 20; i++) {
+  const ip = `3.3.${Math.floor(i / 250)}.${i % 250}`;
+  if (!allowVerifyRequest(ip, 5000)) {
+    verifyBlockedAt = i;
+    break;
+  }
+}
+check(
+  "flood /verify/complete chạm trần toàn cục của chính nó",
+  verifyBlockedAt === VERIFY_MAX_GLOBAL_PER_MIN,
+  String(verifyBlockedAt),
+);
+check("… nhưng /geo_lang vẫn còn lượt", allowGeoRequest("9.9.9.9", 5000));
 __resetGeoGuardForTest();
 
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);

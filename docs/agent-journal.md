@@ -9,6 +9,12 @@
   Convex env, `DASHBOARD_URL` trong env bot VPS, rồi mới bật `verifyWebEnabled`.
   Chưa có test tích hợp với ipapi.is thật (chỉ mock `parseIntel` + policy thuần).
 
+- 🔐 **XFF production chưa xác nhận** — backend Convex local trả
+  `ctx.meta.getRequestMetadata().ip` đúng bằng `x-forwarded-for` client gửi, nên
+  đổi sang `ctx.meta` KHÔNG vá được giả mạo IP. Chỉ edge `*.convex.site` mới
+  quyết định được; cần một request thật (gửi XFF lạ) tới deployment để xác nhận
+  trước khi tin trần per-IP và ban IP.
+
 - 📋 **Nợ sau 5 đợt audit (50 subagent)** — chưa làm vì cần đổi schema/hành vi hoặc
   rủi ro trung bình: `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk
   backup lớn; dedupe `useGuildPlan`/`useSessionMe`; gom hook watch job của
@@ -79,6 +85,14 @@
 ---
 
 ---
+
+## 2026-11-11 (3) — Tách rate-limit verify khỏi `/geo_lang`
+
+- ✅ Xong: `allowVerifyRequest` có Map + trần riêng (10/phút/IP, 300/phút toàn cục); `/verify/complete` không còn tiêu lượt của `/geo_lang`
+- 🔍 Vì sao: flood geo công khai 300 lượt/phút (~15 IP) từng làm mọi người thật nhận 429 khi xác minh; test khoá cả hai chiều độc lập
+- 🔎 Ghi nhận: `ctx.meta.getRequestMetadata().ip` trên backend local cũng lấy từ XFF client gửi → đổi API không vá giả mạo; edge production phải kiểm bằng request thật
+- 🧪 Kiểm chứng: 90/90 CJS · 34/34 TS · tsc/lint/format/repo-map sạch (dùng PATH node chuẩn, không để Bun shim chạy suite)
+- ▶️ Tiếp theo: xác nhận edge `*.convex.site` ghi đè XFF; đặt `IP_HASH_SECRET` + `IPINTEL_API_KEY` rồi mới bật `verifyWebEnabled`
 
 ## 2026-11-11 (2) — Vá luồng cấp role verify web
 

@@ -10,7 +10,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { allowGeoRequest, isPublicIp, parseClientIp } from "./geoGuard";
+import { allowGeoRequest, allowVerifyRequest, isPublicIp, parseClientIp } from "./geoGuard";
 
 /**
  * Cache đáp án geo — PHẢI là `private`.
@@ -163,6 +163,10 @@ function verifyJson(body: unknown, origin: string | null, status = 200): Respons
  * IP lấy từ `x-forwarded-for` (Convex chạy sau proxy) — KHÔNG BAO GIỜ từ body.
  * Đây là ranh giới tin cậy quan trọng nhất của cả tính năng: nếu client tự khai
  * IP thì kẻ bị ban chỉ cần gửi IP sạch là qua.
+ *
+ * Trần tần suất dùng `allowVerifyRequest` — bộ đếm RIÊNG, không chia với
+ * `/geo_lang` (endpoint công khai, CORS mở). Dùng chung thì flood geo 300
+ * lượt/phút khoá luôn verify của mọi người trên instance (xem `geoGuard.ts`).
  */
 const verifyComplete = httpAction(async (ctx, request) => {
   const origin = request.headers.get("origin");
@@ -175,7 +179,7 @@ const verifyComplete = httpAction(async (ctx, request) => {
   }
 
   const ip = parseClientIp(request.headers.get("x-forwarded-for"));
-  if (!isPublicIp(ip) || !allowGeoRequest(ip)) {
+  if (!isPublicIp(ip) || !allowVerifyRequest(ip)) {
     return verifyJson({ ok: false, code: "rate_limited" }, origin, 429);
   }
 
