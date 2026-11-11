@@ -27,7 +27,7 @@ export interface LegalDoc {
 }
 
 /** Ngày rà soát gần nhất — hiển thị ở đầu mỗi văn bản. */
-export const LEGAL_UPDATED = "10/11/2026";
+export const LEGAL_UPDATED = "12/11/2026";
 
 /**
  * Bố cục cố định: mọi ngôn ngữ phải có ĐÚNG các văn bản này, cùng số mục.
@@ -68,6 +68,7 @@ const VI: LegalDoc[] = [
         bullets: [
           "Cấu hình hợp lệ và phù hợp pháp luật: nội dung tự trả lời, lời chào, danh sách từ khoá lọc, mức hình phạt, whitelist.",
           "Thông báo cho thành viên rằng server có bot lọc nội dung, ghi log hành động và có thể áp dụng hình phạt tự động.",
+          "Khi bật xác minh qua web, thông báo rõ rằng trang xác minh thu IP và tín hiệu thiết bị, gửi IP một lần tới ipapi.is và có thể ra quyết định tự động; chỉ bật khi bạn có căn cứ pháp lý và tuân thủ Chính sách quyền riêng tư.",
           "Tiếp nhận và xử lý khiếu nại của thành viên khi bot xử lý nhầm.",
           "Không dùng bot để theo dõi, quấy rối hoặc trấn áp thành viên một cách trái phép.",
         ],
@@ -124,32 +125,44 @@ const VI: LegalDoc[] = [
   {
     slug: "privacy",
     name: "Chính sách quyền riêng tư",
-    summary: "Protogon lưu dữ liệu gì, để làm gì, lưu ở đâu và bạn kiểm soát chúng thế nào.",
+    summary:
+      "Protogon lưu dữ liệu gì, để làm gì, gửi cho ai, giữ bao lâu và bạn kiểm soát chúng thế nào.",
     updated: LEGAL_UPDATED,
     intro:
-      "Protogon chỉ lưu những dữ liệu cần thiết để bot bảo vệ server và để dashboard hiển thị đúng cấu hình của bạn. Chúng tôi không bán dữ liệu, không dùng dữ liệu cho quảng cáo và không đọc tin nhắn riêng tư của bạn.",
+      "Protogon chỉ lưu những dữ liệu cần thiết để bot bảo vệ server và để dashboard hiển thị đúng cấu hình của bạn. Chính sách này nói rõ ai chịu trách nhiệm, dữ liệu nào được thu (kể cả IP và tín hiệu thiết bị khi bật xác minh web), vì sao, gửi cho ai, giữ bao lâu và bạn kiểm soát thế nào. Chúng tôi không bán dữ liệu, không dùng dữ liệu cho quảng cáo và không đọc tin nhắn riêng tư của bạn.",
     sections: [
       {
         heading: "1. Tóm tắt nhanh",
         paragraphs: ["Ba điểm quan trọng nhất trước khi đi vào chi tiết:"],
         bullets: [
           "Chúng tôi lưu ID Discord, cấu hình server và bản ghi hành động của bot — không lưu nội dung tin nhắn thường.",
-          "Dữ liệu không được bán, không được chia sẻ cho mục đích quảng cáo.",
-          "Bạn có thể yêu cầu xoá dữ liệu bất cứ lúc nào; hướng dẫn ở trang Lưu trữ & xoá dữ liệu.",
+          "Khi server bật xác minh web, trang xác minh thu IP và tín hiệu thiết bị. IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server, và IP được gửi một lần tới ipapi.is để tra VPN/proxy/Tor.",
+          "Dữ liệu không được bán, không được chia sẻ cho quảng cáo. Bạn có thể yêu cầu xoá bất cứ lúc nào; hướng dẫn ở trang Lưu trữ & xoá dữ liệu.",
         ],
       },
       {
-        heading: "2. Dữ liệu chúng tôi lưu",
-        paragraphs: ["Dữ liệu nằm trong bốn nhóm, tất cả đều phục vụ vận hành bot và dashboard:"],
+        heading: "2. Ai chịu trách nhiệm về dữ liệu",
+        paragraphs: [
+          "Protogon là bot Discord kèm dashboard web tại protogon.freebuff.app, do đội ngũ RFTV vận hành. Đội ngũ RFTV là bên kiểm soát dữ liệu tài khoản dashboard, dữ liệu vận hành nền tảng và dữ liệu xác minh do bot tạo.",
+          "Khi bot ở trong một server, chủ server quyết định bật/tắt tính năng và cấu hình hình phạt. Với dữ liệu của thành viên trong server, chủ server là bên quyết định mục đích và phạm vi xử lý; Protogon xử lý theo cấu hình đó và theo chính sách này. Chủ server có trách nhiệm thông báo cho thành viên và bảo đảm có căn cứ pháp lý khi bật tính năng thu dữ liệu, đặc biệt là xác minh web.",
+          "Kênh liên hệ chính thức về dữ liệu là kênh hỗ trợ trong Discord Protogon và fanpage Facebook, liên kết ở chân trang. Chúng tôi có thể yêu cầu bạn xác minh danh tính trước khi xử lý yêu cầu để tránh xoá nhầm dữ liệu của người khác.",
+        ],
+      },
+      {
+        heading: "3. Dữ liệu chúng tôi lưu",
+        paragraphs: [
+          "Dữ liệu nằm trong các nhóm sau, tất cả đều phục vụ vận hành bot và dashboard:",
+        ],
         bullets: [
           "Tài khoản dashboard: ID Discord, tên người dùng, tên hiển thị, ảnh đại diện, danh sách server bạn có quyền quản lý, thời điểm đăng nhập gần nhất và phiên đăng nhập.",
           "Server: ID, tên, biểu tượng, số lượng thành viên, prefix, cấu hình từng module, kênh và role dùng cho log, whitelist, webhook đã tạo.",
           "Hoạt động của bot: hành động hình phạt kèm lý do và người thực hiện, điểm nhiệt và số lần cảnh báo, sự kiện chống nuke/raid, lượt vào và rời server khi bật Join Gate.",
           "Nội dung bạn tạo: câu tự trả lời, lời chào và tạm biệt, giveaway, bảng reaction role, và file backup khi bạn bật tính năng sao lưu.",
+          "Xác minh web: phiên xác minh (token đã băm, ID server/người dùng, trạng thái, quyết định, thời gian), hash IP và tín hiệu thiết bị, liên kết tài khoản phụ, ban IP và nhật ký thao tác. Chi tiết ở mục 13.",
         ],
       },
       {
-        heading: "3. Nội dung tin nhắn",
+        heading: "4. Nội dung tin nhắn",
         paragraphs: [
           "Bot đọc tin nhắn trong server để chạy tự trả lời, lọc spam, phát hiện link độc hại và tổng hợp báo cáo khi có raid. Tin nhắn thường không được lưu vào cơ sở dữ liệu.",
           "Chỉ những đoạn bị xử lý mới được ghi lại (nội dung vi phạm, lý do, hình phạt) để mod xem lại và giải trình. Nếu bạn bật sao lưu kèm tin nhắn, nội dung tin nhắn sẽ nằm trong file backup do bạn quản lý.",
@@ -157,24 +170,44 @@ const VI: LegalDoc[] = [
         ],
       },
       {
-        heading: "4. Mục đích sử dụng",
+        heading: "5. Mục đích sử dụng",
         paragraphs: ["Dữ liệu chỉ được dùng cho những việc sau:"],
         bullets: [
           "Chạy đúng các tính năng bạn đã bật: tự trả lời, nhiệt độ vi phạm, chống nuke/raid, Join Gate, welcome, hình phạt.",
-          "Phòng chống lạm dụng và tấn công: phát hiện raid, chặn bot lạ, chống dò mật khẩu.",
+          "Phòng chống lạm dụng và tấn công: phát hiện raid, chặn bot lạ, chống dò mật khẩu, chặn tài khoản phá server quay lại.",
           "Hỗ trợ khi bạn báo sự cố, kèm bằng chứng cần thiết để truy nguyên.",
           "Số liệu sức khoẻ hệ thống ở dạng tổng hợp (số server, số yêu cầu) — không định danh cá nhân.",
+          "Tuân thủ nghĩa vụ pháp lý và bảo vệ quyền, lợi ích hợp pháp của chúng tôi và của người dùng khác.",
         ],
       },
       {
-        heading: "5. Nơi lưu trữ và thời hạn",
+        heading: "6. Cơ sở pháp lý",
         paragraphs: [
-          "Dữ liệu được lưu trên hạ tầng Convex do Protogon sử dụng, tách theo từng server. Phiên đăng nhập dashboard tự hết hạn theo lựa chọn ghi nhớ của bạn khi đăng nhập.",
-          "File backup chỉ được đẩy lên GitHub Gist khi bạn bật tính năng đó và tự cấu hình khoá truy cập. Trong trường hợp này, dữ liệu backup nằm trong tài khoản GitHub của bạn và bạn toàn quyền xoá.",
+          "Với dữ liệu cần để vận hành bot và dashboard, chúng tôi xử lý trên cơ sở thực hiện dịch vụ theo Điều khoản sử dụng và lợi ích hợp pháp trong việc bảo vệ hệ thống, chống lạm dụng. Với IP và tín hiệu thiết bị trong xác minh web, chúng tôi dựa trên sự đồng ý của bạn: bạn chỉ gửi dữ liệu sau khi tick ô đồng ý trên trang xác minh, và có thể từ chối bằng cách đóng trang (khi đó bạn không được xác minh). Ở nơi pháp luật cho phép xử lý vì lợi ích hợp pháp hoặc nghĩa vụ pháp lý, chúng tôi vẫn giới hạn dữ liệu ở mức tối thiểu.",
+          "Nếu bạn ở Việt Nam, chúng tôi áp dụng pháp luật Việt Nam về bảo vệ dữ liệu cá nhân. Nếu bạn ở Khu vực Kinh tế Châu Âu (EEA) hoặc Vương quốc Anh, chúng tôi áp dụng các quyền tương ứng của GDPR. Chúng tôi tôn trọng các quyền này cho mọi người dùng, kể cả khi luật địa phương chưa bắt buộc.",
         ],
       },
       {
-        heading: "6. Bên thứ ba",
+        heading: "7. Nơi lưu trữ, chuyển dữ liệu xuyên biên giới và thời hạn",
+        paragraphs: [
+          "Dữ liệu được lưu trên hạ tầng Convex do Protogon sử dụng, tách theo từng server. Một số nhà cung cấp (Convex, Discord, GitHub, ipapi.is, nhà cung cấp AI và hạ tầng web) có thể xử lý dữ liệu ngoài Việt Nam hoặc ngoài EEA. Chúng tôi chỉ gửi lượng dữ liệu tối thiểu cần cho đúng mục đích, yêu cầu nhà cung cấp bảo mật theo hợp đồng/điều khoản dịch vụ và không chuyển dữ liệu cho bên thứ ba ngoài các trường hợp ở mục 8.",
+          "Thời hạn lưu trữ:",
+        ],
+        bullets: [
+          "Phiên đăng nhập dashboard: tối đa 30 ngày; đăng xuất xoá ngay.",
+          "Phiên xác minh web: hết hạn sau 10 phút; xoá 7 ngày sau khi hết hạn.",
+          "Tín hiệu xác minh (hash IP/thiết bị/cookie/UA): tối đa 730 ngày kể từ lần cuối xuất hiện.",
+          "Liên kết tài khoản phụ: tối đa 180 ngày kể từ tín hiệu cuối.",
+          "Nhật ký xác minh: tối đa 365 ngày.",
+          "Ban IP: thời hạn ban 1–90 ngày; bản ghi được giữ thêm tối đa 90 ngày ở trạng thái vô hiệu để đối chiếu rồi xoá hẳn (tổng tối đa khoảng 180 ngày).",
+          "Cache tra cứu ipapi.is: 24 giờ; xoá ngay khi hết hạn.",
+          "Hành động hình phạt, điểm nhiệt và cảnh báo: giữ tới khi bạn xoá trong dashboard hoặc xoá dữ liệu server.",
+          "Sự kiện chống nuke/raid và lượt vào/rời server: chỉ giữ số bản ghi gần nhất để mod xem lại; bản cũ tự bị loại khi vượt giới hạn.",
+          "File backup: giữ theo lịch bạn chọn (2–30 ngày một bản); bản cũ trong bot tự bị xoá khi có bản mới, còn bản trên GitHub Gist do bạn quản lý.",
+        ],
+      },
+      {
+        heading: "8. Bên thứ ba",
         paragraphs: [
           "Protogon dựa trên các dịch vụ sau để hoạt động. Chúng tôi không bán hoặc trao dữ liệu cho bên quảng cáo:",
         ],
@@ -183,50 +216,78 @@ const VI: LegalDoc[] = [
           "Convex: lưu trữ cơ sở dữ liệu và chạy backend của dashboard.",
           "GitHub: chỉ nhận file backup khi bạn bật đẩy Gist bằng khoá của bạn.",
           "Nhà cung cấp AI: xử lý trích đoạn hội thoại cần thiết khi bạn dùng báo cáo raid hoặc trợ lý Haimiya, phục vụ đúng yêu cầu đó.",
-          "ipapi.is: chỉ nhận địa chỉ IP khi server bật xác minh qua web, để tra VPN/proxy/Tor/datacenter. Không nhận ID Discord, tên người dùng hay bất kỳ dữ liệu định danh nào khác.",
+          "ipapi.is: chỉ nhận địa chỉ IP khi server bật xác minh qua web, để tra quốc gia/ASN và dấu hiệu VPN/proxy/Tor/datacenter. Không nhận ID Discord, tên người dùng hay bất kỳ dữ liệu định danh nào khác. Kết quả được cache theo hash tách server trong 24 giờ.",
+          "Nhà cung cấp hạ tầng web/tên miền: phục vụ dashboard và trang xác minh; xử lý IP như mọi máy chủ web khi trình duyệt kết nối.",
         ],
       },
       {
-        heading: "7. Quyền của bạn",
+        heading: "9. Quyền của bạn",
         paragraphs: [
-          "Bạn kiểm soát dữ liệu của server mình ngay trong dashboard. Ngoài ra, bạn có thể liên hệ để được hỗ trợ:",
+          "TRƯỚC KHI chúng tôi thu thập, chúng tôi cho bạn biết dữ liệu nào được thu, vì sao, gửi cho ai và giữ bao lâu. Bạn có các quyền sau với dữ liệu cá nhân của mình:",
         ],
         bullets: [
-          "Xem và chỉnh sửa cấu hình, danh sách whitelist, câu trả lời và backup trong dashboard.",
+          "Được biết dữ liệu nào được thu, vì sao, gửi cho ai và giữ bao lâu — trước khi chúng tôi thu thập.",
+          "Xem, chỉnh sửa cấu hình, whitelist, câu trả lời và backup trong dashboard.",
           "Yêu cầu xuất hoặc xoá dữ liệu của server hoặc của cá nhân bạn.",
-          "Phản đối việc tiếp tục lưu trữ: cách triệt để nhất là gỡ bot khỏi server, sau đó gửi yêu cầu xoá.",
-          "Được thông báo rõ mục đích, phạm vi và thời hạn lưu trữ TRƯỚC KHI chúng tôi thu thập thông tin, tự chọn phạm vi thông tin đồng ý cung cấp; khi thay đổi mục đích sử dụng, chúng tôi thông báo lại và xin đồng ý mới.",
+          "Rút lại sự đồng ý bất cứ lúc nào; việc rút lại không làm mất hiệu lực xử lý đã diễn ra trước đó, nhưng chúng tôi sẽ ngừng thu mới và xoá theo yêu cầu.",
+          "Phản đối hoặc yêu cầu hạn chế xử lý; cách triệt để nhất là gỡ bot khỏi server, sau đó gửi yêu cầu xoá.",
+          "Yêu cầu xem lại quyết định tự động (ví dụ bị từ chối xác minh) và trình bày lý do.",
+          "Khiếu nại với cơ quan quản lý nhà nước có thẩm quyền về bảo vệ dữ liệu cá nhân tại nơi bạn sinh sống, hoặc tại Việt Nam. Chúng tôi mong bạn liên hệ trước để có cơ hội giải quyết.",
         ],
       },
       {
-        heading: "8. Bảo mật",
+        heading: "10. Cách gửi yêu cầu và thời gian phản hồi",
         paragraphs: [
-          "Quyền truy cập dashboard dựa trên đăng nhập Discord OAuth2 và được kiểm tra lại ở phía backend cho từng yêu cầu; không có backdoor hay đường tắt bỏ qua xác thực.",
+          "Gửi yêu cầu qua kênh hỗ trợ Discord hoặc fanpage Facebook ở chân trang, kèm ID server/ID người dùng và mô tả ngắn. Chúng tôi xác nhận đã nhận trong tối đa 72 giờ làm việc và hoàn tất trong tối đa 30 ngày, trừ khi pháp luật cho phép thời hạn khác hoặc yêu cầu phức tạp cần thêm thời gian (khi đó chúng tôi thông báo lý do).",
+          "Để tránh xoá nhầm dữ liệu của người khác, chúng tôi cần xác minh: người có tài khoản dashboard xác nhận qua đăng nhập Discord, hoặc chủ server xác nhận cho thành viên trong server của mình.",
+        ],
+      },
+      {
+        heading: "11. Bảo mật",
+        paragraphs: [
+          "Quyền truy cập dashboard dựa trên đăng nhập Discord OAuth2 và được kiểm tra lại ở phía backend cho từng yêu cầu; không có backdoor hay đường tắt bỏ qua xác thực. Dữ liệu xác minh chỉ quản trị viên của chính server đó và bot được đọc; team admin của bot không có quyền đọc xuyên server.",
           "Các thao tác quản trị cấp cao cần khoá bot riêng, khoá này được lưu ở dạng băm. File backup có thể được mã hoá AES-256-GCM và kiểm tra toàn vẹn bằng SHA-256 trước khi khôi phục.",
-          "Phát hiện sự cố ảnh hưởng dữ liệu: chúng tôi thông báo cho chủ server bị ảnh hưởng qua kênh liên hệ đã đăng ký.",
-          "Khi hệ thống thông tin bị tấn công làm phát sinh nguy cơ mất an ninh mạng của người tiêu dùng, chúng tôi thông báo cho cơ quan quản lý nhà nước có thẩm quyền trong thời hạn 24 giờ kể từ thời điểm phát hiện và áp dụng các biện pháp khắc phục cần thiết.",
+          "IP thô không được ghi vào cơ sở dữ liệu; hash IP dùng HMAC-SHA-256 với khoá bí mật, tách theo từng server. Hash vẫn là dữ liệu cá nhân giả danh, không phải dữ liệu ẩn danh hoàn toàn — chúng tôi đối xử như vậy.",
+          "Phát hiện sự cố ảnh hưởng dữ liệu: chúng tôi thông báo cho chủ server bị ảnh hưởng qua kênh liên hệ đã đăng ký. Khi hệ thống thông tin bị tấn công làm phát sinh nguy cơ mất an ninh mạng của người tiêu dùng, chúng tôi thông báo cho cơ quan quản lý nhà nước có thẩm quyền trong thời hạn 24 giờ kể từ thời điểm phát hiện và áp dụng các biện pháp khắc phục cần thiết.",
+          "Không hệ thống nào an toàn tuyệt đối. Nếu bạn phát hiện lỗ hổng, hãy báo riêng cho chúng tôi qua kênh hỗ trợ thay vì công khai; chúng tôi ghi nhận và xử lý trước khi công bố.",
         ],
       },
       {
-        heading: "9. Thay đổi chính sách và liên hệ",
+        heading: "12. Cookie và lưu trữ cục bộ",
         paragraphs: [
-          "Chính sách có thể được cập nhật; ngày rà soát gần nhất ghi ở đầu trang và mọi thay đổi quan trọng được thông báo trong cộng đồng Discord.",
-          "Mọi câu hỏi hoặc yêu cầu liên quan dữ liệu: gửi trong kênh hỗ trợ của cộng đồng Discord Protogon kèm ID server hoặc ID người dùng liên quan.",
+          "Dashboard dùng localStorage để giữ token phiên đăng nhập (thời hạn tối đa 30 ngày). Đây là lưu trữ thiết yếu để bạn không phải đăng nhập lại sau mỗi lần tải trang; đăng xuất sẽ xoá token.",
+          "Trang xác minh đặt một mã thiết bị ngẫu nhiên trong localStorage và đọc các tín hiệu trình duyệt (user-agent, canvas, WebGL, kích thước màn hình, ngôn ngữ, múi giờ, số nhân CPU). Mã và tín hiệu chỉ được gửi dưới dạng băm; mục đích là chống tài khoản giả và tái sử dụng thiết bị để lách ban.",
+          "Chúng tôi không dùng cookie quảng cáo, cookie theo dõi của bên thứ ba hay pixel quảng cáo. Bạn có thể xoá localStorage/cookie trong trình duyệt; khi đó xác minh có thể không hoàn tất vì thiếu tín hiệu thiết bị, và bạn có thể phải xác minh lại.",
         ],
       },
       {
-        heading: "10. Xác minh qua web: IP, thiết bị và tài khoản liên quan",
+        heading: "13. Xác minh qua web: IP, thiết bị, quyết định tự động",
         paragraphs: [
-          "Khi chủ server bật xác minh qua web (phương thức “Web”), trang xác minh thu một số tín hiệu để chặn tài khoản giả, VPN/proxy và tài khoản phụ. Việc này chỉ xảy ra khi bạn mở link xác minh do bot gửi.",
+          "Khi chủ server bật xác minh qua web (phương thức “Web”), trang xác minh thu một số tín hiệu để chặn tài khoản giả, VPN/proxy và tài khoản phụ. Việc này chỉ xảy ra khi bạn mở link xác minh do bot gửi và tick ô đồng ý; nếu bạn không đồng ý, trang không gửi IP/thiết bị và bạn không được xác minh.",
         ],
         bullets: [
-          "Địa chỉ IP: KHÔNG được lưu ở dạng thô. Server băm một chiều (HMAC-SHA-256) bằng khoá bí mật, tách riêng theo từng server, nên cùng một IP ở hai server cho hai giá trị khác nhau và không thể đảo ngược.",
-          "Dấu vết thiết bị/trình duyệt: canvas, WebGL, kích thước màn hình, ngôn ngữ, múi giờ, số nhân CPU và một mã cookie do trang tự đặt — tất cả cũng chỉ được lưu dưới dạng băm.",
-          "Tra cứu mạng: để nhận diện VPN/proxy/Tor/datacenter, IP được gửi tới ipapi.is cho đúng một lượt tra cứu; kết quả lưu theo hash trong 24 giờ. Chúng tôi không gửi ID Discord hay tên người dùng tới dịch vụ này.",
+          "Địa chỉ IP: server đọc địa chỉ nguồn của kết nối (mục cuối của X-Forwarded-For do hạ tầng thêm, lùi về metadata của Convex), không tin giá trị client tự khai. IP thô chỉ được xử lý trong bộ nhớ cho lượt xác minh và không ghi vào cơ sở dữ liệu.",
+          "Lưu hash: IP được băm HMAC-SHA-256 bằng khoá bí mật, tách riêng theo từng server. Cùng một IP ở hai server cho hai giá trị khác nhau; phiên mới không lưu hash toàn cục. Hash là dữ liệu cá nhân giả danh, không thể đảo ngược nếu không có khoá bí mật, nhưng chúng tôi vẫn bảo vệ như dữ liệu cá nhân.",
+          "Tra cứu mạng: IP được gửi tới ipapi.is cho đúng một lượt tra cứu để nhận quốc gia/ASN và dấu hiệu VPN/proxy/Tor/datacenter/mobile. Không gửi ID Discord hay tên người dùng. Kết quả lưu theo hash tách server trong 24 giờ.",
+          "Dấu vết thiết bị/trình duyệt: user-agent, canvas, WebGL, kích thước màn hình, ngôn ngữ, múi giờ, số nhân CPU và một mã ngẫu nhiên do trang đặt — tất cả chỉ lưu dưới dạng băm.",
           "Kiểm tra người thật: trang dùng bẫy ẩn (honeypot), thời gian ở trang tối thiểu và cử động chuột/bàn phím — không dùng captcha hình ảnh.",
-          "Ban theo IP: quản trị viên có thể chặn một hash IP từ 1 đến 90 ngày (mặc định 7). Owner, quản trị viên và bot luôn được miễn; IP dùng chung (CGNAT, mạng di động) chỉ bị từ chối xác minh, không bao giờ tự động ban.",
-          "Thời hạn: phiên xác minh bị xoá 7 ngày sau khi hết hạn; dấu vết thiết bị/IP dùng để phát hiện tài khoản phụ giữ tối đa 24 tháng; bản ghi ban IP tối đa 90 ngày và luôn có ngày hết hạn.",
-          "Tắt tính năng: khi chủ server tắt xác minh web, không có lượt thu tín hiệu mới nào; dữ liệu cũ vẫn xoá được theo trang Lưu trữ & xoá dữ liệu.",
+          "Quyết định tự động: theo cấu hình của chủ server, kết quả có thể là cho qua, từ chối, timeout, kick hoặc ban. Chủ server, quản trị viên, bot và người trong whitelist luôn được miễn; IP dùng chung (CGNAT, mạng di động) chỉ bị từ chối xác minh, không tự động ban. Không phải mọi quyết định đều có người xem trước.",
+          "Ban theo IP: quản trị viên có thể chặn một hash IP từ 1 đến 90 ngày (mặc định 7), phạm vi chính xác hoặc prefix IPv6 /64. Bản ghi ban được giữ thêm tối đa 90 ngày ở trạng thái vô hiệu rồi xoá hẳn.",
+          "Thời hạn: phiên xác minh xoá 7 ngày sau khi hết hạn; tín hiệu thiết bị/IP dùng để phát hiện tài khoản phụ giữ tối đa 730 ngày; liên kết tài khoản phụ tối đa 180 ngày; nhật ký xác minh tối đa 365 ngày.",
+          "Tắt tính năng hoặc rút lại đồng ý: khi chủ server tắt xác minh web, không có lượt thu tín hiệu mới nào. Bạn có thể yêu cầu xoá dữ liệu xác minh của mình; quản trị viên server có nút xoá theo từng thành viên. Dữ liệu cũ vẫn được dọn theo thời hạn ở trên.",
+        ],
+      },
+      {
+        heading: "14. Khiếu nại quyết định tự động",
+        paragraphs: [
+          "Liên hệ quản trị viên server hoặc kênh hỗ trợ của Protogon kèm ID server/ID người dùng và thời điểm xác minh. Chúng tôi sẽ xem lại tín hiệu, giải thích lý do trong phạm vi không tiết lộ dữ liệu của người khác, và có thể yêu cầu xác minh lại hoặc gỡ hạn chế nếu phát hiện nhầm.",
+        ],
+      },
+      {
+        heading: "15. Thay đổi chính sách và liên hệ",
+        paragraphs: [
+          "Chính sách có thể được cập nhật; ngày rà soát gần nhất ghi ở đầu trang và mọi thay đổi quan trọng được thông báo trong cộng đồng Discord. Việc bạn tiếp tục dùng bot sau ngày đó nghĩa là bạn chấp nhận bản mới; nếu thay đổi làm thay đổi mục đích hoặc phạm vi xử lý dữ liệu xác minh, chúng tôi sẽ xin lại sự đồng ý trước khi áp dụng cho lượt xác minh mới.",
+          "Mọi câu hỏi hoặc yêu cầu liên quan dữ liệu: gửi trong kênh hỗ trợ của cộng đồng Discord Protogon hoặc fanpage Facebook ở chân trang, kèm ID server hoặc ID người dùng liên quan. Đây là kênh tiếp nhận chính thức; chúng tôi xác nhận trong tối đa 72 giờ làm việc và hoàn tất trong tối đa 30 ngày.",
         ],
       },
     ],
@@ -251,11 +312,16 @@ const VI: LegalDoc[] = [
         heading: "2. Thời hạn lưu trữ",
         paragraphs: ["Thời hạn dưới đây áp dụng cho dữ liệu vận hành thường ngày:"],
         bullets: [
-          "Phiên đăng nhập dashboard: hết hạn theo lựa chọn ghi nhớ khi bạn đăng nhập; bạn cũng có thể đăng xuất để xoá ngay.",
+          "Phiên đăng nhập dashboard: tối đa 30 ngày; đăng xuất xoá ngay.",
+          "Phiên xác minh web: hết hạn sau 10 phút; xoá 7 ngày sau khi hết hạn.",
+          "Tín hiệu xác minh (hash IP/thiết bị/cookie/UA): tối đa 730 ngày kể từ lần cuối xuất hiện.",
+          "Liên kết tài khoản phụ: tối đa 180 ngày kể từ tín hiệu cuối.",
+          "Nhật ký xác minh: tối đa 365 ngày.",
+          "Ban IP: thời hạn ban 1–90 ngày; bản ghi được giữ thêm tối đa 90 ngày ở trạng thái vô hiệu rồi xoá hẳn (tổng tối đa khoảng 180 ngày).",
+          "Cache tra cứu ipapi.is: 24 giờ; xoá ngay khi hết hạn.",
           "Hành động hình phạt, điểm nhiệt và cảnh báo: giữ tới khi bạn xoá trong dashboard hoặc xoá dữ liệu server.",
           "Sự kiện chống nuke/raid và lượt vào/rời server: chỉ giữ số bản ghi gần nhất để mod xem lại, bản cũ tự bị loại khi vượt giới hạn.",
           "File backup: giữ theo lịch bạn chọn (2–30 ngày một bản); bản cũ trong bot tự bị xoá khi có bản mới, còn bản trên GitHub Gist do bạn quản lý.",
-          "Xác minh web: phiên xác minh xoá 7 ngày sau khi hết hạn; dấu vết thiết bị/IP dùng để phát hiện tài khoản phụ giữ tối đa 24 tháng; bản ghi ban IP tối đa 90 ngày và luôn có ngày hết hạn.",
         ],
       },
       {
@@ -266,6 +332,7 @@ const VI: LegalDoc[] = [
         bullets: [
           "Xoá file backup không cần dùng nữa, kể cả bản đã đẩy lên GitHub.",
           "Xoá danh sách whitelist, câu tự trả lời, giveaway, bảng reaction role khi không còn dùng.",
+          "Trong panel Xác minh web, quản trị viên có thể xoá dữ liệu xác minh của một thành viên (phiên, tín hiệu, liên kết tài khoản phụ).",
           "Đặt lại điểm nhiệt và số lần cảnh báo của một thành viên.",
           "Đăng xuất dashboard để vô hiệu hoá phiên đăng nhập hiện tại.",
         ],
@@ -274,7 +341,7 @@ const VI: LegalDoc[] = [
         heading: "4. Xoá vĩnh viễn dữ liệu của cả server",
         paragraphs: [
           "Khi bạn muốn xoá toàn bộ dấu vết của server khỏi Protogon, hãy thực hiện theo thứ tự: gỡ bot khỏi server, sau đó gửi yêu cầu trong kênh hỗ trợ kèm ID server.",
-          "Chúng tôi xác nhận đã nhận yêu cầu, xoá cấu hình, bản ghi hành động, lịch sử nhiệt, thành viên vào/rời và file backup do bot đang giữ, rồi phản hồi khi hoàn tất. Thời gian xử lý thông thường không quá 30 ngày.",
+          "Chúng tôi xác nhận đã nhận yêu cầu, xoá cấu hình, bản ghi hành động, lịch sử nhiệt, thành viên vào/rời, dữ liệu xác minh web (phiên, tín hiệu, liên kết tài khoản phụ) và file backup do bot đang giữ, rồi phản hồi khi hoàn tất. Nhật ký xác minh đã bỏ định danh và bản ghi ban IP đã bỏ định danh có thể được giữ tối đa theo thời hạn an ninh ở mục 2. Thời gian xử lý thông thường không quá 30 ngày.",
         ],
       },
       {
@@ -282,12 +349,13 @@ const VI: LegalDoc[] = [
         paragraphs: [
           "Thành viên trong server có thể yêu cầu xoá dữ liệu liên quan tới chính mình: ID, lượt vào/rời, bản ghi vi phạm, phiên đăng nhập dashboard nếu có.",
           "Để tránh xoá nhầm dữ liệu của người khác, chúng tôi cần xác minh: người có tài khoản dashboard xác nhận qua đăng nhập Discord, hoặc chủ server xác nhận cho thành viên trong server của mình.",
+          "Với dữ liệu xác minh web, quản trị viên server có thể xoá ngay trong panel Xác minh web; yêu cầu qua kênh hỗ trợ cũng được xử lý. Phiên, tín hiệu và liên kết bị xoá; nhật ký audit và bản ghi ban IP được bỏ định danh (không còn userId) và chỉ giữ tối đa theo thời hạn an ninh để chống lạm dụng.",
         ],
       },
       {
         heading: "6. Cách gửi yêu cầu xoá",
         paragraphs: [
-          "Gửi yêu cầu trong kênh hỗ trợ của cộng đồng Discord Protogon, kèm: mục cần xoá, ID server (nếu là dữ liệu server), ID người dùng (nếu là dữ liệu cá nhân) và mô tả ngắn.",
+          "Gửi yêu cầu trong kênh hỗ trợ của cộng đồng Discord Protogon, kèm: mục cần xoá, ID server (nếu là dữ liệu server), ID người dùng (nếu là dữ liệu cá nhân) và mô tả ngắn. Chúng tôi xác nhận trong tối đa 72 giờ làm việc và hoàn tất trong tối đa 30 ngày.",
           "Không ai trong đội ngũ Protogon yêu cầu bạn gửi token bot, mật khẩu, mã xác thực hai lớp hay khoá API. Yêu cầu như vậy là giả mạo — đừng cung cấp và hãy báo lại cho chúng tôi.",
         ],
       },
@@ -301,7 +369,7 @@ const VI: LegalDoc[] = [
       {
         heading: "8. Trường hợp phải giữ lại",
         paragraphs: [
-          "Một lượng tối thiểu bản ghi có thể được giữ lâu hơn khi cần phòng chống lạm dụng (ví dụ bằng chứng về hành vi tấn công hệ thống) hoặc khi pháp luật yêu cầu. Trong trường hợp đó, chúng tôi giới hạn ở mức nhỏ nhất và không dùng cho mục đích khác.",
+          "Một lượng tối thiểu bản ghi có thể được giữ lâu hơn khi cần phòng chống lạm dụng (ví dụ bằng chứng về hành vi tấn công hệ thống, nhật ký xác minh đã bỏ định danh hoặc bản ghi ban IP đã bỏ định danh) hoặc khi pháp luật yêu cầu. Trong trường hợp đó, chúng tôi giới hạn ở mức nhỏ nhất và không dùng cho mục đích khác.",
           "Sau khi dữ liệu đã bị xoá, việc khôi phục là không thể, kể cả khi bạn mời lại bot vào server.",
         ],
       },
@@ -348,6 +416,7 @@ const EN: LegalDoc[] = [
         bullets: [
           "Keep the configuration lawful and appropriate: auto-reply content, greetings, filtered word lists, punishment levels, whitelist.",
           "Inform members that the server uses a bot that filters content, logs actions, and may apply automatic punishments.",
+          "When you enable web verification, clearly tell members that the verification page collects IP and device signals, sends the IP once to ipapi.is, and may make automated decisions; enable it only when you have a legal basis and comply with the Privacy Policy.",
           "Handle member appeals when the bot acts on the wrong person.",
           "Do not use the bot to monitor, harass, or unlawfully suppress members.",
         ],
@@ -402,34 +471,44 @@ const EN: LegalDoc[] = [
   {
     slug: "privacy",
     name: "Privacy Policy",
-    summary: "What data Protogon stores, why, where it lives, and how you stay in control of it.",
+    summary:
+      "What data Protogon stores, why, who receives it, how long it is kept, and how you stay in control.",
     updated: LEGAL_UPDATED,
     intro:
-      "Protogon stores only what is needed for the bot to protect your server and for the dashboard to show your configuration. We do not sell data, we do not use it for advertising, and we do not read your private messages.",
+      "Protogon stores only what is needed for the bot to protect your server and for the dashboard to show your configuration. This policy explains who is responsible, what data is collected (including IP and device signals when web verification is enabled), why, who receives it, how long it is kept, and how you stay in control. We do not sell data, we do not use it for advertising, and we do not read your private messages.",
     sections: [
       {
         heading: "1. Quick summary",
         paragraphs: ["Three points matter most before the details:"],
         bullets: [
           "We store Discord IDs, server configuration, and records of bot actions — not ordinary message content.",
-          "Data is never sold and never shared for advertising.",
-          "You can request deletion at any time; the steps are on the Retention & Data Deletion page.",
+          "When a server enables web verification, the verification page collects IP and device signals. Raw IP is not stored; only a per-server HMAC-SHA-256 value is kept, and the IP is sent once to ipapi.is for VPN/proxy/Tor lookup.",
+          "Data is never sold or shared for advertising. You can request deletion at any time; the steps are on the Retention & Data Deletion page.",
         ],
       },
       {
-        heading: "2. Data we store",
+        heading: "2. Who is responsible for data",
         paragraphs: [
-          "The data falls into four groups, all of them serving the operation of the bot and dashboard:",
+          "Protogon is a Discord bot with a web dashboard at protogon.freebuff.app, operated by the RFTV team. The RFTV team is the controller for dashboard account data, platform operation data, and verification data created by the bot.",
+          "When the bot is in a server, the server owner decides whether to enable features and how punishments are configured. For member data in that server, the server owner determines the purpose and scope; Protogon processes it according to that configuration and this policy. Server owners must inform members and ensure they have a legal basis when enabling data-collecting features, especially web verification.",
+          "The official data contact channels are the support channel in the Protogon Discord and the Facebook page linked in the footer. We may ask you to verify your identity before handling a request so we do not delete someone else's data.",
+        ],
+      },
+      {
+        heading: "3. Data we store",
+        paragraphs: [
+          "The data falls into the following groups, all of them serving the operation of the bot and dashboard:",
         ],
         bullets: [
           "Dashboard account: Discord ID, username, display name, avatar, the list of servers you can manage, last sign-in time, and your dashboard session.",
           "Server: ID, name, icon, member count, prefix, per-module configuration, channels and roles used for logging, whitelist entries, and created webhooks.",
           "Bot activity: punishment records with reason and moderator, heat score and warning count, anti-nuke/raid events, and join/leave records when Join Gate is enabled.",
           "Content you create: auto-reply lines, welcome and goodbye messages, giveaways, reaction-role panels, and backup files when you enable backups.",
+          "Web verification: verification sessions (hashed token, server/user ID, status, decision, timestamps), IP and device hashes, alt-account links, IP bans, and audit records. Details in section 13.",
         ],
       },
       {
-        heading: "3. Message content",
+        heading: "4. Message content",
         paragraphs: [
           "The bot reads messages in your server to run auto-replies, filter spam, detect malicious links, and compile reports during a raid. Ordinary messages are not stored in the database.",
           "Only the parts that triggered a filter are recorded (offending content, reason, punishment) so moderators can review and explain the action. If you enable backups with messages included, that content ends up in a backup file you control.",
@@ -437,76 +516,124 @@ const EN: LegalDoc[] = [
         ],
       },
       {
-        heading: "4. How we use data",
+        heading: "5. How we use data",
         paragraphs: ["Data is used only for the following purposes:"],
         bullets: [
           "Running the features you enabled: auto-reply, heat and warnings, anti-nuke/raid, Join Gate, welcome messages, punishments.",
-          "Preventing abuse and attacks: detecting raids, blocking rogue bots, blocking password guessing.",
+          "Preventing abuse and attacks: detecting raids, blocking rogue bots, blocking password guessing, and stopping raiders from returning.",
           "Supporting you when you report an incident, with the evidence needed to trace it.",
           "Aggregate system health figures (server counts, request counts) with no personal identification.",
+          "Complying with legal obligations and protecting our rights and the rights of other users.",
         ],
       },
       {
-        heading: "5. Where data lives and for how long",
+        heading: "6. Legal basis",
         paragraphs: [
-          "Data is stored on the Convex infrastructure Protogon uses, separated per server. Dashboard sessions expire according to the remember-me option you choose at sign-in.",
-          "Backup files are pushed to GitHub Gist only when you enable that feature and configure your own access key. In that case the backup lives in your GitHub account and you can delete it at any time.",
+          "For data needed to run the bot and dashboard, we process on the basis of performing the service under the Terms of Service and our legitimate interest in protecting the system against abuse. For IP and device signals in web verification, we rely on your consent: data is sent only after you tick the consent box on the verification page, and you can refuse by closing the page (in which case you will not be verified). Where the law allows processing for legitimate interests or legal obligations, we still minimise the data.",
+          "If you are in Vietnam, we apply Vietnamese personal data protection law. If you are in the European Economic Area (EEA) or the United Kingdom, we apply the corresponding GDPR rights. We respect these rights for all users, even where local law does not yet require it.",
         ],
       },
       {
-        heading: "6. Third parties",
+        heading: "7. Where data lives, cross-border transfers, and retention",
         paragraphs: [
-          "Protogon relies on the services below to operate. We do not sell or hand data to advertisers:",
+          "Data is stored on the Convex infrastructure Protogon uses, separated per server. Some providers (Convex, Discord, GitHub, ipapi.is, AI providers, and web hosting) may process data outside Vietnam or the EEA. We send only the minimum data needed for the purpose, require providers to protect it under their contracts/terms of service, and do not transfer data to third parties except as described in section 8.",
+          "Retention periods:",
+        ],
+        bullets: [
+          "Dashboard session: at most 30 days; signing out deletes it immediately.",
+          "Web verification session: expires after 10 minutes; deleted 7 days after expiry.",
+          "Verification signals (IP/device/cookie/UA hashes): at most 730 days from the last sighting.",
+          "Alt-account links: at most 180 days from the last signal.",
+          "Verification audit records: at most 365 days.",
+          "IP bans: ban duration 1–90 days; the record is kept for up to 90 more days in an inactive state for reference, then deleted (about 180 days in total).",
+          "ipapi.is lookup cache: 24 hours; deleted as soon as it expires.",
+          "Punishments, heat scores, and warnings: kept until you clear them in the dashboard or delete the server's data.",
+          "Anti-nuke/raid events and join/leave records: only the most recent records are kept for moderator review; older ones are dropped once the cap is reached.",
+          "Backup files: kept on the schedule you choose (one every 2–30 days); older copies inside the bot are deleted when a new one is created, while copies on GitHub Gist are yours to manage.",
+        ],
+      },
+      {
+        heading: "8. Third parties",
+        paragraphs: [
+          "Protogon relies on the services below to operate. We do not sell or hand data to advertisers, each provider receives only what it needs, and we do not transfer data to other third parties unless you agree or the law requires it:",
         ],
         bullets: [
           "Discord: the source of the data and the platform where the bot acts through the official API.",
           "Convex: hosts the database and runs the dashboard backend.",
           "GitHub: receives backup files only when you enable Gist upload with your own key.",
           "AI providers: process the conversation excerpts necessary when you use raid reports or the Haimiya assistant, for that request only.",
-          "ipapi.is: receives only the IP address when a server enables web verification, to look up VPN/proxy/Tor/datacenter. It receives no Discord ID, username, or other identifying data.",
+          "ipapi.is: receives only the IP address when a server enables web verification, to look up country/ASN and VPN/proxy/Tor/datacenter signals. It receives no Discord ID, username, or other identifying data. Results are cached by a per-server hash for 24 hours.",
+          "Web/domain hosting: serves the dashboard and verification page and processes IP addresses like any web server when your browser connects.",
         ],
       },
       {
-        heading: "7. Your rights",
+        heading: "9. Your rights",
         paragraphs: [
-          "You control your server's data directly in the dashboard. Beyond that, you can contact us for help:",
+          "BEFORE we collect, we tell you what data is collected, why, who receives it, and how long it is kept. You have the following rights over your personal data:",
         ],
         bullets: [
-          "View and edit configuration, whitelist entries, auto-replies, and backups in the dashboard.",
-          "Request an export or deletion of your server's data or your personal data.",
-          "Object to continued storage: the most thorough route is to remove the bot from the server, then send a deletion request.",
-          "Be informed of the purpose, scope, and retention period BEFORE we collect your information, and choose which scope of information you consent to provide; if the purpose of use changes, we notify you again and ask for new consent.",
+          "To know what data is collected, why, who receives it, and how long it is kept — before we collect it.",
+          "To view and edit configuration, whitelist entries, auto-replies, and backups in the dashboard.",
+          "To request an export or deletion of your server's data or your personal data.",
+          "To withdraw consent at any time; withdrawal does not affect processing that already happened, but we stop new collection and delete on request.",
+          "To object to or request restriction of processing; the most thorough route is to remove the bot from the server, then send a deletion request.",
+          "To request a review of an automated decision (for example, a denied verification) and an explanation of the reasons.",
+          "To complain to the competent personal data protection authority where you live, or in Vietnam. We ask you to contact us first so we have a chance to resolve it.",
         ],
       },
       {
-        heading: "8. Security",
+        heading: "10. How to send a request and response times",
         paragraphs: [
-          "Dashboard access relies on Discord OAuth2 sign-in and is re-checked on the backend for every request; there is no backdoor and no way to skip authentication.",
+          "Send requests through the Discord support channel or the Facebook page in the footer, with the server ID/user ID and a short description. We acknowledge within 72 working hours and complete within 30 days, unless the law allows a different period or a complex request needs more time (we will explain why).",
+          "To avoid deleting someone else's data, we verify: dashboard account holders confirm by signing in with Discord, or a server owner confirms on behalf of a member in their server.",
+        ],
+      },
+      {
+        heading: "11. Security",
+        paragraphs: [
+          "Dashboard access relies on Discord OAuth2 sign-in and is re-checked on the backend for every request; there is no backdoor and no way to skip authentication. Verification data can be read only by administrators of that same server and by the bot; the bot's team admins have no cross-server access.",
           "High-privilege administrative actions require a separate bot key, stored as a hash. Backup files can be encrypted with AES-256-GCM and verified with SHA-256 before a restore.",
-          "If an incident affects data, we notify the affected server owners through their registered contact channel.",
-          "When an attack on an information system creates a risk to the cybersecurity of consumer information, we notify the competent state management authority within 24 hours of becoming aware of the attack and apply the necessary remedial measures.",
+          "Raw IP is not written to the database; IP hashes use HMAC-SHA-256 with a secret key, scoped per server. A hash is still pseudonymous personal data, not fully anonymous data — we treat it that way.",
+          "If an incident affects data, we notify the affected server owners through their registered contact channel. When an attack on an information system creates a risk to the cybersecurity of consumer information, we notify the competent state management authority within 24 hours of becoming aware of the attack and apply the necessary remedial measures.",
+          "No system is completely secure. If you find a vulnerability, report it privately through our support channel rather than publicly; we will acknowledge and address it before disclosure.",
         ],
       },
       {
-        heading: "9. Changes to this policy and contact",
+        heading: "12. Cookies and local storage",
         paragraphs: [
-          "This policy may be updated; the last review date is shown at the top of the page, and material changes are announced in the Discord community.",
-          "For any privacy question or request: post in the support channel of the Protogon Discord community with the relevant server ID or user ID.",
+          "The dashboard uses localStorage to keep your sign-in session token (valid for at most 30 days). This is strictly necessary storage so you do not have to sign in again after every page load; signing out clears the token.",
+          "The verification page stores a random device ID in localStorage and reads browser signals (user-agent, canvas, WebGL, screen size, languages, timezone, CPU core count). The ID and signals are sent only as hashes; the purpose is to stop fake accounts and device reuse to evade bans.",
+          "We do not use advertising cookies, third-party tracking cookies, or advertising pixels. You can clear localStorage/cookies in your browser; verification may then fail because device signals are missing, and you may need to verify again.",
         ],
       },
       {
-        heading: "10. Web verification: IP, device, and related accounts",
+        heading: "13. Web verification: IP, device, automated decisions",
         paragraphs: [
-          "When a server owner enables web verification (the “Web” method), the verification page collects a few signals to block fake accounts, VPNs/proxies, and alt accounts. This happens only when you open the verification link the bot sends you.",
+          "When a server owner enables web verification (the “Web” method), the verification page collects a few signals to block fake accounts, VPNs/proxies, and alt accounts. This happens only when you open the verification link the bot sends and tick the consent box; if you do not consent, the page does not send IP/device data and you will not be verified.",
         ],
         bullets: [
-          "IP address: never stored in raw form. The server applies a one-way hash (HMAC-SHA-256) with a secret key, scoped per server, so the same IP produces different values on two servers and cannot be reversed.",
-          "Device/browser fingerprint: canvas, WebGL, screen size, languages, timezone, CPU core count, and a cookie ID the page sets itself — all stored only as hashes.",
-          "Network lookup: to identify VPN/proxy/Tor/datacenter, the IP is sent to ipapi.is for that single lookup; the result is cached by hash for 24 hours. We never send your Discord ID or username to this service.",
+          "IP address: the server reads the source address of the connection (the last entry of X-Forwarded-For added by the edge, falling back to Convex metadata), never a value the client declares. Raw IP is processed in memory for that verification and is not written to the database.",
+          "Hashing: the IP is hashed with HMAC-SHA-256 using a secret key, scoped per server. The same IP on two servers produces different values; new sessions do not store a global hash. A hash is pseudonymous personal data, not reversible without the secret key, but we still protect it as personal data.",
+          "Network lookup: the IP is sent to ipapi.is for that single lookup to obtain country/ASN and VPN/proxy/Tor/datacenter/mobile signals. We do not send your Discord ID or username. The result is cached by a per-server hash for 24 hours.",
+          "Device/browser fingerprint: user-agent, canvas, WebGL, screen size, languages, timezone, CPU core count, and a random ID the page sets — all stored only as hashes.",
           "Human check: the page uses a hidden honeypot field, a minimum time on page, and pointer/keyboard movement — no image captcha.",
-          "IP bans: admins can block an IP hash for 1 to 90 days (7 by default). Owners, administrators, and bots are always exempt; shared IPs (CGNAT, mobile networks) are only denied verification and never auto-banned.",
-          "Retention: verification sessions are deleted 7 days after they expire; device/IP traces used to detect alt accounts are kept for at most 24 months; IP ban records last at most 90 days and always carry an expiry date.",
-          "Turning it off: when the server owner disables web verification, no new signals are collected; existing data can still be deleted through the Retention & Data Deletion page.",
+          "Automated decision: depending on the server owner's configuration, the result may be allow, deny, timeout, kick, or ban. Server owners, administrators, bots, and whitelisted users are always exempt; shared IPs (CGNAT, mobile networks) are only denied verification and never auto-banned. Not every decision is reviewed by a human first.",
+          "IP bans: admins can block an IP hash for 1 to 90 days (7 by default), scoped to the exact address or an IPv6 /64 prefix. The ban record is kept for up to 90 more days in an inactive state, then deleted.",
+          "Retention: verification sessions are deleted 7 days after they expire; device/IP traces used to detect alt accounts are kept for at most 730 days; alt-account links for at most 180 days; verification audit records for at most 365 days.",
+          "Turning it off or withdrawing consent: when the server owner disables web verification, no new signals are collected. You can request deletion of your verification data; server admins have a per-member delete control. Older data is still cleaned up under the periods above.",
+        ],
+      },
+      {
+        heading: "14. Appealing automated decisions",
+        paragraphs: [
+          "Contact the server administrators or the Protogon support channel with the server ID/user ID and the verification time. We will review the signals, explain the reasons without disclosing other people's data, and may ask you to verify again or remove the restriction if we find a mistake.",
+        ],
+      },
+      {
+        heading: "15. Changes to this policy and contact",
+        paragraphs: [
+          "This policy may be updated; the last review date is shown at the top of the page, and material changes are announced in the Discord community. Continuing to use the bot after that date means you accept the new version; if a change alters the purpose or scope of verification data processing, we will ask for consent again before applying it to a new verification.",
+          "For any privacy question or request: post in the support channel of the Protogon Discord community or the Facebook page in the footer, with the relevant server ID or user ID. These are the official contact channels; we acknowledge within 72 working hours and complete within 30 days.",
         ],
       },
     ],
@@ -531,11 +658,16 @@ const EN: LegalDoc[] = [
         heading: "2. Retention windows",
         paragraphs: ["The windows below apply to day-to-day operational data:"],
         bullets: [
-          "Dashboard session: expires according to the remember-me option you choose at sign-in; signing out deletes it immediately.",
+          "Dashboard session: at most 30 days; signing out deletes it immediately.",
+          "Web verification session: expires after 10 minutes; deleted 7 days after expiry.",
+          "Verification signals (IP/device/cookie/UA hashes): at most 730 days from the last sighting.",
+          "Alt-account links: at most 180 days from the last signal.",
+          "Verification audit records: at most 365 days.",
+          "IP bans: ban duration 1–90 days; the record is kept for up to 90 more days in an inactive state, then deleted (about 180 days in total).",
+          "ipapi.is lookup cache: 24 hours; deleted as soon as it expires.",
           "Punishments, heat scores, and warnings: kept until you clear them in the dashboard or delete the server's data.",
           "Anti-nuke/raid events and join/leave records: only the most recent records are kept for moderator review; older ones are dropped once the cap is reached.",
           "Backup files: kept on the schedule you choose (one every 2–30 days); older copies inside the bot are deleted when a new one is created, while copies on GitHub Gist are yours to manage.",
-          "Web verification: verification sessions are deleted 7 days after they expire; device/IP traces used to detect alt accounts are kept for at most 24 months; IP ban records last at most 90 days and always carry an expiry date.",
         ],
       },
       {
@@ -546,6 +678,7 @@ const EN: LegalDoc[] = [
         bullets: [
           "Delete backups you no longer need, including ones already pushed to GitHub.",
           "Delete whitelist entries, auto-replies, giveaways, and reaction-role panels you no longer use.",
+          "In the Web Verification panel, administrators can delete a member's verification data (sessions, signals, alt-account links).",
           "Reset a member's heat score and warning count.",
           "Sign out of the dashboard to invalidate the current session.",
         ],
@@ -554,7 +687,7 @@ const EN: LegalDoc[] = [
         heading: "4. Permanently deleting a server's data",
         paragraphs: [
           "To remove every trace of a server from Protogon, do this in order: remove the bot from the server, then send a request in the support channel with the server ID.",
-          "We confirm receipt, delete the configuration, action records, heat history, join/leave records, and any backup files the bot still holds, then reply once it is done. Processing normally takes no more than 30 days.",
+          "We confirm receipt, delete the configuration, action records, heat history, join/leave records, web verification data (sessions, signals, alt-account links), and any backup files the bot still holds, then reply once it is done. De-identified verification audit records and de-identified IP ban records may be kept up to the security periods in section 2. Processing normally takes no more than 30 days.",
         ],
       },
       {
@@ -562,12 +695,13 @@ const EN: LegalDoc[] = [
         paragraphs: [
           "A member of a server can request deletion of data relating to them: their ID, join/leave records, punishment records, and any dashboard session.",
           "To avoid deleting someone else's data by mistake we verify the request: dashboard account holders confirm by signing in with Discord, or a server owner confirms on behalf of a member in their server.",
+          "For web verification data, server administrators can delete it directly in the Web Verification panel; requests through the support channel are also handled. Sessions, signals, and links are deleted; audit records and IP ban records are de-identified (no userId) and kept only up to the security periods to prevent abuse.",
         ],
       },
       {
         heading: "6. How to send a deletion request",
         paragraphs: [
-          "Post the request in the support channel of the Protogon Discord community, including: what to delete, the server ID (for server data), the user ID (for personal data), and a short description.",
+          "Post the request in the support channel of the Protogon Discord community, including: what to delete, the server ID (for server data), the user ID (for personal data), and a short description. We acknowledge within 72 working hours and complete within 30 days.",
           "Nobody on the Protogon team asks you to send a bot token, password, two-factor code, or API key. Such a request is impersonation — do not provide it, and report it to us.",
         ],
       },
@@ -581,7 +715,7 @@ const EN: LegalDoc[] = [
       {
         heading: "8. When data must be kept",
         paragraphs: [
-          "A minimal set of records may be kept longer where needed to prevent abuse (for example evidence of an attack on our systems) or where the law requires it. In that case we limit it to the smallest amount and do not use it for anything else.",
+          "A minimal set of records may be kept longer where needed to prevent abuse (for example evidence of an attack on our systems, de-identified verification audit records, or de-identified IP ban records) or where the law requires it. In that case we limit it to the smallest amount and do not use it for anything else.",
           "Once data is deleted, it cannot be restored, even if you invite the bot to the server again.",
         ],
       },
@@ -628,6 +762,7 @@ const DE: LegalDoc[] = [
         bullets: [
           "Konfiguration rechtmäßig und angemessen halten: Auto-Antworten, Begrüßungen, Wortfilter, Strafstufen, Whitelist.",
           "Mitglieder darüber informieren, dass ein Bot Inhalte filtert, Aktionen protokolliert und automatische Strafen verhängen kann.",
+          "Bei aktivierter Web-Verifizierung klar mitteilen, dass die Verifizierungsseite IP- und Gerätesignale erfasst, die IP einmalig an ipapi.is sendet und automatisierte Entscheidungen treffen kann; nur mit Rechtsgrundlage und im Einklang mit der Datenschutzerklärung aktivieren.",
           "Einwände von Mitgliedern bearbeiten, wenn der Bot die falsche Person trifft.",
           "Den Bot nicht einsetzen, um Mitglieder zu überwachen, zu belästigen oder rechtswidrig zu unterdrücken.",
         ],
@@ -685,34 +820,43 @@ const DE: LegalDoc[] = [
     slug: "privacy",
     name: "Datenschutzerklärung",
     summary:
-      "Welche Daten Protogon speichert, warum, wo sie liegen und wie du die Kontrolle behältst.",
+      "Welche Daten Protogon speichert, warum, wer sie erhält, wie lange sie bleiben und wie du die Kontrolle behältst.",
     updated: LEGAL_UPDATED,
     intro:
-      "Protogon speichert nur, was nötig ist, damit der Bot deinen Server schützt und das Dashboard deine Konfiguration zeigt. Wir verkaufen keine Daten, nutzen sie nicht für Werbung und lesen keine privaten Nachrichten.",
+      "Protogon speichert nur, was nötig ist, damit der Bot deinen Server schützt und das Dashboard deine Konfiguration zeigt. Diese Erklärung nennt, wer verantwortlich ist, welche Daten erhoben werden (auch IP- und Gerätesignale bei aktivierter Web-Verifizierung), warum, wer sie erhält, wie lange sie gespeichert werden und wie du die Kontrolle behältst. Wir verkaufen keine Daten, nutzen sie nicht für Werbung und lesen keine privaten Nachrichten.",
     sections: [
       {
         heading: "1. Kurzfassung",
         paragraphs: ["Drei Punkte sind vor allen Details wichtig:"],
         bullets: [
           "Wir speichern Discord-IDs, Serverkonfiguration und Aufzeichnungen der Bot-Aktionen — nicht normale Nachrichteninhalte.",
-          "Daten werden nicht verkauft und nicht für Werbung weitergegeben.",
-          "Du kannst jederzeit Löschung verlangen; die Schritte stehen auf der Seite Löschung & Aufbewahrung.",
+          "Bei aktivierter Web-Verifizierung erfasst die Seite IP- und Gerätesignale. Die rohe IP wird nicht gespeichert; nur ein serverbezogener HMAC-SHA-256-Wert bleibt, und die IP wird einmalig an ipapi.is für die VPN-/Proxy-/Tor-Abfrage gesendet.",
+          "Daten werden nicht verkauft und nicht für Werbung weitergegeben. Du kannst jederzeit Löschung verlangen; die Schritte stehen auf der Seite Löschung & Aufbewahrung.",
         ],
       },
       {
-        heading: "2. Gespeicherte Daten",
+        heading: "2. Wer für die Daten verantwortlich ist",
         paragraphs: [
-          "Die Daten fallen in vier Gruppen, alle dienen dem Betrieb von Bot und Dashboard:",
+          "Protogon ist ein Discord-Bot mit Web-Dashboard unter protogon.freebuff.app, betrieben vom RFTV-Team. Das RFTV-Team ist verantwortlich für Dashboard-Kontodaten, Betriebsdaten der Plattform und die vom Bot erzeugten Verifizierungsdaten.",
+          "Wenn der Bot in einem Server ist, entscheidet der Serverbesitzer, ob Funktionen aktiviert werden und wie Strafen konfiguriert sind. Für Mitgliederdaten in diesem Server bestimmt der Serverbesitzer Zweck und Umfang; Protogon verarbeitet sie nach dieser Konfiguration und dieser Erklärung. Serverbesitzer müssen Mitglieder informieren und eine Rechtsgrundlage sicherstellen, wenn sie datenerhebende Funktionen aktivieren, insbesondere die Web-Verifizierung.",
+          "Offizielle Kontaktwege für Datenfragen sind der Support-Kanal im Protogon-Discord und die im Footer verlinkte Facebook-Seite. Wir können dich bitten, deine Identität zu bestätigen, bevor wir einen Antrag bearbeiten, damit wir nicht fremde Daten löschen.",
+        ],
+      },
+      {
+        heading: "3. Gespeicherte Daten",
+        paragraphs: [
+          "Die Daten fallen in folgende Gruppen, alle dienen dem Betrieb von Bot und Dashboard:",
         ],
         bullets: [
           "Dashboard-Konto: Discord-ID, Benutzername, Anzeigename, Avatar, Liste der verwaltbaren Server, letzte Anmeldung und deine Dashboard-Sitzung.",
           "Server: ID, Name, Icon, Mitgliederzahl, Präfix, Konfiguration je Modul, für Logs genutzte Kanäle und Rollen, Whitelist-Einträge und erstellte Webhooks.",
           "Bot-Aktivität: Strafen mit Grund und Moderator, Hitzewert und Verwarnungen, Anti-Nuke-/Raid-Ereignisse sowie Beitritts- und Austrittsdaten bei aktivem Join Gate.",
           "Von dir erstellte Inhalte: Auto-Antworten, Willkommens- und Abschiedstexte, Giveaways, Reaction-Role-Panels und Backup-Dateien bei aktiviertem Backup.",
+          "Web-Verifizierung: Verifizierungssitzungen (gehashter Token, Server-/Nutzer-ID, Status, Entscheidung, Zeitstempel), IP- und Geräte-Hashes, Alt-Konto-Verknüpfungen, IP-Sperren und Audit-Aufzeichnungen. Details in Abschnitt 13.",
         ],
       },
       {
-        heading: "3. Nachrichteninhalte",
+        heading: "4. Nachrichteninhalte",
         paragraphs: [
           "Der Bot liest Nachrichten im Server, um Auto-Antworten auszuführen, Spam zu filtern, schädliche Links zu erkennen und bei einem Raid Berichte zu erstellen. Normale Nachrichten werden nicht in der Datenbank gespeichert.",
           "Aufgezeichnet werden nur die auslösenden Teile (Inhalt, Grund, Strafe), damit Moderatoren die Aktion nachvollziehen können. Ist das Backup samt Nachrichten aktiviert, landen diese Inhalte in einer Backup-Datei, die du kontrollierst.",
@@ -720,76 +864,124 @@ const DE: LegalDoc[] = [
         ],
       },
       {
-        heading: "4. Zwecke der Verarbeitung",
+        heading: "5. Zwecke der Verarbeitung",
         paragraphs: ["Daten werden ausschließlich für folgende Zwecke genutzt:"],
         bullets: [
           "Betrieb der von dir aktivierten Funktionen: Auto-Antworten, Hitze und Verwarnungen, Anti-Nuke/Raid, Join Gate, Willkommensnachrichten, Strafen.",
-          "Abwehr von Missbrauch und Angriffen: Raid-Erkennung, Blockieren fremder Bots, Schutz vor Passwortraten.",
+          "Abwehr von Missbrauch und Angriffen: Raid-Erkennung, Blockieren fremder Bots, Schutz vor Passwortraten und daran hindern, dass Raider zurückkehren.",
           "Support bei gemeldeten Vorfällen, mit den nötigen Belegen zur Nachverfolgung.",
           "Aggregierte Gesundheitswerte des Systems (Server- und Anfragezahlen) ohne Personenbezug.",
+          "Erfüllung gesetzlicher Pflichten und Schutz unserer Rechte sowie der Rechte anderer Nutzer.",
         ],
       },
       {
-        heading: "5. Speicherort und Speicherdauer",
+        heading: "6. Rechtsgrundlage",
         paragraphs: [
-          "Die Daten liegen auf der von Protogon genutzten Convex-Infrastruktur, je Server getrennt. Dashboard-Sitzungen laufen je nach gewählter Anmeldeoption aus.",
-          "Backup-Dateien werden nur dann zu GitHub Gist hochgeladen, wenn du diese Funktion aktivierst und deinen eigenen Zugangsschlüssel hinterlegst. Dann liegen sie in deinem GitHub-Konto und du kannst sie jederzeit löschen.",
+          "Für Daten, die zum Betrieb von Bot und Dashboard nötig sind, verarbeiten wir auf Grundlage der Vertragserfüllung nach den Nutzungsbedingungen und unseres berechtigten Interesses am Schutz des Systems vor Missbrauch. Für IP- und Gerätesignale bei der Web-Verifizierung stützen wir uns auf deine Einwilligung: Daten werden erst gesendet, nachdem du auf der Verifizierungsseite das Kästchen angekreuzt hast, und du kannst ablehnen, indem du die Seite schließt (dann wirst du nicht verifiziert). Wo das Gesetz die Verarbeitung aufgrund berechtigter Interessen oder gesetzlicher Pflichten erlaubt, beschränken wir die Daten trotzdem auf das Minimum.",
+          "Wenn du in Vietnam bist, wenden wir vietnamesisches Datenschutzrecht an. Wenn du im Europäischen Wirtschaftsraum (EWR) oder im Vereinigten Königreich bist, wenden wir die entsprechenden GDPR-Rechte an. Wir respektieren diese Rechte für alle Nutzer, auch wenn lokales Recht sie noch nicht zwingend vorschreibt.",
         ],
       },
       {
-        heading: "6. Dritte",
+        heading: "7. Speicherort, grenzüberschreitende Übermittlung und Speicherdauer",
         paragraphs: [
-          "Protogon stützt sich für den Betrieb auf folgende Dienste. Wir verkaufen keine Daten und geben sie nicht an Werbetreibende weiter:",
+          "Die Daten liegen auf der von Protogon genutzten Convex-Infrastruktur, je Server getrennt. Einige Anbieter (Convex, Discord, GitHub, ipapi.is, KI-Anbieter und Webhosting) können Daten außerhalb Vietnams oder des EWR verarbeiten. Wir senden nur die für den Zweck nötigen Mindestdaten, verpflichten Anbieter vertraglich bzw. über ihre Nutzungsbedingungen zum Schutz und übermitteln keine Daten an andere Dritte, außer wie in Abschnitt 8 beschrieben.",
+          "Aufbewahrungsfristen:",
+        ],
+        bullets: [
+          "Dashboard-Sitzung: höchstens 30 Tage; Abmelden löscht sie sofort.",
+          "Web-Verifizierungssitzung: läuft nach 10 Minuten ab; wird 7 Tage nach Ablauf gelöscht.",
+          "Verifizierungssignale (IP-/Geräte-/Cookie-/UA-Hashes): höchstens 730 Tage seit der letzten Sichtung.",
+          "Alt-Konto-Verknüpfungen: höchstens 180 Tage seit dem letzten Signal.",
+          "Verifizierungs-Audit: höchstens 365 Tage.",
+          "IP-Sperren: Sperrdauer 1–90 Tage; der Datensatz bleibt bis zu 90 weitere Tage inaktiv zur Nachvollziehbarkeit und wird dann gelöscht (insgesamt etwa 180 Tage).",
+          "ipapi.is-Abfragecache: 24 Stunden; wird sofort nach Ablauf gelöscht.",
+          "Strafen, Hitzewerte und Verwarnungen: bleiben, bis du sie im Dashboard zurücksetzt oder die Serverdaten gelöscht werden.",
+          "Anti-Nuke-/Raid-Ereignisse und Beitritts-/Austrittsdaten: nur die jüngsten Einträge bleiben zur Prüfung; ältere fallen bei Erreichen der Obergrenze weg.",
+          "Backup-Dateien: nach deinem Zeitplan (eine alle 2–30 Tage); ältere Kopien im Bot werden bei einer neuen gelöscht, Kopien in GitHub Gist verwaltest du selbst.",
+        ],
+      },
+      {
+        heading: "8. Dritte",
+        paragraphs: [
+          "Protogon stützt sich für den Betrieb auf folgende Dienste. Wir verkaufen keine Daten und geben sie nicht an Werbetreibende weiter; jeder Anbieter erhält nur, was er braucht, und wir übermitteln keine Daten an andere Dritte, außer du stimmst zu oder das Gesetz verlangt es:",
         ],
         bullets: [
           "Discord: Datenquelle und Plattform, auf der der Bot über die offizielle API handelt.",
           "Convex: beherbergt die Datenbank und das Backend des Dashboards.",
           "GitHub: erhält Backup-Dateien nur, wenn du den Gist-Upload mit deinem Schlüssel aktivierst.",
           "KI-Anbieter: verarbeiten die notwendigen Gesprächsausschnitte, wenn du Raid-Berichte oder den Assistenten Haimiya nutzt — nur für diese Anfrage.",
-          "ipapi.is: erhält nur die IP-Adresse, wenn ein Server die Web-Verifizierung aktiviert, um VPN/Proxy/Tor/Rechenzentrum nachzuschlagen. Discord-ID, Nutzername oder andere identifizierende Daten werden nicht übermittelt.",
+          "ipapi.is: erhält nur die IP-Adresse, wenn ein Server die Web-Verifizierung aktiviert, um Land/ASN und VPN-/Proxy-/Tor-/Rechenzentrums-Signale nachzuschlagen. Discord-ID, Nutzername oder andere identifizierende Daten werden nicht übermittelt. Ergebnisse werden 24 Stunden per serverbezogenem Hash zwischengespeichert.",
+          "Web-/Domain-Hosting: liefert Dashboard und Verifizierungsseite aus und verarbeitet IP-Adressen wie jeder Webserver, wenn dein Browser sich verbindet.",
         ],
       },
       {
-        heading: "7. Deine Rechte",
+        heading: "9. Deine Rechte",
         paragraphs: [
-          "Die Daten deines Servers steuerst du direkt im Dashboard. Darüber hinaus kannst du uns kontaktieren:",
+          "Vor der Erhebung sagen wir dir, welche Daten erhoben werden, warum, wer sie erhält und wie lange sie gespeichert werden. Du hast folgende Rechte an deinen personenbezogenen Daten:",
         ],
         bullets: [
+          "Zu erfahren, welche Daten erhoben werden, warum, wer sie erhält und wie lange sie bleiben — bevor wir sie erheben.",
           "Konfiguration, Whitelist, Auto-Antworten und Backups im Dashboard ansehen und ändern.",
           "Export oder Löschung der Server- oder Personendaten verlangen.",
-          "Der weiteren Speicherung widersprechen: am gründlichsten, indem du den Bot entfernst und dann eine Löschung beantragst.",
-          "Vor der Erhebung über Zweck, Umfang und Aufbewahrungsdauer deiner Informationen INFORMIERT zu werden und selbst zu wählen, welchem Umfang du zustimmst; ändert sich der Verwendungszweck, informieren wir erneut und holen eine neue Einwilligung ein.",
+          "Die Einwilligung jederzeit widerrufen; der Widerruf berührt die bereits erfolgte Verarbeitung nicht, aber wir stoppen die neue Erhebung und löschen auf Antrag.",
+          "Der Verarbeitung widersprechen oder ihre Einschränkung verlangen; am gründlichsten, indem du den Bot entfernst und dann eine Löschung beantragst.",
+          "Überprüfung einer automatisierten Entscheidung (z. B. einer abgelehnten Verifizierung) und Erklärung der Gründe verlangen.",
+          "Bei der zuständigen Datenschutzaufsichtsbehörde an deinem Wohnort oder in Vietnam Beschwerde einlegen. Wir bitten dich, zuerst uns zu kontaktieren, damit wir eine Lösung finden können.",
         ],
       },
       {
-        heading: "8. Sicherheit",
+        heading: "10. Anträge und Antwortzeiten",
         paragraphs: [
-          "Der Dashboard-Zugang beruht auf Discord-OAuth2 und wird bei jeder Anfrage im Backend erneut geprüft; es gibt keine Hintertür und keinen Weg an der Authentifizierung vorbei.",
+          "Sende Anträge über den Discord-Support-Kanal oder die Facebook-Seite im Footer, mit Server-ID/Nutzer-ID und einer kurzen Beschreibung. Wir bestätigen den Eingang innerhalb von 72 Arbeitsstunden und schließen den Antrag innerhalb von 30 Tagen ab, es sei denn, das Gesetz erlaubt eine andere Frist oder ein komplexer Antrag braucht mehr Zeit (dann erklären wir warum).",
+          "Um fremde Daten nicht versehentlich zu löschen, prüfen wir den Antrag: Dashboard-Konten bestätigen sich per Discord-Anmeldung, oder ein Serverbesitzer bestätigt für ein Mitglied seines Servers.",
+        ],
+      },
+      {
+        heading: "11. Sicherheit",
+        paragraphs: [
+          "Der Dashboard-Zugang beruht auf Discord-OAuth2 und wird bei jeder Anfrage im Backend erneut geprüft; es gibt keine Hintertür und keinen Weg an der Authentifizierung vorbei. Verifizierungsdaten können nur Administratoren desselben Servers und der Bot lesen; die Team-Admins des Bots haben keinen serverübergreifenden Zugriff.",
           "Verwaltungsaktionen mit hohen Rechten benötigen einen separaten Bot-Schlüssel, der als Hash gespeichert wird. Backup-Dateien können mit AES-256-GCM verschlüsselt und vor dem Wiederherstellen per SHA-256 geprüft werden.",
-          "Bei einem Vorfall mit Datenbezug informieren wir die betroffenen Serverbesitzer über ihren hinterlegten Kontaktweg.",
-          "Wird ein Informationssystem angegriffen und entsteht dadurch ein Risiko für die Cybersicherheit der Verbraucherdaten, informieren wir die zuständige staatliche Stelle innerhalb von 24 Stunden nach Kenntnis des Angriffs und ergreifen die erforderlichen Abhilfemaßnahmen.",
+          "Die rohe IP wird nicht in die Datenbank geschrieben; IP-Hashes nutzen HMAC-SHA-256 mit einem geheimen Schlüssel, getrennt pro Server. Ein Hash ist weiterhin pseudonyme personenbezogene Daten, keine völlig anonymen Daten — wir behandeln ihn so.",
+          "Bei einem Vorfall mit Datenbezug informieren wir die betroffenen Serverbesitzer über ihren hinterlegten Kontaktweg. Wird ein Informationssystem angegriffen und entsteht dadurch ein Risiko für die Cybersicherheit der Verbraucherdaten, informieren wir die zuständige staatliche Stelle innerhalb von 24 Stunden nach Kenntnis des Angriffs und ergreifen die erforderlichen Abhilfemaßnahmen.",
+          "Kein System ist vollständig sicher. Wenn du eine Schwachstelle findest, melde sie bitte vertraulich über unseren Support-Kanal statt öffentlich; wir bestätigen und beheben sie vor einer Veröffentlichung.",
         ],
       },
       {
-        heading: "9. Änderungen und Kontakt",
+        heading: "12. Cookies und lokale Speicherung",
         paragraphs: [
-          "Diese Erklärung kann aktualisiert werden; das Datum der letzten Prüfung steht oben auf der Seite, wesentliche Änderungen kündigen wir in der Discord-Community an.",
-          "Für Datenschutzfragen oder -anträge: im Support-Kanal der Protogon-Discord-Community, mit der betreffenden Server- oder Nutzer-ID.",
+          "Das Dashboard nutzt localStorage, um deinen Anmelde-Token zu speichern (höchstens 30 Tage gültig). Das ist unbedingt erforderliche Speicherung, damit du dich nicht nach jedem Seitenaufruf neu anmelden musst; Abmelden löscht den Token.",
+          "Die Verifizierungsseite speichert eine zufällige Geräte-ID im localStorage und liest Browsersignale (User-Agent, Canvas, WebGL, Bildschirmgröße, Sprachen, Zeitzone, CPU-Kerne). ID und Signale werden nur als Hashes gesendet; Zweck ist die Abwehr von Fake-Accounts und Gerätewiederverwendung zur Umgehung von Sperren.",
+          "Wir verwenden keine Werbe-Cookies, keine Tracking-Cookies Dritter und keine Werbepixel. Du kannst localStorage/Cookies im Browser löschen; die Verifizierung kann dann wegen fehlender Gerätesignale scheitern, und du musst dich eventuell erneut verifizieren.",
         ],
       },
       {
-        heading: "10. Web-Verifizierung: IP, Gerät und verknüpfte Konten",
+        heading: "13. Web-Verifizierung: IP, Gerät, automatisierte Entscheidungen",
         paragraphs: [
-          "Wenn der Serverbesitzer die Web-Verifizierung aktiviert (Methode „Web“), erfasst die Verifizierungsseite einige Signale, um Fake-Accounts, VPNs/Proxys und Alt-Accounts zu blockieren. Das geschieht nur, wenn du den vom Bot gesendeten Verifizierungslink öffnest.",
+          "Wenn der Serverbesitzer die Web-Verifizierung aktiviert (Methode „Web“), erfasst die Verifizierungsseite einige Signale, um Fake-Accounts, VPNs/Proxys und Alt-Accounts zu blockieren. Das geschieht nur, wenn du den vom Bot gesendeten Verifizierungslink öffnest und das Einwilligungskästchen ankreuzt; ohne Einwilligung sendet die Seite keine IP-/Gerätedaten und du wirst nicht verifiziert.",
         ],
         bullets: [
-          "IP-Adresse: wird nie im Rohformat gespeichert. Der Server bildet einen Einweg-Hash (HMAC-SHA-256) mit einem geheimen Schlüssel, getrennt pro Server — dieselbe IP ergibt auf zwei Servern verschiedene Werte und lässt sich nicht zurückrechnen.",
-          "Geräte-/Browser-Fingerabdruck: Canvas, WebGL, Bildschirmgröße, Sprachen, Zeitzone, CPU-Kerne und eine selbst gesetzte Cookie-ID — alles nur als Hash gespeichert.",
-          "Netzwerkabfrage: Zur Erkennung von VPN/Proxy/Tor/Rechenzentrum wird die IP für genau diese eine Abfrage an ipapi.is gesendet; das Ergebnis wird 24 Stunden per Hash zwischengespeichert. Deine Discord-ID oder deinen Nutzernamen senden wir nicht an diesen Dienst.",
+          "IP-Adresse: Der Server liest die Quelladresse der Verbindung (letzter, vom Edge ergänzter X-Forwarded-For-Eintrag, sonst Convex-Metadaten), niemals einen vom Client behaupteten Wert. Die rohe IP wird nur im Speicher für diese Verifizierung verarbeitet und nicht in die Datenbank geschrieben.",
+          "Hashing: Die IP wird mit HMAC-SHA-256 und einem geheimen Schlüssel gehasht, getrennt pro Server. Dieselbe IP ergibt auf zwei Servern verschiedene Werte; neue Sitzungen speichern keinen globalen Hash. Ein Hash ist pseudonyme personenbezogene Daten, ohne den geheimen Schlüssel nicht rückrechenbar, wird aber weiterhin als personenbezogene Daten geschützt.",
+          "Netzwerkabfrage: Die IP wird für genau diese eine Abfrage an ipapi.is gesendet, um Land/ASN und VPN-/Proxy-/Tor-/Rechenzentrums-/Mobilfunk-Signale zu erhalten. Discord-ID oder Nutzername senden wir nicht. Das Ergebnis wird 24 Stunden per serverbezogenem Hash zwischengespeichert.",
+          "Geräte-/Browser-Fingerabdruck: User-Agent, Canvas, WebGL, Bildschirmgröße, Sprachen, Zeitzone, CPU-Kerne und eine zufällige, von der Seite gesetzte ID — alles nur als Hash gespeichert.",
           "Menschlichkeitsprüfung: verstecktes Honeypot-Feld, Mindestverweildauer sowie Maus- und Tastaturbewegung — kein Bild-Captcha.",
-          "IP-Sperren: Admins können einen IP-Hash 1 bis 90 Tage sperren (Standard 7). Owner, Administratoren und Bots sind immer ausgenommen; geteilte IPs (CGNAT, Mobilfunk) werden nur abgelehnt, nie automatisch gebannt.",
-          "Aufbewahrung: Verifizierungssitzungen werden 7 Tage nach Ablauf gelöscht; Geräte-/IP-Spuren zur Alt-Erkennung höchstens 24 Monate; IP-Sperren höchstens 90 Tage und immer mit Ablaufdatum.",
-          "Deaktivierung: Schaltet der Serverbesitzer die Web-Verifizierung ab, werden keine neuen Signale erfasst; bestehende Daten lassen sich über die Seite Aufbewahrung & Löschung löschen.",
+          "Automatisierte Entscheidung: Je nach Konfiguration des Serverbesitzers kann das Ergebnis Allow, Deny, Timeout, Kick oder Ban sein. Serverbesitzer, Administratoren, Bots und Whitelist-Nutzer sind immer ausgenommen; geteilte IPs (CGNAT, Mobilfunk) werden nur abgelehnt, nie automatisch gebannt. Nicht jede Entscheidung wird vorher von einem Menschen geprüft.",
+          "IP-Sperren: Admins können einen IP-Hash 1 bis 90 Tage sperren (Standard 7), genau oder als IPv6-/64-Präfix. Der Sperrdatensatz bleibt bis zu 90 weitere Tage inaktiv und wird dann gelöscht.",
+          "Aufbewahrung: Verifizierungssitzungen werden 7 Tage nach Ablauf gelöscht; Geräte-/IP-Spuren zur Alt-Erkennung höchstens 730 Tage; Alt-Konto-Verknüpfungen höchstens 180 Tage; Verifizierungs-Audit höchstens 365 Tage.",
+          "Deaktivierung oder Widerruf: Schaltet der Serverbesitzer die Web-Verifizierung ab, werden keine neuen Signale erfasst. Du kannst die Löschung deiner Verifizierungsdaten verlangen; Server-Admins haben eine Löschfunktion pro Mitglied. Ältere Daten werden weiterhin nach den obigen Fristen bereinigt.",
+        ],
+      },
+      {
+        heading: "14. Widerspruch gegen automatisierte Entscheidungen",
+        paragraphs: [
+          "Kontaktiere die Server-Administratoren oder den Protogon-Support-Kanal mit Server-ID/Nutzer-ID und dem Zeitpunkt der Verifizierung. Wir prüfen die Signale, erklären die Gründe ohne Offenlegung fremder Daten und können dich bitten, erneut zu verifizieren, oder die Einschränkung aufheben, wenn wir einen Fehler finden.",
+        ],
+      },
+      {
+        heading: "15. Änderungen und Kontakt",
+        paragraphs: [
+          "Diese Erklärung kann aktualisiert werden; das Datum der letzten Prüfung steht oben auf der Seite, wesentliche Änderungen kündigen wir in der Discord-Community an. Wer den Bot danach weiter nutzt, akzeptiert die neue Fassung; ändert eine Änderung den Zweck oder Umfang der Verarbeitung von Verifizierungsdaten, holen wir vor der Anwendung auf eine neue Verifizierung erneut die Einwilligung ein.",
+          "Für Datenschutzfragen oder -anträge: im Support-Kanal der Protogon-Discord-Community oder auf der Facebook-Seite im Footer, mit der betreffenden Server- oder Nutzer-ID. Das sind die offiziellen Kontaktwege; wir bestätigen innerhalb von 72 Arbeitsstunden und schließen innerhalb von 30 Tagen ab.",
         ],
       },
     ],
@@ -814,11 +1006,16 @@ const DE: LegalDoc[] = [
         heading: "2. Aufbewahrungsfristen",
         paragraphs: ["Die folgenden Fristen gelten für den laufenden Betrieb:"],
         bullets: [
-          "Dashboard-Sitzung: läuft je nach Anmeldeoption aus; Abmelden löscht sie sofort.",
+          "Dashboard-Sitzung: höchstens 30 Tage; Abmelden löscht sie sofort.",
+          "Web-Verifizierungssitzung: läuft nach 10 Minuten ab; wird 7 Tage nach Ablauf gelöscht.",
+          "Verifizierungssignale (IP-/Geräte-/Cookie-/UA-Hashes): höchstens 730 Tage seit der letzten Sichtung.",
+          "Alt-Konto-Verknüpfungen: höchstens 180 Tage seit dem letzten Signal.",
+          "Verifizierungs-Audit: höchstens 365 Tage.",
+          "IP-Sperren: Sperrdauer 1–90 Tage; der Datensatz bleibt bis zu 90 weitere Tage inaktiv und wird dann gelöscht (insgesamt etwa 180 Tage).",
+          "ipapi.is-Abfragecache: 24 Stunden; wird sofort nach Ablauf gelöscht.",
           "Strafen, Hitzewerte und Verwarnungen: bleiben, bis du sie im Dashboard zurücksetzt oder die Serverdaten gelöscht werden.",
           "Anti-Nuke-/Raid-Ereignisse und Beitritts-/Austrittsdaten: nur die jüngsten Einträge bleiben zur Prüfung; ältere fallen bei Erreichen der Obergrenze weg.",
           "Backup-Dateien: nach deinem Zeitplan (eine alle 2–30 Tage); ältere Kopien im Bot werden bei einer neuen gelöscht, Kopien in GitHub Gist verwaltest du selbst.",
-          "Web-Verifizierung: Verifizierungssitzungen werden 7 Tage nach Ablauf gelöscht; Geräte-/IP-Spuren zur Alt-Erkennung höchstens 24 Monate; IP-Sperren höchstens 90 Tage und immer mit Ablaufdatum.",
         ],
       },
       {
@@ -829,6 +1026,7 @@ const DE: LegalDoc[] = [
         bullets: [
           "Backups löschen, die du nicht mehr brauchst, auch bereits zu GitHub hochgeladene.",
           "Whitelist-Einträge, Auto-Antworten, Giveaways und Reaction-Role-Panels löschen, die nicht mehr genutzt werden.",
+          "Im Panel Web-Verifizierung können Administratoren die Verifizierungsdaten eines Mitglieds löschen (Sitzungen, Signale, Alt-Konto-Verknüpfungen).",
           "Hitzewert und Verwarnungen eines Mitglieds zurücksetzen.",
           "Im Dashboard abmelden, um die aktuelle Sitzung ungültig zu machen.",
         ],
@@ -837,7 +1035,7 @@ const DE: LegalDoc[] = [
         heading: "4. Serverdaten endgültig löschen",
         paragraphs: [
           "Um jede Spur eines Servers aus Protogon zu entfernen, gehe in dieser Reihenfolge vor: Bot vom Server entfernen, dann eine Anfrage mit der Server-ID im Support-Kanal senden.",
-          "Wir bestätigen den Eingang, löschen Konfiguration, Aktionsprotokolle, Hitze-Verlauf, Beitritts-/Austrittsdaten und die noch vorhandenen Backup-Dateien und melden uns nach Abschluss. Die Bearbeitung dauert üblicherweise nicht länger als 30 Tage.",
+          "Wir bestätigen den Eingang, löschen Konfiguration, Aktionsprotokolle, Hitze-Verlauf, Beitritts-/Austrittsdaten, Web-Verifizierungsdaten (Sitzungen, Signale, Alt-Konto-Verknüpfungen) und die noch vorhandenen Backup-Dateien und melden uns nach Abschluss. De-identifizierte Verifizierungs-Audits und de-identifizierte IP-Sperrdatensätze können bis zu den Sicherheitsfristen in Abschnitt 2 aufbewahrt werden. Die Bearbeitung dauert üblicherweise nicht länger als 30 Tage.",
         ],
       },
       {
@@ -845,12 +1043,13 @@ const DE: LegalDoc[] = [
         paragraphs: [
           "Mitglieder eines Servers können die Löschung der eigenen Daten verlangen: ID, Beitritts-/Austrittsdaten, Strafaufzeichnungen und eine etwaige Dashboard-Sitzung.",
           "Um fremde Daten nicht versehentlich zu löschen, prüfen wir die Anfrage: Dashboard-Konten bestätigen sich per Discord-Anmeldung, oder ein Serverbesitzer bestätigt für ein Mitglied seines Servers.",
+          "Bei Web-Verifizierungsdaten können Server-Administratoren sie direkt im Panel Web-Verifizierung löschen; Anträge über den Support-Kanal werden ebenfalls bearbeitet. Sitzungen, Signale und Verknüpfungen werden gelöscht; Audit- und IP-Sperrdatensätze werden de-identifiziert (keine userId) und nur bis zu den Sicherheitsfristen zur Missbrauchsabwehr aufbewahrt.",
         ],
       },
       {
         heading: "6. Löschanfrage stellen",
         paragraphs: [
-          "Sende die Anfrage im Support-Kanal der Protogon-Discord-Community und nenne: was gelöscht werden soll, die Server-ID (bei Serverdaten), die Nutzer-ID (bei Personendaten) und eine kurze Beschreibung.",
+          "Sende die Anfrage im Support-Kanal der Protogon-Discord-Community und nenne: was gelöscht werden soll, die Server-ID (bei Serverdaten), die Nutzer-ID (bei Personendaten) und eine kurze Beschreibung. Wir bestätigen innerhalb von 72 Arbeitsstunden und schließen innerhalb von 30 Tagen ab.",
           "Niemand im Protogon-Team bittet dich um Bot-Token, Passwort, Zwei-Faktor-Code oder API-Schlüssel. Eine solche Bitte ist Betrug — gib nichts heraus und melde sie uns.",
         ],
       },
@@ -864,7 +1063,7 @@ const DE: LegalDoc[] = [
       {
         heading: "8. Fälle, in denen Daten bleiben müssen",
         paragraphs: [
-          "Ein Mindestbestand an Aufzeichnungen kann länger aufbewahrt werden, wenn das zur Missbrauchsabwehr nötig ist (etwa Belege für einen Angriff auf unsere Systeme) oder das Gesetz es verlangt. Dann beschränken wir es auf das Minimum und nutzen es für nichts anderes.",
+          "Ein Mindestbestand an Aufzeichnungen kann länger aufbewahrt werden, wenn das zur Missbrauchsabwehr nötig ist (etwa Belege für einen Angriff auf unsere Systeme, de-identifizierte Verifizierungs-Audits oder de-identifizierte IP-Sperrdatensätze) oder das Gesetz es verlangt. Dann beschränken wir es auf das Minimum und nutzen es für nichts anderes.",
           "Gelöschte Daten können nicht wiederhergestellt werden, auch wenn du den Bot erneut einlädst.",
         ],
       },

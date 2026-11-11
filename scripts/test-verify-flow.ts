@@ -28,7 +28,6 @@ import {
   VERIFY_CONSENT_VERSION,
   hashVerifyToken,
   ipHash,
-  globalIpHash,
   signalHash,
 } from "../convex/verifyCrypto";
 
@@ -223,7 +222,6 @@ async function newSession(ctx: any, userId = USER_A, privileged = false) {
 function signalsFor(ip: string, fp: string, cookie: string, ua = "UA-Test") {
   return {
     ipHash: ipHash(SECRET, GUILD, ip),
-    globalIpHash: globalIpHash(SECRET, ip),
     fingerprintHash: signalHash(SECRET, "fp", fp),
     cookieHash: signalHash(SECRET, "cookie", cookie),
     uaHash: signalHash(SECRET, "ua", ua),
@@ -318,6 +316,10 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
       (await getSessionH(ctx, { token }))?.grantState === "pending",
     );
     check("đã ghi ipHash (không phải IP thô)", /^[0-9a-f]{64}$/.test(row.ipHash));
+    check(
+      "KHÔNG ghi hash IP toàn cục (không nối được dữ liệu xuyên server)",
+      !("globalIpHash" in row),
+    );
     check(
       "ghi audit",
       tables.verifyAudit.some((r) => r.action === "verify_completed"),
@@ -710,13 +712,25 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
       expiresAt: old,
       active: true,
     });
+    tables.ipIntelCache.push({
+      _id: "old-i",
+      ipHash: "e".repeat(64),
+      provider: "ipapi.is",
+      isVpn: false,
+      checkedAt: old,
+      expiresAt: Date.now() - 3600_000,
+    });
 
     const res = await retentionH(ctx, { botKey: BOT_KEY });
     check("xoá phiên quá hạn 7 ngày", !tables.verifySessions.some((r) => r._id === "old-s"));
     check("xoá link quá 180 ngày", !tables.verifyLinks.some((r) => r._id === "old-l"));
     check("xoá audit quá 365 ngày", !tables.verifyAudit.some((r) => r._id === "old-a"));
     check("xoá ipBan hết hạn quá 90 ngày", !tables.ipBans.some((r) => r._id === "old-b"));
-    check("trả số đã xoá", res.deleted >= 4, res.deleted);
+    check(
+      "xoá cache ipapi.is NGAY khi hết hạn",
+      !tables.ipIntelCache.some((r) => r._id === "old-i"),
+    );
+    check("trả số đã xoá", res.deleted >= 5, res.deleted);
   }
 
   // ═══ 13e. Self-test đọc đúng cấu hình, không lộ secret ═══

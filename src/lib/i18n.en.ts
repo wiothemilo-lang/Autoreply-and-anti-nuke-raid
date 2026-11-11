@@ -1794,6 +1794,19 @@ export const EN: Record<string, string> = {
     "We check your device and connection to block fake accounts, VPNs and alt accounts.",
   "Địa chỉ IP không được lưu — chỉ lưu giá trị băm một chiều không thể đảo ngược.":
     "Your IP address is not stored — only a one-way hash that cannot be reversed.",
+  "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server. IP được gửi một lần tới ipapi.is để tra VPN/proxy/Tor.":
+    "Raw IP is not stored; only a per-server HMAC-SHA-256 value is kept. The IP is sent once to ipapi.is for VPN/proxy/Tor lookup.",
+  "Kết quả có thể được quyết định tự động theo cấu hình server; bạn có thể khiếu nại qua kênh hỗ trợ.":
+    "The result may be decided automatically according to the server configuration; you can appeal through the support channel.",
+  "và việc thu IP/thiết bị, gửi IP tới ipapi.is để xác minh.":
+    "and to the collection of IP/device data and sending the IP to ipapi.is for verification.",
+  "IP thô không được lưu — chỉ lưu giá trị băm một chiều tách theo từng server.":
+    "Raw IP is not stored — only a one-way hash scoped per server is kept.",
+  "— bot mở link riêng trong kênh (hoặc gửi DM); trang web kiểm tra thiết bị/kết nối, chặn VPN và tài khoản phụ.":
+    "— the bot opens a private link in the channel (or sends a DM); the web page checks device/connection and blocks VPNs and alt accounts.",
+  "Trước khi bật xác minh web": "Before enabling web verification",
+  "Trang xác minh thu IP và tín hiệu thiết bị, gửi IP một lần tới ipapi.is và có thể ra quyết định tự động. Hãy thông báo cho thành viên và chỉ bật khi bạn có căn cứ pháp lý.":
+    "The verification page collects IP and device signals, sends the IP once to ipapi.is, and may make automated decisions. Tell members and enable it only when you have a legal basis.",
   "Xác minh ngay": "Verify now",
 
   "Chính sách quyền riêng tư": "Privacy Policy",

@@ -416,7 +416,10 @@ IP là **dữ liệu cá nhân** theo Nghị định 13/2023/NĐ-CP (Việt Nam)
 có người dùng EU. Trước khi triển khai phải có:
 
 1. **Cơ sở pháp lý & mục đích**: chống raid/alt/bot, không dùng cho quảng cáo
-   hay bán dữ liệu. Ghi rõ trong `/privacy` (đã có route) và trong trang verify.
+   hay bán dữ liệu. Dữ liệu vận hành dựa trên hợp đồng + lợi ích hợp pháp; IP và
+   tín hiệu thiết bị của xác minh web dựa trên **sự đồng ý** (checkbox, server
+   ghi `consentVersion`/`consentAt`). Ghi rõ trong `/privacy` mục 6 và 13, và
+   trong trang verify.
 2. **Thông báo + đồng ý**: checkbox trước khi gửi; nêu mục đích, thời hạn lưu,
    bên nhận (provider IP intel), quyền yêu cầu xoá. Server tự gắn
    `consentVersion` + `consentAt` — client chỉ khai `consent: true`, và thiếu
@@ -424,8 +427,9 @@ có người dùng EU. Trước khi triển khai phải có:
 3. **Tối giản**: không lưu IP thô; chỉ lưu hash + country/ASN/VPN; không lưu
    user-agent thô (chỉ hash nếu cần chống lạm dụng).
 4. **Hạn lưu** (đang cài trong `botRunRetention`): phiên xoá 7 ngày sau khi hết
-   hạn; cạnh link 180 ngày; audit 365 ngày; `ipBans` xoá hẳn 90 ngày sau khi
-   hết hạn; `ipIntelCache` 24 giờ; tín hiệu identity 24 tháng.
+   hạn; liên kết alt 180 ngày; audit 365 ngày; `ipBans` xoá hẳn 90 ngày sau khi
+   hết hạn; `ipIntelCache` 24 giờ **và xoá ngay khi hết hạn**; tín hiệu identity
+   730 ngày. Bảng đối chiếu đầy đủ ở mục 14.
 5. **Quyền chủ thể**: admin có nút "Xoá dữ liệu xác minh của thành viên" trong
    `VerifyWebCard` (`verify.deleteUserVerifyData` — xoá phiên/tín hiệu/link,
    bỏ định danh audit + IP ban); hỗ trợ yêu cầu qua `/data-deletion`.
@@ -506,16 +510,16 @@ bảng/helper/cron, chưa thu thập IP thật._
 
 Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch phía trên:
 
-| Thành phần              | File                                     | Ghi chú                                                                                                                                   |
-| ----------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Token + băm IP/tín hiệu | `convex/verifyCrypto.ts`                 | Token 256-bit base64url; DB chỉ lưu SHA-256(token). HMAC tách miền `guild-ip` / `global-ip` / `signal`.                                   |
-| Quyết định              | `convex/verifyPolicy.ts`                 | Thuần, không DB/mạng. Thứ tự: IP ban → ban evasion → VPN → link mềm → allow.                                                              |
-| Phiên + đồ thị + grant  | `convex/verify.ts`                       | `botCreateSession`, `finalize`, `botPendingGrants`/`botClaimGrant`/`botFinishGrant`, `listSessions`, `listLinks`, `botRunRetention`.      |
-| IP intel                | `convex/verifyActions.ts` (`"use node"`) | Đọc `IP_HASH_SECRET` + `IPINTEL_API_KEY`, cache 24h theo hash global. Thiếu key → vẫn verify, chỉ mất phần VPN.                           |
-| Ban IP                  | `convex/verifyBans.ts`                   | 1..90 ngày (mặc định 7), không ban vĩnh viễn; `botSyncGuildBan` + `botReplaceGuildBans`.                                                  |
-| HTTP                    | `convex/http.ts`                         | `POST /verify/complete` — IP đọc từ `x-forwarded-for`, CORS allowlist, trần tần suất RIÊNG trong `geoGuard` (không chia với `/geo_lang`). |
-| Bot                     | `bot/src/verifyWeb.js`                   | Tạo phiên + DM link, thi hành grant, đồng bộ ban, bảo trì 1 lần/ngày trong tick.                                                          |
-| Web                     | `src/pages/VerifyPage.tsx`               | Fingerprint canvas/WebGL + cookie first-party; honeypot + dwell ≥1.5s + `navigator.webdriver`.                                            |
+| Thành phần              | File                                     | Ghi chú                                                                                                                                            |
+| ----------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token + băm IP/tín hiệu | `convex/verifyCrypto.ts`                 | Token 256-bit base64url; DB chỉ lưu SHA-256(token). HMAC tách miền `guild-ip` / `global-ip` / `signal`.                                            |
+| Quyết định              | `convex/verifyPolicy.ts`                 | Thuần, không DB/mạng. Thứ tự: IP ban → ban evasion → VPN → link mềm → allow.                                                                       |
+| Phiên + đồ thị + grant  | `convex/verify.ts`                       | `botCreateSession`, `finalize`, `botPendingGrants`/`botClaimGrant`/`botFinishGrant`, `listSessions`, `listLinks`, `botRunRetention`.               |
+| IP intel                | `convex/verifyActions.ts` (`"use node"`) | Đọc `IP_HASH_SECRET` + `IPINTEL_API_KEY`, cache 24h theo hash **tách guild** (không dùng hash toàn cục). Thiếu key → vẫn verify, chỉ mất phần VPN. |
+| Ban IP                  | `convex/verifyBans.ts`                   | 1..90 ngày (mặc định 7), không ban vĩnh viễn; `botSyncGuildBan` + `botReplaceGuildBans`.                                                           |
+| HTTP                    | `convex/http.ts`                         | `POST /verify/complete` — IP đọc từ `x-forwarded-for`, CORS allowlist, trần tần suất RIÊNG trong `geoGuard` (không chia với `/geo_lang`).          |
+| Bot                     | `bot/src/verifyWeb.js`                   | Tạo phiên + trả link riêng tư trong kênh, DM dự phòng; thi hành grant, đồng bộ ban, bảo trì 1 lần/ngày trong tick.                                 |
+| Web                     | `src/pages/VerifyPage.tsx`               | Fingerprint canvas/WebGL + cookie first-party; honeypot + dwell ≥1.5s + `navigator.webdriver`.                                                     |
 
 ### Biến môi trường
 
@@ -554,7 +558,9 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
   chờ tối đa 5 lượt rồi ghi `grantFailedAt`. `grantAppliedAt` chỉ được ghi khi
   thao tác Discord thành công.
 - **Nhắc mở DM.** Thành viên mới đóng DM nhận mention trong `verifyChannelId`
-  kèm nút `verify_web_start`; không bao giờ đăng token/link công khai.
+  kèm nút `verify_web_start`; không bao giờ đăng token/link công khai. Từ
+  12/11/2026 luồng này thay bằng link tạm thời trả riêng tư ngay trong kênh
+  (mục 14) — DM chỉ còn là kênh phụ, không còn là đường duy nhất.
 
 ## 11. Sửa sau review bảo mật lại (11/11/2026)
 
@@ -610,7 +616,103 @@ Ghi chú:
   tự đọc hash phía server.
 - **IDOR đã khoá**: admin guild A truyền `guildId`/`sessionId`/`linkId` của guild
   B → `null`/lỗi; `createIpBan` kiểm `session.guildId === args.guildId`.
+- **Không có hash toàn cục**: phiên mới không ghi `verifySessions.globalIpHash`;
+  cache ipapi.is dùng hash tách guild, nên cùng một IP ở hai server tạo hai khoá
+  khác nhau và không lộ tương quan giữa hai server. Field `globalIpHash` giữ
+  optional cho hàng cũ, tự hết hạn trong 7 ngày.
 - **Quyền có thể trễ**: `manageableGuildIds` làm mới khi đăng nhập; phiên sống
   30 ngày, nên admin bị giáng chức vẫn đọc được tới lần đăng nhập kế tiếp. Muốn
   thu hồi tức thì phải xoá phiên (`sessions`) hoặc giảm TTL — chưa làm vì đổi
   hành vi đăng nhập ngoài phạm vi việc này.
+
+## 14. Luồng link tạm thời & tuân thủ pháp lý (12/11/2026)
+
+Mục này chốt trạng thái sau đợt sửa UX + pháp lý; các mục 8–13 phía trên giữ
+nguyên làm lịch sử thiết kế. Chỗ nào lệch, mục 14 là bản đúng.
+
+### 14.1 Luồng người xác minh — link tạm thời, DM chỉ là kênh phụ
+
+Trước đây bot tạo phiên rồi **chỉ** gửi link qua DM. Thành viên đóng DM (mặc
+định với người lạ trong nhiều server) rơi vào ngõ cụt: đã bấm nút, phiên đã
+tạo, nhưng không nhận được link và không có cách nào tự lấy lại.
+
+Luồng hiện tại:
+
+1. Thành viên bấm `verify_web_start` (panel Xác minh web hoặc mention trong
+   `verifyChannelId`).
+2. Bot tạo phiên (`botCreateSession`) rồi trả lời **ephemeral** ngay cho người
+   bấm, kèm nút mở `/verify?t=<token>`. Chỉ người bấm thấy; token không bao giờ
+   xuất hiện công khai trong kênh.
+3. Bot gửi thêm DM ở nền như kênh phụ. DM lỗi (đóng DM, chặn bot) **không**
+   làm hỏng lượt xác minh — link đã nằm trong ephemeral reply.
+4. Người dùng mở link → tick đồng ý → `POST /verify/complete` → quyết định →
+   bot thi hành grant.
+
+Đánh đổi: thêm một bước bấm so với DM thuần, nhưng bỏ hẳn trạng thái "không
+có link" và không cần OAuth hay Discord Activity (hai hướng từng cân nhắc đều
+kéo thêm quyền + bề mặt tấn công).
+
+### 14.2 Thay đổi dữ liệu đi kèm
+
+- **Bỏ hash IP toàn cục.** Phiên mới không ghi `verifySessions.globalIpHash`.
+  Cache ipapi.is chuyển sang khoá bằng hash **tách guild**. Hệ quả: cùng một IP
+  ở hai server tạo hai khoá khác nhau, đúng với câu "không tương quan giữa các
+  server" trong chính sách.
+- **Hàng cũ**: `globalIpHash` để optional/deprecated, không backfill, tự hết
+  hạn theo TTL phiên (7 ngày sau khi phiên hết hạn). Không cần migration.
+- **Cache hết hạn bị xoá ngay**, không chờ lượt ghi kế tiếp — `botRunRetention`
+  quét `ipIntelCache` theo `expiresAt`.
+- **Cách gọi đúng**: HMAC-SHA-256 là dữ liệu cá nhân **giả danh**, không phải
+  ẩn danh. Mọi copy (chính sách, UI, doc) phải nói "không lưu IP thô" + "hash
+  tách server", không được nói "ẩn danh hoàn toàn".
+
+### 14.3 Đối chiếu yêu cầu pháp lý → nơi đáp ứng
+
+| Yêu cầu                                | Cách đáp ứng trong code/chính sách                                                                                                        | Nơi kiểm                                                                   |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Cơ sở pháp lý rõ ràng                  | Hợp đồng + lợi ích hợp pháp cho vận hành; **đồng ý** cho IP/thiết bị xác minh web                                                         | `/privacy` mục 6; `src/lib/legalContent.ts`                                |
+| Thông báo trước khi thu                | Checkbox trên trang verify nêu mục đích, ipapi.is, hash tách server, quyết định tự động, quyền rút lại; panel admin có nhắc trước khi bật | `src/pages/VerifyPage.tsx`, `src/components/dashboard/VerifyPanel.tsx`     |
+| Đồng ý do server ghi, không tin client | Thiếu `consent: true` → `consent_required` trước khi đọc DB/băm/gọi provider; `consentVersion` + `consentAt` server ghi                   | `convex/http.ts`, `convex/verifyActions.ts`, `scripts/test-verify-flow.ts` |
+| Tối giản dữ liệu                       | Không lưu IP thô; không lưu UA thô; không trả hash đầy đủ; không có hash toàn cục                                                         | `convex/verifyCrypto.ts`, `convex/verify.ts`, mục 13                       |
+| Hạn lưu cụ thể, có cơ chế xoá          | Bảng ở 14.4; `botRunRetention` chạy hằng ngày trong tick bot                                                                              | `convex/verify.ts`, `scripts/test-verify-flow.ts`                          |
+| Quyền truy cập của chủ thể             | Trang verify chỉ trả metadata phiên của chính mình qua token 256-bit                                                                      | `getSession`, mục 13                                                       |
+| Quyền xoá                              | Admin guild xoá theo thành viên; hỗ trợ qua `/data-deletion`; audit/IP ban được bỏ định danh chứ không xoá hồ sơ an ninh                  | `verify.deleteUserVerifyData`, `src/lib/legalContent.ts`                   |
+| Quyết định tự động + khiếu nại         | Chính sách nêu loại quyết định, miễn trừ owner/admin/bot/whitelist, CGNAT chỉ từ chối; mục khiếu nại riêng                                | `/privacy` mục 13–14, `convex/verifyPolicy.ts`                             |
+| Chuyển dữ liệu xuyên biên giới         | Nêu tên Convex, Discord, GitHub, ipapi.is, nhà cung cấp AI/hạ tầng; chỉ gửi dữ liệu tối thiểu                                             | `/privacy` mục 7–8                                                         |
+| Vai trò bên kiểm soát / bên xử lý      | RFTV kiểm soát dữ liệu nền tảng + phiên do bot tạo; chủ server quyết định bật và chịu trách nhiệm thông báo thành viên                    | `/privacy` mục 2; `/terms` mục 3                                           |
+| Cookie / localStorage                  | Nêu token phiên dashboard và mã thiết bị + tín hiệu trình duyệt ở trang verify; không cookie quảng cáo                                    | `/privacy` mục 12                                                          |
+| Trẻ vị thành niên                      | Discord 13+; tối giản dữ liệu + quyền xoá áp dụng như mọi chủ thể                                                                         | `/privacy` mục 8                                                           |
+| Sự cố dữ liệu                          | Cam kết thông báo chủ server + cơ quan có thẩm quyền trong 24 giờ khi đủ ngưỡng                                                           | `/privacy` mục 11                                                          |
+
+### 14.4 Hạn lưu chính xác
+
+| Dữ liệu                                  | Hạn lưu                                                    | Cơ chế                              |
+| ---------------------------------------- | ---------------------------------------------------------- | ----------------------------------- |
+| Phiên xác minh (`verifySessions`)        | Hết hạn sau 10 phút; xoá 7 ngày sau khi hết hạn            | `botRunRetention` quét `expiresAt`  |
+| Tín hiệu thiết bị/IP (`verifySignals`)   | 730 ngày kể từ lần cuối xuất hiện                          | `botRunRetention` quét `lastSeenAt` |
+| Liên kết tài khoản phụ (`memberIpLinks`) | 180 ngày kể từ tín hiệu cuối                               | `botRunRetention`                   |
+| Nhật ký xác minh (`verifyAudit`)         | 365 ngày                                                   | `botRunRetention`                   |
+| Ban IP (`ipBans`)                        | Ban 1–90 ngày; bản ghi giữ thêm tối đa 90 ngày rồi xoá hẳn | `botRunRetention`                   |
+| Cache ipapi.is (`ipIntelCache`)          | 24 giờ; xoá ngay khi hết hạn                               | `botRunRetention` quét `expiresAt`  |
+| Phiên dashboard (`sessions`)             | 30 ngày; đăng xuất xoá ngay                                | TTL + logout                        |
+
+### 14.5 Điều kiện bắt buộc trước khi bật `verifyWebEnabled`
+
+1. `IP_HASH_SECRET` và `IPINTEL_API_KEY` đã đặt trong Convex env.
+2. `DASHBOARD_URL` đúng trong env bot.
+3. Chạy `POST /verify/self-test` bằng curl kèm `x-forwarded-for` giả để xác
+   nhận edge production ghi đè XFF. Trình duyệt không gửi được header này nên
+   check trong UI chỉ là advisory.
+4. Có DPA/SCC hoặc thoả thuận tương đương với ipapi.is, và đã rà soát bản dịch
+   EN/DE của chính sách.
+5. Chỉ sau 4 bước trên mới bật cho từng guild.
+
+### 14.6 Giới hạn đã biết (không được che trong copy)
+
+- Checkbox đồng ý là tự khai; không xác minh độ tuổi hay năng lực hành vi.
+- Chủ server có thể bật tính năng mà chưa thông báo cho thành viên — nghĩa vụ
+  này ghi trong `/terms` mục 3 nhưng không thể cưỡng chế kỹ thuật.
+- Xoá dữ liệu theo guild **không xoá** audit/IP ban đã bỏ định danh; chúng chỉ
+  hết hạn theo 14.4. Đây là đánh đổi có chủ đích để chống lạm dụng.
+- Quyền admin có thể trễ tới 30 ngày sau khi bị giáng chức (mục 13).
+- Chưa có test tích hợp với ipapi.is thật; chỉ mock `parseIntel` + policy thuần.

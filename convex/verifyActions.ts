@@ -26,7 +26,6 @@ import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import {
-  globalIpHash,
   hashVerifyToken,
   ipHash,
   ipPrefixHash,
@@ -156,10 +155,8 @@ export const complete = internalAction({
     }
 
     let guildIpHash: string;
-    let globalHash: string;
     try {
       guildIpHash = ipHash(secret, session.guildId, ip);
-      globalHash = globalIpHash(secret, ip);
     } catch {
       await ctx.runMutation(internal.verify.markFailed, {
         tokenHash,
@@ -181,7 +178,10 @@ export const complete = internalAction({
 
     // ── IP intelligence: cache trước, gọi API sau ──────────────────────────
     let intel: Intel | null = null;
-    const cached = await ctx.runQuery(internal.verify.getIntelCache, { ipHash: globalHash });
+    // Cache theo hash TÁCH GUILD, không dùng hash toàn cục: cùng một IP ở hai
+    // server phải cho hai khoá khác nhau, nếu không cache vô tình nối dữ liệu
+    // xuyên server ngoài phạm vi quản lý của từng chủ server.
+    const cached = await ctx.runQuery(internal.verify.getIntelCache, { ipHash: guildIpHash });
     if (cached) {
       intel = {
         country: cached.country,
@@ -212,7 +212,7 @@ export const complete = internalAction({
       }
       if (intel) {
         await ctx.runMutation(internal.verify.putIntelCache, {
-          ipHash: globalHash,
+          ipHash: guildIpHash,
           country: intel.country,
           asn: intel.asn,
           org: intel.org,
@@ -235,7 +235,6 @@ export const complete = internalAction({
       tokenHash,
       ipHash: guildIpHash,
       ipPrefixHash: guildPrefixHash,
-      globalIpHash: globalHash,
       fingerprintHash,
       cookieHash,
       uaHash,

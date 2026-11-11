@@ -241,13 +241,23 @@ function makeStore(config = {}, handlers = {}) {
     check("chỉ nhận đúng 1 DM", member._dms.length === 1, member._dms.length);
     const embed = member._dms[0].embeds[0].d;
     check(
-      "DM nói rõ KHÔNG lưu IP thô",
-      /không lưu địa chỉ IP/i.test(embed.description),
+      "DM nói rõ KHÔNG lưu IP thô + có gửi ipapi.is",
+      /IP thô.*không được lưu/i.test(embed.description) && /ipapi\.is/i.test(embed.description),
       embed.description,
     );
     check(
       "nút là link tới trang verify",
       member._dms[0].components[0].components[0].url === session.url,
+    );
+    const ephemeral = vw.buildVerifyMessage(member, session, { ephemeral: true });
+    check(
+      "bản ephemeral ghi rõ link riêng chỉ người bấm thấy",
+      /chỉ bạn thấy/i.test(ephemeral.embeds[0].d.footer.text),
+      ephemeral.embeds[0].d.footer,
+    );
+    check(
+      "bản ephemeral vẫn trỏ đúng token",
+      ephemeral.components[0].components[0].url === session.url,
     );
   }
   {
@@ -325,9 +335,10 @@ function makeStore(config = {}, handlers = {}) {
     );
     const msg = member.guild._channelMessages[0];
     check(
-      "mention đúng người + nút mở lại luồng DM",
+      "mention đúng người + nút nhận link riêng",
       msg.content.includes(member.id) &&
-        msg.components[0].components[0].customId === "verify_web_start",
+        msg.components[0].components[0].customId === "verify_web_start" &&
+        /riêng trong kênh này/i.test(msg.content),
       msg,
     );
     check(

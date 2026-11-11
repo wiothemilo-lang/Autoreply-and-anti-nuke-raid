@@ -1279,9 +1279,14 @@ export default defineSchema({
     /** Hình phạt bot phải áp dụng: kick | ban | timeout | verify (null = không phạt). */
     punish: v.optional(v.string()),
     riskScore: v.optional(v.number()),
-    /** Hash IP theo guild + hash global cho đồ thị identity xuyên server. */
+    /** Hash IP theo guild — đủ so khớp ban, không nối được sang server khác. */
     ipHash: v.optional(v.string()),
     ipPrefixHash: v.optional(v.string()),
+    /**
+     * @deprecated Không ghi mới từ 11/11/2026. Trước đây lưu hash IP toàn cục
+     * nhưng không dùng để quyết định; giữ field optional để đọc phiên cũ, phiên
+     * mới không có trường này. Xoá hẳn sau khi dữ liệu cũ hết hạn (7 ngày).
+     */
     globalIpHash: v.optional(v.string()),
     fingerprintHash: v.optional(v.string()),
     cookieHash: v.optional(v.string()),
@@ -1413,7 +1418,7 @@ export default defineSchema({
     .index("by_guildId_evidenceUserId", ["guildId", "evidenceUserId"])
     .index("by_expiresAt", ["expiresAt"]),
 
-  /** ipIntelCache — cache kết quả ipapi.is theo hash global (không theo IP thô). */
+  /** ipIntelCache — cache kết quả ipapi.is theo hash TÁCH GUILD (không theo IP thô). */
   ipIntelCache: defineTable({
     ipHash: v.string(),
     provider: v.string(),
