@@ -20,6 +20,9 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/dist/**",
       "coverage/**",
+      // Vault Obsidian cục bộ (đã gitignore). Nằm trong repo trên máy agent nên
+      // `eslint .` quét cả plugin bên thứ ba trong đó → lint đỏ dù code sạch.
+      ".obsidian/**",
       "convex/_generated/**", // do `bun convex codegen` sinh ra — không sửa tay
       "bot/test-djs-mock.cjs", // mock tạm sinh khi chạy test
       "scripts/_*.cjs", // script trợ giúp tạm thời (tiền tố _)
