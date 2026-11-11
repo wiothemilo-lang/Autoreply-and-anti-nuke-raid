@@ -15,7 +15,7 @@
  *
  * ⚠️ LUẬT CHUNG: mọi mutation ở đây đều `canManageGuild` + ghi
  * `settingsChangedAt` vì bot đọc danh sách loại qua `guilds:getBotConfig`
- * (bundle cache 30 phút). Bỏ `settingsChangedAt` là bot chạy bản cũ tới 30
+ * (bundle cache 90 phút). Bỏ `settingsChangedAt` là bot chạy bản cũ tới 90
  * phút — đúng lớp bug mà `scripts/check-settings-signal.cjs` chặn.
  */
 
@@ -296,7 +296,7 @@ export const saveKind = mutation({
         createdAt: now,
       });
     }
-    // Bot đọc loại qua `guilds:getBotConfig` (cache 30 phút) → bắt buộc báo
+    // Bot đọc loại qua `guilds:getBotConfig` (cache 90 phút) → bắt buộc báo
     // cấu hình vừa đổi, nếu không panel cũ mãi tới tick xoá cache.
     await ctx.db.patch(guild._id, { settingsChangedAt: now });
     return { ok: true, key: clean.key };

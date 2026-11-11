@@ -3,7 +3,7 @@
  * XÁC bot đang chạy cấu hình nào.
  *
  * Vì sao cần: dashboard hiện giá trị vừa lưu, trông như đã có hiệu lực. Nhưng
- * bot đọc cấu hình qua cache TTL 30 phút (`bot/src/convex.js`); cơ chế
+ * bot đọc cấu hình qua cache TTL 90 phút (`bot/src/convex.js`); cơ chế
  * `settingsChangedAt` + `bot_tick:getPendingJobs` rút xuống còn ~3 phút. Người
  * dùng sửa xong, thấy web vẫn hiện giá trị mới, tưởng bot đang chạy nó — rồi
  * báo "bot chưa chạy". Chính là ảo giác đã gây bug 23/09.

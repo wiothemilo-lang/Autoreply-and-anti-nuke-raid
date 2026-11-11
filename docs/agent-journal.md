@@ -3,15 +3,15 @@
 ## Đang dở
 
 - 📋 **Nợ sau 5 đợt audit (50 subagent)** — chưa làm vì cần đổi schema/hành vi hoặc
-  rủi ro trung bình: retention ticket trong
-  `bot_tick`; `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk
+  rủi ro trung bình: `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk
   backup lớn; dedupe `useGuildPlan`/`useSessionMe`; gom hook watch job của
   `BackupPanel` (214 dòng, 3 bản `judgeJobWatch`); tách `HaimiyaChat` media helpers;
   `SiteNav` tách `PagesPanel` + theme store; bỏ monkey-patch `globalThis.fetch`
-  trong `ai.js`; gộp `processDetection` của `antinuke/audit.js`; tách
+  trong `ai.js`; gộp khối lặp giữa `handleAttributeEvent`/`handleAuditEntry` của
+  `antinuke/audit.js`; tách
   `ticketActionButton`; `AdminCard` (16 card shell), `TicketKindsCard` render loop,
   `formatDateTime` 6 bản, i18n key EN/DE trùng 21+20 key, `plans.catalog()` chưa trả
-  giá/rank; test: 97 bản `check()` chép tay, mock discord.js/Convex ctx trùng ở
+  giá/rank; test: 116 bản `check()` chép tay trong `scripts/test-*`, mock discord.js/Convex ctx trùng ở
   ~10 suite; `eslint` chưa phủ `scripts/**/*.ts` (31 suite TS không được lint). Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
   (~110 dòng trùng), `externalApp.js` 4 khối punish (~60 dòng), verify panel 3 bản
   (prefix/setup/hidden), facade `handlers/backup.js`. Đợt 3 còn nợ: `ticketActivity`
@@ -28,7 +28,7 @@
   tháng 10 ⇒ cần lấy từ VPS: shell history quanh 08:49, pm2/out.log xoay vòng,
   OpenCode session storage, `.bot-key` lạ ngoài `bot/`, Convex logs (nếu còn).
   **Đã chặn tái diễn** (entry "2026-11-09 (3)"): `requestBotKey` từ chối xoay
-  khi `lastHeartbeat` < 3 phút — còn lại chỉ là truy nguyên danh tính.
+  khi `lastHeartbeat` < 6 phút (2 nhịp sync 180s) — còn lại chỉ là truy nguyên danh tính.
 
 - ✅ **Backlog rà soát 30/09: đã sửa xong phần bug kỹ thuật** (entry "01/10/2026 (1)").
   Còn lại các mục cần **người quyết định chính sách** trên đường raid — xem mục "Backlog"
@@ -448,11 +448,11 @@
 - 📁 File đụng (17): `bot/src/sweeper.js` (mới) · `bot/src/{captchaStore.js,altDetection.js,index.js,handlers/filters.js,handlers/interactionVerify.js,handlers/antinuke/index.js}` · `scripts/test-sweeper.cjs` (mới) · `scripts/check-cron-boundary.cjs` (mới) · `scripts/{check-settings-signal.cjs,test-antinuke-orchestrator.cjs}` · `.github/workflows/ci.yml` · `AGENTS.md` · `.opencode/plugins/guardrails.js` · `docs/{cron-migration.md,repo-map.md,decision-log.md,agent-journal.md}`.
 - ▶️ Tiếp theo: deploy bot trên VPS qua `/deploy` (pull → 4 lớp → `pm2 restart protogon-bot`) — sandbox không tới VPS.
 
-## 03/10/2026 (10) — #4 `setInterval` của bot sang Convex cron (chuyển 3/28, giữ 25 có lý do)
+## 03/10/2026 (10) — #4 `setInterval` của bot sang Convex cron (chuyển 2/28, giữ 26 có lý do)
 
 - 🎯 **Vì sao**: yêu cầu #4 — thay `setInterval` bằng cron Convex. Khảo sát **28** vòng `setInterval` thật trong `bot/src/` (grep bỏ `node_modules`, bỏ dòng comment).
-- 💡 **Kết luận kiến trúc (đã ghi vào docs + comment)**: cron chỉ nhận job **không cần tiến trình bot**. 25/28 vòng đọc/ghi RAM của bot, gọi Discord/gateway, hoặc đọc đĩa VPS ⇒ **chuyển lên cron là chết lặng**, tệ hơn giữ nguyên. Bảng phân loại từng vòng: `docs/cron-migration.md`.
-- ⏰ **Chuyển được 3 vòng** → `convex/crons.ts` (MỚI, 2 cron): `auto-backup-sweep` **1h** → `internal.backup.sweepDueAutoBackups` (thay `autoBackupInterval` + `backupJobs.autoBackupSweep`); `daily-report-sweep` **30p** → `internal.reports.sweepDueDailyReports` (thay `reportInterval` 15p).
+- 💡 **Kết luận kiến trúc (đã ghi vào docs + comment)**: cron chỉ nhận job **không cần tiến trình bot**. 26/28 vòng đọc/ghi RAM của bot, gọi Discord/gateway, hoặc đọc đĩa VPS ⇒ **chuyển lên cron là chết lặng**, tệ hơn giữ nguyên. Bảng phân loại từng vòng: `docs/cron-migration.md`.
+- ⏰ **Chuyển được 2 vòng** → `convex/crons.ts` (MỚI, 2 cron): `auto-backup-sweep` **1h** → `internal.backup.sweepDueAutoBackups` (thay `autoBackupInterval` + `backupJobs.autoBackupSweep`); `daily-report-sweep` **30p** → `internal.reports.sweepDueDailyReports` (thay `reportInterval` 15p).
 - 🚩 **Mẫu chuyển đổi**: cron `internalMutation` chỉ **tính + đặt cờ** trên document `guilds`; bot đọc cờ TƯƠI qua batch tick `bot_tick:getPendingJobs` (không qua cache `getBotConfig` 30p) rồi thực thi + xoá cờ bằng mutation có sẵn. **Cờ còn nguyên = bot CHƯA xử lý** (offline / cấu hình vừa tắt) ⇒ lượt sau thử lại, không im lặng bỏ sót.
 - 🧩 **Thay đổi cụ thể**: `convex/schema.ts` thêm `guilds.reportRequestedAt`; `convex/bot_writes/settings.ts` `botSetReportAt` xoá cờ; `convex/bot_tick.ts` trả thêm `reports`; `bot/src/handlers/dailyReport.js` tách `runDailyReportForGuild` + thêm `processReportJobs`; `bot/src/tick.js` nhận tham số `heat`, xử lý `jobs.reports` (bọc try/catch, log `[tick:reports]`), fallback gọi `runDailyReports`; `bot/src/index.js` xoá 2 vòng; `bot/src/backupJobs.js` + `handlers/backup.js` xoá hẳn `autoBackupSweep`.
 - 🧪 **Test chặn hồi quy kiến trúc** (ràng buộc không được lùi về vòng quét trong bot): `test-backup-pipeline.cjs` +5 case (crons.ts có lịch, index.js không còn `autoBackupInterval`/`autoBackupSweep`, backupJobs.js không còn `autoBackupSweep`, sweep kế thừa `messageCount`, sweep bỏ qua claim) · `test-daily-report.cjs` +4 case (lịch 30p, index.js không `reportInterval`, ngưỡng 20h khớp 2 phía, `botSetReportAt` xoá cờ) · `test-backup-convex.ts` +11 case sweep (7 guild g1..g7) · `test-bot-tick-settings.ts` +3 case `jobs.reports` +7 case luật đặt cờ · `test-tick.cjs` +2 case (batch xử lý cờ; batch null → fallback vẫn chạy vòng báo cáo).

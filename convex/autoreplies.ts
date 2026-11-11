@@ -72,7 +72,7 @@ export const add = mutation({
   handler: async (ctx, args) => {
     const guild = await assertManage(ctx, args.token, args.guildId);
     // Rule auto reply được bot đọc qua cache getBotConfig → báo cấu hình vừa đổi
-    // (xem schema.ts) để bot xoá cache ở vòng tick kế tiếp thay vì chờ 30 phút.
+    // (xem schema.ts) để bot xoá cache ở vòng tick kế tiếp thay vì chờ 90 phút.
     await ctx.db.patch(guild._id, { settingsChangedAt: Date.now() });
     if (!/^[a-z0-9_-]{1,32}$/i.test(args.name)) {
       throw new Error("Tên rule chỉ gồm chữ, số, _ hoặc - (tối đa 32 ký tự)");

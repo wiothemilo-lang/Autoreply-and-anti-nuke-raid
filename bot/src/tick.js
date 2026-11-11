@@ -3,10 +3,11 @@
  *
  * Trước đây bot chạy 3 vòng quét riêng: hidden 120s (2 query), verify panel 120s
  * (1 query), backup 60s (1 query) → ~120 query/giờ kể cả khi không có việc gì.
- * Giờ 1 vòng tick duy nhất mỗi 60s gọi bot_tick:getPendingJobs — 1 query batch
+ * Giờ 1 vòng tick duy nhất mỗi 180s gọi bot_tick:getPendingJobs — 1 query batch
  * trả { hidden, verifyPanels, backups } cho MỌI guild, bot tự lọc server mình
  * đang ở → tiết kiệm ~50% function calls của nhóm này trên Convex free tier,
- * đồng thời hidden/verify phản hồi NHANH HƠN (60s thay vì 120s).
+ * đồng thời hidden/verify phản hồi nhanh hơn 2 vòng quét riêng (nay chu kỳ
+ * chung là 180s).
  *
  * Khi batch lỗi (query chưa deploy, lỗi mạng thoáng qua) → fallback về 3 query
  * riêng đúng như hành vi cũ để KHÔNG bỏ lỡ việc. Sau lỗi batch, tạm tránh gọi
@@ -47,7 +48,7 @@ const settingsSeen = new Map();
 /**
  * Dashboard vừa sửa cấu hình → xóa cache cục bộ của đúng guild đó.
  *
- * Bối cảnh: getConfig cache tới 30 phút (cắt reads cho Convex free tier), còn
+ * Bối cảnh: getConfig cache tới 90 phút (cắt reads cho Convex free tier), còn
  * giao diện hứa "bot áp dụng trong khoảng 3 phút". Không có bước này thì bật
  * welcome/goodbye, đổi module antinuke... xong join thử sẽ thấy bot im lặng
  * (bug thật 23/09). Mốc `at` giữ trong process để mỗi thay đổi chỉ xóa cache 1 lần.

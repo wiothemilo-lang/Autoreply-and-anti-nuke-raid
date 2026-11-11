@@ -1,7 +1,7 @@
 # Đợt #4 — `setInterval` của bot sang Convex cron
 
-> Ngày: 03/10/2026. Kết quả: **3/28** vòng `setInterval` chuyển được sang cron
-> phía Convex, **25/28** phải ở lại tiến trình bot — và đây là kết luận có chủ ý,
+> Ngày: 03/10/2026. Kết quả: **2/28** vòng `setInterval` chuyển được sang cron
+> phía Convex, **26/28** phải ở lại tiến trình bot — và đây là kết luận có chủ ý,
 > không phải việc làm dở.
 
 ## Vì sao không chuyển hết
@@ -36,7 +36,7 @@ Bốn điểm cố ý giữ trong mẫu này:
 1. Cron **chỉ tính + đặt cờ**, không thực thi — nên job không bao giờ chạm
    Discord từ phía server.
 2. Bot đọc cờ **TƯƠI** qua batch tick `bot_tick:getPendingJobs`, không đi qua
-   bundle cache `getBotConfig` (cache 30 phút sẽ giấu cờ mới → job trễ).
+   bundle cache `getBotConfig` (cache 90 phút sẽ giấu cờ mới → job trễ).
 3. Cờ **còn nguyên = bot chưa xử lý** (bot offline, hoặc cấu hình vừa bị tắt).
    Lượt sau thử lại, không im lặng bỏ sót — không có hạn dùng nên không mất việc.
 4. Chống trùng nằm ở phía server (`lastReportAt`, `backupClaimedAt`), không nằm ở

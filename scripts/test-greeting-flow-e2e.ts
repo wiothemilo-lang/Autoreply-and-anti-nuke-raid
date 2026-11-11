@@ -9,7 +9,7 @@
  *   dashboard (updateSettings thật, bump settingsChangedAt)
  *     → bot_tick:getPendingJobs thật (settingsChanges)
  *     → tick.js runTickOnce thật (applySettingsChanges → store.invalidate)
- *     → ConvexStore thật (getConfig cache TTL 30 phút)
+ *     → ConvexStore thật (getConfig cache TTL 90 phút)
  *     → guilds:getBotConfig thật (đọc doc guild)
  *     → welcome.js handleWelcome/handleGoodbye thật
  *     → thẻ PNG vẽ bằng @napi-rs/canvas THẬT + font nhúng
@@ -274,7 +274,7 @@ function makeMember(guild: any, over: Row = {}) {
 
 // ───── Store thật + patch tầng HTTP để gọi thẳng handler Convex giả ─────
 /**
- * Dùng ConvexStore THẬT của bot NGUYÊN VẸN (cache TTL 30 phút, proxy chèn
+ * Dùng ConvexStore THẬT của bot NGUYÊN VẸN (cache TTL 90 phút, proxy chèn
  * botKey, TỰ xoá cache sau khi bot tự ghi cấu hình qua CONFIG_WRITE_MUTATIONS,
  * retry). Patch nằm ở TẦNG DƯỚI NHẤT — ConvexHttpClient.prototype — tức dưới
  * proxy của store, nên mọi logic production chạy như trên VPS; test KHÔNG tự

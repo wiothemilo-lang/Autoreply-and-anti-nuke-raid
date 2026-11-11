@@ -16,7 +16,8 @@ import { BOT_ONLINE_WINDOW_MS } from "./heartbeat";
  *
  * Luồng:
  *  1. Dashboard bấm "Backup ngay" → requestBackup đặt cờ backupRequested trên guild.
- *  2. Bot quét backup:botGetPending mỗi ~20s, thấy cờ → chụp role/kênh/quyền → lưu
+ *  2. Bot nhận job trong batch tick mỗi 180s (chính `jobs.backups`, fallback
+ *     `backup:botGetPending`), thấy cờ → chụp role/kênh/quyền → lưu
  *     vào bảng guildBackups (bot_writes:botStoreBackup). Nếu yêu cầu đẩy GitHub → gọi
  *     action backup:githubPush (đọc GITHUB_TOKEN từ Keys của Convex) tạo Gist riêng tư.
  *  3. Server bị nuke phá sập → mời bot vào server phụ → dashboard bấm "Khôi phục" →
@@ -278,7 +279,7 @@ export const myRestoreKeys = query({
  * đường cứu hộ (mất quyền server gốc) hỏng dù mã đúng. Biết `_id` không mở thêm
  * quyền gì: hai mutation kia vẫn kiểm tra quyền server ĐÍCH + mã/nguồn gốc.
  *
- * Chỉ cần đăng nhập + quản lý ít nhất một server; mã 130 bit là chìa khoá.
+ * Chỉ cần đăng nhập + quản lý ít nhất một server; mã 125 bit là chìa khoá.
  */
 export const lookupBackup = query({
   args: { token: v.string(), restoreKey: v.string() },
@@ -824,7 +825,7 @@ export const botGetLastChecksum = query({
   },
 });
 
-/** Bot quét mỗi ~20s để nhận yêu cầu tạo backup / khôi phục đang chờ. */
+/** Bot đọc trong batch tick mỗi 180s — fallback cho `jobs.backups`. */
 export const botGetPending = query({
   args: { botKey: v.optional(v.string()) },
   handler: async (ctx, { botKey }) => {

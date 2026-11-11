@@ -4,14 +4,14 @@
  * chạy bản cũ".
  *
  * Bối cảnh (bug thật 23/09/2026 + 6 chỗ sót cùng lớp):
- *   Bot cache bundle cấu hình của guild qua `guilds:getBotConfig` với TTL **30
+ *   Bot cache bundle cấu hình của guild qua `guilds:getBotConfig` với TTL **90
  *   phút** (cố ý — cắt reads cho Convex free tier). Có đúng 2 đường để thay đổi
  *   tới bot NGAY thay vì chờ hết TTL:
  *     1. Dashboard sửa → ghi `settingsChangedAt` trên document guild →
  *        `bot_tick:getPendingJobs` trả `settingsChanges` → tick xoá cache.
  *     2. Chính bot sửa (bot_writes) → proxy trong `bot/src/convex.js` xoá cache
  *        ngay sau lượt ghi (CONFIG_WRITE_MUTATIONS).
- *   Thiếu cả 2 thì người dùng phải chờ tới 30 phút mới thấy tác dụng trong khi
+ *   Thiếu cả 2 thì người dùng phải chờ tới 90 phút mới thấy tác dụng trong khi
  *   giao diện hứa "khoảng 3 phút" — bug im lặng: không có lỗi ở đâu cả.
  *
  *   Bug đầu tiên (welcome/goodbye) đã vá riêng lẻ; script này chặn CẢ LỚP.
@@ -89,7 +89,7 @@ const ALLOWLIST = {
  * không ghi field bot đọc vào document guild):
  *  - `relay.ts::setRelaySettings` — relayShare được Convex kiểm lại ở MỌI lượt
  *    bot báo signature, relayReceive làm mới theo nhịp 10 phút của relayClient
- *    (RELAY_REFRESH_MS): trễ tối đa 10 phút, không phải lớp 30 phút; cả 2 field
+ *    (RELAY_REFRESH_MS): trễ tối đa 10 phút, không phải lớp 90 phút; cả 2 field
  *    cũng KHÔNG có trong getBotConfig.
  *  - `threatIntel.ts` — cấu hình ghi vào `botStatus` (toàn cục, không phải
  *    document guild); batch tick đọc tươi.
@@ -668,7 +668,7 @@ function main() {
     console.error(
       [
         "",
-        "Hệ quả: thay đổi chậm tới 30 phút (TTL cache getConfig của bot) trong khi giao diện",
+        "Hệ quả: thay đổi chậm tới 90 phút (TTL cache getConfig của bot) trong khi giao diện",
         "hứa ~3 phút — người dùng tưởng tính năng hỏng (bug thật 23/09/2026).",
         "",
         "Sửa: thêm `settingsChangedAt: Date.now()` vào patch ghi cấu hình. Nếu thay đổi KHÔNG đi",

@@ -166,7 +166,7 @@ async function lockGuild(client, guild, config, store) {
     // Cache config được xóa TỰ ĐỘNG sau lượt ghi này (proxy trong convex.js — xem
     // CONFIG_WRITE_MUTATIONS). Bắt buộc với tính đúng ở đây: `tickUnlocks` đọc
     // `lockdownUntil` từ cache để biết lúc nào mở khóa, nên cache cũ (until = null)
-    // làm kênh bị khóa lâu hơn cấu hình (tới hết TTL 30 phút).
+    // làm kênh bị khóa lâu hơn cấu hình (tới hết TTL 90 phút).
     await store.client.mutation("bot_writes:botLockState", { guildId: guild.id, until });
 
     const embed = logEmbed({

@@ -1351,7 +1351,7 @@ const throws = async (fn: () => Promise<unknown>) => {
     });
     check("saveKind tạo loại mới", out?.key === "billing" && e.ticketKinds.length === 1);
     check(
-      "settingsChangedAt được bump (bot đọc qua cache 30 phút)",
+      "settingsChangedAt được bump (bot đọc qua cache 90 phút)",
       typeof e.guilds[0].settingsChangedAt === "number",
     );
     const rows = await listKindsH(e.ctx, { token: "tok", guildId: "g1" });

@@ -1494,7 +1494,7 @@ function BackupListCard({
  * Hai vấn đề thật mà card này gỡ:
  *  1. Bản backup chỉ hiện được khi bạn CÒN quản lý server gốc. Đúng lúc cần
  *     cứu — server đã bị nuke mất role / bị kick / đã xoá — bạn mất quyền đó:
- *     danh sách trống và khôi phục bị từ chối. MÃ KHÔI PHỤC (130 bit ngẫu
+ *     danh sách trống và khôi phục bị từ chối. MÃ KHÔI PHỤC (125 bit ngẫu
  *     nhiên, sinh cho từng bản backup) gỡ bế tắc đó mà KHÔNG phải lộ id
  *     server: tra cứu theo index và không trả về `guildId` của server gốc.
  *  2. Chủ server cần chỗ CẦM MÃ để không mất nó lúc cần — mất server là mất

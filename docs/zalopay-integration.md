@@ -2,7 +2,7 @@
 
 > **10/11/2026 — BÁN GÓI ĐANG TẮT.** `SALES_ENABLED = false` trong
 > `convex/plans.ts`: `createTransferIntent` và `startPayment` từ chối mọi đơn
-> Premium MỚI; `/premium` redirect 301 về `/`; dashboard không còn thẻ gói.
+> Premium MỚI; `/premium` redirect vĩnh viễn về `/` (Vercel 308, nginx 301); dashboard không còn thẻ gói.
 > Đơn cũ vẫn xác nhận/gia hạn được. Bật lại chỉ cần đổi cờ thành `true`.
 >
 > 06/10/2026 · Code: `convex/payments.ts` (logic + giá) · `convex/paymentsAction.ts`

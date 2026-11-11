@@ -274,7 +274,7 @@ const BUCKET_MAX = 200;
  * "update không đổi setup cũ" (chủ server tự bật từng module trên web).
  *
  * Vì sao KHÔNG mặc định bật (đã từng là `enabled: true` — bug 28/09/2026): cache
- * config của bot giữ 30 phút, seed chạy muộn hơn, và nếu `botEnsureModules` lỗi
+ * config của bot giữ tới 90 phút, seed chạy muộn hơn, và nếu `botEnsureModules` lỗi
  * thì dòng module vĩnh viễn thiếu — lúc đó module chưa bật sẽ phạt thật (mặc định
  * `ban`) đúng người vô tội. Hướng lỗi nguy hiểm; thiếu cấu hình thì phải im.
  * Ngưỡng vẫn trả về để web hiển thị/đề xuất; chỉ `enabled` là TẮT.

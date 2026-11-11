@@ -10,7 +10,7 @@
  * tức backup bị BỎ RƠI đúng lúc cần nhất.
  *
  * Mã khôi phục thay cho id nội bộ của Convex:
- *  - 130 bit ngẫu nhiên (Convex `crypto.getRandomValues`) → không đoán được,
+ *  - 125 bit ngẫu nhiên (Convex `crypto.getRandomValues`) → không đoán được,
  *    không cần giấu id server.
  *  - Tra cứu theo INDEX `by_restoreKey` → O(1), không quét bảng.
  *  - `lookupBackup` KHÔNG trả về `guildId`: biết mã không làm lộ id server

@@ -534,7 +534,7 @@ export const getBotConfig = query({
       lockdownRequested: guild.lockdownRequested ?? false,
       dailyReportEnabled: guild.dailyReportEnabled ?? true,
       emergencyAlertEnabled: guild.emergencyAlertEnabled ?? true,
-      // Bot đọc qua getBotConfig (TTL cache 30 phút) — thiếu ở đây thì hai knob
+      // Bot đọc qua getBotConfig (TTL cache 90 phút) — thiếu ở đây thì hai knob
       // trên dashboard báo "đã lưu" mà bot vẫn chạy mặc định (bug thật 23/09).
       reportMinIntervalMin: clampReportMinIntervalMinutes(guild.reportMinIntervalMin),
       reportMinEvents: clampReportMinEvents(guild.reportMinEvents),
@@ -651,7 +651,7 @@ export const getBotConfig = query({
       ticketDefaultKind: guild.ticketDefaultKind ?? "support",
       // Kênh dán panel + cờ chờ dán: bot đọc để dựng panel, và cache config phải
       // rút TTL ngắn khi cờ đang chờ (xem hasPending trong bot/src/convex.js) —
-      // nếu không, bấm "Gửi panel" xong phải đợi tới 30 phút mới thấy.
+      // nếu không, bấm "Gửi panel" xong phải đợi tới 90 phút mới thấy.
       ticketPanelChannelId: guild.ticketPanelChannelId ?? null,
       ticketSendPanel: guild.ticketSendPanel ?? false,
       ticketPanelMessageId: guild.ticketPanelMessageId ?? null,
@@ -767,8 +767,8 @@ export const updateLockdown = mutation({
     if (!guild || !canManageGuild(user, guild))
       throw new Error("Không có quyền quản lý server này");
     // settingsChangedAt: bot đọc lockdownEnabled/lockdownMinutes từ bundle cache
-    // (TTL 30 phút) — thiếu tín hiệu thì bật/tắt "khóa kênh khi raid" phải chờ
-    // tới 30 phút mới có tác dụng (cùng lớp bug welcome/goodbye 23/09).
+    // (TTL 90 phút) — thiếu tín hiệu thì bật/tắt "khóa kênh khi raid" phải chờ
+    // tới 90 phút mới có tác dụng (cùng lớp bug welcome/goodbye 23/09).
     const patch: Record<string, unknown> = {
       updatedAt: Date.now(),
       settingsChangedAt: Date.now(),
@@ -810,7 +810,7 @@ export const resetHeat = mutation({
     // settingsChangedAt là BẮT BUỘC ở đây: cờ heatResetRequested được bot đọc
     // qua bundle cache, mà `hasPending` phía bot chỉ rút ngắn TTL khi bản cache
     // ĐÃ có cờ — lần yêu cầu đầu tiên (false → true) không được rút ngắn, nên
-    // nút "Xóa nhiệt" sẽ đứng im tới 30 phút nếu thiếu tín hiệu này.
+    // nút "Xóa nhiệt" sẽ đứng im tới 90 phút nếu thiếu tín hiệu này.
     await ctx.db.patch(guild._id, {
       heatResetRequested: true,
       heatResetUserId: userId ?? undefined,
@@ -834,7 +834,7 @@ export const requestUnlock = mutation({
       throw new Error("Không có quyền quản lý server này");
     // settingsChangedAt: bot chỉ thấy lockdownRequested qua bundle cache. Khi
     // đang khóa thì TTL tự ngắn (lockdownUntil tương lai), nhưng ca "khóa đã hết
-    // hạn mà kênh chưa mở" lại rơi vào TTL 30 phút → nút Mở khóa đứng im.
+    // hạn mà kênh chưa mở" lại rơi vào TTL 90 phút → nút Mở khóa đứng im.
     await ctx.db.patch(guild._id, {
       lockdownRequested: true,
       updatedAt: Date.now(),
@@ -937,7 +937,7 @@ export const setAutomod = mutation({
  *
  * `settingsChangedAt` được set cho từng guild để bot nhận ngay qua
  * `bot_tick:getPendingJobs` (xem bot/src/tick.js) — thiếu nó thì đổi cấu
- * hình sẽ chờ tới hết TTL cache 30 phút, đúng lớp lỗi 23/09.
+ * hình sẽ chờ tới hết TTL cache 90 phút, đúng lớp lỗi 23/09.
  */
 export const setAntinukeGlobalBatch = mutation({
   args: {
@@ -1134,7 +1134,7 @@ export const botSyncGuilds = mutation({
         version: v.string(),
         ownerName: v.optional(v.string()),
         ownerAvatarUrl: v.optional(v.string()),
-        /** Sức khỏe AI (đợt 12) — đi nhờ vòng sync 60s, không tốn function call thêm. */
+        /** Sức khỏe AI (đợt 12) — đi nhờ vòng sync 180s, không tốn function call thêm. */
         aiHealth: v.optional(
           v.object({
             available: v.boolean(),

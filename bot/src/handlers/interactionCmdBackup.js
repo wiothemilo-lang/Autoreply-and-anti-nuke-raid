@@ -185,8 +185,8 @@ async function backup(store, interaction, guild) {
       store.invalidate(guildId);
       return interaction.reply({
         content: github
-          ? "✅ Đã yêu cầu tạo backup (đẩy lên GitHub của chủ bot) — bot thực hiện trong ~20 giây. Xem kết quả: `/backup list`"
-          : "✅ Đã yêu cầu tạo backup (chỉ lưu trên Convex) — bot thực hiện trong ~20 giây. Xem kết quả: `/backup list`",
+          ? "✅ Đã yêu cầu tạo backup (đẩy lên GitHub của chủ bot) — bot thực hiện trong ~3 phút. Xem kết quả: `/backup list`"
+          : "✅ Đã yêu cầu tạo backup (chỉ lưu trên Convex) — bot thực hiện trong ~3 phút. Xem kết quả: `/backup list`",
         ephemeral: true,
       });
     } catch (e) {

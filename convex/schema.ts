@@ -488,7 +488,7 @@ export default defineSchema({
      * `updatedAt` bị chính bot bump mỗi lượt sync/heartbeat nên không dùng làm tín
      * hiệu "cấu hình vừa đổi" được. Vòng tick của bot đọc field này để xoá cache
      * config của đúng guild vừa sửa: không có nó thì thay đổi từ dashboard phải
-     * chờ hết TTL cache (30 phút) mới tới bot, trong khi giao diện hứa "khoảng 3
+     * chờ hết TTL cache (90 phút) mới tới bot, trong khi giao diện hứa "khoảng 3
      * phút" — người dùng tưởng tính năng hỏng (bug thật 23/09, welcome/goodbye).
      */
     settingsChangedAt: v.optional(v.number()),
@@ -735,7 +735,7 @@ export default defineSchema({
     /** ID backup trước đó (dùng cho diff). */
     previousBackupId: v.optional(v.string()),
     /**
-     * Mã khôi phục (capability) của RIÊNG bản backup này — 130 bit ngẫu nhiên,
+     * Mã khôi phục (capability) của RIÊNG bản backup này — 125 bit ngẫu nhiên,
      * sinh 1 lần lúc lưu. Đây là đường cứu hộ khi chủ server ĐÃ MẤT quyền với
      * server gốc (server bị nuke/kick, hoặc xoá server cũ dựng server mới):
      * chỉ cần dán mã này vào trang "Tra cứu backup" là khôi phục được vào bất kỳ
@@ -743,7 +743,7 @@ export default defineSchema({
      *
      * Vì sao KHÔNG dùng luôn `_id` của Convex làm mã: tra cứu theo id nội bộ
      * buộc phải phát tán id (ảnh chụp màn hình, log, lỗi) và id đó là thứ ta
-     * không muốn lộ. Mã riêng 130 bit không đoán được, chủ server xoay được
+     * không muốn lộ. Mã riêng 125 bit không đoán được, chủ server xoay được
      * bằng cách xoá bản backup cũ, và tra cứu KHÔNG trả về `guildId` nên biết
      * mã cũng không lộ id server gốc.
      */
@@ -1006,7 +1006,7 @@ export default defineSchema({
     botApplicationId: v.optional(v.string()),
     /** Seed cho chìa khóa chức năng (botFunc): các action nguy hiểm (OAuth exchange, AI chat) yêu cầu funcKey. */
     funcSeed: v.optional(v.string()),
-    /** Sức khỏe AI (đợt 12): tổng hợp từ aiStats() của bot — gộp vào vòng sync 60s sẵn có (0 function call thêm). Chỉ owner xem qua Admin. */
+    /** Sức khỏe AI (đợt 12): tổng hợp từ aiStats() của bot — gộp vào vòng sync 180s sẵn có (0 function call thêm). Chỉ owner xem qua Admin. */
     aiHealth: v.optional(
       v.object({
         available: v.boolean(),
