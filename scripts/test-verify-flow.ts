@@ -22,6 +22,7 @@ import {
 import { complete as completeAction } from "../convex/verifyActions";
 import { authorize as preflightAuthorize } from "../convex/verifyPreflightData";
 import { ipapiLooksValid } from "../convex/verifyPreflight";
+import { createIpBan, ipBanSummary, listIpBans } from "../convex/verifyBans";
 import { computeBotKey } from "../convex/botAuth";
 import {
   VERIFY_CONSENT_VERSION,
@@ -188,23 +189,29 @@ const deleteH = (deleteUserVerifyData as any)._handler;
 const retentionH = (botRunRetention as any)._handler;
 const completeH = (completeAction as any)._handler;
 const preflightH = (preflightAuthorize as any)._handler;
+const bansH = (listIpBans as any)._handler;
+const banSummaryH = (ipBanSummary as any)._handler;
+const createBanH = (createIpBan as any)._handler;
 
 const DASH_TOKEN = "dashboard-token-test";
 
 /** Dựng user + phiên dashboard hợp lệ để test các query cần quyền. */
-function login(tables: Record<string, Row[]>) {
+function login(tables: Record<string, Row[]>, opts: { id?: string; guildIds?: string[] } = {}) {
+  const id = opts.id ?? "user-dash";
+  const token = id === "user-dash" ? DASH_TOKEN : `token-${id}`;
   tables.users.push({
-    _id: "user-dash",
-    discordId: "999999999999999999",
-    manageableGuildIds: [GUILD],
+    _id: id,
+    discordId: id === "user-dash" ? "999999999999999999" : "888888888888888888",
+    manageableGuildIds: opts.guildIds ?? [GUILD],
   });
   tables.sessions.push({
-    _id: "sess-dash",
-    token: DASH_TOKEN,
-    userId: "user-dash",
+    _id: `sess-${id}`,
+    token,
+    userId: id,
     createdAt: Date.now(),
     authVersion: 1,
   });
+  return token;
 }
 
 /** Tạo phiên rồi trả token thô (chỉ test mới có token thô). */
@@ -759,6 +766,150 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     const { ctx } = makeCtx({ verifyWebEnabled: true });
     const denied = await linksH(ctx, { token: "khong-co-phien", guildId: GUILD });
     check("không đăng nhập → null", denied === null);
+  }
+
+  // ═══ 15. Chỉ admin của CHÍNH server đó đọc được dữ liệu IP/PII ═══
+  console.log("\n── phân quyền dữ liệu verify (IP hash, userId) ──");
+  {
+    const OTHER_GUILD = "987654321098765432";
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    login(tables);
+    tables.guilds.push({
+      _id: "g2",
+      discordId: OTHER_GUILD,
+      name: "Server Khác",
+      managers: [],
+    });
+    // Người đã đăng nhập nhưng không có Manage Server ở đâu cả.
+    const plainToken = login(tables, { id: "user-plain", guildIds: [] });
+
+    const { token } = await newSession(ctx, USER_A);
+    await runFinalize(ctx, token, signalsFor("203.0.113.80", "fp-acl", "ck-acl"));
+    tables.verifyLinks.push({
+      _id: "link-g1",
+      guildId: GUILD,
+      userId: USER_A,
+      linkedUserId: USER_B,
+      score: 70,
+      reasons: [],
+      status: "candidate",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastSignalAt: Date.now(),
+    });
+    tables.verifyLinks.push({
+      _id: "link-g2",
+      guildId: OTHER_GUILD,
+      userId: USER_A,
+      linkedUserId: USER_B,
+      score: 70,
+      reasons: [],
+      status: "candidate",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastSignalAt: Date.now(),
+    });
+    tables.ipBans.push({
+      _id: "ban-g1",
+      guildId: GUILD,
+      ipHash: "c".repeat(64),
+      scope: "ip",
+      reason: "test",
+      createdBy: "admin",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 86_400_000,
+      evidenceUserId: USER_A,
+      active: true,
+    });
+    tables.ipBans.push({
+      _id: "ban-g2",
+      guildId: OTHER_GUILD,
+      ipHash: "d".repeat(64),
+      scope: "ip",
+      reason: "test",
+      createdBy: "admin",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 86_400_000,
+      active: true,
+    });
+    tables.verifySessions.push({
+      _id: "sess-other-guild",
+      tokenHash: "y".repeat(64),
+      guildId: OTHER_GUILD,
+      userId: USER_B,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 600_000,
+      status: "verified",
+      ipHash: "e".repeat(64),
+    });
+
+    // (a) Người thường đã đăng nhập: không đọc/xoá được gì.
+    check(
+      "non-admin: listSessions → null",
+      (await sessionsH(ctx, { token: plainToken, guildId: GUILD })) === null,
+    );
+    check(
+      "non-admin: listLinks → null",
+      (await linksH(ctx, { token: plainToken, guildId: GUILD })) === null,
+    );
+    check(
+      "non-admin: listIpBans → null",
+      (await bansH(ctx, { token: plainToken, guildId: GUILD })) === null,
+    );
+    check(
+      "non-admin: ipBanSummary → null",
+      (await banSummaryH(ctx, { token: plainToken, guildId: GUILD })) === null,
+    );
+    let deniedDelete = false;
+    try {
+      await deleteH(ctx, { token: plainToken, guildId: GUILD, userId: USER_A });
+    } catch {
+      deniedDelete = true;
+    }
+    check("non-admin: deleteUserVerifyData bị chặn", deniedDelete);
+
+    // (b) Admin guild A KHÔNG đọc/xoá được dữ liệu guild B (IDOR).
+    check(
+      "admin A: listSessions guild B → null",
+      (await sessionsH(ctx, { token: DASH_TOKEN, guildId: OTHER_GUILD })) === null,
+    );
+    check(
+      "admin A: listLinks guild B → null",
+      (await linksH(ctx, { token: DASH_TOKEN, guildId: OTHER_GUILD })) === null,
+    );
+    check(
+      "admin A: listIpBans guild B → null",
+      (await bansH(ctx, { token: DASH_TOKEN, guildId: OTHER_GUILD })) === null,
+    );
+    let deniedCrossDelete = false;
+    try {
+      await deleteH(ctx, { token: DASH_TOKEN, guildId: OTHER_GUILD, userId: USER_A });
+    } catch {
+      deniedCrossDelete = true;
+    }
+    check("admin A: xoá dữ liệu guild B bị chặn", deniedCrossDelete);
+
+    // (c) Không được ban bằng phiên của guild khác.
+    let deniedCrossBan = false;
+    try {
+      await createBanH(ctx, {
+        token: DASH_TOKEN,
+        guildId: GUILD,
+        sessionId: "sess-other-guild",
+      });
+    } catch {
+      deniedCrossBan = true;
+    }
+    check("admin A: ban bằng session guild B bị chặn", deniedCrossBan);
+
+    // (d) Admin guild A chỉ thấy dữ liệu guild A, và payload đã tối giản.
+    const mine = await bansH(ctx, { token: DASH_TOKEN, guildId: GUILD });
+    check("admin A: chỉ thấy ban của guild A", Array.isArray(mine) && mine.length === 1);
+    check("admin A: KHÔNG nhận ipHash đầy đủ", mine?.[0] && !("ipHash" in mine[0]));
+    check("admin A: KHÔNG nhận evidenceUserId", mine?.[0] && !("evidenceUserId" in mine[0]));
+    check("admin A: vẫn có ipHashShort", typeof mine?.[0]?.ipHashShort === "string");
+    const summary = await banSummaryH(ctx, { token: DASH_TOKEN, guildId: GUILD });
+    check("admin A: summary chỉ đếm guild A", summary?.active === 1, summary);
   }
 
   console.log(`\n${pass}/${pass + fail} assertion xanh`);

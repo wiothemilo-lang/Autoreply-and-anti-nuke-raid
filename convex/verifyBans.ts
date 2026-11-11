@@ -43,14 +43,18 @@ export const listIpBans = query({
       .take(LIST_TAKE);
     return rows.map((row) => ({
       id: row._id,
+      /**
+       * CHỈ 12 ký tự đầu — đủ để admin đối chiếu giữa các dòng, không đủ để
+       * đối chiếu ngược. Không trả `ipHash` đầy đủ hay `evidenceUserId`:
+       * UI không dùng, còn `revokeIpBan` nhận `id` và đọc hash phía server.
+       * Giảm PII/hash trên đường truyền là mặc định của panel này.
+       */
       ipHashShort: row.ipHash.slice(0, 12),
-      ipHash: row.ipHash,
       scope: row.scope,
       reason: row.reason,
       createdBy: row.createdBy,
       createdAt: row.createdAt,
       expiresAt: row.expiresAt,
-      evidenceUserId: row.evidenceUserId ?? null,
       source: row.source ?? "manual",
       active: row.active && row.expiresAt > now,
     }));
