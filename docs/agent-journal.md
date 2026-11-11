@@ -2,6 +2,12 @@
 
 ## Đang dở
 
+- 🚧 **Verify web đã merge nhưng CHƯA bật được** (PR #102, `b90f6c7`): cần đặt
+  `IP_HASH_SECRET` (bắt buộc — thiếu thì mọi phiên `failed: missing_secret`) và
+  `IPINTEL_API_KEY` (khuyến nghị — thiếu thì không phát hiện VPN/proxy/Tor) trong
+  Convex env, `DASHBOARD_URL` trong env bot VPS, rồi mới bật `verifyWebEnabled`.
+  Chưa có test tích hợp với ipapi.is thật (chỉ mock `parseIntel` + policy thuần).
+
 - 📋 **Nợ sau 5 đợt audit (50 subagent)** — chưa làm vì cần đổi schema/hành vi hoặc
   rủi ro trung bình: `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk
   backup lớn; dedupe `useGuildPlan`/`useSessionMe`; gom hook watch job của
@@ -137,6 +143,14 @@
 - 📁 Gom trùng: `cleanKeywords`/`cleanChannels` (autoreplies), `findDefaultWebhook` (3 bản), `jobOf()` cho 4 literal job ticket trong `bot_tick`, `clipField` trong `ticketKinds`, `ensureBotStatus` chưa gom (nợ); `guildStats.StatEvent.punish` + `incidents.reason` là field ghi-không-đọc → xoá.
 - 🧪 Kiểm chứng: **89/89 CJS** (143,1s) · **31/31 TS** (5,2s) · typecheck · lint · format:check · 10 cổng tĩnh sạch (convex-contract **509 export**, −24). Test cập nhật: bỏ case `botKinds`/`listChannelLocks`/classifyViolation, nới check `relaySignatures`; CSV chưa có suite riêng → ghi nợ test.
 - ▶️ Tiếp theo: PR `refactor/dead-code-convex`; đợt 4/5 — `src/` web (bundle + hook trùng + panel chết).
+
+## 2026-11-11 — Xác minh web kiểu Double Counter (IP/VPN/alt/ban)
+
+- ✅ Xong: phương thức verify thứ ba `web` — trang `/verify/:token` thu fingerprint canvas/WebGL + cookie first-party, kiểm tra người thật vô hình (honeypot, dwell ≥1,5s, `navigator.webdriver`); `POST /verify/complete` đọc IP từ `x-forwarded-for` (KHÔNG bao giờ từ body), CORS allowlist, rate-limit dùng chung `geoGuard`; `verifyPolicy.ts` quyết định IP ban → ban evasion → VPN → link mềm → allow; HMAC tách miền guild/global (không lưu IP thô); ban IP 1..90 ngày (mặc định 7); bot thi hành grant có fencing + đồng bộ `guildBans`; dashboard `VerifyWebCard`; mục 10 chính sách riêng tư VI/EN/DE.
+- 🐛 Bug thật khi tự review: `guilds.getGuild`/`getBotConfig` thiếu field mới → bot không thấy `verifyWebEnabled`; `runDailyMaintenance` gọi `client.guilds.cache.values()` làm sập tick trên harness không có `.values()`; bot gọi `verify:botSyncGuildBan` trong khi function nằm ở `verifyBans:*` (hợp đồng bot⇄Convex bắt được); i18n trùng key `Lỗi` (tsc TS1117); `VerifyPage` thiếu `<main tabIndex={-1}>` (skip link).
+- 📁 File đụng: `convex/{verify,verifyPolicy,verifyCrypto,verifyActions,verifyBans,http,schema,bot_tick,guilds,altDetection}.ts` + `guilds/updateSettings.ts`, `bot/src/{verifyWeb,tick}.js` + 4 handler, `src/pages/VerifyPage.tsx`, `src/components/dashboard/{VerifyWebCard,VerifyPanel,AltDetectionPanel}.tsx`, `src/lib/{types,routes,seo,legalContent,i18n.en,i18n.de}`, `docs/{verify-ip-architecture,repo-map}.md`, `AGENTS.md`, `Dockerfile.web`, `vercel.json`, `public/robots.txt`, 4 suite mới.
+- 🧪 Kiểm chứng: CJS **90/90** (142,6s) · TS **34/34** (5,2s) · coverage 95,73% dòng / 98,75% hàm / 81,02% nhánh + `coverage:floor` đạt · tsc/lint/format sạch · 10 cổng tĩnh xanh · PR #102 merge rebase (`b90f6c7`).
+- ▶️ Tiếp theo: đặt `IP_HASH_SECRET` + `IPINTEL_API_KEY` trong Convex env, `DASHBOARD_URL` trong env bot VPS, rồi mới bật `verifyWebEnabled` trên server thật.
 
 ## 2026-11-10 (7) — Dọn code rác đợt 2/5: handlers + commands
 
