@@ -70,6 +70,11 @@ const COPY: Record<Lang, Copy> = {
       description:
         "Gói Premium của Protogon hiện tạm ngừng bán vì chưa đủ điều kiện pháp lý để giao dịch. Gói Miễn phí vẫn dùng được cho mọi server.",
     },
+    verify: {
+      title: "Xác minh thành viên — Protogon",
+      description:
+        "Xác minh thành viên qua web: kiểm tra thiết bị và kết nối để chặn tài khoản giả, VPN và tài khoản phụ.",
+    },
     auth: {
       title: "Đăng nhập — Protogon",
       description: "Đăng nhập an toàn bằng Discord để quản lý các server của bạn trên Protogon.",
@@ -132,6 +137,11 @@ const COPY: Record<Lang, Copy> = {
       title: "Premium plans temporarily unavailable — Protogon",
       description:
         "Protogon Premium plans are temporarily not for sale because selling is not legally possible yet. The free plan remains available for every server.",
+    },
+    verify: {
+      title: "Member verification — Protogon",
+      description:
+        "Web-based member verification: checks device and connection signals to block fake accounts, VPNs and alts.",
     },
     auth: {
       title: "Sign in — Protogon",
@@ -196,6 +206,11 @@ const COPY: Record<Lang, Copy> = {
       title: "Premium-Tarife vorübergehend nicht erhältlich — Protogon",
       description:
         "Die Premium-Tarife von Protogon sind vorübergehend nicht käuflich, da ein Verkauf derzeit rechtlich nicht möglich ist. Der kostenlose Tarif bleibt für jeden Server verfügbar.",
+    },
+    verify: {
+      title: "Mitgliederverifizierung — Protogon",
+      description:
+        "Webbasierte Mitgliederverifizierung: prüft Geräte- und Verbindungssignale, um Fake-Accounts, VPNs und Alt-Accounts zu blockieren.",
     },
     auth: {
       title: "Anmelden — Protogon",

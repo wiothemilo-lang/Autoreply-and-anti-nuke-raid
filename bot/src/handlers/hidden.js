@@ -393,14 +393,21 @@ async function processVerifyPanelItems(client, store, items) {
           "Chưa cấu hình đủ 2 role xác minh (chưa xác minh/đã xác minh) — hãy chọn role trong phần Xác minh trước",
         );
       }
-      const method = item.verifyMethod === "captcha" ? "captcha" : "button";
+      const method =
+        item.verifyMethod === "captcha"
+          ? "captcha"
+          : item.verifyMethod === "web"
+            ? "web"
+            : "button";
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle("✅ Xác minh thành viên")
         .setDescription(
           method === "captcha"
             ? "Nhấn nút bên dưới để nhận mã xác minh qua DM, sau đó nhập mã trong kênh này."
-            : "Nhấn nút bên dưới để xác minh và vào server.",
+            : method === "web"
+              ? "Nhấn nút bên dưới để nhận link xác minh qua DM. Trang xác minh sẽ tự kiểm tra kết nối và thiết bị của bạn."
+              : "Nhấn nút bên dưới để xác minh và vào server.",
         )
         .setFooter({ text: "Protogon · Verify" });
       const row = new ActionRowBuilder().addComponents(
@@ -409,10 +416,15 @@ async function processVerifyPanelItems(client, store, items) {
               .setCustomId("verify_request_captcha")
               .setLabel("Nhận mã xác minh 🔑")
               .setStyle(ButtonStyle.Primary)
-          : new ButtonBuilder()
-              .setCustomId("verify_confirm")
-              .setLabel("Xác minh ✅")
-              .setStyle(ButtonStyle.Success),
+          : method === "web"
+            ? new ButtonBuilder()
+                .setCustomId("verify_web_start")
+                .setLabel("Xác minh qua web 🔐")
+                .setStyle(ButtonStyle.Primary)
+            : new ButtonBuilder()
+                .setCustomId("verify_confirm")
+                .setLabel("Xác minh ✅")
+                .setStyle(ButtonStyle.Success),
       );
       await channel.send({ embeds: [embed], components: [row] });
       console.log(

@@ -89,6 +89,17 @@
       "note": "góp ý người dùng (báo lỗi/đề xuất) — không cần đăng nhập, chỉ chủ bot đọc được"
     },
     {
+      "path": "/verify",
+      "match": "prefix",
+      "seoKind": "verify",
+      "visibility": "private",
+      "index": false,
+      "sitemap": false,
+      "spaFallback": true,
+      "redirect": null,
+      "note": "member verification SPA - token in URL is the capability, never indexed"
+    },
+    {
       "path": "/monitor",
       "match": "exact",
       "seoKind": "monitor",

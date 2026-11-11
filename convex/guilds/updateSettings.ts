@@ -117,10 +117,15 @@ export const updateSettingsArgs = {
   rollbackEnabled: v.optional(v.boolean()),
   theme: v.optional(v.string()),
   verifyEnabled: v.optional(v.boolean()),
-  verifyMethod: v.optional(v.union(v.literal("button"), v.literal("captcha"))),
+  verifyMethod: v.optional(v.union(v.literal("button"), v.literal("captcha"), v.literal("web"))),
   verifyChannelId: v.optional(v.union(v.string(), v.null())),
   unverifiedRoleId: v.optional(v.union(v.string(), v.null())),
   verifiedRoleId: v.optional(v.union(v.string(), v.null())),
+  verifyWebEnabled: v.optional(v.boolean()),
+  ipBanAction: v.optional(v.union(v.literal("deny"), v.literal("ban"))),
+  /** Admin tick "hiểu rủi ro ban nhầm" — server tự đóng dấu thời gian. */
+  ipBanAcknowledged: v.optional(v.boolean()),
+  ipBanWhitelistHashes: v.optional(v.array(v.string())),
   verifyWelcomeEnabled: v.optional(v.boolean()),
   verifyWelcomeTitle: v.optional(v.union(v.string(), v.null())),
   verifyWelcomeDescription: v.optional(v.union(v.string(), v.null())),
@@ -545,6 +550,22 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   if (args.warnStrikePunish !== undefined) patch.warnStrikePunish = args.warnStrikePunish;
   if (args.verifyEnabled !== undefined) patch.verifyEnabled = args.verifyEnabled;
   if (args.verifyMethod !== undefined) patch.verifyMethod = args.verifyMethod;
+  if (args.verifyWebEnabled !== undefined) patch.verifyWebEnabled = args.verifyWebEnabled;
+  // Auto-ban theo IP là quyết định có rủi ro ban nhầm — bắt buộc admin đã tick
+  // xác nhận (một lần). Thiếu chốt này, API gọi thẳng có thể bật "ban" mà
+  // không ai đọc cảnh báo.
+  if (args.ipBanAction !== undefined) {
+    if (args.ipBanAction === "ban" && !guild.ipBanAcknowledgedAt && !args.ipBanAcknowledged) {
+      throw new Error("Hãy xác nhận bạn hiểu rủi ro ban nhầm trước khi bật tự động ban");
+    }
+    patch.ipBanAction = args.ipBanAction;
+  }
+  if (args.ipBanAcknowledged) patch.ipBanAcknowledgedAt = Date.now();
+  if (args.ipBanWhitelistHashes !== undefined) {
+    patch.ipBanWhitelistHashes = args.ipBanWhitelistHashes
+      .filter((h) => typeof h === "string" && /^[0-9a-f]{64}$/.test(h))
+      .slice(0, 100);
+  }
   if (args.verifyChannelId !== undefined) patch.verifyChannelId = args.verifyChannelId || undefined;
   if (args.unverifiedRoleId !== undefined)
     patch.unverifiedRoleId = args.unverifiedRoleId || undefined;

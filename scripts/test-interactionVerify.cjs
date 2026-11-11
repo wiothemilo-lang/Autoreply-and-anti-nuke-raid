@@ -37,6 +37,9 @@ const ctl = {
   analysis: { riskScore: 0, action: "pass", riskFactors: [] },
   analysisThrows: false,
   punish: { executed: false },
+  // Kết quả verifyWeb.startVerification trả về (test điều khiển từng nhánh).
+  webResult: { ok: true, reason: "sent", url: "https://x/verify/t" },
+  webCalls: 0,
 };
 const calls = {
   captchaSet: [],
@@ -58,6 +61,14 @@ const captchaMock = {
 };
 const utilMock = {
   sendLog: async (guild, config, embed) => calls.logs.push({ guildId: guild?.id, embed }),
+};
+// verifyWeb là module RIÊNG (đã có suite riêng test-verify-web-bot). Ở đây chỉ
+// cần biết handler gọi nó đúng lúc và phản ứng đúng với từng kết quả.
+const verifyWebMock = {
+  startVerification: async () => {
+    ctl.webCalls += 1;
+    return ctl.webResult;
+  },
 };
 const altMock = {
   analyzeNewMember: async () => {
@@ -109,6 +120,7 @@ Module._load = function (request, parent) {
     if (request === "../captchaStore") return captchaMock;
     if (request === "../altDetection") return altMock;
     if (request === "../util") return utilMock;
+    if (request === "../verifyWeb") return verifyWebMock;
   }
   return origLoad.apply(this, arguments);
 };
@@ -670,6 +682,142 @@ const sweepFn = () => calls.sweeps.get("interactionVerify").fn();
         /Đã xác minh thành công/.test(inter._replies[0].content),
       );
       ctl.analysisThrows = false;
+    }
+  }
+
+  // ══════════ handleVerifyWebStart — gửi lại link xác minh web ══════════
+  {
+    const webConfig = {
+      verifyEnabled: true,
+      verifyWebEnabled: true,
+      verifyMethod: "web",
+      unverifiedRoleId: "r-unv",
+      verifiedRoleId: "r-ver",
+    };
+
+    // Không có guild (DM) → im lặng, không ném.
+    {
+      const inter = mkInteraction({ guild: null });
+      let threw = false;
+      try {
+        await verify.handleVerifyWebStart(mkStore(webConfig), inter);
+      } catch {
+        threw = true;
+      }
+      check("webStart: không có guild → không ném", threw === false && inter._replies.length === 0);
+    }
+
+    // Tắt ở 3 mức khác nhau — phải cùng một câu, không lộ cấu hình nội bộ.
+    for (const [label, cfg] of [
+      ["verifyEnabled=false", { ...webConfig, verifyEnabled: false }],
+      ["verifyWebEnabled=false", { ...webConfig, verifyWebEnabled: false }],
+    ]) {
+      const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w1")), userId: "w1" });
+      await verify.handleVerifyWebStart(mkStore(cfg), inter);
+      check(`webStart: ${label} → báo đang tắt`, /đang tắt/.test(inter._replies[0].content));
+    }
+
+    // Server dùng phương thức khác → chỉ sang panel đúng, không tạo phiên.
+    {
+      const before = ctl.webCalls;
+      const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w2")), userId: "w2" });
+      await verify.handleVerifyWebStart(mkStore({ ...webConfig, verifyMethod: "button" }), inter);
+      check(
+        "webStart: phương thức không phải web → từ chối, KHÔNG tạo phiên",
+        /không dùng xác minh qua web/.test(inter._replies[0].content) && ctl.webCalls === before,
+      );
+    }
+
+    // Thiếu role chưa xác minh → không thể biết ai cần verify.
+    {
+      const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w3")), userId: "w3" });
+      await verify.handleVerifyWebStart(mkStore({ ...webConfig, unverifiedRoleId: null }), inter);
+      check(
+        "webStart: thiếu role Unverified → báo chưa cấu hình",
+        /Chưa cấu hình role/.test(inter._replies[0].content),
+      );
+    }
+
+    // Không tìm thấy thành viên (đã rời) → câu riêng.
+    {
+      const inter = mkInteraction({ guild: mkGuild("g1", null), userId: "w4" });
+      await verify.handleVerifyWebStart(mkStore(webConfig), inter);
+      check(
+        "webStart: không tìm thấy thành viên → báo rõ",
+        /Không tìm thấy thành viên/.test(inter._replies[0].content),
+      );
+    }
+
+    // Đã xác minh rồi (không còn role Unverified) → không gửi link vô ích.
+    {
+      const before = ctl.webCalls;
+      const member = mkMember("w5", { hasUnverified: false, hasVerified: true });
+      const inter = mkInteraction({ guild: mkGuild("g1", member), userId: "w5" });
+      await verify.handleVerifyWebStart(mkStore(webConfig), inter);
+      check(
+        "webStart: đã xác minh → không tạo phiên mới",
+        /đã xác minh rồi/.test(inter._replies[0].content) && ctl.webCalls === before,
+      );
+    }
+
+    // Gửi thành công.
+    {
+      ctl.webResult = { ok: true, reason: "sent", url: "https://x/verify/t" };
+      const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w6")), userId: "w6" });
+      await verify.handleVerifyWebStart(mkStore(webConfig), inter);
+      check(
+        "webStart: gửi được → báo đã gửi link qua DM",
+        /Đã gửi link xác minh qua DM/.test(inter._replies[0].content),
+      );
+    }
+
+    // Người dùng chặn DM — phải hướng dẫn bật DM, không phải "thử lại sau".
+    {
+      ctl.webResult = { ok: false, reason: "dm_blocked" };
+      const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w7")), userId: "w7" });
+      await verify.handleVerifyWebStart(mkStore(webConfig), inter);
+      check(
+        "webStart: DM bị chặn → hướng dẫn bật DM + chờ 1 phút",
+        /Không gửi được DM/.test(inter._replies[0].content) &&
+          /1 phút/.test(inter._replies[0].content),
+      );
+    }
+
+    // Lỗi khác (Convex chưa đồng bộ, server lỗi…) → câu chung, không lộ chi tiết.
+    {
+      ctl.webResult = { ok: false, reason: "session_failed" };
+      const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w8")), userId: "w8" });
+      await verify.handleVerifyWebStart(mkStore(webConfig), inter);
+      check(
+        "webStart: lỗi tạo phiên → câu chung, không lộ reason",
+        /Chưa tạo được phiên/.test(inter._replies[0].content) &&
+          !/session_failed/.test(inter._replies[0].content),
+      );
+    }
+
+    // ══════════ handleVerifyConfirm chặn đường tắt khi bật web ══════════
+    {
+      const before = ctl.webCalls;
+      const member = mkMember("w9");
+      const inter = mkInteraction({ guild: mkGuild("g1", member), userId: "w9" });
+      await verify.handleVerifyConfirm(mkStore(webConfig), inter);
+      check(
+        "confirm: server dùng web → KHÔNG cấp role thẳng (chặn bỏ qua bước thu tín hiệu)",
+        /Xác minh qua web/.test(inter._replies[0].content) &&
+          member._added.length === 0 &&
+          ctl.webCalls === before,
+      );
+    }
+    {
+      // verifyMethod=web nhưng cờ tắt → đường cũ vẫn chạy (không khoá người dùng
+      // ở role Unverified khi tính năng chưa bật).
+      const member = mkMember("w10");
+      const inter = mkInteraction({ guild: mkGuild("g1", member), userId: "w10" });
+      await verify.handleVerifyConfirm(mkStore({ ...webConfig, verifyWebEnabled: false }), inter);
+      check(
+        "confirm: method=web nhưng cờ tắt → vẫn xác minh bình thường",
+        /Đã xác minh thành công/.test(inter._replies[0].content),
+      );
     }
   }
 

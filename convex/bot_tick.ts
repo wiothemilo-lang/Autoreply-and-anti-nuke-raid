@@ -299,6 +299,27 @@ export const getPendingJobs = query({
     // logic — hai bản chọn job riêng sẽ lệch nhau (autoClose/closeChannel/purge).
     const tickets = await buildTicketJobs(ctx, guilds, nowMs);
 
+    // Xác minh web (Double Counter style): phiên đã có kết quả nhưng bot chưa thi
+    // hành (cấp role / kick / ban / timeout). Đọc thẳng bảng bằng index boolean —
+    // bot tự lọc guild mình đang ở như mọi job khác.
+    const verifyGrants = (
+      await ctx.db
+        .query("verifySessions")
+        .withIndex("by_grantPending", (q) => q.eq("grantPending", true))
+        .take(60)
+    ).map((row) => ({
+      id: row._id,
+      guildId: row.guildId,
+      userId: row.userId,
+      decision: row.decision ?? "deny",
+      reason: row.reason ?? "",
+      punish: row.punish ?? null,
+      riskScore: row.riskScore ?? 0,
+      linkedUserId: row.linkedUserId ?? null,
+      createdAt: row.createdAt,
+      grantAttempts: row.grantAttempts ?? 0,
+    }));
+
     // Báo cáo ngày (đợt #4): cờ cron đặt, bot gửi trong tick kế tiếp rồi xoá cờ
     // bằng botSetReportAt. Cờ còn = bot chưa gửi (offline / tắt tạm) — giữ nguyên.
     const reports = guilds
@@ -315,6 +336,7 @@ export const getPendingJobs = query({
       selfDiagnose,
       threatFlags,
       tickets,
+      verifyGrants,
     };
   },
 });

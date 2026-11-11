@@ -69,6 +69,11 @@ import type * as status from "../status.js";
 import type * as threatIntel from "../threatIntel.js";
 import type * as ticketKinds from "../ticketKinds.js";
 import type * as tickets from "../tickets.js";
+import type * as verify from "../verify.js";
+import type * as verifyActions from "../verifyActions.js";
+import type * as verifyBans from "../verifyBans.js";
+import type * as verifyCrypto from "../verifyCrypto.js";
+import type * as verifyPolicy from "../verifyPolicy.js";
 import type * as webhooks from "../webhooks.js";
 
 import type {
@@ -139,6 +144,11 @@ declare const fullApi: ApiFromModules<{
   threatIntel: typeof threatIntel;
   ticketKinds: typeof ticketKinds;
   tickets: typeof tickets;
+  verify: typeof verify;
+  verifyActions: typeof verifyActions;
+  verifyBans: typeof verifyBans;
+  verifyCrypto: typeof verifyCrypto;
+  verifyPolicy: typeof verifyPolicy;
   webhooks: typeof webhooks;
 }>;
 

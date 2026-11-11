@@ -40,6 +40,8 @@ const StatsPage = lazy(() => import("./pages/StatsPage"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 const DonatePage = lazy(() => import("./pages/DonatePage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
+// Xác minh web kiểu Double Counter — công khai, chỉ cần token trong URL.
+const VerifyPage = lazy(() => import("./pages/VerifyPage"));
 
 function RouteMetadataSync({ lang }: { lang: "vi" | "en" | "de" }) {
   const { pathname } = useLocation();
@@ -130,7 +132,8 @@ export default function App() {
   // trên landing vì landing có header riêng to hơn (components/landing/Nav
   // đã cắm cùng `PagesMenu` vào cụm bên phải) — hai header chồng nhau sẽ
   // thành hai tầng dính trên đỉnh.
-  const transient = pathname === "/auth" || pathname === "/discord/callback";
+  const transient =
+    pathname === "/auth" || pathname === "/discord/callback" || pathname.startsWith("/verify/");
   const isLanding = pathname === "/";
   return (
     <>
@@ -167,6 +170,9 @@ export default function App() {
                 khách chưa đăng nhập. */}
           <Route path="/donate" element={<DonatePage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
+          {/* Xác minh thành viên qua web: token trong URL là capability duy nhất,
+              không cần đăng nhập. Ẩn nav (transient) để người dùng tập trung. */}
+          <Route path="/verify/:token" element={<VerifyPage />} />
           {/* /premium tạm ẩn vì chưa thể bán hợp pháp: route vẫn giữ để link cũ
               và link quay về từ cổng thanh toán không 404, nhưng đưa thẳng về
               trang chủ. Hosting cũng redirect 301 (vercel.json + Dockerfile.web). */}

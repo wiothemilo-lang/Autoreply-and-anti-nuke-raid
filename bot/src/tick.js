@@ -279,6 +279,48 @@ async function runBackupJobs(client, store, items) {
  */
 let tickRunning = false;
 
+/**
+ * Mốc lần bảo trì gần nhất (trong RAM). Restart reset → chạy lại sớm, vô hại vì
+ * mọi thao tác đều idempotent.
+ */
+let lastMaintenanceAt = 0;
+const MAINTENANCE_INTERVAL_MS = 24 * 3600_000;
+
+/**
+ * Bảo trì 1 lần/ngày: dọn dữ liệu verify quá hạn + quét bù danh sách ban.
+ *
+ * Vì sao KHÔNG dùng cron Convex: cron chỉ được tính + đặt cờ (docs/cron-migration.md);
+ * xoá dữ liệu và gọi Discord API là side effect thật, phải nằm trong tiến trình bot.
+ */
+async function runDailyMaintenance(client, store) {
+  if (Date.now() - lastMaintenanceAt < MAINTENANCE_INTERVAL_MS) return;
+  lastMaintenanceAt = Date.now();
+  try {
+    const result = await store.client.mutation("verify:botRunRetention", {});
+    if (result?.deleted) {
+      console.log(`[tick:retention] xoá ${result.deleted} bản ghi verify quá hạn`);
+    }
+  } catch (e) {
+    console.error("[tick:retention]", e?.message || e);
+  }
+  // Quét bù ban thực hiện tay trên UI Discord khi bot offline — không có bước này
+  // thì `guildBans` thiếu, ban evasion không bị phát hiện.
+  const verifyWeb = require("./verifyWeb");
+  const cache = client.guilds?.cache;
+  // `Collection` của discord.js có `.values()`; harness test dùng Map/giả lập nên
+  // phải chấp nhận cả hai — thiếu bước kiểm tra này làm sập cả lượt tick.
+  const guilds = typeof cache?.values === "function" ? [...cache.values()] : [];
+  for (const guild of guilds) {
+    try {
+      const config = await store.getConfig(guild.id);
+      if (!config?.verifyWebEnabled) continue;
+      await verifyWeb.resyncGuildBans(store, guild);
+    } catch {
+      // Guild lỗi không được chặn các guild còn lại.
+    }
+  }
+}
+
 async function runTickOnce(client, store, heat) {
   if (tickRunning) {
     console.warn("[tick] lượt trước chưa xong — bỏ lượt này để tránh chồng chéo");
@@ -355,6 +397,21 @@ async function runTickOnceInner(client, store, heat) {
       console.error("[tick:tickets]", e?.message || e);
     }
     try {
+      const done = await require("./verifyWeb").processVerifyGrants(
+        client,
+        store,
+        jobs.verifyGrants ?? [],
+      );
+      if (done > 0) console.log(`[tick:verifyWeb] thi hành ${done} phiên xác minh`);
+    } catch (e) {
+      console.error("[tick:verifyWeb]", e?.message || e);
+    }
+    try {
+      await runDailyMaintenance(client, store);
+    } catch (e) {
+      console.error("[tick:maintenance]", e?.message || e);
+    }
+    try {
       await runChannelLocks(client, store);
     } catch (e) {
       console.error("[tick:channelLock]", e?.message || e);
@@ -401,6 +458,18 @@ async function runTickOnceInner(client, store, heat) {
     await runChannelLocks(client, store);
   } catch (e) {
     console.error("[tick:channelLock:fallback]", e?.message || e);
+  }
+  try {
+    const grants = await store.client.query("verify:botPendingGrants", {});
+    const done = await require("./verifyWeb").processVerifyGrants(client, store, grants ?? []);
+    if (done > 0) console.log(`[tick:verifyWeb:fallback] thi hành ${done} phiên xác minh`);
+  } catch (e) {
+    console.error("[tick:verifyWeb:fallback]", e?.message || e);
+  }
+  try {
+    await runDailyMaintenance(client, store);
+  } catch (e) {
+    console.error("[tick:maintenance:fallback]", e?.message || e);
   }
   // Batch hỏng: vẫn giữ đường báo cáo cũ (quét theo cache config) — nếu không,
   // báo cáo ngày sẽ đứng im suốt thời gian batch lỗi.

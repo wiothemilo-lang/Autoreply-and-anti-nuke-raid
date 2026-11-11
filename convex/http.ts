@@ -115,4 +115,106 @@ http.route({ path: "/geo_lang", method: "GET", handler: geoLang });
 http.route({ path: "/geo_lang", method: "OPTIONS", handler: geoLang });
 http.route({ path: "/zalopay/callback", method: "POST", handler: zalopayCallback });
 
+// ═══ XÁC MINH WEB (Double Counter style) ════════════════════════════════════
+
+/**
+ * Origin được phép POST kết quả verify.
+ *
+ * Vì sao allowlist thay vì `*`: request mang token phiên trong body. Dù token
+ * tự nó là capability (không có cookie, không có session), một trang lạ đọc
+ * được token từ URL referrer rồi tự POST hộ sẽ đốt lượt verify của người dùng
+ * và ghi tín hiệu rác vào đồ thị identity. Chỉ domain của sản phẩm được gọi.
+ *
+ * `httpAction` chạy ở default runtime nên KHÔNG đọc được `process.env`; danh
+ * sách này là hằng số có chủ đích (đổi domain phải sửa file + deploy).
+ */
+const VERIFY_ORIGINS = new Set([
+  "https://protogon.freebuff.app",
+  "https://www.protogon.freebuff.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:8080",
+  "http://127.0.0.1:8080",
+]);
+
+function verifyCors(origin: string | null): Record<string, string> {
+  const allow = origin && VERIFY_ORIGINS.has(origin) ? origin : "";
+  const headers: Record<string, string> = {
+    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+    "access-control-max-age": "600",
+    vary: "origin",
+    "cache-control": "no-store",
+  };
+  if (allow) headers["access-control-allow-origin"] = allow;
+  return headers;
+}
+
+function verifyJson(body: unknown, origin: string | null, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", ...verifyCors(origin) },
+  });
+}
+
+/**
+ * POST /verify/complete — nhận tín hiệu trình duyệt, quyết định, trả kết quả.
+ *
+ * IP lấy từ `x-forwarded-for` (Convex chạy sau proxy) — KHÔNG BAO GIỜ từ body.
+ * Đây là ranh giới tin cậy quan trọng nhất của cả tính năng: nếu client tự khai
+ * IP thì kẻ bị ban chỉ cần gửi IP sạch là qua.
+ */
+const verifyComplete = httpAction(async (ctx, request) => {
+  const origin = request.headers.get("origin");
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: verifyCors(origin) });
+  }
+  // Origin lạ: từ chối trước khi parse body (chặn trang thứ ba POST hộ).
+  if (origin && !VERIFY_ORIGINS.has(origin)) {
+    return verifyJson({ ok: false, code: "forbidden_origin" }, origin, 403);
+  }
+
+  const ip = parseClientIp(request.headers.get("x-forwarded-for"));
+  if (!isPublicIp(ip) || !allowGeoRequest(ip)) {
+    return verifyJson({ ok: false, code: "rate_limited" }, origin, 429);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return verifyJson({ ok: false, code: "bad_request" }, origin, 400);
+  }
+
+  const token = typeof body.token === "string" ? body.token : "";
+  if (!token || token.length > 128) {
+    return verifyJson({ ok: false, code: "not_found" }, origin, 200);
+  }
+
+  // UA lấy từ HEADER (client không sửa được qua JS) thay vì body.
+  const userAgent = request.headers.get("user-agent") ?? "";
+  const fingerprint = typeof body.fingerprint === "string" ? body.fingerprint : undefined;
+  const cookieId = typeof body.cookieId === "string" ? body.cookieId : undefined;
+  const consentVersion = typeof body.consentVersion === "string" ? body.consentVersion : undefined;
+
+  try {
+    const result = await ctx.runAction(internal.verifyActions.complete, {
+      token,
+      ip,
+      userAgent,
+      fingerprint,
+      cookieId,
+      human: body.human === true,
+      consentVersion,
+    });
+    return verifyJson(result, origin);
+  } catch {
+    // Không rò chi tiết lỗi hạ tầng ra trình duyệt.
+    return verifyJson({ ok: false, code: "server_error" }, origin, 500);
+  }
+});
+
+http.route({ path: "/verify/complete", method: "POST", handler: verifyComplete });
+http.route({ path: "/verify/complete", method: "OPTIONS", handler: verifyComplete });
+
 export default http;

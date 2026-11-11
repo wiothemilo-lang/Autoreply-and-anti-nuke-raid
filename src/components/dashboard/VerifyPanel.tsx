@@ -21,6 +21,7 @@ import type { GuildData } from "../../lib/types";
 import { getSessionToken } from "../../lib/discord";
 
 import { dateLocale, translate } from "../../lib/i18n";
+import VerifyWebCard from "./VerifyWebCard";
 const TOKEN = () => getSessionToken();
 
 export default function VerifyPanel({ data }: { data: GuildData }) {
@@ -174,25 +175,38 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
               <p className="mt-0.5 text-xs text-muted-foreground">
                 <b>Button</b> {translate("— thành viên bấm nút là xác minh xong ngay.")}{" "}
                 <b>Captcha</b>{" "}
-                {translate("— bot gửi mã qua DM, thành viên nhập lại mã trong kênh.")}{" "}
+                {translate("— bot gửi mã qua DM, thành viên nhập lại mã trong kênh.")} <b>Web</b>{" "}
+                {translate(
+                  "— bot gửi link qua DM; trang web kiểm tra thiết bị/kết nối, chặn VPN và tài khoản phụ.",
+                )}
               </p>
             </div>
           </div>
           <select
             value={g.verifyMethod}
-            onChange={(e) =>
+            onChange={(e) => {
+              const method = e.target.value as "button" | "captcha" | "web";
+              // Chọn "web" phải bật luôn cờ tính năng — thiếu cờ thì bot không
+              // gửi link và thành viên kẹt ở role Unverified.
               patch(
-                { verifyMethod: e.target.value as "button" | "captcha" },
+                method === "web"
+                  ? { verifyMethod: method, verifyWebEnabled: true }
+                  : { verifyMethod: method, verifyWebEnabled: false },
                 translate("Đã đổi phương thức xác minh"),
-              )
-            }
+              );
+            }}
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
           >
             <option value="button">{translate("🖱️ Button — bấm nút xác minh")}</option>
             <option value="captcha">{translate("🔑 Captcha — nhập mã từ DM")}</option>
+            <option value="web">
+              {translate("🛡️ Web — kiểm tra IP/thiết bị (Double Counter)")}
+            </option>
           </select>
         </div>
       )}
+
+      {g.verifyEnabled && g.verifyMethod === "web" && <VerifyWebCard data={data} />}
 
       {g.verifyEnabled && (
         <Card>
