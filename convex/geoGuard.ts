@@ -8,8 +8,8 @@
  * của MỌI người dùng thật.
  *
  * 3 lớp, tất cả đều RẺ và không chạm DB:
- *  1. Chuẩn hoá `x-forwarded-for` (bỏ cổng/ngoặc/zone, cắt độ dài) — đầu vào rác
- *     bị loại TRƯỚC khi tốn bất cứ thứ gì.
+ *  1. Chuẩn hoá `x-forwarded-for` — nằm ở `clientIp.ts` (dùng chung với verify,
+ *     lấy mục CUỐI thay vì mục đầu; xem chú thích ở đó).
  *  2. Chỉ nhận IP CÔNG CỘNG: loopback/riêng tư/link-local/multicast trả rỗng
  *     ngay, KHÔNG gọi upstream (bản cũ vẫn fetch vô ích cho những IP này).
  *  3. Trần sliding-window: mỗi IP 20 lượt/phút + trần toàn cục 300 lượt/phút mỗi
@@ -44,6 +44,17 @@ export const GEO_MAX_GLOBAL_PER_MIN = 300;
  */
 export const VERIFY_MAX_PER_IP_PER_MIN = 10;
 export const VERIFY_MAX_GLOBAL_PER_MIN = 300;
+
+/**
+ * Trần RIÊNG của `/verify/self-test`.
+ *
+ * Vì sao không dùng chung với `/verify/complete`: self-test là thao tác admin,
+ * mỗi lượt có thể gọi ipapi.is; nếu dùng chung bucket thì một admin bấm kiểm
+ * tra liên tục sẽ khoá đường xác minh của người dùng thật — đúng lỗi đã tách
+ * ở PR #106. 5 lượt/phút/IP là đủ cho debug.
+ */
+export const SELFTEST_MAX_PER_IP_PER_MIN = 5;
+export const SELFTEST_MAX_GLOBAL_PER_MIN = 30;
 
 type Limiter = {
   allow: (ip: string, now?: number) => boolean;
@@ -98,82 +109,7 @@ function createLimiter(maxPerIp: number, maxGlobal: number): Limiter {
 
 const geoLimiter = createLimiter(GEO_MAX_PER_IP_PER_MIN, GEO_MAX_GLOBAL_PER_MIN);
 const verifyLimiter = createLimiter(VERIFY_MAX_PER_IP_PER_MIN, VERIFY_MAX_GLOBAL_PER_MIN);
-
-/**
- * Lấy IP client từ `x-forwarded-for` (Convex chạy sau proxy, IP thật là mục đầu).
- * Trả "" khi không có/đầu vào vô lý — caller coi như IP không hợp lệ.
- */
-export function parseClientIp(raw: string | null | undefined): string {
-  const first = String(raw ?? "")
-    .split(",")[0]
-    ?.trim();
-  if (!first || first.length > 64) return "";
-  let ip = first;
-  if (ip.startsWith("[")) {
-    // IPv6 trong ngoặc, thường kèm cổng: "[2001:db8::1]:443"
-    const end = ip.indexOf("]");
-    if (end < 0) return "";
-    ip = ip.slice(1, end);
-  } else if (/^\d{1,3}(\.\d{1,3}){3}:\d+$/.test(ip)) {
-    ip = ip.slice(0, ip.indexOf(":")); // IPv4 kèm cổng: "1.2.3.4:5678"
-  }
-  const zone = ip.indexOf("%"); // IPv6 zone id: "fe80::1%eth0"
-  if (zone >= 0) ip = ip.slice(0, zone);
-  return ip.trim();
-}
-
-/** Parse IPv4 → 4 số; null nếu không đúng dạng. */
-function parseIpv4(ip: string): number[] | null {
-  const parts = ip.split(".");
-  if (parts.length !== 4) return null;
-  const out: number[] = [];
-  for (const part of parts) {
-    if (!/^\d{1,3}$/.test(part)) return null;
-    const n = Number(part);
-    if (n > 255) return null;
-    out.push(n);
-  }
-  return out;
-}
-
-/** Dải KHÔNG công cộng của IPv4 (loopback/riêng tư/CGNAT/link-local/multicast…). */
-function isNonPublicIpv4(quad: number[]): boolean {
-  const [a, b, c] = quad;
-  if (a === 0 || a === 10 || a === 127) return true; // this-network, private, loopback
-  if (a === 169 && b === 254) return true; // link-local
-  if (a === 172 && b >= 16 && b <= 31) return true; // private
-  if (a === 192 && b === 168) return true; // private
-  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-  if (a === 192 && b === 0 && c === 0) return true; // 192.0.0.0/24
-  if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
-  if (a >= 224) return true; // multicast + reserved + broadcast
-  return false;
-}
-
-/** IPv6 công cộng? (chỉ loại các dải rõ ràng không định tuyến ra Internet). */
-function isPublicIpv6(ip: string): boolean {
-  const lower = ip.toLowerCase();
-  if (!lower.includes(":")) return false;
-  if (!/^[0-9a-f:.]+$/.test(lower)) return false;
-  if (lower === "::" || lower === "::1") return false;
-  if (/^f[cd]/.test(lower)) return false; // fc00::/7 unique-local
-  if (/^fe[89ab]/.test(lower)) return false; // fe80::/10 link-local
-  if (lower.startsWith("ff")) return false; // multicast
-  // IPv4-mapped (::ffff:1.2.3.4) → áp đúng luật IPv4.
-  if (lower.startsWith("::ffff:")) {
-    const v4 = parseIpv4(lower.slice(7));
-    return v4 !== null && !isNonPublicIpv4(v4);
-  }
-  return true;
-}
-
-/** IP công cộng hợp lệ (đủ để gọi upstream)? */
-export function isPublicIp(ip: string): boolean {
-  if (!ip || ip.length > 64) return false;
-  if (ip.includes(":")) return isPublicIpv6(ip);
-  const quad = parseIpv4(ip);
-  return quad !== null && !isNonPublicIpv4(quad);
-}
+const selfTestLimiter = createLimiter(SELFTEST_MAX_PER_IP_PER_MIN, SELFTEST_MAX_GLOBAL_PER_MIN);
 
 /**
  * Còn lượt gọi upstream cho `/geo_lang`? Trả false nghĩa là caller phải trả đáp
@@ -187,8 +123,12 @@ export const allowGeoRequest = geoLimiter.allow;
  */
 export const allowVerifyRequest = verifyLimiter.allow;
 
-/** Chỉ dùng trong test: xoá sạch bộ đếm của CẢ HAI limiter. */
+/** Còn lượt chạy self-test? Bộ đếm tách riêng, không tiêu lượt verify. */
+export const allowVerifySelfTest = selfTestLimiter.allow;
+
+/** Chỉ dùng trong test: xoá sạch bộ đếm của CẢ BA limiter. */
 export function __resetGeoGuardForTest(): void {
   geoLimiter.reset();
   verifyLimiter.reset();
+  selfTestLimiter.reset();
 }

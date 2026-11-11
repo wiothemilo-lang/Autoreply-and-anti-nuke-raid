@@ -24,6 +24,7 @@ import type { Id } from "./_generated/dataModel";
 import { canManageGuild, getUserByToken } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import {
+  VERIFY_CONSENT_VERSION,
   VERIFY_SESSION_TTL_MS,
   clampBanDays,
   generateVerifyToken,
@@ -115,6 +116,10 @@ async function computeLinks(
       .withIndex("by_kind_valueHash", (q) =>
         q.eq("kind", signal.kind).eq("valueHash", signal.valueHash),
       )
+      // Chỉ so trong CÙNG guild: fingerprint/cookie/UA hash là global, nếu
+      // không lọc thì admin guild A thấy linkedUserId của người chỉ từng ở
+      // guild B — rò rỉ danh tính xuyên server ngoài phạm vi quản lý.
+      .filter((q) => q.eq(q.field("guildId"), guildId))
       .take(40);
     for (const row of rows) {
       if (row.userId === userId) continue;
@@ -426,7 +431,6 @@ export const finalize = internalMutation({
     uaHash: v.optional(v.string()),
     sharedIp: v.boolean(),
     human: v.boolean(),
-    consentVersion: v.optional(v.string()),
     intel: v.optional(
       v.object({
         country: v.optional(v.string()),
@@ -542,7 +546,10 @@ export const finalize = internalMutation({
       linkedUserId: topLink?.userId,
       linkScore: topLink?.score,
       linkReasons: topLink?.reasons.slice(0, 8),
-      consentVersion: args.consentVersion,
+      // Server tự gắn phiên bản consent — client không được khai để tránh
+      // "đồng ý phiên bản cũ" rồi trốn nghĩa vụ của phiên bản hiện tại.
+      consentVersion: VERIFY_CONSENT_VERSION,
+      consentAt: Date.now(),
       grantPending: true,
       grantAttempts: 0,
     });
@@ -732,8 +739,13 @@ export const listSessions = query({
       createdAt: row.createdAt,
       /** 12 ký tự đầu của hash IP — đủ để admin nhận diện, không đủ để đối chiếu ngược. */
       ipHashShort: row.ipHash ? row.ipHash.slice(0, 12) : null,
-      /** Hash đầy đủ chỉ dùng để đưa vào whitelist/ban qua UI. */
-      ipHash: row.ipHash ?? null,
+      /**
+       * Có hash IP để ban hay không. KHÔNG trả hash đầy đủ: UI chỉ cần biết
+       * nút "Ban IP" có bấm được không, còn `createIpBan` nhận `sessionId` và
+       * tự đọc hash phía server. Trả hash qua mạng là mở rộng bề mặt rò rỉ
+       * vô ích (bản cũ trả nguyên hash 64 ký tự).
+       */
+      canBanIp: Boolean(row.ipHash),
     }));
   },
 });
@@ -786,12 +798,132 @@ export const dismissLink = mutation({
   },
 });
 
+/** Trần xoá mỗi lượt — một mutation không được đọc/ghi vô hạn. */
+const DELETE_TAKE = 200;
+
 /**
- * Dọn dữ liệu quá hạn — bot gọi 1 lần/ngày từ tick (xem `botRunRetention`).
+ * Xoá dữ liệu verify của MỘT thành viên trong MỘT guild.
  *
- * Trần lưu giữ: 24 tháng cho đồ thị identity (bằng Double Counter), 7 ngày cho
- * phiên đã xong. Xoá cả `ipIntelCache` hết hạn để bảng không phình.
+ * Vì sao tách khỏi mutation: cùng logic được dùng bởi dashboard và (sau này)
+ * đường hỗ trợ; giữ một bản để không lệch hành vi.
+ *
+ * Nguyên tắc:
+ *  - Xoá hẳn phiên + tín hiệu + cạnh link (dữ liệu định danh).
+ *  - `verifyAudit` và `ipBans` là hồ sơ AN NINH: giữ bản ghi nhưng bỏ mọi
+ *    trường trỏ tới người dùng (`userId`, `sessionId`, `evidenceUserId`,
+ *    `details`). Xoá sạch sẽ mở đường cho kẻ bị ban xoá dấu vết rồi quay lại.
+ *  - Trả `truncated` khi chạm trần để caller biết còn phần chưa xoá.
  */
+async function purgeUserVerifyData(ctx: MutationCtx, guildId: string, userId: string) {
+  let sessions = 0;
+  let signals = 0;
+  let links = 0;
+  let audit = 0;
+  let bans = 0;
+
+  const sessionRows = await ctx.db
+    .query("verifySessions")
+    .withIndex("by_guildId_userId_createdAt", (q) => q.eq("guildId", guildId).eq("userId", userId))
+    .take(DELETE_TAKE);
+  for (const row of sessionRows) {
+    await ctx.db.delete(row._id);
+    sessions++;
+  }
+
+  const signalRows = await ctx.db
+    .query("verifySignals")
+    .withIndex("by_guildId_userId", (q) => q.eq("guildId", guildId).eq("userId", userId))
+    .take(DELETE_TAKE);
+  for (const row of signalRows) {
+    await ctx.db.delete(row._id);
+    signals++;
+  }
+
+  // Link lưu cặp đã sắp xếp nên người dùng có thể nằm ở một trong hai đầu.
+  const linksAsUser = await ctx.db
+    .query("verifyLinks")
+    .withIndex("by_guildId_userId", (q) => q.eq("guildId", guildId).eq("userId", userId))
+    .take(DELETE_TAKE);
+  for (const row of linksAsUser) {
+    await ctx.db.delete(row._id);
+    links++;
+  }
+  const linksAsLinked = await ctx.db
+    .query("verifyLinks")
+    .withIndex("by_guildId_linkedUserId", (q) =>
+      q.eq("guildId", guildId).eq("linkedUserId", userId),
+    )
+    .take(DELETE_TAKE);
+  for (const row of linksAsLinked) {
+    await ctx.db.delete(row._id);
+    links++;
+  }
+
+  const auditRows = await ctx.db
+    .query("verifyAudit")
+    .withIndex("by_guildId_userId", (q) => q.eq("guildId", guildId).eq("userId", userId))
+    .take(DELETE_TAKE);
+  for (const row of auditRows) {
+    await ctx.db.patch(row._id, {
+      userId: undefined,
+      sessionId: undefined,
+      details: undefined,
+    });
+    audit++;
+  }
+
+  const banRows = await ctx.db
+    .query("ipBans")
+    .withIndex("by_guildId_evidenceUserId", (q) =>
+      q.eq("guildId", guildId).eq("evidenceUserId", userId),
+    )
+    .take(DELETE_TAKE);
+  for (const row of banRows) {
+    await ctx.db.patch(row._id, {
+      evidenceUserId: undefined,
+      evidenceSessionId: undefined,
+    });
+    bans++;
+  }
+
+  const truncated = [
+    sessionRows.length,
+    signalRows.length,
+    linksAsUser.length,
+    linksAsLinked.length,
+    auditRows.length,
+    banRows.length,
+  ].some((n) => n >= DELETE_TAKE);
+
+  return { sessions, signals, links, audit, bans, truncated };
+}
+
+/**
+ * Dashboard: xoá dữ liệu verify của một thành viên (yêu cầu quyền riêng tư).
+ *
+ * Chỉ admin guild hiện tại. Không nhận `botKey`: đây là thao tác của người
+ * quản trị qua phiên đăng nhập, không phải bot tự chạy.
+ */
+export const deleteUserVerifyData = mutation({
+  args: { token: v.string(), guildId: v.string(), userId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await getUserByToken(ctx, args.token);
+    if (!user) throw new Error("Chưa đăng nhập");
+    const guild = await guildByDiscordId(ctx, args.guildId);
+    if (!guild || !canManageGuild(user, guild)) throw new Error("Không có quyền");
+    if (!/^\d{15,21}$/.test(args.userId)) throw new Error("userId không hợp lệ");
+
+    const counts = await purgeUserVerifyData(ctx, args.guildId, args.userId);
+    // Audit KHÔNG chứa userId: mục đích của yêu cầu là bỏ định danh.
+    await audit(ctx, {
+      guildId: args.guildId,
+      action: "verify_user_data_deleted",
+      actor: user.discordId ?? String(user._id),
+      details: JSON.stringify(counts),
+    });
+    return { ok: true as const, ...counts };
+  },
+});
 
 /** Nhãn hạn ban mặc định cho UI (tránh hardcode 2 nơi). */
 export const banDefaults = query({
@@ -801,6 +933,10 @@ export const banDefaults = query({
 
 /**
  * Bot chạy dọn dẹp định kỳ (1 lần/ngày, gọi từ tick).
+ *
+ * Trần lưu giữ: 24 tháng cho tín hiệu identity (bằng Double Counter), 6 tháng
+ * cho cạnh link, 12 tháng cho audit, 7 ngày sau hết hạn cho phiên, và 90 ngày
+ * sau hết hạn cho IP ban. Xoá cả `ipIntelCache` hết hạn để bảng không phình.
  *
  * Vì sao bot gọi chứ không phải cron Convex: cron chỉ được TÍNH + ĐẶT CỜ
  * (docs/cron-migration.md). Xoá dữ liệu là side effect thật, phải nằm ở tiến
@@ -841,12 +977,38 @@ export const botRunRetention = mutation({
       deleted++;
     }
 
+    // Cạnh link và audit cũng phải có hạn: trước đây hai bảng này không bao
+    // giờ được dọn, chỉ phình theo thời gian dù dữ liệu đã hết giá trị.
+    const staleLinks = await ctx.db
+      .query("verifyLinks")
+      .withIndex("by_lastSignalAt", (q) => q.lt("lastSignalAt", now - 180 * DAY))
+      .take(200);
+    for (const row of staleLinks) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
+    const staleAudit = await ctx.db
+      .query("verifyAudit")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", now - 365 * DAY))
+      .take(200);
+    for (const row of staleAudit) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
     const expiredBans = await ctx.db
       .query("ipBans")
       .withIndex("by_expiresAt", (q) => q.lt("expiresAt", now))
       .take(100);
     for (const row of expiredBans) {
-      if (row.active) await ctx.db.patch(row._id, { active: false });
+      // Hết hạn quá 90 ngày → xoá hẳn; trong 90 ngày giữ dấu vết nhưng tắt.
+      if (row.expiresAt < now - 90 * DAY) {
+        await ctx.db.delete(row._id);
+        deleted++;
+      } else if (row.active) {
+        await ctx.db.patch(row._id, { active: false });
+      }
     }
 
     return { deleted };

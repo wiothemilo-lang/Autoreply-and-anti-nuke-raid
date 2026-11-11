@@ -26,7 +26,6 @@ import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import {
-  VERIFY_CONSENT_VERSION,
   globalIpHash,
   hashVerifyToken,
   ipHash,
@@ -97,7 +96,12 @@ export const complete = internalAction({
     cookieId: v.optional(v.string()),
     /** Kết quả kiểm tra người-thật phía client (honeypot + dwell + pointer). */
     human: v.boolean(),
-    consentVersion: v.optional(v.string()),
+    /**
+     * Người dùng đã tick checkbox đồng ý xử lý dữ liệu. Bắt buộc: không có
+     * consent thì KHÔNG băm/ghi bất kỳ tín hiệu nào. Phiên vẫn pending để
+     * người dùng tick rồi thử lại (không đốt token).
+     */
+    consent: v.boolean(),
   },
   handler: async (
     ctx,
@@ -115,6 +119,9 @@ export const complete = internalAction({
   > => {
     const token = args.token.trim();
     if (!token || token.length > 128) return { ok: false, code: "not_found" };
+    // Chốt consent TRƯỚC mọi thao tác đọc/ghi: chưa đồng ý thì không băm,
+    // không gọi ipapi.is, không ghi DB. Phiên giữ nguyên pending để thử lại.
+    if (args.consent !== true) return { ok: false, code: "consent_required" };
     const tokenHash = hashVerifyToken(token);
 
     const session = await ctx.runQuery(internal.verify.getSessionForAction, { tokenHash });
@@ -234,7 +241,6 @@ export const complete = internalAction({
       uaHash,
       sharedIp,
       human: args.human === true,
-      consentVersion: args.consentVersion?.slice(0, 32) ?? VERIFY_CONSENT_VERSION,
       intel: intel ?? undefined,
     });
 

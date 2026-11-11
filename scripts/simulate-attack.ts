@@ -23,12 +23,11 @@ import path from "node:path";
 import { rateLimitPublicAction, __resetRateGuardForTest } from "../convex/rateGuard";
 import {
   allowGeoRequest,
-  isPublicIp,
-  parseClientIp,
   __resetGeoGuardForTest,
   GEO_MAX_PER_IP_PER_MIN,
   GEO_MAX_GLOBAL_PER_MIN,
 } from "../convex/geoGuard";
+import { isPublicIp, parseClientIp } from "../convex/clientIp";
 import { isExternalAppSpam, messageFingerprint } from "../bot/src/externalAppGuard.js";
 import { isAuthLoopTarget, resolveAuthPageState } from "../src/lib/authRoute";
 
@@ -268,7 +267,7 @@ console.log("═══ MÔ PHỎNG TẤN CÔNG (offline — gọi hàm phòng th
   const bad = ["127.0.0.1", "10.1.2.3", "192.168.1.5", "::1", "fd00::1", "999.1.1.1", "abc", ""];
   const refused = bad.filter((ip) => !isPublicIp(ip)).length;
   const xff = parseClientIp("203.0.113.7, 10.0.0.1");
-  const ok = refused === bad.length && xff === "203.0.113.7";
+  const ok = refused === bad.length && xff === "10.0.0.1";
   record(
     "IP nội bộ / rác không tới upstream",
     bad.length,
@@ -276,7 +275,7 @@ console.log("═══ MÔ PHỎNG TẤN CÔNG (offline — gọi hàm phòng th
     null,
     ok,
     ok
-      ? "chỉ IP công cộng được gọi; x-forwarded-for lấy mục đầu (client thật)"
+      ? "chỉ IP công cộng được gọi; x-forwarded-for lấy mục cuối (proxy append)"
       : `refused=${refused}/${bad.length} xff=${xff}`,
   );
 }

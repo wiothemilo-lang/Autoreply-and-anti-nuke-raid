@@ -6,15 +6,16 @@ import { rateLimitPublicAction, __resetRateGuardForTest } from "../convex/rateGu
 import {
   allowGeoRequest,
   allowVerifyRequest,
-  isPublicIp,
-  parseClientIp,
+  allowVerifySelfTest,
   __resetGeoGuardForTest,
   GEO_MAX_PER_IP_PER_MIN,
   GEO_MAX_GLOBAL_PER_MIN,
   GEO_WINDOW_MS,
+  SELFTEST_MAX_PER_IP_PER_MIN,
   VERIFY_MAX_PER_IP_PER_MIN,
   VERIFY_MAX_GLOBAL_PER_MIN,
 } from "../convex/geoGuard";
+import { isPublicIp, parseClientIp, resolveClientIp } from "../convex/clientIp";
 import { publicConfig } from "../convex/public";
 import { aiStatus } from "../convex/haimiya";
 
@@ -239,8 +240,33 @@ check(
 
 console.log("── geoGuard: /geo_lang chống đốt usage + DDoS ──");
 
-// 8. Chuẩn hoá x-forwarded-for: mục ĐẦU là IP client (Convex chạy sau proxy).
-check("xff nhiều mục → lấy mục đầu", parseClientIp("1.2.3.4, 10.0.0.1") === "1.2.3.4");
+// 8. Chuẩn hoá x-forwarded-for: mục CUỐI là IP do proxy append (không spoof được).
+// Lấy mục đầu là lỗ hổng cũ: client tự đặt "X-Forwarded-For: <IP nạn nhân>".
+check(
+  "xff nhiều mục → lấy mục CUỐI (proxy append)",
+  parseClientIp("1.2.3.4, 10.0.0.1") === "10.0.0.1",
+);
+check(
+  "xff client giả mạo IP nạn nhân → không lấy mục đầu",
+  parseClientIp("203.0.113.7, 198.51.100.4") === "198.51.100.4",
+);
+check(
+  "resolveClientIp: XFF có IP công cộng → dùng mục cuối",
+  resolveClientIp({ forwardedFor: "203.0.113.7, 198.51.100.4" }).ip === "198.51.100.4",
+);
+check(
+  "resolveClientIp: mục cuối private → lùi về metadata công cộng",
+  resolveClientIp({ metaIp: "8.8.8.8", forwardedFor: "203.0.113.7, 10.0.0.1" }).ip === "8.8.8.8",
+);
+check(
+  "resolveClientIp: không có nguồn nào → rỗng",
+  resolveClientIp({ metaIp: "", forwardedFor: "" }).ip === "",
+);
+check(
+  "resolveClientIp: cảnh báo khi meta trùng mục đầu (nền tảng đọc XFF client)",
+  resolveClientIp({ metaIp: "203.0.113.7", forwardedFor: "203.0.113.7, 198.51.100.4" })
+    .spoofRisk === true,
+);
 check("xff IPv4 kèm cổng → cắt cổng", parseClientIp("1.2.3.4:5678") === "1.2.3.4");
 check(
   "xff IPv6 trong ngoặc → bỏ ngoặc + cổng",
@@ -340,6 +366,16 @@ check(
   String(verifyBlockedAt),
 );
 check("… nhưng /geo_lang vẫn còn lượt", allowGeoRequest("9.9.9.9", 5000));
+
+// 14. Self-test có bucket RIÊNG: admin bấm kiểm tra không tiêu lượt verify.
+__resetGeoGuardForTest();
+let selfTestAllOk = true;
+for (let i = 0; i < SELFTEST_MAX_PER_IP_PER_MIN; i++) {
+  if (!allowVerifySelfTest("4.4.4.4", 6000)) selfTestAllOk = false;
+}
+check(`self-test: IP gọi ${SELFTEST_MAX_PER_IP_PER_MIN} lượt → ok`, selfTestAllOk);
+check("self-test: lượt vượt trần cùng IP → chặn", !allowVerifySelfTest("4.4.4.4", 6000));
+check("… /verify/complete vẫn còn lượt cho cùng IP", allowVerifyRequest("4.4.4.4", 6000));
 __resetGeoGuardForTest();
 
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);

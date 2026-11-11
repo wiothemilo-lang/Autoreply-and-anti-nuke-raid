@@ -35,6 +35,7 @@ import type * as bot_writes_settings from "../bot_writes/settings.js";
 import type * as bot_writes_shared from "../bot_writes/shared.js";
 import type * as bot_writes_tickets from "../bot_writes/tickets.js";
 import type * as channelLocks from "../channelLocks.js";
+import type * as clientIp from "../clientIp.js";
 import type * as crons from "../crons.js";
 import type * as dataExport from "../dataExport.js";
 import type * as feedback from "../feedback.js";
@@ -74,6 +75,8 @@ import type * as verifyActions from "../verifyActions.js";
 import type * as verifyBans from "../verifyBans.js";
 import type * as verifyCrypto from "../verifyCrypto.js";
 import type * as verifyPolicy from "../verifyPolicy.js";
+import type * as verifyPreflight from "../verifyPreflight.js";
+import type * as verifyPreflightData from "../verifyPreflightData.js";
 import type * as webhooks from "../webhooks.js";
 
 import type {
@@ -110,6 +113,7 @@ declare const fullApi: ApiFromModules<{
   "bot_writes/shared": typeof bot_writes_shared;
   "bot_writes/tickets": typeof bot_writes_tickets;
   channelLocks: typeof channelLocks;
+  clientIp: typeof clientIp;
   crons: typeof crons;
   dataExport: typeof dataExport;
   feedback: typeof feedback;
@@ -149,6 +153,8 @@ declare const fullApi: ApiFromModules<{
   verifyBans: typeof verifyBans;
   verifyCrypto: typeof verifyCrypto;
   verifyPolicy: typeof verifyPolicy;
+  verifyPreflight: typeof verifyPreflight;
+  verifyPreflightData: typeof verifyPreflightData;
   webhooks: typeof webhooks;
 }>;
 

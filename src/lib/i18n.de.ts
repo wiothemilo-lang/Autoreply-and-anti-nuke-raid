@@ -1723,7 +1723,7 @@ export const DE: Record<string, string> = {
   "Địa chỉ IP không được lưu — chỉ lưu giá trị băm một chiều không thể đảo ngược.":
     "Die IP-Adresse wird nicht gespeichert — nur ein nicht umkehrbarer Einweg-Hash.",
   "Xác minh ngay": "Jetzt verifizieren",
-  "Khi bấm, bạn đồng ý với": "Mit dem Klick stimmst du der",
+
   "Chính sách quyền riêng tư": "Datenschutzerklärung",
   "Đang xác minh…": "Wird verifiziert…",
   "Đã xác minh tín hiệu": "Verifizierungsprüfungen bestanden",
@@ -1815,4 +1815,55 @@ export const DE: Record<string, string> = {
     "Webbasierte Mitgliederverifizierung: prüft Geräte- und Verbindungssignale, um Fake-Accounts, VPNs und Alt-Accounts zu blockieren.",
   "Kết nối hoặc thiết bị của bạn bị đánh giá là rủi ro. Hãy tắt VPN/proxy rồi thử lại, hoặc liên hệ quản trị server.":
     "Deine Verbindung oder dein Gerät wurde als riskant eingestuft. Schalte VPN/Proxy aus und versuche es erneut oder kontaktiere den Server-Administrator.",
+  // ── Consent + self-test + xoá dữ liệu verify (11/11/2026) ──
+  "Chúng tôi không lưu địa chỉ IP — chỉ lưu giá trị băm một chiều.":
+    "Wir speichern keine IP-Adresse — nur einen nicht umkehrbaren Hashwert.",
+  "Tôi đã đọc và đồng ý với": "Ich habe gelesen und stimme zu:",
+  "và việc kiểm tra thiết bị/kết nối để xác minh.":
+    "sowie den Geräte-/Verbindungsprüfungen zur Verifizierung.",
+  "Hãy đọc và đồng ý với chính sách quyền riêng tư trước khi xác minh.":
+    "Bitte lies und akzeptiere die Datenschutzrichtlinie vor der Verifizierung.",
+  "Kiểm tra sẵn sàng": "Bereitschaftsprüfung",
+  "Chạy trước khi bật xác minh web để phát hiện thiếu cấu hình, bot offline hoặc header IP bị giả mạo.":
+    "Vor dem Aktivieren der Web-Verifizierung ausführen, um fehlende Konfiguration, einen Offline-Bot oder fälschbare IP-Header zu erkennen.",
+  "Chạy kiểm tra": "Prüfung starten",
+  "Đủ điều kiện bật xác minh web.": "Bereit zum Aktivieren der Web-Verifizierung.",
+  "Đủ điều kiện, nhưng còn mục cần kiểm tra thêm.":
+    "Bereit, aber einige Prüfungen benötigen noch Aufmerksamkeit.",
+  "Còn mục chưa đạt — xem chi tiết bên dưới.": "Einige Prüfungen fehlgeschlagen — Details unten.",
+  "24 giờ qua": "Letzte 24 Stunden",
+  "Không chạy được kiểm tra — thử lại sau.":
+    "Prüfung konnte nicht ausgeführt werden — später erneut versuchen.",
+  "Xoá toàn bộ dữ liệu xác minh của thành viên này trong server này? Hành động không hoàn tác. Hồ sơ an ninh (audit/IP ban) chỉ được bỏ định danh, không xoá.":
+    "Alle Verifizierungsdaten dieses Mitglieds in diesem Server löschen? Nicht rückgängig zu machen. Sicherheitsdaten (Audit/IP-Bann) werden nur anonymisiert, nicht gelöscht.",
+  "Đã xoá dữ liệu xác minh của thành viên.": "Verifizierungsdaten des Mitglieds gelöscht.",
+  "Xoá dữ liệu xác minh của thành viên": "Verifizierungsdaten des Mitglieds löschen",
+  "Xoá thất bại": "Löschen fehlgeschlagen",
+  "Khóa băm IP (IP_HASH_SECRET)": "IP-Hash-Schlüssel (IP_HASH_SECRET)",
+  "Khóa ipapi.is (IPINTEL_API_KEY)": "ipapi.is-Schlüssel (IPINTEL_API_KEY)",
+  "Kết nối ipapi.is": "ipapi.is-Verbindung",
+  "Chống giả mạo IP": "Schutz vor IP-Fälschung",
+  "Cấu hình xác minh": "Verifizierungskonfiguration",
+  "Role xác minh": "Verifizierungsrollen",
+  "Bot trực tuyến": "Bot online",
+  "Lỗi cấp quyền 24 giờ": "Berechtigungsfehler in 24 Stunden",
+  Đạt: "Bestanden",
+  "Chưa chọn kênh": "Kein Kanal ausgewählt",
+  "Chưa cấu hình": "Nicht konfiguriert",
+  "Quá ngắn (cần ít nhất 32 ký tự)": "Zu kurz (mindestens 32 Zeichen)",
+  "Quá thời gian chờ": "Zeitüberschreitung",
+  "Không kết nối được": "Verbindung nicht möglich",
+  "Bỏ qua vì thiếu khóa": "Übersprungen, da der Schlüssel fehlt",
+  "Phản hồi không hợp lệ (kiểm tra lại khóa)": "Ungültige Antwort (Schlüssel prüfen)",
+  "Header bị tin trực tiếp — NGUY HIỂM": "Header wird direkt vertraut — GEFÄHRLICH",
+  "Không gửi được header kiểm tra — hãy kiểm tra thủ công bằng curl":
+    "Test-Header konnte nicht gesendet werden — manuell mit curl prüfen",
+  "Chưa bật xác minh": "Verifizierung ist aus",
+  "Chưa bật xác minh web": "Web-Verifizierung ist aus",
+  "Phương thức không phải web": "Methode ist nicht Web",
+  "Thiếu role chưa xác minh": "Unverifizierte Rolle fehlt",
+  "Thiếu role đã xác minh": "Verifizierte Rolle fehlt",
+  "Bot offline": "Bot offline",
+  "Heartbeat quá cũ": "Heartbeat ist veraltet",
+  "Có lỗi trong 24 giờ": "Fehler in den letzten 24 Stunden",
 };

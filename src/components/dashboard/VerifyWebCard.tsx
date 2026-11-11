@@ -1,7 +1,18 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
-import { Ban, Fingerprint, Globe2, Link2, ShieldAlert, ShieldCheck, Trash2 } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  Fingerprint,
+  Globe2,
+  Link2,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 
 import { api } from "../../../convex/_generated/api";
 import { Badge } from "../ui/badge";
@@ -9,6 +20,7 @@ import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import type { GuildData } from "../../lib/types";
 import { getSessionToken } from "../../lib/discord";
+import { convexSiteUrl } from "../../lib/convexUrl";
 import { toastConvexError } from "../../lib/toastError";
 import { dateLocale, translate } from "../../lib/i18n";
 
@@ -44,7 +56,25 @@ type SessionRow = {
   linkReasons: string[];
   createdAt: number;
   ipHashShort: string | null;
-  ipHash: string | null;
+  /** Server không trả hash đầy đủ — chỉ cho biết nút "Ban IP" có dùng được. */
+  canBanIp: boolean;
+};
+
+type PreflightCheck = { id: string; ok: boolean; detail: string; advisory?: boolean };
+
+type PreflightResult = {
+  ok: boolean;
+  checks: PreflightCheck[];
+  stats: {
+    total: number;
+    verified: number;
+    denied: number;
+    banned: number;
+    failed: number;
+    pending: number;
+    grantPending: number;
+  };
+  ip: { source: string; public: boolean; chainLength: number; spoofRisk: boolean };
 };
 
 /** Nhãn + màu cho từng kết quả — một nguồn duy nhất cho cả bảng lẫn badge. */
@@ -70,6 +100,10 @@ export default function VerifyWebCard({ data }: { data: GuildData }) {
   const updateSettings = useMutation(api.guilds.updateSettings);
   const createIpBan = useMutation(api.verifyBans.createIpBan);
   const revokeIpBan = useMutation(api.verifyBans.revokeIpBan);
+  const deleteUserData = useMutation(api.verify.deleteUserVerifyData);
+
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
+  const [preflightError, setPreflightError] = useState("");
 
   const sessions = useQuery(api.verify.listSessions, {
     token: TOKEN(),
@@ -144,8 +178,125 @@ export default function VerifyWebCard({ data }: { data: GuildData }) {
     }
   }
 
+  async function runPreflight() {
+    setBusy(true);
+    setPreflightError("");
+    try {
+      const res = await fetch(`${convexSiteUrl()}/verify/self-test`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${TOKEN()}`,
+          // IP TEST-NET-3: nếu hạ tầng để nguyên giá trị này ở mục cuối của
+          // X-Forwarded-For thì header đang bị client điều khiển.
+          "x-forwarded-for": "203.0.113.9",
+          "x-protogon-probe-ip": "203.0.113.9",
+        },
+        body: JSON.stringify({ guildId: g.discordId }),
+      });
+      const data = (await res.json()) as PreflightResult | { ok: false; code: string };
+      if (!("checks" in data)) {
+        setPreflightError(translate("Không chạy được kiểm tra — thử lại sau."));
+        return;
+      }
+      setPreflight(data);
+    } catch {
+      setPreflightError(translate("Không kết nối được máy chủ — kiểm tra mạng rồi thử lại."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function purgeUser(userId: string) {
+    const ok = window.confirm(
+      translate(
+        "Xoá toàn bộ dữ liệu xác minh của thành viên này trong server này? Hành động không hoàn tác. Hồ sơ an ninh (audit/IP ban) chỉ được bỏ định danh, không xoá.",
+      ),
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await deleteUserData({ token: TOKEN(), guildId: g.discordId, userId });
+      toast.success(translate("Đã xoá dữ liệu xác minh của thành viên."));
+    } catch (e: unknown) {
+      toastConvexError(e, translate("Xoá thất bại"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {/* Kiểm tra sẵn sàng trước khi bật */}
+      <Card>
+        <CardContent className="space-y-3 p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{translate("Kiểm tra sẵn sàng")}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {translate(
+                    "Chạy trước khi bật xác minh web để phát hiện thiếu cấu hình, bot offline hoặc header IP bị giả mạo.",
+                  )}
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" disabled={busy} onClick={runPreflight}>
+              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
+              {translate("Chạy kiểm tra")}
+            </Button>
+          </div>
+
+          {preflightError && <p className="text-xs text-destructive">{preflightError}</p>}
+
+          {preflight && (
+            <div className="space-y-2">
+              <div
+                className={`rounded-lg px-3 py-2 text-xs ${
+                  !preflight.ok
+                    ? "bg-destructive/10 text-destructive"
+                    : preflight.checks.some((c) => c.advisory && !c.ok)
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                }`}
+              >
+                {!preflight.ok
+                  ? translate("Còn mục chưa đạt — xem chi tiết bên dưới.")
+                  : preflight.checks.some((c) => c.advisory && !c.ok)
+                    ? translate("Đủ điều kiện, nhưng còn mục cần kiểm tra thêm.")
+                    : translate("Đủ điều kiện bật xác minh web.")}
+              </div>
+              {preflight.checks.map((check) => (
+                <div key={check.id} className="flex items-start gap-2 text-xs">
+                  {check.ok ? (
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                  ) : check.advisory ? (
+                    <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                  ) : (
+                    <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                  )}
+                  <span className="min-w-0">
+                    <span className="font-medium">{preflightLabel(check.id)}</span>
+                    <span className="text-muted-foreground">
+                      {" — "}
+                      {preflightDetail(check.id, check.detail)}
+                    </span>
+                  </span>
+                </div>
+              ))}
+              <p className="text-[11px] text-muted-foreground">
+                {translate("24 giờ qua")}: {preflight.stats.total} · {translate("Đã xác minh")}:{" "}
+                {preflight.stats.verified} · {translate("Từ chối")}: {preflight.stats.denied} ·{" "}
+                {translate("Lỗi")}: {preflight.stats.failed}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Cấu hình hành động khi IP bị chặn */}
       <Card>
         <CardContent className="space-y-4 p-4 sm:p-5">
@@ -264,7 +415,7 @@ export default function VerifyWebCard({ data }: { data: GuildData }) {
                         {row.ipHashShort}…
                       </span>
                     )}
-                    {row.ipHash && (
+                    {row.canBanIp && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -276,6 +427,16 @@ export default function VerifyWebCard({ data }: { data: GuildData }) {
                         {translate("Ban IP")}
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px] text-muted-foreground"
+                      disabled={busy}
+                      title={translate("Xoá dữ liệu xác minh của thành viên")}
+                      onClick={() => purgeUser(row.userId)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 );
               })}
@@ -369,6 +530,76 @@ export default function VerifyWebCard({ data }: { data: GuildData }) {
       </Card>
     </div>
   );
+}
+
+/** Mã check self-test → nhãn hiển thị. */
+function preflightLabel(id: string): string {
+  switch (id) {
+    case "ip_hash_secret":
+      return translate("Khóa băm IP (IP_HASH_SECRET)");
+    case "ipintel_key":
+      return translate("Khóa ipapi.is (IPINTEL_API_KEY)");
+    case "ipapi":
+      return translate("Kết nối ipapi.is");
+    case "xff_spoof":
+      return translate("Chống giả mạo IP");
+    case "guild_verify":
+      return translate("Cấu hình xác minh");
+    case "guild_roles":
+      return translate("Role xác minh");
+    case "guild_channel":
+      return translate("Kênh xác minh");
+    case "bot_online":
+      return translate("Bot trực tuyến");
+    case "recent_failures":
+      return translate("Lỗi cấp quyền 24 giờ");
+    default:
+      return id;
+  }
+}
+
+/** Mã chi tiết self-test → câu người đọc được. */
+function preflightDetail(id: string, detail: string): string {
+  switch (detail) {
+    case "ok":
+      return translate("Đạt");
+    case "missing":
+      return id === "guild_channel" ? translate("Chưa chọn kênh") : translate("Chưa cấu hình");
+    case "too_short":
+      return translate("Quá ngắn (cần ít nhất 32 ký tự)");
+    case "timeout":
+      return translate("Quá thời gian chờ");
+    case "network":
+      return translate("Không kết nối được");
+    case "skipped_no_key":
+      return translate("Bỏ qua vì thiếu khóa");
+    case "bad_response":
+      return translate("Phản hồi không hợp lệ (kiểm tra lại khóa)");
+    case "spoof_accepted":
+      return translate("Header bị tin trực tiếp — NGUY HIỂM");
+    case "probe_missing":
+      return translate("Không gửi được header kiểm tra — hãy kiểm tra thủ công bằng curl");
+    case "verify_off":
+      return translate("Chưa bật xác minh");
+    case "web_off":
+      return translate("Chưa bật xác minh web");
+    case "method_not_web":
+      return translate("Phương thức không phải web");
+    case "missing_unverified":
+      return translate("Thiếu role chưa xác minh");
+    case "missing_verified":
+      return translate("Thiếu role đã xác minh");
+    case "offline":
+      return translate("Bot offline");
+    case "stale":
+      return translate("Heartbeat quá cũ");
+    case "has_failures":
+      return translate("Có lỗi trong 24 giờ");
+    case "none":
+      return translate("Không có");
+    default:
+      return detail.startsWith("http_") ? detail.toUpperCase() : detail;
+  }
 }
 
 /** Mã lý do (server trả) → câu người đọc được. */
