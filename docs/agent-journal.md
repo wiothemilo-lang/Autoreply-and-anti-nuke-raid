@@ -2,7 +2,8 @@
 
 ## Đang dở
 
-- 🚧 **Verify web đã merge nhưng CHƯA bật được** (PR #102, `b90f6c7`): cần đặt
+- 🚧 **Verify web đã merge (PR #102) + vá grant-state (PR #104) nhưng CHƯA bật được**:
+  cần đặt
   `IP_HASH_SECRET` (bắt buộc — thiếu thì mọi phiên `failed: missing_secret`) và
   `IPINTEL_API_KEY` (khuyến nghị — thiếu thì không phát hiện VPN/proxy/Tor) trong
   Convex env, `DASHBOARD_URL` trong env bot VPS, rồi mới bật `verifyWebEnabled`.
@@ -78,6 +79,14 @@
 ---
 
 ---
+
+## 2026-11-11 (2) — Vá luồng cấp role verify web
+
+- ✅ Xong: trang chỉ báo "đã cấp quyền" khi bot ghi `grantAppliedAt` thật (`grantState` pending/applied/failed); `botFinishGrant` retry 5 lượt rồi `grantFailedAt`; lỗi Discord không bị nuốt
+- ✅ Deny không còn mặc định kick (human_check_failed/CGNAT/IP-ban deny-only); thành viên đóng DM được mention + nút `verify_web_start` trong kênh verify, không lộ token
+- 📁 File đụng: `convex/verify.ts`, `convex/schema.ts`, `bot/src/verifyWeb.js`, `bot/src/handlers/joinGate.js`, `src/pages/VerifyPage.tsx`
+- 🧪 Kiểm chứng: 90/90 CJS · 34/34 TS · tsc/lint/format sạch · coverage 95,72% · joinGate 95,56% · PR #104 merge (`21e69d1`)
+- ▶️ Tiếp theo: đặt `IP_HASH_SECRET` + `IPINTEL_API_KEY` (Convex) và `DASHBOARD_URL` (bot VPS) rồi mới bật `verifyWebEnabled`
 
 ## 2026-11-10 (14) — Vault thành bộ não thứ hai: bản đồ trí nhớ + onboarding agent
 
