@@ -311,7 +311,7 @@ export const closeTicket = mutation({
  *   - `openChannelId` — ticket đang mở của họ, để báo "bạn đã có ticket".
  *
  * ⚠️ Không đọc qua `getBotConfig`: đây không phải CẤU HÌNH, mà là trạng thái
- * đổi mỗi giây. Nếu nhét vào bundle cache 30 phút thì hàng rào chống spam
+ * đổi mỗi giây. Nếu nhét vào bundle cache 90 phút thì hàng rào chống spam
  * sẽ đếm trên dữ liệu cũ — tức là vô hiệu. Query riêng luôn đọc tươi.
  */
 /**
@@ -322,7 +322,7 @@ export const closeTicket = mutation({
  * bot không có token đó. `botTicketState` thì lọc theo `userId` nên không
  * dùng được cho placeholder `{open}` trên panel mở ticket.
  *
- * ⚠️ Đọc tươi (không đi qua `getBotConfig` cache 30 phút): con số này chỉ
+ * ⚠️ Đọc tươi (không đi qua `getBotConfig` cache 90 phút): con số này chỉ
  * dùng cho hiển thị, nhưng dán lại từ cache cũ sẽ ra "0 ticket" sai lệch
  * với thực tế. Query riêng giữ panel luôn khớp với DB.
  */

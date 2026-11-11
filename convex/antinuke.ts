@@ -82,7 +82,7 @@ export const updateModule = mutation({
     if (args.whitelistRoles !== undefined) patch.whitelistRoles = args.whitelistRoles;
     if (args.heat !== undefined) patch.heat = Math.max(1, Math.min(100, Math.floor(args.heat)));
     // Module antinuke được bot đọc qua cache getBotConfig → đánh dấu cấu hình vừa
-    // đổi để vòng tick xoá cache, nếu không bật/tắt module phải chờ tới 30 phút.
+    // đổi để vòng tick xoá cache, nếu không bật/tắt module phải chờ tới 90 phút.
     if (guild) await ctx.db.patch(guild._id, { settingsChangedAt: Date.now() });
     if (mod) {
       await ctx.db.patch(mod._id, patch);

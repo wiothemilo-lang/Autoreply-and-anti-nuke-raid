@@ -1051,8 +1051,8 @@ async function handleBackup(client, message, args, config, store) {
     store.invalidate(guildId);
     return message.reply(
       push
-        ? "✅ Đã yêu cầu tạo backup (đẩy lên GitHub của chủ bot) — bot thực hiện trong ~20 giây. Xem kết quả: `!backup list`"
-        : "✅ Đã yêu cầu tạo backup (chỉ lưu trên Convex) — bot thực hiện trong ~20 giây. Xem kết quả: `!backup list`",
+        ? "✅ Đã yêu cầu tạo backup (đẩy lên GitHub của chủ bot) — bot thực hiện trong ~3 phút. Xem kết quả: `!backup list`"
+        : "✅ Đã yêu cầu tạo backup (chỉ lưu trên Convex) — bot thực hiện trong ~3 phút. Xem kết quả: `!backup list`",
     );
   } catch (e) {
     return message.reply(`❌ ${e.message}`);

@@ -91,7 +91,7 @@ function makeStore({ failNames = [] } = {}) {
   return {
     _mutations: mutations,
     _invalidated: invalidated,
-    /** Bot tự ghi DB thì phải xoá cache config (TTL 30 phút) — xem ensureModules. */
+    /** Bot tự ghi DB thì phải xoá cache config (TTL 90 phút) — xem ensureModules. */
     invalidate: (guildId) => invalidated.push(guildId),
     client: {
       mutation: async (name, args) => {

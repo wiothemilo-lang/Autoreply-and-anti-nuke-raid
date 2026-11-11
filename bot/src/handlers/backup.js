@@ -1,7 +1,8 @@
 /**
  * handlers/backup.js — điểm vào hệ thống backup: chụp/khôi phục/import.
  *
- * Bot quét backup:botGetPending mỗi ~20 giây:
+ * Bot nhận job backup trong batch tick mỗi 180 giây (chính: `jobs.backups`;
+ * fallback: `backup:botGetPending`):
  *  - kind "backup": chụp role (tên/màu/quyền) + kênh (kênh/quyền truy cập) + cấu hình
  *    + TIN NHẮN (tối đa 50 tin/kênh, kèm thứ tự thời gian), lưu vào bảng guildBackups,
  *    đẩy lên GitHub Gist nếu được yêu cầu.

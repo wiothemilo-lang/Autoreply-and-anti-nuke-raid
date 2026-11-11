@@ -202,7 +202,7 @@ export const applyPreset = mutation({
     // settingsChangedAt BẮT BUỘC: preset ghi thẳng cấu hình bot đọc
     // (antinukeEnabled, joinGate*, actionBudgetPerMinute…) và cả bảng
     // antinukeModules mà getBotConfig trả về — thiếu tín hiệu thì "Áp preset"
-    // không có tác dụng với bot tới 30 phút (cùng lớp bug 23/09).
+    // không có tác dụng với bot tới 90 phút (cùng lớp bug 23/09).
     const globalPatch: Record<string, unknown> = {
       updatedAt: now,
       settingsChangedAt: Date.now(),

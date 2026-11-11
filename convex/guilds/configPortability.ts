@@ -44,7 +44,7 @@ export async function exportGuildConfigHandler(
  *   1. `canManageGuild` — nạp cấu hình là quyền quản trị server, không phải
  *      ai có token phiên cũng nạp được.
  *   2. `settingsChangedAt` — bot đọc field này để biết "cấu hình vừa đổi".
- *      Thiếu nó thì thay đổi phải chờ hết TTL cache 30 phút (đúng lớp lỗi
+ *      Thiếu nó thì thay đổi phải chờ hết TTL cache 90 phút (đúng lớp lỗi
  *      23/09, cổng `check-settings-signal.cjs` canh chỗ này).
  *   3. `sanitizeImportedConfig` lọc allowlist + chuẩn hoá TRƯỚC khi patch —
  *      không tin file client gửi lên.

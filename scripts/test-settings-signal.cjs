@@ -2,7 +2,7 @@
 // TEST: cổng "tín hiệu cấu hình" (scripts/check-settings-signal.cjs) — chạy:
 // node scripts/test-settings-signal.cjs
 //
-// Bối cảnh: bot cache bundle cấu hình 30 phút; thay đổi từ dashboard chỉ tới bot
+// Bối cảnh: bot cache bundle cấu hình 90 phút; thay đổi từ dashboard chỉ tới bot
 // ngay khi có `settingsChangedAt` (dashboard) hoặc proxy xoá cache (bot tự ghi).
 // 6 chỗ sót cùng lớp đã được vá 23/09/2026 — suite này khoá lại bằng cách chạy
 // bộ phân tích của CỔNG trên NGUỒN CONVEX THẬT, không chỉ snippet giả:

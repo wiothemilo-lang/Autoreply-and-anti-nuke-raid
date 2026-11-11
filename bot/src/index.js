@@ -166,7 +166,7 @@ client.once("clientReady", async () => {
   }
 
   // D1 — preload config mọi guild lúc online: làm ấm cache trước khi có sự kiện
-  // → antinuke/lockdown phản hồi tức thì; TTL 30 phút cắt ~2/3 reads getConfig.
+  // → antinuke/lockdown phản hồi tức thì; TTL 90 phút cắt ~2/3 reads getConfig.
   try {
     const ids = [...client.guilds.cache.keys()];
     if (ids.length) await store.prewarmConfigs(ids);
@@ -319,12 +319,12 @@ client.once("clientReady", async () => {
 
   // Self-Diagnose — bắt unhandledRejection/uncaughtException toàn cục, gửi AI
   // (chuỗi research Kira/Mimo) chẩn đoán + đăng ĐỀ XUẤT vá vào kênh log. Chỉ
-  // chạy khi owner bật trên Admin web (flag đi nhờ batch tick 60s sẵn có).
+  // chạy khi owner bật trên Admin web (flag đi nhờ batch tick 180s sẵn có).
   // Flag cập nhật từng lượt tick qua setEnabledFromJobs (xem setupTick dưới).
   selfDiagnose.attach(client, store);
 
-  // TỐI ƯU USAGE: KHÔNG còn vòng heartbeat 60s riêng (status:heartbeat) — nó
-  // trùng 100% với guild sync loop 60s (đã gộp heartbeat vào botSyncGuilds qua
+  // TỐI ƯU USAGE: KHÔNG còn vòng heartbeat riêng (status:heartbeat) — nó
+  // trùng 100% với guild sync loop (nay 180s; đã gộp heartbeat vào botSyncGuilds qua
   // globalStatus). Vòng riêng cũ đốt ~43k function calls/tháng cho thông tin
   // y hệt. sendHeartbeat chỉ còn là FALLBACK khi sync loop lỗi liên tiếp.
   const heartbeatInterval = setInterval(() => {

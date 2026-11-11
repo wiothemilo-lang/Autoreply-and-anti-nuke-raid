@@ -167,7 +167,7 @@ const CH = "123456789012345678"; // 18 chữ số — hợp lệ
     check("rule mới luôn bật", row.enabled === true, row.enabled);
     check("createdAt = updatedAt = lúc tạo", row.createdAt === row.updatedAt, row);
     check(
-      "✅ báo tín hiệu cho bot (settingsChangedAt) — nếu thiếu, bot chờ cache 30 phút",
+      "✅ báo tín hiệu cho bot (settingsChangedAt) — nếu thiếu, bot chờ cache 90 phút",
       typeof guilds[0].settingsChangedAt === "number",
       guilds[0].settingsChangedAt,
     );

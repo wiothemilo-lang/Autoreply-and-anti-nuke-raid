@@ -151,7 +151,7 @@ async function syncAll(client, store) {
   // lastHeartbeat per-guild refresh theo chu kỳ dài (mỗi 5 sync ≈ 10 phút) thay
   // vì ghi lại toàn row mỗi phút (guild row ~90 fields → nguồn I/O lớn nhất).
   const refreshHeartbeat = runCounter % 5 === 0;
-  // Sức khỏe AI (đợt 12): gộp aiStats() vào mutation sync 60s sẵn có — 0
+  // Sức khỏe AI (đợt 12): gộp aiStats() vào mutation sync 180s sẵn có — 0
   // function call thêm. Dashboard Admin (chỉ owner) đọc qua status:getAiHealth.
   let aiHealth;
   try {
@@ -188,7 +188,7 @@ module.exports = { syncAll, syncOne, markGone, ensureModules, isSyncHealthy };
 
 /** Upsert nhanh 1 guild vừa mời bot — sync NGAY tên/icon/thành viên + channels + roles.
  *  Previously only synced basic info, causing empty dropdowns on web dashboard
- *  until the next syncAll cycle (~5 min). Now syncs everything immediately.
+ *  until the next syncAll cycle (~3 phút = 180 giây). Now syncs everything immediately.
  */
 async function syncOne(client, store, guildId) {
   const g = client.guilds.cache.get(guildId);
@@ -243,7 +243,7 @@ async function ensureModules(client, store) {
     try {
       await store.client.mutation("bot_writes:botEnsureModules", { guildId: g.id });
       // Mutation vừa THÊM dòng module vào DB, nhưng cache config của bot đang giữ
-      // payload cũ tới 30 phút (CONFIG_TTL_MS) — bot sẽ tiếp tục rơi vào fallback
+      // payload cũ tới 90 phút (CONFIG_TTL_MS) — bot sẽ tiếp tục rơi vào fallback
       // moduleCfgOf cho module chưa có dòng. Xoá cache ngay để lần đọc kế tiếp lấy
       // cấu hình thật (đúng contract "invalidate sau khi bot tự ghi" của convex.js).
       store.invalidate(g.id);

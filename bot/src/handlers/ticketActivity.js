@@ -18,7 +18,7 @@
  * duy nhất đáng tin là so với category mà chủ server đã cấu hình: đây cũng
  * chính là điều kiện bot dùng khi TẠO kênh ticket.
  *
- * `store.getConfig` có cache 30 phút nên lời gọi này gần như miễn phí — tin
+ * `store.getConfig` có cache 90 phút nên lời gọi này gần như miễn phí — tin
  * nhắn thường thoát ngay ở bước ticket bật/tắt, chỉ kênh trong category
  * ticket mới đi tiếp.
  */

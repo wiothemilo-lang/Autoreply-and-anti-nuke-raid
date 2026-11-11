@@ -103,14 +103,14 @@ async function withRetry(fn, label) {
 
 /**
  * Mutation bot TỰ ghi cấu hình mà chính bot đọc lại qua `guilds:getBotConfig`
- * (bundle cache TTL 30 phút). Ghi xong là bản cache cục bộ SAI ngay — bot phải
+ * (bundle cache TTL 90 phút). Ghi xong là bản cache cục bộ SAI ngay — bot phải
  * xoá để lượt đọc sau thấy giá trị mới.
  *
  * Vì sao tập trung ở đây thay vì gọi store.invalidate() ở từng chỗ gọi: thực tế
  * đã đo được 7/35 chỗ gọi quên, gây bug thật (23/09/2026) — server bị khoá kênh
  * LÂU HƠN cấu hình vì tickUnlocks đọc `lockdownUntil` cũ, mở khoá xong bot tưởng
  * còn đang khoá nên bỏ qua raid sau, báo cáo ngày gửi lặp, và restore xong vẫn
- * chạy cấu hình cũ tới 30 phút. Proxy bên dưới bắt MỌI lượt ghi (kể cả chỗ gọi
+ * chạy cấu hình cũ tới 90 phút. Proxy bên dưới bắt MỌI lượt ghi (kể cả chỗ gọi
  * thêm sau này) nên không thể quên lần nữa.
  *
  * Danh sách này phải khớp CHÍNH XÁC tập mutation ghi field bot đọc trong
@@ -178,7 +178,7 @@ class ConvexStore {
     this.cache = new Map(); // guildId -> { config, fetchedAt }
     // Thế hệ cache theo guild: tăng mỗi lần invalidate(). Fetch đang bay mà bị
     // invalidate giữa chừng (bot vừa tự ghi cấu hình) thì kết quả CŨ không được
-    // ghi đè cache — nếu không, cấu hình trước khi ghi bị giữ tới 30 phút.
+    // ghi đè cache — nếu không, cấu hình trước khi ghi bị giữ tới 90 phút.
     this._cacheGen = new Map(); // guildId -> số thế hệ
     // Gộp các lượt getConfig SONG SONG cùng guild. Mỗi tin nhắn có 5 listener
     // (messageCreate, filters, antinuke messages ×2, ticketActivity) cùng gọi

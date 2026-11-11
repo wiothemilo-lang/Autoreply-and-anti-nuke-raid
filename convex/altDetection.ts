@@ -90,7 +90,7 @@ export const updateAltConfig = mutation({
     }
     if (args.altSafeMode !== undefined) patch.altSafeMode = args.altSafeMode;
     // Tín hiệu cấu hình vừa đổi → vòng tick của bot xoá cache config của guild này
-    // (không có thì bot giữ bản cũ tới hết TTL 30 phút — xem schema.ts).
+    // (không có thì bot giữ bản cũ tới hết TTL 90 phút — xem schema.ts).
     patch.settingsChangedAt = Date.now();
     await ctx.db.patch(guild._id, patch);
     return { ok: true };
