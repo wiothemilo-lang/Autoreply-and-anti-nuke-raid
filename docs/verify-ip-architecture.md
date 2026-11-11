@@ -587,3 +587,30 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
 - **Xoá dữ liệu theo guild.** `verify.deleteUserVerifyData` xoá phiên/tín
   hiệu/link, bỏ định danh audit + IP ban (giữ hồ sơ an ninh). `listSessions`
   không còn trả hash IP đầy đủ — chỉ `canBanIp`.
+
+## 13. Mô hình truy cập dữ liệu verify (11/11/2026)
+
+Chỉ bốn nhóm dưới đây chạm được dữ liệu IP/PII; mọi nhóm khác nhận `null`
+(query) hoặc lỗi (mutation). Test `scripts/test-verify-flow.ts` mục 15 khoá
+từng dòng.
+
+| Chủ thể                                            | Được đọc                                                                                                                                                            | Cổng kiểm tra                                                                                                           |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Trang verify công khai**                         | Chỉ metadata phiên CỦA CHÍNH MÌNH qua token 256-bit: trạng thái, tên server, hạn, quyết định. KHÔNG có `ipHash`, `ipHashShort`, `linkedUserId`, tín hiệu hay IP thô | `getSession` băm token rồi tra `by_tokenHash`; token sai/hết hạn → `null`                                               |
+| **Quản trị viên server** (Discord `Manage Server`) | Phiên, link alt, IP ban, thống kê, xoá dữ liệu — **chỉ guild mình quản lý**                                                                                         | `canManageGuild` ⇄ `manageableGuildIds` do Discord trả về lúc đăng nhập; mọi query/mutation nhận `guildId` đều kiểm lại |
+| **Bot**                                            | Phiên chờ cấp quyền, userId/guildId để thi hành, đồng bộ guild ban                                                                                                  | `requireBotKeyStrict` — botKey = HMAC của `OWNER_SEED`, chỉ tiến trình bot có                                           |
+| **Chủ sở hữu bot**                                 | Trong app: như quản trị viên server (chỉ guild họ quản lý). Ngoài app: quyền hạ tầng Convex dashboard                                                               | `isBotOwnerUser` chỉ dùng cho cửa sổ Admin (feedback/payments/status), KHÔNG mở rộng quyền đọc verify                   |
+
+Ghi chú:
+
+- **Team admin không phải guild admin** → không thấy dữ liệu verify. `requireBotAdmin`
+  là cổng của Admin panel, tách hẳn khỏi dữ liệu guild.
+- **Không trả hash đầy đủ**: `listSessions` trả `canBanIp`, `listIpBans` trả
+  `ipHashShort` (12 ký tự); `createIpBan`/`revokeIpBan` nhận `id`/`sessionId` và
+  tự đọc hash phía server.
+- **IDOR đã khoá**: admin guild A truyền `guildId`/`sessionId`/`linkId` của guild
+  B → `null`/lỗi; `createIpBan` kiểm `session.guildId === args.guildId`.
+- **Quyền có thể trễ**: `manageableGuildIds` làm mới khi đăng nhập; phiên sống
+  30 ngày, nên admin bị giáng chức vẫn đọc được tới lần đăng nhập kế tiếp. Muốn
+  thu hồi tức thì phải xoá phiên (`sessions`) hoặc giảm TTL — chưa làm vì đổi
+  hành vi đăng nhập ngoài phạm vi việc này.
