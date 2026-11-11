@@ -10,7 +10,8 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { allowGeoRequest, allowVerifyRequest, isPublicIp, parseClientIp } from "./geoGuard";
+import { allowGeoRequest, allowVerifyRequest, allowVerifySelfTest } from "./geoGuard";
+import { isPublicIp, normalizeIpToken, parseClientIp, resolveClientIp, splitXff } from "./clientIp";
 
 /**
  * Cache đáp án geo — PHẢI là `private`.
@@ -158,11 +159,37 @@ function verifyJson(body: unknown, origin: string | null, status = 200): Respons
 }
 
 /**
+ * CORS riêng cho self-test: cho phép `authorization` + hai header dò XFF.
+ *
+ * Vì sao nới header ở ĐÂY mà không ở `/verify/complete`: self-test cần gửi
+ * thử `x-forwarded-for` để chứng minh hạ tầng có ghi đè/append hay không.
+ * `/verify/complete` giữ nguyên allowlist hẹp — trình duyệt không được phép
+ * tự đặt XFF ở đường xác minh thật.
+ */
+function selfTestCors(origin: string | null): Record<string, string> {
+  return {
+    ...verifyCors(origin),
+    "access-control-allow-headers":
+      "content-type, authorization, x-forwarded-for, x-protogon-probe-ip",
+  };
+}
+
+function selfTestJson(body: unknown, origin: string | null, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", ...selfTestCors(origin) },
+  });
+}
+
+type PreflightCheck = { id: string; ok: boolean; detail: string; advisory?: boolean };
+
+/**
  * POST /verify/complete — nhận tín hiệu trình duyệt, quyết định, trả kết quả.
  *
- * IP lấy từ `x-forwarded-for` (Convex chạy sau proxy) — KHÔNG BAO GIỜ từ body.
- * Đây là ranh giới tin cậy quan trọng nhất của cả tính năng: nếu client tự khai
- * IP thì kẻ bị ban chỉ cần gửi IP sạch là qua.
+ * IP lấy từ mục CUỐI của `x-forwarded-for` (proxy append), lùi về metadata của
+ * Convex — KHÔNG BAO GIỜ từ body. Đây là ranh giới tin cậy quan trọng nhất của
+ * cả tính năng: nếu client tự khai IP thì kẻ bị ban chỉ cần gửi IP sạch là qua.
+ * Xem `clientIp.ts` để biết vì sao không lấy mục đầu.
  *
  * Trần tần suất dùng `allowVerifyRequest` — bộ đếm RIÊNG, không chia với
  * `/geo_lang` (endpoint công khai, CORS mở). Dùng chung thì flood geo 300
@@ -178,7 +205,12 @@ const verifyComplete = httpAction(async (ctx, request) => {
     return verifyJson({ ok: false, code: "forbidden_origin" }, origin, 403);
   }
 
-  const ip = parseClientIp(request.headers.get("x-forwarded-for"));
+  const metaIp = (await ctx.meta.getRequestMetadata()).ip ?? "";
+  const resolved = resolveClientIp({
+    metaIp,
+    forwardedFor: request.headers.get("x-forwarded-for"),
+  });
+  const ip = resolved.ip;
   if (!isPublicIp(ip) || !allowVerifyRequest(ip)) {
     return verifyJson({ ok: false, code: "rate_limited" }, origin, 429);
   }
@@ -199,7 +231,6 @@ const verifyComplete = httpAction(async (ctx, request) => {
   const userAgent = request.headers.get("user-agent") ?? "";
   const fingerprint = typeof body.fingerprint === "string" ? body.fingerprint : undefined;
   const cookieId = typeof body.cookieId === "string" ? body.cookieId : undefined;
-  const consentVersion = typeof body.consentVersion === "string" ? body.consentVersion : undefined;
 
   try {
     const result = await ctx.runAction(internal.verifyActions.complete, {
@@ -209,7 +240,9 @@ const verifyComplete = httpAction(async (ctx, request) => {
       fingerprint,
       cookieId,
       human: body.human === true,
-      consentVersion,
+      // Đồng ý phải là hành động tường minh của người dùng (checkbox ở trang
+      // verify). Server tự gắn phiên bản consent — client không được khai.
+      consent: body.consent === true,
     });
     return verifyJson(result, origin);
   } catch {
@@ -220,5 +253,152 @@ const verifyComplete = httpAction(async (ctx, request) => {
 
 http.route({ path: "/verify/complete", method: "POST", handler: verifyComplete });
 http.route({ path: "/verify/complete", method: "OPTIONS", handler: verifyComplete });
+
+/**
+ * POST /verify/self-test — checklist trước khi bật xác minh web.
+ *
+ * Chỉ admin của guild gọi được (Bearer token dashboard). Trả checklist KHÔNG
+ * chứa secret/IP thô: env đã cấu hình chưa, ipapi.is có sống không, XFF có bị
+ * client điều khiển không, guild đã đủ role/kênh chưa, bot còn heartbeat không.
+ *
+ * Vì sao là HTTP action chứ không phải query: chỉ nơi đây mới thấy được header
+ * `x-forwarded-for` thật của request. Query/action thường chỉ thấy metadata đã
+ * được nền tảng tổng hợp, không đủ để chứng minh chống giả mạo IP.
+ */
+const verifySelfTest = httpAction(async (ctx, request) => {
+  const origin = request.headers.get("origin");
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: selfTestCors(origin) });
+  }
+  if (origin && !VERIFY_ORIGINS.has(origin)) {
+    return selfTestJson({ ok: false, code: "forbidden_origin" }, origin, 403);
+  }
+
+  const auth = request.headers.get("authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  if (!token) return selfTestJson({ ok: false, code: "unauthenticated" }, origin, 401);
+
+  const metaIp = (await ctx.meta.getRequestMetadata()).ip ?? "";
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const resolved = resolveClientIp({ metaIp, forwardedFor });
+  if (!allowVerifySelfTest(resolved.ip || "unknown")) {
+    return selfTestJson({ ok: false, code: "rate_limited" }, origin, 429);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return selfTestJson({ ok: false, code: "bad_request" }, origin, 400);
+  }
+  const guildId = typeof body.guildId === "string" ? body.guildId : "";
+  if (!/^\d{15,21}$/.test(guildId)) {
+    return selfTestJson({ ok: false, code: "bad_request" }, origin, 400);
+  }
+
+  const authRes = await ctx
+    .runQuery(internal.verifyPreflightData.authorize, { token, guildId })
+    .catch(() => null);
+  if (!authRes) return selfTestJson({ ok: false, code: "server_error" }, origin, 500);
+  if (!authRes.ok) {
+    return selfTestJson(
+      { ok: false, code: authRes.code },
+      origin,
+      authRes.code === "unauthenticated" ? 401 : 403,
+    );
+  }
+
+  const probe = await ctx.runAction(internal.verifyPreflight.probe, {}).catch(() => null);
+  if (!probe) return selfTestJson({ ok: false, code: "server_error" }, origin, 500);
+
+  // Dò XFF: trình duyệt gửi kèm `x-protogon-probe-ip` + `x-forwarded-for` cùng
+  // một IP TEST-NET. Nếu mục CUỐI của chuỗi vẫn là IP thử → hạ tầng đang để
+  // client điều khiển XFF (NGUY HIỂM). Nếu IP thử chỉ nằm ở đầu chuỗi → proxy
+  // đã append IP thật, an toàn.
+  const marker = normalizeIpToken(request.headers.get("x-protogon-probe-ip"));
+  const chain = splitXff(forwardedFor);
+  const probeSeen = marker !== "" && chain.includes(marker);
+  const spoof =
+    marker === "" || !probeSeen
+      ? "probe_missing"
+      : chain[chain.length - 1] === marker
+        ? "spoof_accepted"
+        : "ok";
+
+  const g = authRes.guild;
+  const botAge = Date.now() - authRes.bot.lastHeartbeat;
+  const checks: PreflightCheck[] = [
+    { id: "ip_hash_secret", ok: probe.env.ipHashSecret === "ok", detail: probe.env.ipHashSecret },
+    { id: "ipintel_key", ok: probe.env.ipintelKey === "ok", detail: probe.env.ipintelKey },
+    {
+      id: "ipapi",
+      ok: probe.ipapi.ok,
+      detail: probe.ipapi.detail,
+      // Thiếu key là cảnh báo (verify vẫn chạy, chỉ mất phần VPN), không chặn.
+      advisory: probe.ipapi.detail === "skipped_no_key",
+    },
+    {
+      id: "xff_spoof",
+      ok: spoof !== "spoof_accepted",
+      detail: spoof,
+      // Trình duyệt có thể chặn header thử → không kết luận được, chỉ cảnh báo.
+      advisory: spoof === "probe_missing",
+    },
+    {
+      id: "guild_verify",
+      ok: g.verifyEnabled && g.verifyWebEnabled && g.verifyMethod === "web",
+      detail: !g.verifyEnabled
+        ? "verify_off"
+        : !g.verifyWebEnabled
+          ? "web_off"
+          : g.verifyMethod !== "web"
+            ? "method_not_web"
+            : "ok",
+    },
+    {
+      id: "guild_roles",
+      ok: Boolean(g.unverifiedRoleId && g.verifiedRoleId),
+      detail: !g.unverifiedRoleId
+        ? "missing_unverified"
+        : !g.verifiedRoleId
+          ? "missing_verified"
+          : "ok",
+    },
+    {
+      id: "guild_channel",
+      ok: Boolean(g.verifyChannelId),
+      detail: g.verifyChannelId ? "ok" : "missing",
+    },
+    {
+      id: "bot_online",
+      ok: authRes.bot.online && botAge < 5 * 60_000,
+      detail: !authRes.bot.online ? "offline" : botAge >= 5 * 60_000 ? "stale" : "ok",
+    },
+    {
+      id: "recent_failures",
+      ok: authRes.stats.failed === 0,
+      detail: authRes.stats.failed > 0 ? "has_failures" : "none",
+      advisory: true,
+    },
+  ];
+
+  return selfTestJson(
+    {
+      ok: checks.every((c) => c.ok || c.advisory),
+      checks,
+      stats: authRes.stats,
+      ip: {
+        source: resolved.source,
+        public: isPublicIp(resolved.ip),
+        chainLength: resolved.chain.length,
+        spoofRisk: resolved.spoofRisk,
+      },
+    },
+    origin,
+  );
+});
+
+http.route({ path: "/verify/self-test", method: "POST", handler: verifySelfTest });
+http.route({ path: "/verify/self-test", method: "OPTIONS", handler: verifySelfTest });
 
 export default http;

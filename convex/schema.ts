@@ -1302,6 +1302,8 @@ export default defineSchema({
     linkScore: v.optional(v.number()),
     linkReasons: v.optional(v.array(v.string())),
     consentVersion: v.optional(v.string()),
+    /** Lúc người dùng tick checkbox đồng ý (server ghi, không tin client). */
+    consentAt: v.optional(v.number()),
     /**
      * Bot đã thi hành xong THẬT (Discord API trả thành công) — dùng để chống
      * xử lý lặp và cho trang verify biết role đã được cấp, không chỉ "đã xếp việc".
@@ -1366,7 +1368,8 @@ export default defineSchema({
   })
     .index("by_guildId_userId", ["guildId", "userId"])
     .index("by_guildId_linkedUserId", ["guildId", "linkedUserId"])
-    .index("by_guildId_score", ["guildId", "score"]),
+    .index("by_guildId_score", ["guildId", "score"])
+    .index("by_lastSignalAt", ["lastSignalAt"]),
 
   /** verifyAudit — log bất biến của quyết định verify (ai/khi nào/vì sao). */
   verifyAudit: defineTable({
@@ -1380,6 +1383,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_guildId_createdAt", ["guildId", "createdAt"])
+    .index("by_guildId_userId", ["guildId", "userId"])
+    .index("by_createdAt", ["createdAt"])
     .index("by_sessionId", ["sessionId"]),
 
   /**
@@ -1405,6 +1410,7 @@ export default defineSchema({
     .index("by_guildId_ipPrefixHash", ["guildId", "ipPrefixHash"])
     .index("by_guildId_expiresAt", ["guildId", "expiresAt"])
     .index("by_guildId_active", ["guildId", "active"])
+    .index("by_guildId_evidenceUserId", ["guildId", "evidenceUserId"])
     .index("by_expiresAt", ["expiresAt"]),
 
   /** ipIntelCache — cache kết quả ipapi.is theo hash global (không theo IP thô). */

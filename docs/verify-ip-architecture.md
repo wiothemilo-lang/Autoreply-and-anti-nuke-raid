@@ -32,8 +32,10 @@
    bật/tắt `vpnBlockEnabled` không có tác dụng. Hệ thống mới phải thay bằng
    hành động có ngưỡng, không phải boolean.
 5. **`/geo_lang` đã có sẵn hạ tầng đọc IP**: `parseClientIp()` +
-   `isPublicIp()` + rate-limit trong `convex/geoGuard.ts`, dùng
-   `x-forwarded-for` ở `convex/http.ts:60`. Tái sử dụng, không viết lại.
+   `isPublicIp()` + rate-limit — hàm thuần nằm ở `convex/clientIp.ts` (tách khỏi
+   `geoGuard.ts` để verify và geo dùng CHUNG một quy tắc), gọi từ
+   `convex/http.ts`. Quy tắc: lấy mục **cuối** của `x-forwarded-for` (proxy
+   append), KHÔNG lấy mục đầu — mục đầu do client tự đặt được. Xem mục 8.
 
 ## 2. Hiện trạng verification
 
@@ -112,7 +114,9 @@ nào ghi giá trị thật** — đây là chỗ nối vào hệ thống mới.
              ▼                                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ Convex HTTP action (http.ts)                                 │
-│  1. parseClientIp(x-forwarded-for) + isPublicIp()            │
+│  0. chốt `consent` trước mọi thao tác đọc/ghi                │
+│  1. resolveClientIp(x-forwarded-for cuối → metadata Convex)   │
+│     + isPublicIp() — private/rỗng thì fail-closed             │
 │  2. HMAC-SHA-256 → ipHash (theo guild)                       │
 │  3. tra ipBans → trúng: deny + audit + enqueue banJob        │
 │  4. tra ipIntelCache → nếu thiếu: gọi provider (timeout 4s)  │
@@ -378,19 +382,19 @@ không chỉ vào docs):
 
 ## 7. Bảo mật — threat model (STRIDE)
 
-| Mối đe dọa                 | Kịch bản                                   | Kiểm soát                                                                                                                                   |
-| -------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Spoofing**               | Đoán/đánh cắp token verify                 | 32 byte CSPRNG, chỉ lưu hash, TTL 10 phút, dùng 1 lần, bind guild+user                                                                      |
-| **Spoofing IP**            | Client tự gửi `X-Forwarded-For` giả        | Chỉ tin header do platform/proxy tin cậy đặt; `isPublicIp()`; nếu sau Cloudflare thì chỉ nhận `CF-Connecting-IP` khi origin khoá Cloudflare |
-| **Tampering**              | Sửa `guildId`/`userId` trong request       | Token bind cả hai; server đọc từ session, không tin body                                                                                    |
-| **Repudiation**            | Admin phủ nhận đã ban IP                   | Audit log bất biến (bảng `securityAudit`/`antinukeEvents`)                                                                                  |
-| **Information disclosure** | Lộ IP thô qua dashboard/log/backup         | Chỉ lưu hash; log redact; dashboard chỉ hiện country/ASN/VPN; không trả hash cho client                                                     |
-| **DoS**                    | Spam `/verify/complete` đốt provider quota | Rate-limit DB-backed: per token 5, per user 3/10 phút, per IP hash 10/giờ, global 300/phút; cache 24h; circuit breaker                      |
-| **Elevation**              | User thường gọi `ipBans:create`            | `canManageGuild` + token session; chỉ admin server; audit                                                                                   |
-| **SSRF**                   | Provider URL bị điều khiển                 | URL cố định trong code; không nhận URL từ client                                                                                            |
-| **Replay**                 | Dùng lại token đã consume                  | `consumedAt` + status; transaction kiểm tra trước khi ghi                                                                                   |
-| **Enumeration**            | Dò IP nào bị ban                           | Luôn trả cùng một thông báo generic; không trả lý do chi tiết                                                                               |
-| **Open redirect**          | `?next=` dẫn sang site lạ                  | Không nhận redirect param; success page cố định                                                                                             |
+| Mối đe dọa                 | Kịch bản                                   | Kiểm soát                                                                                                                                                                                                          |
+| -------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Spoofing**               | Đoán/đánh cắp token verify                 | 32 byte CSPRNG, chỉ lưu hash, TTL 10 phút, dùng 1 lần, bind guild+user                                                                                                                                             |
+| **Spoofing IP**            | Client tự gửi `X-Forwarded-For` giả        | Chỉ lấy mục **cuối** (proxy append), lùi về metadata Convex khi mục cuối private; `isPublicIp()`; self-test `/verify/self-test` dò hạ tầng có để client điều khiển XFF không. KHÔNG lấy mục đầu — đó là lỗ hổng cũ |
+| **Tampering**              | Sửa `guildId`/`userId` trong request       | Token bind cả hai; server đọc từ session, không tin body                                                                                                                                                           |
+| **Repudiation**            | Admin phủ nhận đã ban IP                   | Audit log bất biến (bảng `securityAudit`/`antinukeEvents`)                                                                                                                                                         |
+| **Information disclosure** | Lộ IP thô qua dashboard/log/backup         | Chỉ lưu hash; log redact; dashboard chỉ hiện country/ASN/VPN; không trả hash cho client                                                                                                                            |
+| **DoS**                    | Spam `/verify/complete` đốt provider quota | Rate-limit DB-backed: per token 5, per user 3/10 phút, per IP hash 10/giờ, global 300/phút; cache 24h; circuit breaker                                                                                             |
+| **Elevation**              | User thường gọi `ipBans:create`            | `canManageGuild` + token session; chỉ admin server; audit                                                                                                                                                          |
+| **SSRF**                   | Provider URL bị điều khiển                 | URL cố định trong code; không nhận URL từ client                                                                                                                                                                   |
+| **Replay**                 | Dùng lại token đã consume                  | `consumedAt` + status; transaction kiểm tra trước khi ghi                                                                                                                                                          |
+| **Enumeration**            | Dò IP nào bị ban                           | Luôn trả cùng một thông báo generic; không trả lý do chi tiết                                                                                                                                                      |
+| **Open redirect**          | `?next=` dẫn sang site lạ                  | Không nhận redirect param; success page cố định                                                                                                                                                                    |
 
 Bổ sung:
 
@@ -414,13 +418,17 @@ có người dùng EU. Trước khi triển khai phải có:
 1. **Cơ sở pháp lý & mục đích**: chống raid/alt/bot, không dùng cho quảng cáo
    hay bán dữ liệu. Ghi rõ trong `/privacy` (đã có route) và trong trang verify.
 2. **Thông báo + đồng ý**: checkbox trước khi gửi; nêu mục đích, thời hạn lưu,
-   bên nhận (provider IP intel), quyền yêu cầu xoá.
+   bên nhận (provider IP intel), quyền yêu cầu xoá. Server tự gắn
+   `consentVersion` + `consentAt` — client chỉ khai `consent: true`, và thiếu
+   consent thì KHÔNG băm/gọi provider/ghi DB.
 3. **Tối giản**: không lưu IP thô; chỉ lưu hash + country/ASN/VPN; không lưu
    user-agent thô (chỉ hash nếu cần chống lạm dụng).
-4. **Hạn lưu**: session 15 phút; `memberIpLinks` 30 ngày (cấu hình 7–90);
-   `ipBans` tối đa 90 ngày (mặc định 30); `ipIntelCache` 24 giờ; audit 180 ngày.
-5. **Quyền chủ thể**: admin có nút "Xoá dữ liệu IP của thành viên"; owner có
-   "Xoá toàn bộ dữ liệu IP của server"; hỗ trợ yêu cầu qua `/data-deletion`.
+4. **Hạn lưu** (đang cài trong `botRunRetention`): phiên xoá 7 ngày sau khi hết
+   hạn; cạnh link 180 ngày; audit 365 ngày; `ipBans` xoá hẳn 90 ngày sau khi
+   hết hạn; `ipIntelCache` 24 giờ; tín hiệu identity 24 tháng.
+5. **Quyền chủ thể**: admin có nút "Xoá dữ liệu xác minh của thành viên" trong
+   `VerifyWebCard` (`verify.deleteUserVerifyData` — xoá phiên/tín hiệu/link,
+   bỏ định danh audit + IP ban); hỗ trợ yêu cầu qua `/data-deletion`.
 6. **Chuyển dữ liệu xuyên biên giới**: provider IP intel thường ở nước ngoài →
    cần DPA/SCC và ghi rõ trong chính sách; nếu không, chọn provider nội địa hoặc
    chỉ dùng country từ `api.country.is` (không đủ cho VPN).
@@ -561,3 +569,21 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
   Việc edge production có ghi đè XFF hay không phải kiểm bằng request thật tới
   `*.convex.site`; đến khi xác nhận, coi XFF là ranh giới cần platform bảo đảm.
   Trần per-IP và ban IP chỉ đáng tin khi edge ghi đè header.
+
+## 12. Gia cố P0 (11/11/2026)
+
+- **XFF: lấy mục CUỐI, không lấy mục đầu.** `convex/clientIp.ts` là bản duy
+  nhất của quy tắc (dùng cho `/geo_lang`, `/verify/complete`, self-test).
+  `resolveClientIp()` ưu tiên mục cuối nếu công cộng, lùi về metadata Convex,
+  và fail-closed khi cả hai private. Đổi `TRUSTED_PROXY_HOPS` chỉ khi biết chắc
+  số hop — mặc định 1.
+- **Self-test trước khi bật.** `POST /verify/self-test` (Bearer token admin)
+  kiểm env, ipapi.is, cấu hình guild, heartbeat bot và dò XFF bằng IP TEST-NET.
+  Trình duyệt không gửi được `x-forwarded-for` → check XFF là advisory
+  `probe_missing`; muốn kết luận phải chạy curl kèm header thật.
+- **Consent server-authoritative.** Thiếu `consent: true` → `consent_required`
+  trước khi đọc DB/băm/gọi provider. `consentVersion` + `consentAt` do server
+  ghi.
+- **Xoá dữ liệu theo guild.** `verify.deleteUserVerifyData` xoá phiên/tín
+  hiệu/link, bỏ định danh audit + IP ban (giữ hồ sơ an ninh). `listSessions`
+  không còn trả hash IP đầy đủ — chỉ `canBanIp`.

@@ -12,12 +12,24 @@ import {
   botCreateSession,
   botFinishGrant,
   botPendingGrants,
+  botRunRetention,
+  deleteUserVerifyData,
   finalize,
   getSession,
   listLinks,
+  listSessions,
 } from "../convex/verify";
+import { complete as completeAction } from "../convex/verifyActions";
+import { authorize as preflightAuthorize } from "../convex/verifyPreflightData";
+import { ipapiLooksValid } from "../convex/verifyPreflight";
 import { computeBotKey } from "../convex/botAuth";
-import { hashVerifyToken, ipHash, globalIpHash, signalHash } from "../convex/verifyCrypto";
+import {
+  VERIFY_CONSENT_VERSION,
+  hashVerifyToken,
+  ipHash,
+  globalIpHash,
+  signalHash,
+} from "../convex/verifyCrypto";
 
 const BOT_KEY = "khoa-bot-cho-test-verify";
 const SECRET = "secret-test-verify";
@@ -171,6 +183,29 @@ const claimH = (botClaimGrant as any)._handler;
 const finishH = (botFinishGrant as any)._handler;
 const pendingH = (botPendingGrants as any)._handler;
 const linksH = (listLinks as any)._handler;
+const sessionsH = (listSessions as any)._handler;
+const deleteH = (deleteUserVerifyData as any)._handler;
+const retentionH = (botRunRetention as any)._handler;
+const completeH = (completeAction as any)._handler;
+const preflightH = (preflightAuthorize as any)._handler;
+
+const DASH_TOKEN = "dashboard-token-test";
+
+/** Dựng user + phiên dashboard hợp lệ để test các query cần quyền. */
+function login(tables: Record<string, Row[]>) {
+  tables.users.push({
+    _id: "user-dash",
+    discordId: "999999999999999999",
+    manageableGuildIds: [GUILD],
+  });
+  tables.sessions.push({
+    _id: "sess-dash",
+    token: DASH_TOKEN,
+    userId: "user-dash",
+    createdAt: Date.now(),
+    authVersion: 1,
+  });
+}
 
 /** Tạo phiên rồi trả token thô (chỉ test mới có token thô). */
 async function newSession(ctx: any, userId = USER_A, privileged = false) {
@@ -193,7 +228,6 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     tokenHash: hashVerifyToken(token),
     sharedIp: false,
     human: true,
-    consentVersion: "2026-11-11",
     ...signals,
     ...extra,
   });
@@ -282,6 +316,37 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
       tables.verifyAudit.some((r) => r.action === "verify_completed"),
     );
     check("ghi 4 tín hiệu", tables.verifySignals.length === 4, tables.verifySignals.length);
+    check("server gán consentVersion", row.consentVersion === VERIFY_CONSENT_VERSION);
+    check("server ghi consentAt", typeof row.consentAt === "number");
+  }
+
+  // ═══ 5b. Consent bắt buộc + kiểm tra TRƯỚC khi đọc DB ═══
+  console.log("\n── verifyActions.complete: consent ──");
+  {
+    let touched = false;
+    const fakeCtx = {
+      runQuery: async () => {
+        touched = true;
+        return null;
+      },
+      runMutation: async () => {
+        touched = true;
+        return null;
+      },
+    };
+    const res = await completeH(fakeCtx, {
+      token: "x".repeat(43),
+      ip: "203.0.113.5",
+      userAgent: "UA",
+      human: true,
+      consent: false,
+    });
+    check(
+      "consent=false → consent_required",
+      res.ok === false && res.code === "consent_required",
+      res,
+    );
+    check("consent=false → KHÔNG chạm DB", touched === false);
   }
 
   // ═══ 6. Dùng lại token → used ═══
@@ -412,6 +477,32 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     );
   }
 
+  // ═══ 11b. Không link xuyên guild ═══
+  console.log("\n── finalize: cô lập tín hiệu theo guild ──");
+  {
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    const otherGuild = "999999999999999999";
+    tables.verifySignals.push({
+      _id: "sig-other",
+      kind: "fingerprint",
+      valueHash: signalHash(SECRET, "fp", "fp-cross"),
+      userId: USER_B,
+      guildId: otherGuild,
+      firstSeenAt: Date.now(),
+      lastSeenAt: Date.now(),
+      hits: 1,
+    });
+    const { token } = await newSession(ctx, USER_A);
+    const res = await runFinalize(ctx, token, signalsFor("203.0.113.50", "fp-cross", "ck-cross"));
+    check("vẫn allow", res.ok && res.decision === "allow", res);
+    check(
+      "KHÔNG gắn linkedUserId từ guild khác",
+      tables.verifySessions[0].linkedUserId === undefined,
+      tables.verifySessions[0].linkedUserId,
+    );
+    check("KHÔNG tạo verifyLinks xuyên guild", tables.verifyLinks.length === 0);
+  }
+
   // ═══ 12. Bot claim grant đúng một lần ═══
   console.log("\n── botClaimGrant: fencing ──");
   {
@@ -501,6 +592,165 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
       threw = true;
     }
     check("botCreateSession từ chối botKey sai", threw);
+  }
+
+  // ═══ 13b. listSessions không trả hash đầy đủ ═══
+  console.log("\n── listSessions: chỉ trả hash rút gọn + canBanIp ──");
+  {
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    login(tables);
+    const { token } = await newSession(ctx);
+    await runFinalize(ctx, token, signalsFor("203.0.113.70", "fp-list", "ck-list"));
+    const rows = await sessionsH(ctx, { token: DASH_TOKEN, guildId: GUILD });
+    check("trả 1 phiên", Array.isArray(rows) && rows.length === 1);
+    check("canBanIp=true", rows?.[0]?.canBanIp === true);
+    check("KHÔNG có ipHash đầy đủ", rows?.[0] && !("ipHash" in rows[0]));
+    check("vẫn có ipHashShort", typeof rows?.[0]?.ipHashShort === "string");
+  }
+
+  // ═══ 13c. Xoá dữ liệu verify theo thành viên ═══
+  console.log("\n── deleteUserVerifyData ──");
+  {
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    login(tables);
+    const a = await newSession(ctx, USER_A);
+    await runFinalize(ctx, a.token, signalsFor("203.0.113.71", "fp-del", "ck-del"));
+    const b = await newSession(ctx, USER_B);
+    await runFinalize(ctx, b.token, signalsFor("203.0.113.72", "fp-del", "ck-del"));
+    await ctx.db.insert("ipBans", {
+      guildId: GUILD,
+      ipHash: "a".repeat(64),
+      scope: "ip",
+      reason: "test",
+      createdBy: "admin",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 86_400_000,
+      evidenceUserId: USER_A,
+      active: true,
+    });
+    check("trước khi xoá có link A↔B", tables.verifyLinks.length === 1);
+
+    const res = await deleteH(ctx, { token: DASH_TOKEN, guildId: GUILD, userId: USER_A });
+    check("trả ok", res.ok === true, res);
+    check("xoá phiên của A", !tables.verifySessions.some((r) => r.userId === USER_A));
+    check(
+      "giữ phiên của B",
+      tables.verifySessions.some((r) => r.userId === USER_B),
+    );
+    check("xoá signal của A", !tables.verifySignals.some((r) => r.userId === USER_A));
+    check(
+      "xoá cạnh link liên quan A",
+      !tables.verifyLinks.some((r) => r.userId === USER_A || r.linkedUserId === USER_A),
+    );
+    check(
+      "audit cũ của A bị bỏ định danh",
+      tables.verifyAudit
+        .filter((r) => r.action === "verify_completed")
+        .every((r) => r.userId !== USER_A),
+    );
+    check(
+      "ipBan giữ hash nhưng bỏ evidenceUserId",
+      tables.ipBans[0].evidenceUserId === undefined &&
+        tables.ipBans[0].evidenceSessionId === undefined,
+    );
+    check(
+      "có audit xoá dữ liệu",
+      tables.verifyAudit.some((r) => r.action === "verify_user_data_deleted"),
+    );
+  }
+
+  // ═══ 13d. Retention dọn link/audit/ipBan cũ ═══
+  console.log("\n── botRunRetention: dọn bảng chưa có TTL ──");
+  {
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    const old = Date.now() - 800 * 24 * 3600_000;
+    tables.verifySessions.push({
+      _id: "old-s",
+      tokenHash: "x",
+      guildId: GUILD,
+      userId: USER_A,
+      createdAt: old,
+      expiresAt: old + 600_000,
+      status: "verified",
+    });
+    tables.verifyLinks.push({
+      _id: "old-l",
+      guildId: GUILD,
+      userId: USER_A,
+      linkedUserId: USER_B,
+      score: 70,
+      reasons: [],
+      status: "candidate",
+      createdAt: old,
+      updatedAt: old,
+      lastSignalAt: old,
+    });
+    tables.verifyAudit.push({
+      _id: "old-a",
+      guildId: GUILD,
+      action: "verify_completed",
+      actor: "system",
+      createdAt: old,
+    });
+    tables.ipBans.push({
+      _id: "old-b",
+      guildId: GUILD,
+      ipHash: "b".repeat(64),
+      scope: "ip",
+      reason: "x",
+      createdBy: "admin",
+      createdAt: old,
+      expiresAt: old,
+      active: true,
+    });
+
+    const res = await retentionH(ctx, { botKey: BOT_KEY });
+    check("xoá phiên quá hạn 7 ngày", !tables.verifySessions.some((r) => r._id === "old-s"));
+    check("xoá link quá 180 ngày", !tables.verifyLinks.some((r) => r._id === "old-l"));
+    check("xoá audit quá 365 ngày", !tables.verifyAudit.some((r) => r._id === "old-a"));
+    check("xoá ipBan hết hạn quá 90 ngày", !tables.ipBans.some((r) => r._id === "old-b"));
+    check("trả số đã xoá", res.deleted >= 4, res.deleted);
+  }
+
+  // ═══ 13e. Self-test đọc đúng cấu hình, không lộ secret ═══
+  console.log("\n── verifyPreflightData.authorize ──");
+  {
+    const { ctx, tables } = makeCtx({
+      verifyEnabled: true,
+      verifyWebEnabled: true,
+      verifyMethod: "web",
+      verifyChannelId: "111",
+      unverifiedRoleId: "222",
+      verifiedRoleId: "333",
+    });
+    login(tables);
+    tables.botStatus[0].online = true;
+    tables.botStatus[0].lastHeartbeat = Date.now();
+    const res = await preflightH(ctx, { token: DASH_TOKEN, guildId: GUILD });
+    check("authorize ok", res.ok === true, res);
+    check(
+      "trả đủ cấu hình guild",
+      res.ok && res.guild.verifyMethod === "web" && res.guild.unverifiedRoleId === "222",
+    );
+    check("trả bot online", res.ok && res.bot.online === true);
+    check("không trả secret", res.ok && !JSON.stringify(res).toLowerCase().includes("secret"));
+    const denied = await preflightH(ctx, { token: "sai", guildId: GUILD });
+    check("token sai → unauthenticated", denied.ok === false && denied.code === "unauthenticated");
+  }
+
+  // ═══ 13f. ipapi.is: 200 OK nhưng sai hình dạng phải bị coi là lỗi ═══
+  console.log("\n── verifyPreflight.ipapiLooksValid ──");
+  {
+    check("có ip → hợp lệ", ipapiLooksValid({ ip: "1.1.1.1" }) === true);
+    check("có is_vpn → hợp lệ", ipapiLooksValid({ is_vpn: false }) === true);
+    check("có asn object → hợp lệ", ipapiLooksValid({ asn: { asn: 13335 } }) === true);
+    check(
+      "object lỗi khóa sai → KHÔNG hợp lệ",
+      ipapiLooksValid({ error: "invalid key" }) === false,
+    );
+    check("null → KHÔNG hợp lệ", ipapiLooksValid(null) === false);
+    check("ip sai kiểu → KHÔNG hợp lệ", ipapiLooksValid({ ip: 123 }) === false);
+    check("chuỗi → KHÔNG hợp lệ", ipapiLooksValid("ok") === false);
   }
 
   // ═══ 14. Dashboard links chỉ đọc khi có quyền ═══

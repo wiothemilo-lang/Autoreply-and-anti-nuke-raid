@@ -1795,7 +1795,7 @@ export const EN: Record<string, string> = {
   "Địa chỉ IP không được lưu — chỉ lưu giá trị băm một chiều không thể đảo ngược.":
     "Your IP address is not stored — only a one-way hash that cannot be reversed.",
   "Xác minh ngay": "Verify now",
-  "Khi bấm, bạn đồng ý với": "By pressing, you agree to the",
+
   "Chính sách quyền riêng tư": "Privacy Policy",
   "Đang xác minh…": "Verifying…",
   "Đã xác minh tín hiệu": "Verification checks passed",
@@ -1885,4 +1885,54 @@ export const EN: Record<string, string> = {
   "Xác minh thành viên — Protogon": "Member verification — Protogon",
   "Xác minh thành viên qua web: kiểm tra thiết bị và kết nối để chặn tài khoản giả, VPN và tài khoản phụ.":
     "Web-based member verification: checks device and connection signals to block fake accounts, VPNs and alts.",
+  // ── Consent + self-test + xoá dữ liệu verify (11/11/2026) ──
+  "Chúng tôi không lưu địa chỉ IP — chỉ lưu giá trị băm một chiều.":
+    "We do not store your IP address — only an irreversible hash.",
+  "Tôi đã đọc và đồng ý với": "I have read and agree to the",
+  "và việc kiểm tra thiết bị/kết nối để xác minh.":
+    "and to the device/connection checks used for verification.",
+  "Hãy đọc và đồng ý với chính sách quyền riêng tư trước khi xác minh.":
+    "Please read and accept the privacy policy before verifying.",
+  "Kiểm tra sẵn sàng": "Readiness check",
+  "Chạy trước khi bật xác minh web để phát hiện thiếu cấu hình, bot offline hoặc header IP bị giả mạo.":
+    "Run before enabling web verification to catch missing configuration, an offline bot or a spoofable IP header.",
+  "Chạy kiểm tra": "Run check",
+  "Đủ điều kiện bật xác minh web.": "Ready to enable web verification.",
+  "Đủ điều kiện, nhưng còn mục cần kiểm tra thêm.": "Ready, but some checks still need attention.",
+  "Còn mục chưa đạt — xem chi tiết bên dưới.": "Some checks failed — see details below.",
+  "24 giờ qua": "Last 24 hours",
+  "Không chạy được kiểm tra — thử lại sau.": "Could not run the check — try again later.",
+  "Xoá toàn bộ dữ liệu xác minh của thành viên này trong server này? Hành động không hoàn tác. Hồ sơ an ninh (audit/IP ban) chỉ được bỏ định danh, không xoá.":
+    "Delete all verification data for this member in this server? This cannot be undone. Security records (audit/IP ban) are de-identified, not deleted.",
+  "Đã xoá dữ liệu xác minh của thành viên.": "Member verification data deleted.",
+  "Xoá dữ liệu xác minh của thành viên": "Delete member verification data",
+  "Xoá thất bại": "Delete failed",
+  "Khóa băm IP (IP_HASH_SECRET)": "IP hash key (IP_HASH_SECRET)",
+  "Khóa ipapi.is (IPINTEL_API_KEY)": "ipapi.is key (IPINTEL_API_KEY)",
+  "Kết nối ipapi.is": "ipapi.is connectivity",
+  "Chống giả mạo IP": "IP spoofing protection",
+  "Cấu hình xác minh": "Verification configuration",
+  "Role xác minh": "Verification roles",
+  "Bot trực tuyến": "Bot online",
+  "Lỗi cấp quyền 24 giờ": "Grant errors in the last 24 hours",
+  Đạt: "Passed",
+  "Chưa chọn kênh": "No channel selected",
+  "Chưa cấu hình": "Not configured",
+  "Quá ngắn (cần ít nhất 32 ký tự)": "Too short (at least 32 characters required)",
+  "Quá thời gian chờ": "Timed out",
+  "Không kết nối được": "Cannot connect",
+  "Bỏ qua vì thiếu khóa": "Skipped because the key is missing",
+  "Phản hồi không hợp lệ (kiểm tra lại khóa)": "Invalid response (double-check the key)",
+  "Header bị tin trực tiếp — NGUY HIỂM": "Header is trusted directly — DANGEROUS",
+  "Không gửi được header kiểm tra — hãy kiểm tra thủ công bằng curl":
+    "Could not send the probe header — check manually with curl",
+  "Chưa bật xác minh": "Verification is off",
+  "Chưa bật xác minh web": "Web verification is off",
+  "Phương thức không phải web": "Method is not web",
+  "Thiếu role chưa xác minh": "Missing unverified role",
+  "Thiếu role đã xác minh": "Missing verified role",
+  "Bot offline": "Bot offline",
+  "Heartbeat quá cũ": "Heartbeat is stale",
+  "Có lỗi trong 24 giờ": "Errors in the last 24 hours",
+  "Không có": "None",
 };

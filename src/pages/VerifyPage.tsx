@@ -37,6 +37,8 @@ import { translate } from "../lib/i18n";
 const COOKIE_KEY = "pg_vid";
 /** Ở trang ít nhất 1.5s mới coi là người thật — bot điền form thường nhanh hơn. */
 const MIN_DWELL_MS = 1500;
+/** Ở lâu hơn ngưỡng này thì không bắt buộc phải có cử động (người dùng chậm). */
+const SLOW_HUMAN_MS = 4000;
 
 type Phase =
   | "loading"
@@ -145,6 +147,8 @@ export default function VerifyPage() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [message, setMessage] = useState("");
   const [human, setHuman] = useState(false);
+  /** Đồng ý xử lý dữ liệu — bắt buộc trước khi gửi bất kỳ tín hiệu nào. */
+  const [consent, setConsent] = useState(false);
   const mountedAt = useRef(Date.now());
   const honeypot = useRef<HTMLInputElement | null>(null);
   const moved = useRef(false);
@@ -202,17 +206,24 @@ export default function VerifyPage() {
 
   const submit = useCallback(async () => {
     if (phase === "sending" || phase === "granting" || phase === "granted") return;
+    if (!consent) {
+      setMessage(translate("Hãy đọc và đồng ý với chính sách quyền riêng tư trước khi xác minh."));
+      return;
+    }
     setPhase("sending");
     setMessage("");
 
     const dwell = Date.now() - mountedAt.current;
     const nav = navigator as Navigator & { webdriver?: boolean };
     // 3 điều kiện vô hình. Thiếu bất kỳ điều nào → server từ chối, không phạt.
+    // Cử động chuột/chạm/phím là tín hiệu thật; người dùng chậm (đọc kỹ, mạng
+    // lag) được miễn để không chặn oan — trước đây điều kiện `moved` bị vô hiệu
+    // vì `dwell >= MIN_DWELL_MS` đã bắt buộc ở vế trước.
     const looksHuman =
       dwell >= MIN_DWELL_MS &&
       nav.webdriver !== true &&
       !honeypot.current?.value &&
-      (moved.current || dwell >= MIN_DWELL_MS);
+      (moved.current || dwell >= SLOW_HUMAN_MS);
     setHuman(looksHuman);
 
     try {
@@ -225,6 +236,8 @@ export default function VerifyPage() {
           fingerprint,
           cookieId: deviceId(),
           human: looksHuman,
+          // Server gắn phiên bản consent; client chỉ khai "đã đồng ý".
+          consent: true,
         }),
       });
       const data = (await res.json()) as CompleteResponse;
@@ -246,7 +259,7 @@ export default function VerifyPage() {
       setPhase("error");
       setMessage(translate("Không kết nối được máy chủ — kiểm tra mạng rồi thử lại."));
     }
-  }, [phase, token]);
+  }, [phase, token, consent]);
 
   const guildName = session?.guildName || translate("server này");
 
@@ -317,16 +330,36 @@ export default function VerifyPage() {
                   aria-hidden="true"
                   className="pointer-events-none absolute h-0 w-0 opacity-0"
                 />
-                <Button className="w-full" onClick={submit} disabled={phase !== "ready"}>
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/50 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                  />
+                  <span>
+                    {translate("Tôi đã đọc và đồng ý với")}{" "}
+                    <a
+                      className="underline hover:text-foreground"
+                      href="/privacy"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {translate("Chính sách quyền riêng tư")}
+                    </a>{" "}
+                    {translate("và việc kiểm tra thiết bị/kết nối để xác minh.")}
+                  </span>
+                </label>
+                <Button
+                  className="w-full"
+                  onClick={submit}
+                  disabled={phase !== "ready" || !consent}
+                >
                   <BadgeCheck className="mr-2 h-4 w-4" />
                   {translate("Xác minh ngay")}
                 </Button>
                 <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-                  {translate("Khi bấm, bạn đồng ý với")}{" "}
-                  <a className="underline hover:text-foreground" href="/privacy">
-                    {translate("Chính sách quyền riêng tư")}
-                  </a>
-                  .
+                  {translate("Chúng tôi không lưu địa chỉ IP — chỉ lưu giá trị băm một chiều.")}
                 </p>
               </div>
             )}
@@ -437,6 +470,8 @@ function codeMessage(code: string): string {
       return translate("Server chưa cấu hình xong tính năng xác minh — hãy báo quản trị server.");
     case "ip_unavailable":
       return translate("Không xác định được kết nối của bạn — hãy thử lại bằng mạng khác.");
+    case "consent_required":
+      return translate("Hãy đọc và đồng ý với chính sách quyền riêng tư trước khi xác minh.");
     case "rate_limited":
       return translate("Bạn thao tác quá nhanh — chờ một phút rồi thử lại.");
     case "forbidden_origin":
