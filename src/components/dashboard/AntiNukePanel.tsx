@@ -302,6 +302,11 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
                       "Chia sẻ chữ ký raid ẩn danh với các server khác dùng Protogon — server của bạn được bảo vệ bằng kinh nghiệm toàn mạng.",
                     )}{" "}
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {translate(
+                      "Khi bật đóng góp: đoạn nội dung spam tối đa 60 ký tự (đã lược mention) và tên bot lạ được chia sẻ ẩn danh trong 24 giờ; không gửi ID người dùng, server nguồn bị băm một chiều.",
+                    )}
+                  </p>
                   {relayStatus && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       {translate("Hiện có")} {relayStatus.activeSignatures}{" "}

@@ -19,7 +19,10 @@ export default defineSchema({
     authVersion: v.optional(v.number()),
   })
     .index("by_token", ["token"])
-    .index("by_userId", ["userId"]),
+    .index("by_userId", ["userId"])
+    // Dọn phiên quá hạn 30 ngày (botRunRetention). Trước đây phiên hết hạn chỉ
+    // bị TỪ CHỐI khi đọc chứ không bao giờ bị xoá — bảng phình mãi.
+    .index("by_createdAt", ["createdAt"]),
 
   /**
    * Ngôn ngữ được đểt bằng `/language`. Để được chưa dùng của mình
@@ -717,7 +720,10 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_guildId", ["guildId"])
-    .index("by_guildId_createdAt", ["guildId", "createdAt"]),
+    .index("by_guildId_createdAt", ["guildId", "createdAt"])
+    // Dọn theo tuổi bản ghi (botRunRetention) — không có index này thì job dọn
+    // phải quét toàn bảng hoặc lặp từng server, cả hai đều đắt vô ích.
+    .index("by_createdAt", ["createdAt"]),
 
   guildBackups: defineTable({
     guildId: v.string(),
@@ -1244,7 +1250,10 @@ export default defineSchema({
   })
     .index("by_guildId", ["guildId"])
     .index("by_guildId_joinedAt", ["guildId", "joinedAt"])
-    .index("by_guildId_riskScore", ["guildId", "riskScore"]),
+    .index("by_guildId_riskScore", ["guildId", "riskScore"])
+    // Dọn lượt join cũ theo tuổi (botRunRetention). Bản ghi join chứa tên/avatar
+    // và điểm rủi ro — không có lý do giữ vô hạn sau khi đã hết giá trị chống alt.
+    .index("by_joinedAt", ["joinedAt"]),
 
   /**
    * verifySessions — một lượt xác minh qua web (Double Counter style).
@@ -1600,6 +1609,12 @@ export default defineSchema({
     // cho phép `order("desc").first()` đọc ĐÚNG 1 document, thay vì collect
     // toàn bộ ticket của user rồi sort trong RAM.
     .index("by_guildId_openerId_createdAt", ["guildId", "openerId", "createdAt"])
+    /**
+     * Dọn ticket đã đóng theo tuổi (botRunRetention). Chỉ ticket ĐÃ ĐÓNG mới
+     * có `closedAt`, nên index này tự bỏ qua ticket còn mở — đúng ý: không
+     * xoá nội dung của ticket đang chờ staff xử lý.
+     */
+    .index("by_closedAt", ["closedAt"])
     /**
      * Tra ticket theo ĐÚNG kênh (mỗi kênh chỉ thuộc 1 ticket).
      *

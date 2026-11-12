@@ -762,6 +762,10 @@ export const DE: Record<string, string> = {
   "Sự cố / lỗi": "Vorfälle / Fehler",
   "Threat Intel — bot tự học": "Threat Intel — der Bot lernt",
   "Threat relay liên server": "Serverübergreifendes Threat-Relay",
+  "Chia sẻ chữ ký raid ẩn danh với các server khác dùng Protogon — server của bạn được bảo vệ bằng kinh nghiệm toàn mạng.":
+    "Anonyme Raid-Signaturen mit anderen Protogon-Servern teilen — dein Server profitiert von netzwerkweiter Erfahrung.",
+  "Khi bật đóng góp: đoạn nội dung spam tối đa 60 ký tự (đã lược mention) và tên bot lạ được chia sẻ ẩn danh trong 24 giờ; không gửi ID người dùng, server nguồn bị băm một chiều.":
+    "Bei aktiviertem Beitrag: ein Spam-Ausschnitt von höchstens 60 Zeichen (ohne Mentions) und Namen auffälliger Bots werden 24 Stunden lang anonym geteilt; keine Nutzer-IDs, der Quellserver wird mit einem Einweg-Hash versehen.",
   "Thumbnail (ảnh nhỏ, tùy chọn)": "Vorschaubild (kleines Bild, optional)",
   "Thành viên": "Mitglieder",
   "Thành viên sở hữu role này được bỏ qua toàn bộ kiểm tra moderation, anti-raid và anti-nuke của":

@@ -6,16 +6,17 @@ sao hợp đồng/thoả thuận xử lý dữ liệu với các bên tham gia.
 > Cột **Chứng từ** ghi nơi lưu bản sao. Không dán nội dung hợp đồng vào repo;
 > lưu PDF/ảnh chụp trong thư mục ngoài repo và ghi đường dẫn nội bộ.
 
-| Nhà cung cấp     | Dịch vụ         | Dữ liệu                                                   | Nơi xử lý                | Vai trò               | Cơ sở chuyển                           | Chứng từ               | Trạng thái             |
-| ---------------- | --------------- | --------------------------------------------------------- | ------------------------ | --------------------- | -------------------------------------- | ---------------------- | ---------------------- |
-| Convex           | DB + backend    | Toàn bộ dữ liệu guild, tài khoản, dữ liệu xác minh đã băm | Hoa Kỳ                   | Bên xử lý             | Hợp đồng                               | `[lưu DPA Convex]`     | **Cần tải DPA**        |
-| Discord Inc.     | Nền tảng        | ID, tên, avatar, nội dung tương tác                       | Hoa Kỳ                   | Bên kiểm soát độc lập | n/a                                    | Chính sách của Discord | n/a                    |
-| ipapi.is         | Tra IP          | Chỉ IP                                                    | Đức / Hoa Kỳ / Singapore | Bên xử lý             | DPA tự động khi dùng API (Điều 12 DPA) | `[lưu DPA ipapi.is]`   | **Đã xác nhận cơ chế** |
-| Kira (kiraai.vn) | AI              | Nội dung lệnh                                             | Việt Nam                 | Bên xử lý             | Hợp đồng                               | `[lưu điều khoản]`     | **Cần xác nhận**       |
-| Groq             | AI              | Nội dung lệnh                                             | Hoa Kỳ                   | Bên xử lý             | Hợp đồng                               | `[lưu DPA]`            | **Cần tải DPA**        |
-| OpenAI           | AI              | Nội dung lệnh                                             | Hoa Kỳ                   | Bên xử lý             | Hợp đồng                               | `[lưu DPA]`            | **Cần tải DPA**        |
-| GitHub           | Lưu code + Gist | Code; backup nếu chủ server bật                           | Hoa Kỳ                   | Bên xử lý             | Hợp đồng                               | `[lưu DPA]`            | **Cần tải DPA**        |
-| Nhà cung cấp VPS | Hạ tầng         | Log hạ tầng                                               | `[NƯỚC]`                 | Bên xử lý             | Hợp đồng                               | `[lưu hợp đồng]`       | **Cần điền tên**       |
+| Nhà cung cấp     | Dịch vụ         | Dữ liệu                                                             | Nơi xử lý                | Vai trò               | Cơ sở chuyển                           | Chứng từ               | Trạng thái             |
+| ---------------- | --------------- | ------------------------------------------------------------------- | ------------------------ | --------------------- | -------------------------------------- | ---------------------- | ---------------------- |
+| Convex           | DB + backend    | Toàn bộ dữ liệu guild, tài khoản, dữ liệu xác minh đã băm           | Hoa Kỳ                   | Bên xử lý             | Hợp đồng                               | `[lưu DPA Convex]`     | **Cần tải DPA**        |
+| Discord Inc.     | Nền tảng        | ID, tên, avatar, nội dung tương tác                                 | Hoa Kỳ                   | Bên kiểm soát độc lập | n/a                                    | Chính sách của Discord | n/a                    |
+| ipapi.is         | Tra IP          | Chỉ IP                                                              | Đức / Hoa Kỳ / Singapore | Bên xử lý             | DPA tự động khi dùng API (Điều 12 DPA) | `[lưu DPA ipapi.is]`   | **Đã xác nhận cơ chế** |
+| Kira (kiraai.vn) | AI              | Nội dung lệnh                                                       | Việt Nam                 | Bên xử lý             | Hợp đồng                               | `[lưu điều khoản]`     | **Cần xác nhận**       |
+| Groq             | AI              | Nội dung lệnh                                                       | Hoa Kỳ                   | Bên xử lý             | Hợp đồng                               | `[lưu DPA]`            | **Cần tải DPA**        |
+| OpenAI           | AI              | Nội dung lệnh                                                       | Hoa Kỳ                   | Bên xử lý             | Hợp đồng                               | `[lưu DPA]`            | **Cần tải DPA**        |
+| GitHub           | Lưu code + Gist | Code; backup nếu chủ server bật                                     | Hoa Kỳ                   | Bên xử lý             | Hợp đồng                               | `[lưu DPA]`            | **Cần tải DPA**        |
+| ZaloPay          | Cổng thanh toán | Mã đơn, số tiền, trạng thái; thông tin thẻ/tài khoản do ZaloPay giữ | Việt Nam                 | Bên xử lý             | Hợp đồng/điều khoản dịch vụ            | `[lưu điều khoản]`     | **Cần xác nhận**       |
+| Nhà cung cấp VPS | Hạ tầng         | Log hạ tầng                                                         | `[NƯỚC]`                 | Bên xử lý             | Hợp đồng                               | `[lưu hợp đồng]`       | **Cần điền tên**       |
 
 ## Việc phải làm
 
