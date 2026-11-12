@@ -96,6 +96,18 @@
 
 ---
 
+## 2026-11-12 (7) — Vá công tắc module biến mất trên dashboard
+
+- 🐛 Gốc rễ: `.modern-toggle__stack` là grid item `justify-self: center`
+  (shrink-to-fit) mà `.modern-toggle__switch` đặt `width: 100%` → 100% của hộp
+  `auto` resolve thành `auto`; con của switch đều absolute nên bề rộng nội
+  dung 0 → track/núm **0×0**, toàn bộ công tắc module vô hình dù DOM vẫn đủ.
+- ✅ Vá: `width: 100%` cho stack (lấy mốc từ grid area 36px của
+  `.threeui-switch`); thêm test trình duyệt **L1** đo layout thật trên CSS đã
+  build — đã chứng minh ĐỎ (0×0) khi thiếu fix, XANH (36×20.45) khi có.
+- 🧪 90/90 CJS · 34/34 TS · typecheck/lint/format sạch.
+- ▶️ Tiếp theo: PR → CI → merge; nhắc RFTV đổi Verify sang Button/Captcha.
+
 ## 2026-11-12 (6) — Tạm khoá thu thập IP, bot vẫn chạy
 
 - ✅ Xong: công tắc `IP_COLLECTION_ENABLED=false` trong `convex/ipCollectionLock.ts`;
