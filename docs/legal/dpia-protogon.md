@@ -77,6 +77,13 @@ này. Vì vậy:
   đồng ý phải tăng version và lưu ảnh chụp màn hình tương ứng.
 - Từ chối đồng ý = không gửi IP/thiết bị, không xác minh; không có hình phạt tự động.
 
+**Vì sao chọn sự đồng ý thay vì Điều 19(1)(a) Luật** (bảo vệ quyền/lợi ích trước
+hành vi xâm phạm): điều kiện của Điều 19(1)(a) là **cần thiết** và **trong trường
+hợp cấp bách**, bên kiểm soát phải chứng minh cho từng trường hợp. Xác minh hàng
+loạt mọi thành viên mới không đáp ứng tính cấp bách của từng người, nên sự đồng ý
+là căn cứ sạch và minh bạch hơn. Dù chọn căn cứ nào, **DPIA và CTIA vẫn bắt buộc**
+— đây là nghĩa vụ giải trình, không phải giấy tờ của riêng sự đồng ý.
+
 ## 4. Sự cần thiết và tương xứng
 
 - Xác minh web chỉ chạy khi chủ server bật (`verifyWebEnabled`) và người dùng tick
