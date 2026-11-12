@@ -2,19 +2,22 @@
 
 ## Đang dở
 
-- 🚧 **Verify web: UX + pháp lý đã xong (nhánh `feat/verify-legal-ux`) nhưng CHƯA bật được**:
-  cần đặt
-  `IP_HASH_SECRET` (bắt buộc — thiếu thì mọi phiên `failed: missing_secret`) và
-  `IPINTEL_API_KEY` (khuyến nghị — thiếu thì không phát hiện VPN/proxy/Tor) trong
-  Convex env, `DASHBOARD_URL` trong env bot VPS, chạy curl self-test XFF trên edge
-  production, có DPA/SCC với ipapi.is, rồi mới bật `verifyWebEnabled`.
-  Chưa có test tích hợp với ipapi.is thật (chỉ mock `parseIntel` + policy thuần).
+- 🚧 **Verify web đã bật cho RFTV (12/11/2026) nhưng bot VPS chưa restart**:
+  `IP_HASH_SECRET` + `IPINTEL_API_KEY` đã đặt trên Convex prod
+  `accomplished-chipmunk-74`; self-test trả `ok:true` (XFF `probe_missing`
+  advisory nhưng `ip.source=xff`, chainLength 1, spoofRisk false). Đã bật
+  `verifyMethod=web`, `verifyWebEnabled=true` cho guild RFTV
+  `1524054368524173454`; roles/kênh/bot đều xanh. **Còn**: bot VPS phải
+  `git pull` + restart để dùng link ephemeral; test tài khoản thật; DPA/SCC với
+  ipapi.is; rà bản dịch EN/DE. `IP_HASH_SECRET` đang lưu tạm 0600 ở
+  `~/.secrets/protogon-ip-hash-secret` — chuyển vào password manager rồi xoá.
 
-- 🔐 **XFF production chưa xác nhận** — backend Convex local trả
-  `ctx.meta.getRequestMetadata().ip` đúng bằng `x-forwarded-for` client gửi, nên
-  đổi sang `ctx.meta` KHÔNG vá được giả mạo IP. Chỉ edge `*.convex.site` mới
-  quyết định được; cần một request thật (gửi XFF lạ) tới deployment để xác nhận
-  trước khi tin trần per-IP và ban IP.
+- ✅ **XFF production đã xác nhận (12/11/2026)** — self-test trên edge
+  `accomplished-chipmunk-74.convex.site` trả `ip.source=xff`, `chainLength=1`,
+  `spoofRisk=false`; gửi `x-forwarded-for: 8.8.8.8` và `9.9.9.9` tới
+  `/geo_lang` đều trả `VN` (không phải US/CH), nghĩa là edge không để client
+  điều khiển mục cuối. `probe_missing` chỉ vì edge xoá header thử, không phải
+  dấu hiệu giả mạo.
 
 - 📋 **Nợ sau 5 đợt audit (50 subagent)** — chưa làm vì cần đổi schema/hành vi hoặc
   rủi ro trung bình: `revenueStats` `take(1000)`; `getJobBacklog` full scan; payload/chunk
@@ -86,6 +89,13 @@
 ---
 
 ---
+
+## 2026-11-12 (2) — Bật xác minh web production cho RFTV
+
+- ✅ Xong: đặt `IP_HASH_SECRET` + `IPINTEL_API_KEY` trên Convex prod `accomplished-chipmunk-74`; bật `verifyMethod=web` + `verifyWebEnabled=true` cho RFTV `1524054368524173454`; self-test `ok:true`, roles/kênh/bot đều xanh
+- 🔍 XFF: `probe_missing` advisory nhưng `ip.source=xff`, chainLength 1, spoofRisk false; `/geo_lang` với XFF 8.8.8.8 và 9.9.9.9 đều trả VN → edge không để client điều khiển mục cuối
+- 🔐 Secret hash đang ở `~/.secrets/protogon-ip-hash-secret` (0600) — chờ chuyển vào password manager rồi xoá; đổi secret sẽ làm hash/ban cũ không còn khớp
+- ▶️ Tiếp theo: bot VPS `git pull` + restart để nhận code link ephemeral; test tài khoản thật; DPA/SCC ipapi.is; rà EN/DE
 
 ## 2026-11-12 — Verify web: link tạm thời + chính sách pháp lý đầy đủ
 

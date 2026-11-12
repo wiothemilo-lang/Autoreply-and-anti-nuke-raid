@@ -707,6 +707,10 @@ kéo thêm quyền + bề mặt tấn công).
    EN/DE của chính sách.
 5. Chỉ sau 4 bước trên mới bật cho từng guild.
 
+> Trạng thái 12/11/2026: bước 1–3 đã xong trên production (`self-test` trả
+> `ok:true`, XFF do edge kiểm soát). Bước 4 (DPA/SCC với ipapi.is + rà EN/DE)
+> **còn nợ**; bước 5 đã bật cho guild RFTV sau khi bước 1–3 xanh.
+
 ### 14.6 Giới hạn đã biết (không được che trong copy)
 
 - Checkbox đồng ý là tự khai; không xác minh độ tuổi hay năng lực hành vi.
