@@ -30,7 +30,7 @@ export const IP_BAN_MAX_DAYS = 90;
 export const IP_BAN_DEFAULT_DAYS = 7;
 
 /** Phiên bản consent hiển thị trên trang verify — tăng khi đổi nội dung. */
-export const VERIFY_CONSENT_VERSION = "2026-11-11";
+export const VERIFY_CONSENT_VERSION = "2026-11-12";
 
 const BASE64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 

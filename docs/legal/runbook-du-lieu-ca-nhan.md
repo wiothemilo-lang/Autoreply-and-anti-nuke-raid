@@ -92,11 +92,14 @@ nộp cơ quan. Không xoá log của sự cố trước khi có kết luận.
 ## 3. Bằng chứng đồng ý
 
 - Phiên bản đồng ý hiện tại: `VERIFY_CONSENT_VERSION` trong
-  `convex/verifyCrypto.ts`.
+  `convex/verifyCrypto.ts` (hiện `2026-11-12`).
 - Mỗi phiên xác minh lưu `consentVersion` + `consentAt`.
+- Trang xác minh phải hiển thị khối **"Dữ liệu cá nhân nhạy cảm"** (Điều 4(l),
+  6(4) NĐ 356), nêu ipapi.is là bên thứ ba nhận IP và các nước xử lý (Đức, Hoa
+  Kỳ, Singapore), trước ô đồng ý. Tin nhắn bot cũng phải nêu cùng thông tin.
 - Khi đổi nội dung đồng ý: tăng version, ghi hash SHA-256 của đoạn văn bản tương
-  ứng và lưu cùng tag git `consent-<version>`.
-- Không suy ra đồng ý từ im lặng; không gộp mục đích.
+  ứng, lưu ảnh chụp màn hình trang xác minh và tag git `consent-<version>`.
+- Không suy ra đồng ý từ im lặng; không gộp mục đích; ô đồng ý mặc định trống.
 
 ## 4. Kiểm tra lưu trữ (hàng quý)
 

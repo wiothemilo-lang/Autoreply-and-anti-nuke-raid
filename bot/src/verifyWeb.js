@@ -106,7 +106,8 @@ function buildVerifyMessage(member, session, { ephemeral = false } = {}) {
       `Chào **${member.user?.username ?? "bạn"}**! Nhấn nút bên dưới để xác minh và nhận quyền truy cập **${member.guild.name}**.\n\n` +
         "Trang xác minh sẽ kiểm tra kết nối và thiết bị để chặn tài khoản giả, VPN và tài khoản phụ. " +
         "IP thô **không được lưu** — chỉ lưu giá trị băm một chiều tách theo server. " +
-        "IP được gửi **một lần** tới ipapi.is để tra VPN/proxy/Tor.",
+        "IP được gửi **một lần** tới ipapi.is (Đức, Hoa Kỳ, Singapore) để tra VPN/proxy/Tor; " +
+        "đây là **dữ liệu cá nhân nhạy cảm** theo pháp luật Việt Nam và trang xác minh chỉ gửi sau khi bạn đồng ý.",
     )
     .setFooter({
       text: ephemeral

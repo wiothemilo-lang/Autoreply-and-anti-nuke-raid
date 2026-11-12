@@ -420,13 +420,15 @@ GDPR áp dụng nếu có người dùng EU. Trước khi triển khai phải c�
 
 1. **Cơ sở pháp lý & mục đích**: chống raid/alt/bot, không dùng cho quảng cáo
    hay bán dữ liệu. Dữ liệu vận hành dựa trên hợp đồng + lợi ích hợp pháp; IP và
-   tín hiệu thiết bị của xác minh web dựa trên **sự đồng ý** (checkbox, server
-   ghi `consentVersion`/`consentAt`). Ghi rõ trong `/privacy` mục 6 và 13, và
-   trong trang verify.
+   tín hiệu thiết bị/hành vi của xác minh web dựa trên **sự đồng ý** (checkbox,
+   server ghi `consentVersion`/`consentAt`). Đây là **dữ liệu cá nhân nhạy cảm**
+   theo Điều 4(l) NĐ 356 (theo dõi hành vi trên mạng xã hội/dịch vụ trực tuyến),
+   nên trang verify phải thông báo rõ trước khi xin đồng ý (Điều 6(4)). Ghi rõ
+   trong `/privacy` mục 6 và 13, và trong trang verify.
 2. **Thông báo + đồng ý**: checkbox trước khi gửi; nêu mục đích, thời hạn lưu,
-   bên nhận (provider IP intel), quyền yêu cầu xoá. Server tự gắn
-   `consentVersion` + `consentAt` — client chỉ khai `consent: true`, và thiếu
-   consent thì KHÔNG băm/gọi provider/ghi DB.
+   bên nhận (ipapi.is — xử lý tại Đức/Hoa Kỳ/Singapore), quyền yêu cầu xoá; nêu
+   rõ từ chối = không xác minh. Server tự gắn `consentVersion` + `consentAt` —
+   client chỉ khai `consent: true`, và thiếu consent thì KHÔNG băm/gọi provider/ghi DB.
 3. **Tối giản**: không lưu IP thô; chỉ lưu hash + country/ASN/VPN; không lưu
    user-agent thô (chỉ hash nếu cần chống lạm dụng).
 4. **Hạn lưu** (đang cài trong `botRunRetention`): phiên xoá 7 ngày sau khi hết
@@ -438,7 +440,8 @@ GDPR áp dụng nếu có người dùng EU. Trước khi triển khai phải c�
    bỏ định danh audit + IP ban); hỗ trợ yêu cầu qua `/data-deletion`.
 6. **Chuyển dữ liệu xuyên biên giới**: Convex (US), Discord (US), ipapi.is
    (DE/US/SG), AI (Kira VN; Groq/OpenAI US), GitHub (US) → hồ sơ CTIA tại
-   `docs/legal/ctia-protogon.md`, danh mục DPA tại `docs/legal/vendor-register.md`.
+   `docs/legal/ctia-protogon.md`, danh mục chứng từ (URL + ngày truy cập + ảnh
+   chụp) tại `docs/legal/vendor-register.md`.
    Chốt 12/11/2026: giữ `api.ipapi.is`; nếu sau này cần chỉ xử lý tại EEA thì đổi
    sang `de.ipapi.is` (một dòng trong `convex/verifyActions.ts` +
    `convex/verifyPreflight.ts`).

@@ -306,6 +306,35 @@ export default function VerifyPage() {
                     "Bấm nút bên dưới để xác minh và nhận quyền truy cập server. Quá trình mất vài giây.",
                   )}
                 </p>
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-foreground">
+                  <p className="mb-1.5 flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
+                    <ShieldAlert className="h-4 w-4 shrink-0" />
+                    {translate("Dữ liệu cá nhân nhạy cảm")}
+                  </p>
+                  <p>
+                    {translate(
+                      "Theo Điều 4(l) Nghị định 356/2025/NĐ-CP, địa chỉ IP và tín hiệu thiết bị/hành vi của bạn là dữ liệu cá nhân nhạy cảm.",
+                    )}
+                  </p>
+                  <p className="mt-1.5">
+                    {translate(
+                      "Để xác minh, IP của bạn được gửi một lần tới nhà cung cấp dịch vụ ipapi.is (xử lý tại Đức, Hoa Kỳ và Singapore) để tra VPN/proxy/Tor. ipapi.is xử lý thay mặt chúng tôi theo DPA công bố của họ.",
+                    )}{" "}
+                    <a
+                      className="underline hover:text-foreground"
+                      href="https://ipapi.is/privacy.html"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {translate("Chính sách của ipapi.is")}
+                    </a>
+                  </p>
+                  <p className="mt-1.5 font-medium">
+                    {translate(
+                      "Nếu không đồng ý, bạn không thể xác minh và sẽ không vào được server.",
+                    )}
+                  </p>
+                </div>
                 <ul className="space-y-2 text-xs text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <Fingerprint className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -316,7 +345,7 @@ export default function VerifyPage() {
                   <li className="flex items-start gap-2">
                     <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     {translate(
-                      "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server. IP được gửi một lần tới ipapi.is để tra VPN/proxy/Tor.",
+                      "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server.",
                     )}
                   </li>
                   <li className="flex items-start gap-2">
@@ -353,7 +382,9 @@ export default function VerifyPage() {
                     >
                       {translate("Chính sách quyền riêng tư")}
                     </a>{" "}
-                    {translate("và việc thu IP/thiết bị, gửi IP tới ipapi.is để xác minh.")}
+                    {translate(
+                      "và việc xử lý dữ liệu cá nhân nhạy cảm nêu trên, gồm gửi IP tới ipapi.is để xác minh.",
+                    )}
                   </span>
                 </label>
                 <Button

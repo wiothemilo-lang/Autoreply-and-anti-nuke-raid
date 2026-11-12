@@ -35,6 +35,12 @@ ghi để đầy đủ chuỗi.
 - Không có nhà cung cấp trong nước thay thế tương đương cho Convex (backend
   realtime + DB) và Discord (nền tảng bắt buộc).
 - ipapi.is chỉ nhận IP, không nhận ID Discord/tên người dùng; kết quả cache 24h.
+- IP và tín hiệu thiết bị/hành vi trong xác minh web là **dữ liệu cá nhân nhạy
+  cảm** theo Điều 4(l) NĐ 356. Trang xác minh thông báo rõ trước khi xin đồng ý
+  (Điều 6(4)), nêu ipapi.is và các nước xử lý; từ chối = không chuyển IP.
+- Không có miễn trừ CTIA cho trường hợp này: Điều 20(6) Luật và Điều 18(3) NĐ 356
+  chỉ miễn báo chí/truyền thông, dữ liệu đã công khai, tình huống khẩn cấp và
+  quản lý nhân sự xuyên biên giới — không có thương mại điện tử/dịch vụ bot.
 - Có thể tắt xác minh web theo từng guild → dừng luồng 3 ngay lập tức.
 - Không chuyển dữ liệu cho mục đích quảng cáo, không bán dữ liệu.
 
@@ -56,7 +62,9 @@ ghi để đầy đủ chuỗi.
 3. **Mã hoá**: TLS khi truyền; backup có thể AES-256-GCM.
 4. **Kiểm soát truy cập**: chỉ admin guild + bot đọc dữ liệu xác minh.
 5. **Thời hạn**: cache ipapi 24h; phiên 7 ngày sau hết hạn; audit 365 ngày.
-6. **Ứng cứu**: runbook 72h; có thể tắt xác minh web toàn bộ theo guild.
+6. **Đồng ý nhạy cảm**: khối thông báo "dữ liệu cá nhân nhạy cảm" + ipapi.is/3
+   nước hiển thị trước checkbox; ô mặc định trống; lưu `consentVersion`/`consentAt`.
+7. **Ứng cứu**: runbook 72h; có thể tắt xác minh web toàn bộ theo guild.
 
 ## 5. Quyền của chủ thể dữ liệu
 
