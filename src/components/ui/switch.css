@@ -44,11 +44,21 @@
 
 .threeui-switch .modern-toggle__stack {
   gap: 0;
+  /* PHẢI có bề rộng xác định. `.modern-toggle__stack` là grid item
+     `justify-self: center` của `.modern-toggle` ⇒ shrink-to-fit; nếu để
+     `width: auto`, `width: 100%` của `.modern-toggle__switch` bên dưới
+     resolve thành `auto`, mà con của switch đều absolute ⇒ bề rộng nội dung
+     0 ⇒ track/núm 0×0 và MỌI công tắc module biến mất (bug 12/11/2026).
+     `100%` ở đây lấy theo grid area 36px của `.threeui-switch`, tạo mốc cho
+     chuỗi phần trăm phía trong. */
+  width: 100%;
 }
 
 /* clamp(104px, min(18cqw, 33cqh), 330px) là sàn cứng của bản gốc — giữ nó
    thì switch luôn ≥104px và không vừa ô form. Đặt lại 100%: switch vẫn giữ
-   aspect-ratio 44/25 nên hình học bên trong không đổi tỉ lệ nào. */
+   aspect-ratio 44/25 nên hình học bên trong không đổi tỉ lệ nào.
+   `100%` này CHỈ đúng khi `.modern-toggle__stack` có bề rộng xác định —
+   xem `width: 100%` ở rule stack phía trên. */
 .threeui-switch .modern-toggle__switch {
   width: 100%;
 }

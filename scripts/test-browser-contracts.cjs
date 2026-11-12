@@ -19,6 +19,10 @@
  *      desktop lẫn mobile, trên trang chủ lẫn trang trong (desktop 07/10/2026:
  *      dock cũ từng "biến mất" vì thiếu neo dọc — nút trôi xuống dưới đáy
  *      khung nhìn, cách ~4.800px, dù DOM vẫn còn).
+ *   L. Công tắc bật/tắt module phải có KÍCH THƯỚC THẬT. Bug 12/11/2026:
+ *      `width:100%` của switch nằm trong stack shrink-to-fit ⇒ resolve thành
+ *      `auto` ⇒ track/núm 0×0 ⇒ toàn bộ nút bật/tắt biến mất dù DOM vẫn còn
+ *      và CSS "hợp lệ". Chỉ đo trong trình duyệt mới bắt được.
  *
  * KHÔNG cài dependency mới: điều khiển Chromium bằng DevTools Protocol qua
  * WebSocket, phục vụ dist/ bằng http server của Node. WebSocket lấy theo thứ tự:
@@ -1932,6 +1936,89 @@ browserTest("K3. /auth chưa đăng nhập hiện form, không treo splash vô h
       "không bao giờ đổi, splash vô hạn = khách không đăng nhập được (bug 10/10/2026)",
   );
   t.assert.ok(state.login, "/auth phải hiện nút đăng nhập Discord cho khách chưa đăng nhập");
+});
+
+// L1 — công tắc module phải có kích thước THẬT trong trình duyệt.
+// Bug 12/11/2026: `.modern-toggle__stack` shrink-to-fit + `width:100%` của
+// `.modern-toggle__switch` ⇒ 100% của hộp `auto` = `auto`, con đều absolute
+// ⇒ switch/track/núm 0×0. DOM vẫn đủ, CSS vẫn "hợp lệ", test so-chuỗi nào
+// cũng xanh — chỉ phép đo layout mới thấy.
+browserTest("L1. Công tắc bật/tắt module không được co về 0×0", async (t) => {
+  const ctx = await setup();
+  const page = await ctx.openPage();
+  t.after(() => closeQuietly(page));
+
+  // Dùng CSS ĐÃ BUILD (đúng thứ người dùng tải), không phải file nguồn.
+  const assets = path.join(DIST, "assets");
+  const cssFile = fs
+    .readdirSync(assets)
+    .filter((f) => f.endsWith(".css"))
+    .find((f) => fs.readFileSync(path.join(assets, f), "utf8").includes(".threeui-switch"));
+  t.assert.ok(cssFile, "phải tìm thấy CSS chứa .threeui-switch trong dist/assets");
+  const css = fs.readFileSync(path.join(assets, cssFile), "utf8");
+
+  // Markup copy từ ModernToggle + Switch: đúng chuỗi span.threeui-switch >
+  // div.modern-toggle > div.modern-toggle__stack > button.modern-toggle__switch.
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head>
+<body style="margin:0;padding:24px;background:#0b0d12">
+<div style="display:flex;align-items:center;gap:8px;width:420px">
+  <span style="flex:1;color:#fff;font:14px sans-serif">Spam</span>
+  <span class="threeui-switch">
+    <div class="modern-toggle" data-mode="dark" data-state="on">
+      <div class="modern-toggle__halo" aria-hidden="true"></div>
+      <div class="modern-toggle__stack">
+        <button type="button" class="modern-toggle__switch" role="switch" aria-checked="true" aria-label="Spam">
+          <span class="modern-toggle__track" aria-hidden="true"></span>
+          <span class="modern-toggle__thumb" aria-hidden="true">
+            <span class="modern-toggle__mark">
+              <svg viewBox="0 0 24 24" data-mark="check" aria-hidden="true"><path d="M5 12.8 9.6 17.4 19 8"></path></svg>
+              <svg viewBox="0 0 24 24" data-mark="dash" aria-hidden="true"><path d="M6.5 12h11"></path></svg>
+            </span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </span>
+</div>
+</body></html>`;
+
+  // about:blank + document.write: không phụ thuộc CSP của app, không cần
+  // route tĩnh riêng, và không dính chính sách chặn data: URL của Chromium.
+  await page.goto("about:blank");
+  await page.evaluate(
+    `document.open(); document.write(${JSON.stringify(html)}); document.close();`,
+  );
+
+  const box = await page.evaluate(`(() => {
+    const rect = (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { w: +r.width.toFixed(2), h: +r.height.toFixed(2), x: +r.x.toFixed(2), y: +r.y.toFixed(2) };
+    };
+    return {
+      stage: rect(".threeui-switch"),
+      control: rect(".modern-toggle__switch"),
+      track: rect(".modern-toggle__track"),
+      thumb: rect(".modern-toggle__thumb"),
+    };
+  })()`);
+  t.diagnostic(`switch đo được: ${JSON.stringify(box)}`);
+  t.assert.ok(box.control, "phải render được .modern-toggle__switch");
+  t.assert.ok(
+    box.control.w >= 34 && box.control.h >= 18,
+    `công tắc phải giữ ~36×20.5 — đo được ${box.control.w}×${box.control.h}. ` +
+      "0×0 = stack shrink-to-fit + width:100% không có mốc ⇒ mọi nút bật/tắt module biến mất",
+  );
+  t.assert.ok(
+    box.thumb.w >= 14 && box.thumb.h >= 14,
+    `núm công tắc phải ~17px — đo được ${box.thumb.w}×${box.thumb.h} ` +
+      "(0 = 47.6cqw của container 0px, đúng triệu chứng bug 12/11/2026)",
+  );
+  t.assert.ok(
+    box.track.w >= 34 && box.track.h >= 18,
+    `track phải phủ kín switch — đo được ${box.track.w}×${box.track.h}`,
+  );
 });
 
 // Dọn dẹp sau toàn bộ suite: giết Chromium + đóng server + dừng breadcrumb
