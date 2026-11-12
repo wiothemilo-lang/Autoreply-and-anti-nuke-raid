@@ -2,14 +2,20 @@
 
 ## Đang dở
 
+- 🚧 **Hồ sơ pháp lý đang dở (12/11/2026)**: DPIA + CTIA đã soạn nháp trong
+  `docs/legal/` nhưng **chưa điền họ tên/địa chỉ/email và chưa nộp**; cần tải DPA
+  Convex/Groq/OpenAI/GitHub; hiện chưa có pháp nhân nên hồ sơ đứng tên cá nhân —
+  nếu lập hộ kinh doanh/công ty thì cập nhật trong 10 ngày (Điều 20(2) NĐ 356).
+
 - 🚧 **Verify web đã bật cho RFTV (12/11/2026) nhưng bot VPS chưa restart**:
   `IP_HASH_SECRET` + `IPINTEL_API_KEY` đã đặt trên Convex prod
   `accomplished-chipmunk-74`; self-test trả `ok:true` (XFF `probe_missing`
   advisory nhưng `ip.source=xff`, chainLength 1, spoofRisk false). Đã bật
   `verifyMethod=web`, `verifyWebEnabled=true` cho guild RFTV
   `1524054368524173454`; roles/kênh/bot đều xanh. **Còn**: bot VPS phải
-  `git pull` + restart để dùng link ephemeral; test tài khoản thật; DPA/SCC với
-  ipapi.is; rà bản dịch EN/DE. `IP_HASH_SECRET` đang lưu tạm 0600 ở
+  `git pull` + restart để dùng link ephemeral; test tài khoản thật; DPA ipapi.is
+  đã xác nhận cơ chế tự động khi dùng API (bản ký song phương là tuỳ chọn); rà
+  bản dịch EN/DE. `IP_HASH_SECRET` đang lưu tạm 0600 ở
   `~/.secrets/protogon-ip-hash-secret` — chuyển vào password manager rồi xoá.
 
 - ✅ **XFF production đã xác nhận (12/11/2026)** — self-test trên edge
@@ -89,6 +95,14 @@
 ---
 
 ---
+
+## 2026-11-12 (3) — Hồ sơ pháp lý theo Luật 91/2025 + NĐ 356/2025
+
+- ✅ Xong: rà văn bản gốc (Luật 91/2025/QH15, NĐ 356/2025/NĐ-CP, NĐ 330/2026/NĐ-CP); bỏ 2 dẫn chiếu NĐ 13/2023 đã hết hiệu lực; chính sách VI/EN/DE đổi thời hạn quyền thành phản hồi 02 ngày làm việc + thực hiện 10/15/20 ngày, thông báo vi phạm 72 giờ, nêu tên luật
+- 📁 Mới: `docs/legal/{README,dpia-protogon,ctia-protogon,vendor-register,runbook-du-lieu-ca-nhan}.md` — bản nháp hồ sơ, còn trường `[…]` phải điền trước khi nộp
+- ⚠️ Phát hiện: Điều 4(l) NĐ 356 xếp "dữ liệu theo dõi hành vi… mạng xã hội" vào nhạy cảm → mất miễn trừ Điều 41, DPIA/CTIA/đầu mối là bắt buộc; NĐ 392/2026 chỉ sửa thủ tục an ninh trật tự, KHÔNG phải nghị định dữ liệu cá nhân
+- 🧪 Kiểm chứng: typecheck/lint/format/i18n sạch; `bun run test` 71/90 nhưng đúng 19 suite đó đỏ cả trước khi sửa (`ModalBuilder` không resolve) — không do thay đổi này
+- ▶️ Tiếp theo: điền họ tên/địa chỉ/email, nộp DPIA + CTIA, tải DPA Convex/Groq/OpenAI/GitHub, restart bot VPS
 
 ## 2026-11-12 (2) — Bật xác minh web production cho RFTV
 
