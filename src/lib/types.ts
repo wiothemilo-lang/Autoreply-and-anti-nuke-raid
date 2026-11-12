@@ -237,6 +237,11 @@ export interface GuildData {
     verifiedRoleId: string | null;
     /** Verify web (Double Counter style): thu IP/fingerprint, chặn VPN, link alt. */
     verifyWebEnabled: boolean;
+    /**
+     * Công tắc toàn cục: false = xác minh web tạm khoá, dashboard ẩn/khoá lựa
+     * chọn "Web" và bot tự lùi về xác minh bằng nút.
+     */
+    ipCollectionEnabled: boolean;
     /** Hành động khi IP đã bị ban cố verify lại: "deny" chỉ từ chối, "ban" ban account. */
     ipBanAction: "deny" | "ban";
     /** Mốc admin đã xác nhận hiểu rủi ro ban nhầm (bắt buộc trước khi bật "ban"). */

@@ -12,6 +12,11 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { allowGeoRequest, allowVerifyRequest, allowVerifySelfTest } from "./geoGuard";
 import { isPublicIp, normalizeIpToken, parseClientIp, resolveClientIp, splitXff } from "./clientIp";
+import {
+  isIpCollectionEnabled,
+  IP_COLLECTION_LOCK_CODE,
+  IP_COLLECTION_LOCK_REASON,
+} from "./ipCollectionLock";
 
 /**
  * Cache đáp án geo — PHẢI là `private`.
@@ -205,6 +210,17 @@ const verifyComplete = httpAction(async (ctx, request) => {
     return verifyJson({ ok: false, code: "forbidden_origin" }, origin, 403);
   }
 
+  // Công tắc tạm khoá: trả lời TRƯỚC `getRequestMetadata()` và trước mọi
+  // thao tác đọc `x-forwarded-for`. Đây là điểm quan trọng nhất — nếu chỉ chặn
+  // sau khi resolve IP thì IP thô đã đi vào bộ nhớ Convex, đúng thứ đang khoá.
+  if (!isIpCollectionEnabled()) {
+    return verifyJson(
+      { ok: false, code: IP_COLLECTION_LOCK_CODE, message: IP_COLLECTION_LOCK_REASON },
+      origin,
+      503,
+    );
+  }
+
   const metaIp = (await ctx.meta.getRequestMetadata()).ip ?? "";
   const resolved = resolveClientIp({
     metaIp,
@@ -328,6 +344,11 @@ const verifySelfTest = httpAction(async (ctx, request) => {
   const g = authRes.guild;
   const botAge = Date.now() - authRes.bot.lastHeartbeat;
   const checks: PreflightCheck[] = [
+    {
+      id: "ip_collection",
+      ok: isIpCollectionEnabled(),
+      detail: isIpCollectionEnabled() ? "enabled" : "locked",
+    },
     { id: "ip_hash_secret", ok: probe.env.ipHashSecret === "ok", detail: probe.env.ipHashSecret },
     { id: "ipintel_key", ok: probe.env.ipintelKey === "ok", detail: probe.env.ipintelKey },
     {

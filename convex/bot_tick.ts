@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { buildHiddenJobs } from "./hidden";
 import { requireBotKeyStrict } from "./botAuth";
 import { reassembleBackupJsonForRead } from "./backupChunks";
+import { effectiveVerifyMethod } from "./ipCollectionLock";
 
 /**
  * Sinh job dọn ticket cho MỘT lượt tick.
@@ -155,7 +156,7 @@ export const getPendingJobs = query({
         verifyChannelId: g.verifyChannelId!,
         unverifiedRoleId: g.unverifiedRoleId ?? null,
         verifiedRoleId: g.verifiedRoleId ?? null,
-        verifyMethod: g.verifyMethod ?? "button",
+        verifyMethod: effectiveVerifyMethod(g.verifyMethod),
       }));
     // Panel MỞ ticket (nút cho thành viên tự mở ticket, không cần gõ lệnh).
     // Cùng khuôn cờ chờ với verify: dashboard bấm → bot dán xong xoá cờ.

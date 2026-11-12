@@ -34,6 +34,7 @@ import {
   normalizeIp,
   signalHash,
 } from "./verifyCrypto";
+import { isIpCollectionEnabled, IP_COLLECTION_LOCK_CODE } from "./ipCollectionLock";
 
 /** Cache kết quả ipapi.is: 24h — đủ tươi cho VPN/proxy, đủ rẻ cho hạn mức API. */
 const INTEL_TTL_MS = 24 * 3600_000;
@@ -116,6 +117,10 @@ export const complete = internalAction({
         country: string | null;
       }
   > => {
+    // Lớp chặn thứ hai sau HTTP: kể cả khi một function nội bộ khác gọi thẳng
+    // action này, không có IP nào được băm, lưu, hay gửi tới ipapi.is.
+    if (!isIpCollectionEnabled()) return { ok: false, code: IP_COLLECTION_LOCK_CODE };
+
     const token = args.token.trim();
     if (!token || token.length > 128) return { ok: false, code: "not_found" };
     // Chốt consent TRƯỚC mọi thao tác đọc/ghi: chưa đồng ý thì không băm,

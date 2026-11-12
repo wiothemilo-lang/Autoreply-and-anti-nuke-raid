@@ -163,6 +163,19 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
         />
       </div>
 
+      {/* Tạm khoá thu thập IP: hiện lý do TRƯỚC bộ chọn để admin không tưởng
+          đây là lỗi, và không chọn "Web" rồi thắc mắc vì sao bị từ chối. */}
+      {!g.ipCollectionEnabled && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed">
+          <p className="font-semibold text-foreground">{translate("Xác minh web đang tạm khoá")}</p>
+          <p className="mt-1 text-muted-foreground">
+            {translate(
+              "Hệ thống chưa hoàn tất hồ sơ bảo vệ dữ liệu cá nhân nên không thu IP. Server tự dùng xác minh bằng nút; lựa chọn Web sẽ mở lại sau khi hồ sơ hoàn tất.",
+            )}
+          </p>
+        </div>
+      )}
+
       {/* Verify Method Selector */}
       {g.verifyEnabled && (
         <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-secondary/50 px-4 py-3">
@@ -199,7 +212,7 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
           >
             <option value="button">{translate("🖱️ Button — bấm nút xác minh")}</option>
             <option value="captcha">{translate("🔑 Captcha — nhập mã từ DM")}</option>
-            <option value="web">
+            <option value="web" disabled={!g.ipCollectionEnabled}>
               {translate("🛡️ Web — kiểm tra IP/thiết bị (Double Counter)")}
             </option>
           </select>
