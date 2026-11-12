@@ -184,7 +184,7 @@ const VI: LegalDoc[] = [
         heading: "6. Cơ sở pháp lý",
         paragraphs: [
           "Với dữ liệu cần để vận hành bot và dashboard, chúng tôi xử lý trên cơ sở thực hiện dịch vụ theo Điều khoản sử dụng và lợi ích hợp pháp trong việc bảo vệ hệ thống, chống lạm dụng. Với IP và tín hiệu thiết bị trong xác minh web, chúng tôi dựa trên sự đồng ý của bạn: bạn chỉ gửi dữ liệu sau khi tick ô đồng ý trên trang xác minh, và có thể từ chối bằng cách đóng trang (khi đó bạn không được xác minh). Ở nơi pháp luật cho phép xử lý vì lợi ích hợp pháp hoặc nghĩa vụ pháp lý, chúng tôi vẫn giới hạn dữ liệu ở mức tối thiểu.",
-          "Nếu bạn ở Việt Nam, chúng tôi áp dụng pháp luật Việt Nam về bảo vệ dữ liệu cá nhân. Nếu bạn ở Khu vực Kinh tế Châu Âu (EEA) hoặc Vương quốc Anh, chúng tôi áp dụng các quyền tương ứng của GDPR. Chúng tôi tôn trọng các quyền này cho mọi người dùng, kể cả khi luật địa phương chưa bắt buộc.",
+          "Nếu bạn ở Việt Nam, chúng tôi áp dụng Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Nghị định 356/2025/NĐ-CP. Nếu bạn ở Khu vực Kinh tế Châu Âu (EEA) hoặc Vương quốc Anh, chúng tôi áp dụng các quyền tương ứng của GDPR. Chúng tôi tôn trọng các quyền này cho mọi người dùng, kể cả khi luật địa phương chưa bắt buộc.",
         ],
       },
       {
@@ -238,7 +238,7 @@ const VI: LegalDoc[] = [
       {
         heading: "10. Cách gửi yêu cầu và thời gian phản hồi",
         paragraphs: [
-          "Gửi yêu cầu qua kênh hỗ trợ Discord hoặc fanpage Facebook ở chân trang, kèm ID server/ID người dùng và mô tả ngắn. Chúng tôi xác nhận đã nhận trong tối đa 72 giờ làm việc và hoàn tất trong tối đa 30 ngày, trừ khi pháp luật cho phép thời hạn khác hoặc yêu cầu phức tạp cần thêm thời gian (khi đó chúng tôi thông báo lý do).",
+          "Gửi yêu cầu qua kênh hỗ trợ Discord hoặc fanpage Facebook ở chân trang, kèm ID server/ID người dùng và mô tả ngắn. Chúng tôi phản hồi trong tối đa 02 ngày làm việc và hoàn tất trong tối đa 10 ngày với yêu cầu xem, chỉnh sửa hoặc cung cấp dữ liệu; 15 ngày với yêu cầu rút lại đồng ý, hạn chế hoặc phản đối xử lý; 20 ngày với yêu cầu xoá. Nếu phức tạp, chúng tôi gia hạn một lần theo mức luật cho phép và thông báo lý do.",
           "Để tránh xoá nhầm dữ liệu của người khác, chúng tôi cần xác minh: người có tài khoản dashboard xác nhận qua đăng nhập Discord, hoặc chủ server xác nhận cho thành viên trong server của mình.",
         ],
       },
@@ -248,7 +248,7 @@ const VI: LegalDoc[] = [
           "Quyền truy cập dashboard dựa trên đăng nhập Discord OAuth2 và được kiểm tra lại ở phía backend cho từng yêu cầu; không có backdoor hay đường tắt bỏ qua xác thực. Dữ liệu xác minh chỉ quản trị viên của chính server đó và bot được đọc; team admin của bot không có quyền đọc xuyên server.",
           "Các thao tác quản trị cấp cao cần khoá bot riêng, khoá này được lưu ở dạng băm. File backup có thể được mã hoá AES-256-GCM và kiểm tra toàn vẹn bằng SHA-256 trước khi khôi phục.",
           "IP thô không được ghi vào cơ sở dữ liệu; hash IP dùng HMAC-SHA-256 với khoá bí mật, tách theo từng server. Hash vẫn là dữ liệu cá nhân giả danh, không phải dữ liệu ẩn danh hoàn toàn — chúng tôi đối xử như vậy.",
-          "Phát hiện sự cố ảnh hưởng dữ liệu: chúng tôi thông báo cho chủ server bị ảnh hưởng qua kênh liên hệ đã đăng ký. Khi hệ thống thông tin bị tấn công làm phát sinh nguy cơ mất an ninh mạng của người tiêu dùng, chúng tôi thông báo cho cơ quan quản lý nhà nước có thẩm quyền trong thời hạn 24 giờ kể từ thời điểm phát hiện và áp dụng các biện pháp khắc phục cần thiết.",
+          "Phát hiện sự cố ảnh hưởng dữ liệu: chúng tôi thông báo cho chủ server bị ảnh hưởng qua kênh liên hệ đã đăng ký. Nếu sự cố có thể xâm phạm tính mạng, sức khoẻ, danh dự, nhân phẩm, tài sản của chủ thể dữ liệu hoặc ảnh hưởng an ninh quốc gia, trật tự, an toàn xã hội, chúng tôi thông báo cho cơ quan chuyên trách bảo vệ dữ liệu cá nhân chậm nhất 72 giờ kể từ khi phát hiện, lập biên bản xác nhận và áp dụng biện pháp khắc phục cần thiết.",
           "Không hệ thống nào an toàn tuyệt đối. Nếu bạn phát hiện lỗ hổng, hãy báo riêng cho chúng tôi qua kênh hỗ trợ thay vì công khai; chúng tôi ghi nhận và xử lý trước khi công bố.",
         ],
       },
@@ -287,7 +287,7 @@ const VI: LegalDoc[] = [
         heading: "15. Thay đổi chính sách và liên hệ",
         paragraphs: [
           "Chính sách có thể được cập nhật; ngày rà soát gần nhất ghi ở đầu trang và mọi thay đổi quan trọng được thông báo trong cộng đồng Discord. Việc bạn tiếp tục dùng bot sau ngày đó nghĩa là bạn chấp nhận bản mới; nếu thay đổi làm thay đổi mục đích hoặc phạm vi xử lý dữ liệu xác minh, chúng tôi sẽ xin lại sự đồng ý trước khi áp dụng cho lượt xác minh mới.",
-          "Mọi câu hỏi hoặc yêu cầu liên quan dữ liệu: gửi trong kênh hỗ trợ của cộng đồng Discord Protogon hoặc fanpage Facebook ở chân trang, kèm ID server hoặc ID người dùng liên quan. Đây là kênh tiếp nhận chính thức; chúng tôi xác nhận trong tối đa 72 giờ làm việc và hoàn tất trong tối đa 30 ngày.",
+          "Mọi câu hỏi hoặc yêu cầu liên quan dữ liệu: gửi trong kênh hỗ trợ của cộng đồng Discord Protogon hoặc fanpage Facebook ở chân trang, kèm ID server hoặc ID người dùng liên quan. Đây là kênh tiếp nhận chính thức; chúng tôi phản hồi trong tối đa 02 ngày làm việc và hoàn tất theo thời hạn luật định (10 ngày với xem/chỉnh sửa/cung cấp, 15 ngày với hạn chế hoặc phản đối xử lý, 20 ngày với xoá; gia hạn một lần theo mức luật cho phép nếu phức tạp).",
         ],
       },
     ],
@@ -341,7 +341,7 @@ const VI: LegalDoc[] = [
         heading: "4. Xoá vĩnh viễn dữ liệu của cả server",
         paragraphs: [
           "Khi bạn muốn xoá toàn bộ dấu vết của server khỏi Protogon, hãy thực hiện theo thứ tự: gỡ bot khỏi server, sau đó gửi yêu cầu trong kênh hỗ trợ kèm ID server.",
-          "Chúng tôi xác nhận đã nhận yêu cầu, xoá cấu hình, bản ghi hành động, lịch sử nhiệt, thành viên vào/rời, dữ liệu xác minh web (phiên, tín hiệu, liên kết tài khoản phụ) và file backup do bot đang giữ, rồi phản hồi khi hoàn tất. Nhật ký xác minh đã bỏ định danh và bản ghi ban IP đã bỏ định danh có thể được giữ tối đa theo thời hạn an ninh ở mục 2. Thời gian xử lý thông thường không quá 30 ngày.",
+          "Chúng tôi xác nhận đã nhận yêu cầu, xoá cấu hình, bản ghi hành động, lịch sử nhiệt, thành viên vào/rời, dữ liệu xác minh web (phiên, tín hiệu, liên kết tài khoản phụ) và file backup do bot đang giữ, rồi phản hồi khi hoàn tất. Nhật ký xác minh đã bỏ định danh và bản ghi ban IP đã bỏ định danh có thể được giữ tối đa theo thời hạn an ninh ở mục 2. Thời hạn thực hiện: phản hồi trong tối đa 02 ngày làm việc, hoàn tất trong tối đa 20 ngày (gia hạn một lần theo mức luật cho phép nếu phức tạp).",
         ],
       },
       {
@@ -355,7 +355,7 @@ const VI: LegalDoc[] = [
       {
         heading: "6. Cách gửi yêu cầu xoá",
         paragraphs: [
-          "Gửi yêu cầu trong kênh hỗ trợ của cộng đồng Discord Protogon, kèm: mục cần xoá, ID server (nếu là dữ liệu server), ID người dùng (nếu là dữ liệu cá nhân) và mô tả ngắn. Chúng tôi xác nhận trong tối đa 72 giờ làm việc và hoàn tất trong tối đa 30 ngày.",
+          "Gửi yêu cầu trong kênh hỗ trợ của cộng đồng Discord Protogon, kèm: mục cần xoá, ID server (nếu là dữ liệu server), ID người dùng (nếu là dữ liệu cá nhân) và mô tả ngắn. Chúng tôi phản hồi trong tối đa 02 ngày làm việc và hoàn tất trong tối đa 20 ngày.",
           "Không ai trong đội ngũ Protogon yêu cầu bạn gửi token bot, mật khẩu, mã xác thực hai lớp hay khoá API. Yêu cầu như vậy là giả mạo — đừng cung cấp và hãy báo lại cho chúng tôi.",
         ],
       },
@@ -376,7 +376,7 @@ const VI: LegalDoc[] = [
       {
         heading: "9. Xác nhận và liên hệ",
         paragraphs: [
-          "Yêu cầu xoá luôn được phản hồi xác nhận: đã nhận, đang xử lý, hoặc đã hoàn tất. Nếu quá 30 ngày bạn chưa nhận được phản hồi, hãy nhắc lại trong kênh hỗ trợ.",
+          "Yêu cầu xoá luôn được phản hồi xác nhận: đã nhận, đang xử lý, hoặc đã hoàn tất. Nếu quá 20 ngày bạn chưa nhận được phản hồi, hãy nhắc lại trong kênh hỗ trợ.",
           "Liên kết tới cộng đồng Discord và fanpage nằm ở phần chân trang của website; đây cũng là kênh tiếp nhận mọi yêu cầu về dữ liệu.",
         ],
       },
@@ -530,7 +530,7 @@ const EN: LegalDoc[] = [
         heading: "6. Legal basis",
         paragraphs: [
           "For data needed to run the bot and dashboard, we process on the basis of performing the service under the Terms of Service and our legitimate interest in protecting the system against abuse. For IP and device signals in web verification, we rely on your consent: data is sent only after you tick the consent box on the verification page, and you can refuse by closing the page (in which case you will not be verified). Where the law allows processing for legitimate interests or legal obligations, we still minimise the data.",
-          "If you are in Vietnam, we apply Vietnamese personal data protection law. If you are in the European Economic Area (EEA) or the United Kingdom, we apply the corresponding GDPR rights. We respect these rights for all users, even where local law does not yet require it.",
+          "If you are in Vietnam, we apply the Personal Data Protection Law No. 91/2025/QH15 and Decree 356/2025/ND-CP. If you are in the European Economic Area (EEA) or the United Kingdom, we apply the corresponding GDPR rights. We respect these rights for all users, even where local law does not yet require it.",
         ],
       },
       {
@@ -584,7 +584,7 @@ const EN: LegalDoc[] = [
       {
         heading: "10. How to send a request and response times",
         paragraphs: [
-          "Send requests through the Discord support channel or the Facebook page in the footer, with the server ID/user ID and a short description. We acknowledge within 72 working hours and complete within 30 days, unless the law allows a different period or a complex request needs more time (we will explain why).",
+          "Send requests through the Discord support channel or the Facebook page in the footer, with the server ID/user ID and a short description. We respond within 2 working days and complete within 10 days for access, correction or data-portability requests; 15 days for withdrawal of consent, restriction or objection; and 20 days for erasure. If a request is complex, we extend once by the maximum the law allows and explain why.",
           "To avoid deleting someone else's data, we verify: dashboard account holders confirm by signing in with Discord, or a server owner confirms on behalf of a member in their server.",
         ],
       },
@@ -594,7 +594,7 @@ const EN: LegalDoc[] = [
           "Dashboard access relies on Discord OAuth2 sign-in and is re-checked on the backend for every request; there is no backdoor and no way to skip authentication. Verification data can be read only by administrators of that same server and by the bot; the bot's team admins have no cross-server access.",
           "High-privilege administrative actions require a separate bot key, stored as a hash. Backup files can be encrypted with AES-256-GCM and verified with SHA-256 before a restore.",
           "Raw IP is not written to the database; IP hashes use HMAC-SHA-256 with a secret key, scoped per server. A hash is still pseudonymous personal data, not fully anonymous data — we treat it that way.",
-          "If an incident affects data, we notify the affected server owners through their registered contact channel. When an attack on an information system creates a risk to the cybersecurity of consumer information, we notify the competent state management authority within 24 hours of becoming aware of the attack and apply the necessary remedial measures.",
+          "If an incident affects data, we notify the affected server owners through their registered contact channel. Where the incident may harm the life, health, honour, dignity or property of data subjects, or affect national security, public order or social safety, we notify the competent personal data protection authority within 72 hours of discovery, record a written confirmation of the incident, and apply the necessary remedial measures.",
           "No system is completely secure. If you find a vulnerability, report it privately through our support channel rather than publicly; we will acknowledge and address it before disclosure.",
         ],
       },
@@ -633,7 +633,7 @@ const EN: LegalDoc[] = [
         heading: "15. Changes to this policy and contact",
         paragraphs: [
           "This policy may be updated; the last review date is shown at the top of the page, and material changes are announced in the Discord community. Continuing to use the bot after that date means you accept the new version; if a change alters the purpose or scope of verification data processing, we will ask for consent again before applying it to a new verification.",
-          "For any privacy question or request: post in the support channel of the Protogon Discord community or the Facebook page in the footer, with the relevant server ID or user ID. These are the official contact channels; we acknowledge within 72 working hours and complete within 30 days.",
+          "For any privacy question or request: post in the support channel of the Protogon Discord community or the Facebook page in the footer, with the relevant server ID or user ID. These are the official contact channels; we respond within 2 working days and complete within the statutory deadlines (10 days for access/correction/portability, 15 days for restriction or objection, 20 days for erasure; one extension within the statutory limit where a request is complex).",
         ],
       },
     ],
@@ -687,7 +687,7 @@ const EN: LegalDoc[] = [
         heading: "4. Permanently deleting a server's data",
         paragraphs: [
           "To remove every trace of a server from Protogon, do this in order: remove the bot from the server, then send a request in the support channel with the server ID.",
-          "We confirm receipt, delete the configuration, action records, heat history, join/leave records, web verification data (sessions, signals, alt-account links), and any backup files the bot still holds, then reply once it is done. De-identified verification audit records and de-identified IP ban records may be kept up to the security periods in section 2. Processing normally takes no more than 30 days.",
+          "We confirm receipt, delete the configuration, action records, heat history, join/leave records, web verification data (sessions, signals, alt-account links), and any backup files the bot still holds, then reply once it is done. De-identified verification audit records and de-identified IP ban records may be kept up to the security periods in section 2. Timing: we respond within 2 working days and complete within 20 days (one extension within the statutory limit where a request is complex).",
         ],
       },
       {
@@ -701,7 +701,7 @@ const EN: LegalDoc[] = [
       {
         heading: "6. How to send a deletion request",
         paragraphs: [
-          "Post the request in the support channel of the Protogon Discord community, including: what to delete, the server ID (for server data), the user ID (for personal data), and a short description. We acknowledge within 72 working hours and complete within 30 days.",
+          "Post the request in the support channel of the Protogon Discord community, including: what to delete, the server ID (for server data), the user ID (for personal data), and a short description. We respond within 2 working days and complete within 20 days.",
           "Nobody on the Protogon team asks you to send a bot token, password, two-factor code, or API key. Such a request is impersonation — do not provide it, and report it to us.",
         ],
       },
@@ -722,7 +722,7 @@ const EN: LegalDoc[] = [
       {
         heading: "9. Confirmation and contact",
         paragraphs: [
-          "Every deletion request gets an acknowledgement: received, in progress, or completed. If 30 days pass without a reply, remind us in the support channel.",
+          "Every deletion request gets an acknowledgement: received, in progress, or completed. If 20 days pass without a reply, remind us in the support channel.",
           "Links to the Discord community and the Facebook page are in the website footer; that is also where we take data requests.",
         ],
       },
@@ -878,7 +878,7 @@ const DE: LegalDoc[] = [
         heading: "6. Rechtsgrundlage",
         paragraphs: [
           "Für Daten, die zum Betrieb von Bot und Dashboard nötig sind, verarbeiten wir auf Grundlage der Vertragserfüllung nach den Nutzungsbedingungen und unseres berechtigten Interesses am Schutz des Systems vor Missbrauch. Für IP- und Gerätesignale bei der Web-Verifizierung stützen wir uns auf deine Einwilligung: Daten werden erst gesendet, nachdem du auf der Verifizierungsseite das Kästchen angekreuzt hast, und du kannst ablehnen, indem du die Seite schließt (dann wirst du nicht verifiziert). Wo das Gesetz die Verarbeitung aufgrund berechtigter Interessen oder gesetzlicher Pflichten erlaubt, beschränken wir die Daten trotzdem auf das Minimum.",
-          "Wenn du in Vietnam bist, wenden wir vietnamesisches Datenschutzrecht an. Wenn du im Europäischen Wirtschaftsraum (EWR) oder im Vereinigten Königreich bist, wenden wir die entsprechenden GDPR-Rechte an. Wir respektieren diese Rechte für alle Nutzer, auch wenn lokales Recht sie noch nicht zwingend vorschreibt.",
+          "Wenn du in Vietnam bist, wenden wir das Gesetz zum Schutz personenbezogener Daten Nr. 91/2025/QH15 und die Verordnung 356/2025/NĐ-CP an. Wenn du im Europäischen Wirtschaftsraum (EWR) oder im Vereinigten Königreich bist, wenden wir die entsprechenden GDPR-Rechte an. Wir respektieren diese Rechte für alle Nutzer, auch wenn lokales Recht sie noch nicht zwingend vorschreibt.",
         ],
       },
       {
@@ -932,7 +932,7 @@ const DE: LegalDoc[] = [
       {
         heading: "10. Anträge und Antwortzeiten",
         paragraphs: [
-          "Sende Anträge über den Discord-Support-Kanal oder die Facebook-Seite im Footer, mit Server-ID/Nutzer-ID und einer kurzen Beschreibung. Wir bestätigen den Eingang innerhalb von 72 Arbeitsstunden und schließen den Antrag innerhalb von 30 Tagen ab, es sei denn, das Gesetz erlaubt eine andere Frist oder ein komplexer Antrag braucht mehr Zeit (dann erklären wir warum).",
+          "Sende Anträge über den Discord-Support-Kanal oder die Facebook-Seite im Footer, mit Server-ID/Nutzer-ID und einer kurzen Beschreibung. Wir antworten innerhalb von 2 Werktagen und erledigen den Antrag innerhalb von 10 Tagen bei Auskunft, Berichtigung oder Datenübertragbarkeit; 15 Tagen bei Widerruf der Einwilligung, Einschränkung oder Widerspruch; 20 Tagen bei Löschung. Bei komplexen Anträgen verlängern wir einmalig im gesetzlich zulässigen Rahmen und begründen dies.",
           "Um fremde Daten nicht versehentlich zu löschen, prüfen wir den Antrag: Dashboard-Konten bestätigen sich per Discord-Anmeldung, oder ein Serverbesitzer bestätigt für ein Mitglied seines Servers.",
         ],
       },
@@ -942,7 +942,7 @@ const DE: LegalDoc[] = [
           "Der Dashboard-Zugang beruht auf Discord-OAuth2 und wird bei jeder Anfrage im Backend erneut geprüft; es gibt keine Hintertür und keinen Weg an der Authentifizierung vorbei. Verifizierungsdaten können nur Administratoren desselben Servers und der Bot lesen; die Team-Admins des Bots haben keinen serverübergreifenden Zugriff.",
           "Verwaltungsaktionen mit hohen Rechten benötigen einen separaten Bot-Schlüssel, der als Hash gespeichert wird. Backup-Dateien können mit AES-256-GCM verschlüsselt und vor dem Wiederherstellen per SHA-256 geprüft werden.",
           "Die rohe IP wird nicht in die Datenbank geschrieben; IP-Hashes nutzen HMAC-SHA-256 mit einem geheimen Schlüssel, getrennt pro Server. Ein Hash ist weiterhin pseudonyme personenbezogene Daten, keine völlig anonymen Daten — wir behandeln ihn so.",
-          "Bei einem Vorfall mit Datenbezug informieren wir die betroffenen Serverbesitzer über ihren hinterlegten Kontaktweg. Wird ein Informationssystem angegriffen und entsteht dadurch ein Risiko für die Cybersicherheit der Verbraucherdaten, informieren wir die zuständige staatliche Stelle innerhalb von 24 Stunden nach Kenntnis des Angriffs und ergreifen die erforderlichen Abhilfemaßnahmen.",
+          "Bei einem Vorfall mit Datenbezug informieren wir die betroffenen Serverbesitzer über ihren hinterlegten Kontaktweg. Kann der Vorfall Leben, Gesundheit, Ehre, Würde oder Eigentum der Betroffenen beeinträchtigen oder die nationale Sicherheit, die öffentliche Ordnung oder die soziale Sicherheit berühren, informieren wir die zuständige Datenschutzbehörde innerhalb von 72 Stunden nach Kenntnis, fertigen eine schriftliche Bestätigung des Vorfalls an und ergreifen die erforderlichen Abhilfemaßnahmen.",
           "Kein System ist vollständig sicher. Wenn du eine Schwachstelle findest, melde sie bitte vertraulich über unseren Support-Kanal statt öffentlich; wir bestätigen und beheben sie vor einer Veröffentlichung.",
         ],
       },
@@ -981,7 +981,7 @@ const DE: LegalDoc[] = [
         heading: "15. Änderungen und Kontakt",
         paragraphs: [
           "Diese Erklärung kann aktualisiert werden; das Datum der letzten Prüfung steht oben auf der Seite, wesentliche Änderungen kündigen wir in der Discord-Community an. Wer den Bot danach weiter nutzt, akzeptiert die neue Fassung; ändert eine Änderung den Zweck oder Umfang der Verarbeitung von Verifizierungsdaten, holen wir vor der Anwendung auf eine neue Verifizierung erneut die Einwilligung ein.",
-          "Für Datenschutzfragen oder -anträge: im Support-Kanal der Protogon-Discord-Community oder auf der Facebook-Seite im Footer, mit der betreffenden Server- oder Nutzer-ID. Das sind die offiziellen Kontaktwege; wir bestätigen innerhalb von 72 Arbeitsstunden und schließen innerhalb von 30 Tagen ab.",
+          "Für Datenschutzfragen oder -anträge: im Support-Kanal der Protogon-Discord-Community oder auf der Facebook-Seite im Footer, mit der betreffenden Server- oder Nutzer-ID. Das sind die offiziellen Kontaktwege; wir antworten innerhalb von 2 Werktagen und erledigen den Antrag innerhalb der gesetzlichen Fristen (10 Tage bei Auskunft/Berichtigung/Übertragbarkeit, 15 Tage bei Einschränkung oder Widerspruch, 20 Tage bei Löschung; einmalige Verlängerung im gesetzlich zulässigen Rahmen bei komplexen Anträgen).",
         ],
       },
     ],
@@ -1049,7 +1049,7 @@ const DE: LegalDoc[] = [
       {
         heading: "6. Löschanfrage stellen",
         paragraphs: [
-          "Sende die Anfrage im Support-Kanal der Protogon-Discord-Community und nenne: was gelöscht werden soll, die Server-ID (bei Serverdaten), die Nutzer-ID (bei Personendaten) und eine kurze Beschreibung. Wir bestätigen innerhalb von 72 Arbeitsstunden und schließen innerhalb von 30 Tagen ab.",
+          "Sende die Anfrage im Support-Kanal der Protogon-Discord-Community und nenne: was gelöscht werden soll, die Server-ID (bei Serverdaten), die Nutzer-ID (bei Personendaten) und eine kurze Beschreibung. Wir antworten innerhalb von 2 Werktagen und schließen den Antrag innerhalb von 20 Tagen ab.",
           "Niemand im Protogon-Team bittet dich um Bot-Token, Passwort, Zwei-Faktor-Code oder API-Schlüssel. Eine solche Bitte ist Betrug — gib nichts heraus und melde sie uns.",
         ],
       },
@@ -1070,7 +1070,7 @@ const DE: LegalDoc[] = [
       {
         heading: "9. Bestätigung und Kontakt",
         paragraphs: [
-          "Jede Löschanfrage wird bestätigt: eingegangen, in Bearbeitung oder abgeschlossen. Kommt nach 30 Tagen keine Antwort, erinnere uns im Support-Kanal.",
+          "Jede Löschanfrage wird bestätigt: eingegangen, in Bearbeitung oder abgeschlossen. Kommt nach 20 Tagen keine Antwort, erinnere uns im Support-Kanal.",
           "Links zur Discord-Community und zur Facebook-Seite stehen im Footer der Website; dort nehmen wir auch Datenanfragen entgegen.",
         ],
       },

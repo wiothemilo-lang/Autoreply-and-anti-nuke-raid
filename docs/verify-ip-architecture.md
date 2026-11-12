@@ -137,7 +137,9 @@ nào ghi giá trị thật** — đây là chỗ nối vào hệ thống mới.
 
 - Chỉ request HTTP từ trình duyệt người dùng mới mang IP thật của họ.
 - Trang web cho phép **consent + thông báo mục đích** trước khi xử lý IP — yêu
-  cầu của Nghị định 13/2023/NĐ-CP và GDPR (nếu có người dùng EU).
+  cầu của Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định
+  356/2025/NĐ-CP (hiệu lực 01/01/2026, thay Nghị định 13/2023/NĐ-CP), cùng GDPR
+  nếu có người dùng EU.
 - Trang web là nơi duy nhất có thể chạy captcha/Turnstile và hiển thị lý do bị
   từ chối mà không lộ thông tin nhạy cảm trong kênh công khai.
 
@@ -412,8 +414,9 @@ Bổ sung:
 
 ## 8. Quyền riêng tư & pháp lý
 
-IP là **dữ liệu cá nhân** theo Nghị định 13/2023/NĐ-CP (Việt Nam) và GDPR nếu
-có người dùng EU. Trước khi triển khai phải có:
+IP là **dữ liệu cá nhân** theo Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và
+Nghị định 356/2025/NĐ-CP (hiệu lực 01/01/2026, thay Nghị định 13/2023/NĐ-CP);
+GDPR áp dụng nếu có người dùng EU. Trước khi triển khai phải có:
 
 1. **Cơ sở pháp lý & mục đích**: chống raid/alt/bot, không dùng cho quảng cáo
    hay bán dữ liệu. Dữ liệu vận hành dựa trên hợp đồng + lợi ích hợp pháp; IP và
@@ -433,9 +436,12 @@ có người dùng EU. Trước khi triển khai phải có:
 5. **Quyền chủ thể**: admin có nút "Xoá dữ liệu xác minh của thành viên" trong
    `VerifyWebCard` (`verify.deleteUserVerifyData` — xoá phiên/tín hiệu/link,
    bỏ định danh audit + IP ban); hỗ trợ yêu cầu qua `/data-deletion`.
-6. **Chuyển dữ liệu xuyên biên giới**: provider IP intel thường ở nước ngoài →
-   cần DPA/SCC và ghi rõ trong chính sách; nếu không, chọn provider nội địa hoặc
-   chỉ dùng country từ `api.country.is` (không đủ cho VPN).
+6. **Chuyển dữ liệu xuyên biên giới**: Convex (US), Discord (US), ipapi.is
+   (DE/US/SG), AI (Kira VN; Groq/OpenAI US), GitHub (US) → hồ sơ CTIA tại
+   `docs/legal/ctia-protogon.md`, danh mục DPA tại `docs/legal/vendor-register.md`.
+   Chốt 12/11/2026: giữ `api.ipapi.is`; nếu sau này cần chỉ xử lý tại EEA thì đổi
+   sang `de.ipapi.is` (một dòng trong `convex/verifyActions.ts` +
+   `convex/verifyPreflight.ts`).
 7. **Discord Developer Policy**: cập nhật mô tả app/privacy policy; không thu
    thập dữ liệu ngoài phạm vi cần thiết; không chia sẻ với bên thứ ba ngoài
    provider đã nêu.
