@@ -3,9 +3,11 @@
 ## Đang dở
 
 - 🚧 **Hồ sơ pháp lý đang dở (12/11/2026)**: DPIA + CTIA đã soạn nháp trong
-  `docs/legal/` nhưng **chưa điền họ tên/địa chỉ/email và chưa nộp**; cần tải DPA
-  Convex/Groq/OpenAI/GitHub; hiện chưa có pháp nhân nên hồ sơ đứng tên cá nhân —
-  nếu lập hộ kinh doanh/công ty thì cập nhật trong 10 ngày (Điều 20(2) NĐ 356).
+  `docs/legal/` nhưng **chưa điền họ tên/địa chỉ/email và chưa nộp**. Chứng từ
+  nhà cung cấp giờ là **URL công bố + ngày truy cập + PDF/ảnh chụp** (không cần
+  xin DPA ký song phương) — còn lưu ảnh chụp cho 8 vendor. Hiện chưa có pháp
+  nhân nên hồ sơ đứng tên cá nhân — nếu lập hộ kinh doanh/công ty thì cập nhật
+  trong 10 ngày (Điều 20(2) NĐ 356).
 
 - 🚧 **Verify web đã bật cho RFTV (12/11/2026) nhưng bot VPS chưa restart**:
   `IP_HASH_SECRET` + `IPINTEL_API_KEY` đã đặt trên Convex prod
@@ -95,6 +97,21 @@
 ---
 
 ---
+
+## 2026-11-12 (5) — Thông báo dữ liệu nhạy cảm + bỏ bước DPA rườm rà
+
+- ✅ Xong: trang `/verify` có khối "Dữ liệu cá nhân nhạy cảm" (Điều 4(l), 6(4)
+  NĐ 356) trước checkbox, nêu ipapi.is + Đức/Hoa Kỳ/Singapore + từ chối = không
+  xác minh; tin nhắn DM/ephemeral của bot nêu cùng thông tin; `VERIFY_CONSENT_VERSION`
+  lên `2026-11-12`
+- 📄 Chính sách VI/EN/DE mục 6/8/13 nêu cơ sở nhạy cảm, bên nhận và nước xử lý;
+  DPIA/CTIA/runbook/kiến trúc cập nhật; `docs/legal/README` thêm bảng "việc có
+  thể bỏ" (không cần DPA ký song phương, không có tờ khai thứ ba) + mức phạt
+  NĐ 330/2026; vendor register chuyển sang URL + ngày truy cập + ảnh chụp
+- 🧪 Kiểm chứng: `test-verify-web-bot` bắt buộc "nhạy cảm" + 3 nước;
+  `test-web-contracts` bắt buộc khối nhạy cảm trước checkbox và trong 3 bản chính sách
+- ▶️ Tiếp theo: chạy đủ bộ kiểm chứng, PR; điền họ tên/địa chỉ/email + lưu ảnh
+  chụp vendor rồi nộp DPIA/CTIA; restart bot VPS
 
 ## 2026-11-12 (4) — Retention thật cho dữ liệu vận hành + ticket
 

@@ -46,20 +46,36 @@ Chi tiết endpoint, biến môi trường và cách đọc XFF: `docs/verify-ip
 
 ## 3. Cơ sở pháp lý và nguyên tắc
 
-| Hoạt động | Cơ sở                                                                                |
-| --------- | ------------------------------------------------------------------------------------ |
-| 1, 5      | Hợp đồng/hợp tác với chủ server; lợi ích hợp pháp (an ninh server)                   |
-| 2         | Thực hiện hợp đồng; lợi ích hợp pháp (vận hành dịch vụ)                              |
-| 3         | **Sự đồng ý** của người được xác minh (checkbox, ghi `consentVersion`/`consentAt`)   |
-| 4         | Thực hiện yêu cầu của người dùng                                                     |
-| 6         | Thực hiện dịch vụ hỗ trợ theo yêu cầu của người dùng/chủ server                      |
-| 7         | **Sự đồng ý** của chủ server (opt-in `relayShare`/`relayReceive`) + lợi ích hợp pháp |
-| 8         | Lợi ích hợp pháp (an ninh hệ thống); dữ liệu đã bỏ định danh trước khi bot đọc       |
-| 9         | Thực hiện hợp đồng mua/ủng hộ + nghĩa vụ kế toán                                     |
-| 10        | Sự đồng ý của người gửi (tự nguyện gửi form)                                         |
+| Hoạt động | Cơ sở                                                                                                                                                        |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1, 5      | Hợp đồng/hợp tác với chủ server; lợi ích hợp pháp (an ninh server)                                                                                           |
+| 2         | Thực hiện hợp đồng; lợi ích hợp pháp (vận hành dịch vụ)                                                                                                      |
+| 3         | **Sự đồng ý** rõ ràng của người được xác minh; thông báo trước rằng đây là **dữ liệu cá nhân nhạy cảm** (Điều 6(4) NĐ 356); ghi `consentVersion`/`consentAt` |
+| 4         | Thực hiện yêu cầu của người dùng                                                                                                                             |
+| 6         | Thực hiện dịch vụ hỗ trợ theo yêu cầu của người dùng/chủ server                                                                                              |
+| 7         | **Sự đồng ý** của chủ server (opt-in `relayShare`/`relayReceive`) + lợi ích hợp pháp                                                                         |
+| 8         | Lợi ích hợp pháp (an ninh hệ thống); dữ liệu đã bỏ định danh trước khi bot đọc                                                                               |
+| 9         | Thực hiện hợp đồng mua/ủng hộ + nghĩa vụ kế toán                                                                                                             |
+| 10        | Sự đồng ý của người gửi (tự nguyện gửi form)                                                                                                                 |
 
 Nguyên tắc: tối thiểu hoá (không lưu IP thô, không lưu nội dung tin nhắn thường),
 giới hạn mục đích (không quảng cáo, không bán), tách theo guild, có thời hạn xoá.
+
+### 3.1. Vì sao xác minh web là dữ liệu cá nhân nhạy cảm
+
+Điều 4(l) Nghị định 356/2025/NĐ-CP xếp **dữ liệu theo dõi hành vi, hoạt động sử
+dụng dịch vụ viễn thông, mạng xã hội, dịch vụ truyền thông trực tuyến và các
+dịch vụ khác trên không gian mạng** vào nhóm nhạy cảm. Xác minh web ghi nhận
+hành vi trên trang (thời gian ở trang, cử động chuột/bàn phím), tín hiệu thiết
+bị/trình duyệt và IP của người dùng Discord — cách đọc an toàn là thuộc nhóm
+này. Vì vậy:
+
+- Trang xác minh hiển thị khối **"Dữ liệu cá nhân nhạy cảm"** trước ô đồng ý,
+  nêu rõ ipapi.is là bên thứ ba nhận IP và các nước xử lý (Đức, Hoa Kỳ, Singapore).
+- Ô đồng ý **mặc định trống**, không gộp mục đích, không coi im lặng là đồng ý.
+- Server gắn `VERIFY_CONSENT_VERSION` và `consentAt` cho từng phiên; đổi nội dung
+  đồng ý phải tăng version và lưu ảnh chụp màn hình tương ứng.
+- Từ chối đồng ý = không gửi IP/thiết bị, không xác minh; không có hình phạt tự động.
 
 ## 4. Sự cần thiết và tương xứng
 
@@ -122,6 +138,8 @@ giới hạn mục đích (không quảng cáo, không bán), tách theo guild, 
 - Action bảo mật cao dùng `botKey` dẫn xuất SHA-256; không có backdoor.
 - Phân quyền đọc dữ liệu xác minh: chỉ admin guild + bot.
 - XFF lấy mục cuối, fail-closed khi IP riêng; có `/verify/self-test`.
+- Đồng ý xác minh: khối thông báo dữ liệu nhạy cảm + ipapi.is/3 nước hiển thị
+  trước checkbox; ô mặc định trống; server lưu `consentVersion` + `consentAt`.
 - Backup có thể mã hoá AES-256-GCM + kiểm tra SHA-256.
 - Nhật ký hành động phục vụ truy vết; không ghi IP thô.
 
@@ -147,6 +165,9 @@ bình**. Điều kiện để kết luận này đứng vững:
 5. Duy trì test `scripts/test-verify-flow.ts` cho các sweep của `botRunRetention`
    (join, hình phạt, antinuke, mẫu raid, ticket + transcript) — retention chỉ có
    giá trị pháp lý khi code thực sự xoá.
+6. Giữ khối thông báo **dữ liệu cá nhân nhạy cảm** + ipapi.is/3 nước trên trang
+   xác minh và trong tin nhắn bot; mỗi lần đổi nội dung phải tăng
+   `VERIFY_CONSENT_VERSION`, lưu ảnh chụp màn hình và tag git `consent-<version>`.
 
 **Người lập:** `[HỌ TÊN]` — **Ngày:** `[NGÀY]`
 **Phê duyệt:** `[HỌ TÊN]` — **Chữ ký:** `[KÝ]`

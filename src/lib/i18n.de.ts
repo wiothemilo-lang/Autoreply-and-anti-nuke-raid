@@ -1726,12 +1726,20 @@ export const DE: Record<string, string> = {
     "Wir prüfen Gerät und Verbindung, um Fake-Accounts, VPNs und Alt-Accounts zu blockieren.",
   "Địa chỉ IP không được lưu — chỉ lưu giá trị băm một chiều không thể đảo ngược.":
     "Die IP-Adresse wird nicht gespeichert — nur ein nicht umkehrbarer Einweg-Hash.",
-  "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server. IP được gửi một lần tới ipapi.is để tra VPN/proxy/Tor.":
-    "Die rohe IP wird nicht gespeichert; nur ein serverbezogener HMAC-SHA-256-Wert bleibt. Die IP wird einmalig an ipapi.is für die VPN-/Proxy-/Tor-Abfrage gesendet.",
+  "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server.":
+    "Die rohe IP wird nicht gespeichert; nur ein serverbezogener HMAC-SHA-256-Wert bleibt.",
+  "Dữ liệu cá nhân nhạy cảm": "Sensible personenbezogene Daten",
+  "Theo Điều 4(l) Nghị định 356/2025/NĐ-CP, địa chỉ IP và tín hiệu thiết bị/hành vi của bạn là dữ liệu cá nhân nhạy cảm.":
+    "Nach Artikel 4(l) der Verordnung 356/2025/NĐ-CP sind deine IP-Adresse und Geräte-/Verhaltenssignale sensible personenbezogene Daten.",
+  "Để xác minh, IP của bạn được gửi một lần tới nhà cung cấp dịch vụ ipapi.is (xử lý tại Đức, Hoa Kỳ và Singapore) để tra VPN/proxy/Tor. ipapi.is xử lý thay mặt chúng tôi theo DPA công bố của họ.":
+    "Zur Verifizierung wird deine IP einmalig an den Dienstleister ipapi.is übermittelt (Verarbeitung in Deutschland, den USA und Singapur) für eine VPN-/Proxy-/Tor-Abfrage. ipapi.is verarbeitet sie in unserem Auftrag gemäß der veröffentlichten DPA.",
+  "Chính sách của ipapi.is": "ipapi.is-Richtlinie",
+  "Nếu không đồng ý, bạn không thể xác minh và sẽ không vào được server.":
+    "Wenn du nicht zustimmst, kannst du dich nicht verifizieren und erhältst keinen Zugriff auf den Server.",
   "Kết quả có thể được quyết định tự động theo cấu hình server; bạn có thể khiếu nại qua kênh hỗ trợ.":
     "Das Ergebnis kann je nach Serverkonfiguration automatisch entschieden werden; du kannst über den Support-Kanal Einspruch einlegen.",
-  "và việc thu IP/thiết bị, gửi IP tới ipapi.is để xác minh.":
-    "sowie in die Erhebung von IP-/Gerätedaten und die Übermittlung der IP an ipapi.is zur Verifizierung.",
+  "và việc xử lý dữ liệu cá nhân nhạy cảm nêu trên, gồm gửi IP tới ipapi.is để xác minh.":
+    "sowie in die oben beschriebene Verarbeitung sensibler personenbezogener Daten, einschließlich der Übermittlung der IP an ipapi.is zur Verifizierung.",
   "IP thô không được lưu — chỉ lưu giá trị băm một chiều tách theo từng server.":
     "Die rohe IP wird nicht gespeichert — nur ein serverbezogener Einweg-Hash.",
   "— bot mở link riêng trong kênh (hoặc gửi DM); trang web kiểm tra thiết bị/kết nối, chặn VPN và tài khoản phụ.":

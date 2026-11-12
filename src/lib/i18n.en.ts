@@ -1798,12 +1798,20 @@ export const EN: Record<string, string> = {
     "We check your device and connection to block fake accounts, VPNs and alt accounts.",
   "Địa chỉ IP không được lưu — chỉ lưu giá trị băm một chiều không thể đảo ngược.":
     "Your IP address is not stored — only a one-way hash that cannot be reversed.",
-  "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server. IP được gửi một lần tới ipapi.is để tra VPN/proxy/Tor.":
-    "Raw IP is not stored; only a per-server HMAC-SHA-256 value is kept. The IP is sent once to ipapi.is for VPN/proxy/Tor lookup.",
+  "IP thô không được lưu; chỉ lưu HMAC-SHA-256 tách theo từng server.":
+    "Raw IP is not stored; only a per-server HMAC-SHA-256 value is kept.",
+  "Dữ liệu cá nhân nhạy cảm": "Sensitive personal data",
+  "Theo Điều 4(l) Nghị định 356/2025/NĐ-CP, địa chỉ IP và tín hiệu thiết bị/hành vi của bạn là dữ liệu cá nhân nhạy cảm.":
+    "Under Article 4(l) of Decree 356/2025/ND-CP, your IP address and device/behaviour signals are sensitive personal data.",
+  "Để xác minh, IP của bạn được gửi một lần tới nhà cung cấp dịch vụ ipapi.is (xử lý tại Đức, Hoa Kỳ và Singapore) để tra VPN/proxy/Tor. ipapi.is xử lý thay mặt chúng tôi theo DPA công bố của họ.":
+    "To verify you, your IP is sent once to the service provider ipapi.is (processed in Germany, the United States and Singapore) for a VPN/proxy/Tor lookup. ipapi.is processes it on our behalf under its published DPA.",
+  "Chính sách của ipapi.is": "ipapi.is policy",
+  "Nếu không đồng ý, bạn không thể xác minh và sẽ không vào được server.":
+    "If you do not agree, you cannot verify and will not get access to the server.",
   "Kết quả có thể được quyết định tự động theo cấu hình server; bạn có thể khiếu nại qua kênh hỗ trợ.":
     "The result may be decided automatically according to the server configuration; you can appeal through the support channel.",
-  "và việc thu IP/thiết bị, gửi IP tới ipapi.is để xác minh.":
-    "and to the collection of IP/device data and sending the IP to ipapi.is for verification.",
+  "và việc xử lý dữ liệu cá nhân nhạy cảm nêu trên, gồm gửi IP tới ipapi.is để xác minh.":
+    "and to the processing of sensitive personal data described above, including sending the IP to ipapi.is for verification.",
   "IP thô không được lưu — chỉ lưu giá trị băm một chiều tách theo từng server.":
     "Raw IP is not stored — only a one-way hash scoped per server is kept.",
   "— bot mở link riêng trong kênh (hoặc gửi DM); trang web kiểm tra thiết bị/kết nối, chặn VPN và tài khoản phụ.":

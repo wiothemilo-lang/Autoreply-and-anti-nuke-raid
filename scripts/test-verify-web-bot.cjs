@@ -241,8 +241,11 @@ function makeStore(config = {}, handlers = {}) {
     check("chỉ nhận đúng 1 DM", member._dms.length === 1, member._dms.length);
     const embed = member._dms[0].embeds[0].d;
     check(
-      "DM nói rõ KHÔNG lưu IP thô + có gửi ipapi.is",
-      /IP thô.*không được lưu/i.test(embed.description) && /ipapi\.is/i.test(embed.description),
+      "DM nói rõ KHÔNG lưu IP thô, gửi ipapi.is và đây là dữ liệu nhạy cảm",
+      /IP thô.*không được lưu/i.test(embed.description) &&
+        /ipapi\.is/i.test(embed.description) &&
+        /dữ liệu cá nhân nhạy cảm/i.test(embed.description) &&
+        /Đức.*Hoa Kỳ.*Singapore/i.test(embed.description),
       embed.description,
     );
     check(

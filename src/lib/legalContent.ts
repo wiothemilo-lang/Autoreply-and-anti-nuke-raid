@@ -190,6 +190,7 @@ const VI: LegalDoc[] = [
         heading: "6. Cơ sở pháp lý",
         paragraphs: [
           "Với dữ liệu cần để vận hành bot và dashboard, chúng tôi xử lý trên cơ sở thực hiện dịch vụ theo Điều khoản sử dụng và lợi ích hợp pháp trong việc bảo vệ hệ thống, chống lạm dụng. Với IP và tín hiệu thiết bị trong xác minh web, chúng tôi dựa trên sự đồng ý của bạn: bạn chỉ gửi dữ liệu sau khi tick ô đồng ý trên trang xác minh, và có thể từ chối bằng cách đóng trang (khi đó bạn không được xác minh). Ở nơi pháp luật cho phép xử lý vì lợi ích hợp pháp hoặc nghĩa vụ pháp lý, chúng tôi vẫn giới hạn dữ liệu ở mức tối thiểu.",
+          "Với người ở Việt Nam, IP và tín hiệu thiết bị/hành vi trong xác minh web được xác định là dữ liệu cá nhân nhạy cảm theo Điều 4(l) Nghị định 356/2025/NĐ-CP (dữ liệu theo dõi hành vi, hoạt động sử dụng dịch vụ mạng xã hội và dịch vụ trực tuyến khác). Trước khi xin đồng ý, trang xác minh thông báo rõ đây là dữ liệu cá nhân nhạy cảm theo Điều 6(4); ô đồng ý mặc định trống, không gộp mục đích và bạn có thể từ chối.",
           "Nếu bạn ở Việt Nam, chúng tôi áp dụng Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Nghị định 356/2025/NĐ-CP. Nếu bạn ở Khu vực Kinh tế Châu Âu (EEA) hoặc Vương quốc Anh, chúng tôi áp dụng các quyền tương ứng của GDPR. Chúng tôi tôn trọng các quyền này cho mọi người dùng, kể cả khi luật địa phương chưa bắt buộc.",
         ],
       },
@@ -226,7 +227,7 @@ const VI: LegalDoc[] = [
           "Convex: lưu trữ cơ sở dữ liệu và chạy backend của dashboard.",
           "GitHub: chỉ nhận file backup khi bạn bật đẩy Gist bằng khoá của bạn.",
           "Nhà cung cấp AI: xử lý trích đoạn hội thoại cần thiết khi bạn dùng báo cáo raid hoặc trợ lý Haimiya, phục vụ đúng yêu cầu đó.",
-          "ipapi.is: chỉ nhận địa chỉ IP khi server bật xác minh qua web, để tra quốc gia/ASN và dấu hiệu VPN/proxy/Tor/datacenter. Không nhận ID Discord, tên người dùng hay bất kỳ dữ liệu định danh nào khác. Kết quả được cache theo hash tách server trong 24 giờ.",
+          "ipapi.is: chỉ nhận địa chỉ IP khi server bật xác minh qua web, để tra quốc gia/ASN và dấu hiệu VPN/proxy/Tor/datacenter. Dữ liệu được xử lý tại Đức, Hoa Kỳ hoặc Singapore; ipapi.is xử lý thay mặt chúng tôi theo DPA công bố của họ. Không nhận ID Discord, tên người dùng hay bất kỳ dữ liệu định danh nào khác. Kết quả được cache theo hash tách server trong 24 giờ.",
           "Nhà cung cấp hạ tầng web/tên miền: phục vụ dashboard và trang xác minh; xử lý IP như mọi máy chủ web khi trình duyệt kết nối.",
         ],
       },
@@ -274,11 +275,12 @@ const VI: LegalDoc[] = [
         heading: "13. Xác minh qua web: IP, thiết bị, quyết định tự động",
         paragraphs: [
           "Khi chủ server bật xác minh qua web (phương thức “Web”), trang xác minh thu một số tín hiệu để chặn tài khoản giả, VPN/proxy và tài khoản phụ. Việc này chỉ xảy ra khi bạn mở link xác minh do bot gửi và tick ô đồng ý; nếu bạn không đồng ý, trang không gửi IP/thiết bị và bạn không được xác minh.",
+          "Đây là dữ liệu cá nhân nhạy cảm theo Điều 4(l) Nghị định 356/2025/NĐ-CP. Trang xác minh thông báo rõ điều này trước khi xin đồng ý theo Điều 6(4); ô đồng ý mặc định trống, không gộp mục đích và bạn có thể từ chối bất cứ lúc nào trước khi bấm xác minh.",
         ],
         bullets: [
           "Địa chỉ IP: server đọc địa chỉ nguồn của kết nối (mục cuối của X-Forwarded-For do hạ tầng thêm, lùi về metadata của Convex), không tin giá trị client tự khai. IP thô chỉ được xử lý trong bộ nhớ cho lượt xác minh và không ghi vào cơ sở dữ liệu.",
           "Lưu hash: IP được băm HMAC-SHA-256 bằng khoá bí mật, tách riêng theo từng server. Cùng một IP ở hai server cho hai giá trị khác nhau; phiên mới không lưu hash toàn cục. Hash là dữ liệu cá nhân giả danh, không thể đảo ngược nếu không có khoá bí mật, nhưng chúng tôi vẫn bảo vệ như dữ liệu cá nhân.",
-          "Tra cứu mạng: IP được gửi tới ipapi.is cho đúng một lượt tra cứu để nhận quốc gia/ASN và dấu hiệu VPN/proxy/Tor/datacenter/mobile. Không gửi ID Discord hay tên người dùng. Kết quả lưu theo hash tách server trong 24 giờ.",
+          "Tra cứu mạng: IP được gửi tới ipapi.is cho đúng một lượt tra cứu để nhận quốc gia/ASN và dấu hiệu VPN/proxy/Tor/datacenter/mobile. Dữ liệu được xử lý tại Đức, Hoa Kỳ hoặc Singapore theo DPA công bố của ipapi.is. Không gửi ID Discord hay tên người dùng. Kết quả lưu theo hash tách server trong 24 giờ.",
           "Dấu vết thiết bị/trình duyệt: user-agent, canvas, WebGL, kích thước màn hình, ngôn ngữ, múi giờ, số nhân CPU và một mã ngẫu nhiên do trang đặt — tất cả chỉ lưu dưới dạng băm.",
           "Kiểm tra người thật: trang dùng bẫy ẩn (honeypot), thời gian ở trang tối thiểu và cử động chuột/bàn phím — không dùng captcha hình ảnh.",
           "Quyết định tự động: theo cấu hình của chủ server, kết quả có thể là cho qua, từ chối, timeout, kick hoặc ban. Chủ server, quản trị viên, bot và người trong whitelist luôn được miễn; IP dùng chung (CGNAT, mạng di động) chỉ bị từ chối xác minh, không tự động ban. Không phải mọi quyết định đều có người xem trước.",
@@ -550,6 +552,7 @@ const EN: LegalDoc[] = [
         heading: "6. Legal basis",
         paragraphs: [
           "For data needed to run the bot and dashboard, we process on the basis of performing the service under the Terms of Service and our legitimate interest in protecting the system against abuse. For IP and device signals in web verification, we rely on your consent: data is sent only after you tick the consent box on the verification page, and you can refuse by closing the page (in which case you will not be verified). Where the law allows processing for legitimate interests or legal obligations, we still minimise the data.",
+          "For people in Vietnam, IP and device/behaviour signals in web verification are sensitive personal data under Article 4(l) of Decree 356/2025/ND-CP (data tracking behaviour and use of social networks and other online services). Before asking for consent, the verification page states clearly that this is sensitive personal data, as required by Article 6(4); the consent box is empty by default, purposes are not bundled, and you can refuse.",
           "If you are in Vietnam, we apply the Personal Data Protection Law No. 91/2025/QH15 and Decree 356/2025/ND-CP. If you are in the European Economic Area (EEA) or the United Kingdom, we apply the corresponding GDPR rights. We respect these rights for all users, even where local law does not yet require it.",
         ],
       },
@@ -586,7 +589,7 @@ const EN: LegalDoc[] = [
           "Convex: hosts the database and runs the dashboard backend.",
           "GitHub: receives backup files only when you enable Gist upload with your own key.",
           "AI providers: process the conversation excerpts necessary when you use raid reports or the Haimiya assistant, for that request only.",
-          "ipapi.is: receives only the IP address when a server enables web verification, to look up country/ASN and VPN/proxy/Tor/datacenter signals. It receives no Discord ID, username, or other identifying data. Results are cached by a per-server hash for 24 hours.",
+          "ipapi.is: receives only the IP address when a server enables web verification, to look up country/ASN and VPN/proxy/Tor/datacenter signals. Data is processed in Germany, the United States, or Singapore; ipapi.is processes it on our behalf under its published DPA. It receives no Discord ID, username, or other identifying data. Results are cached by a per-server hash for 24 hours.",
           "Web/domain hosting: serves the dashboard and verification page and processes IP addresses like any web server when your browser connects.",
         ],
       },
@@ -634,11 +637,12 @@ const EN: LegalDoc[] = [
         heading: "13. Web verification: IP, device, automated decisions",
         paragraphs: [
           "When a server owner enables web verification (the “Web” method), the verification page collects a few signals to block fake accounts, VPNs/proxies, and alt accounts. This happens only when you open the verification link the bot sends and tick the consent box; if you do not consent, the page does not send IP/device data and you will not be verified.",
+          "This is sensitive personal data under Article 4(l) of Decree 356/2025/ND-CP. The verification page states this clearly before asking for consent, as required by Article 6(4); the consent box is empty by default, purposes are not bundled, and you can refuse at any time before pressing verify.",
         ],
         bullets: [
           "IP address: the server reads the source address of the connection (the last entry of X-Forwarded-For added by the edge, falling back to Convex metadata), never a value the client declares. Raw IP is processed in memory for that verification and is not written to the database.",
           "Hashing: the IP is hashed with HMAC-SHA-256 using a secret key, scoped per server. The same IP on two servers produces different values; new sessions do not store a global hash. A hash is pseudonymous personal data, not reversible without the secret key, but we still protect it as personal data.",
-          "Network lookup: the IP is sent to ipapi.is for that single lookup to obtain country/ASN and VPN/proxy/Tor/datacenter/mobile signals. We do not send your Discord ID or username. The result is cached by a per-server hash for 24 hours.",
+          "Network lookup: the IP is sent to ipapi.is for that single lookup to obtain country/ASN and VPN/proxy/Tor/datacenter/mobile signals. Data is processed in Germany, the United States, or Singapore under ipapi.is's published DPA. We do not send your Discord ID or username. The result is cached by a per-server hash for 24 hours.",
           "Device/browser fingerprint: user-agent, canvas, WebGL, screen size, languages, timezone, CPU core count, and a random ID the page sets — all stored only as hashes.",
           "Human check: the page uses a hidden honeypot field, a minimum time on page, and pointer/keyboard movement — no image captcha.",
           "Automated decision: depending on the server owner's configuration, the result may be allow, deny, timeout, kick, or ban. Server owners, administrators, bots, and whitelisted users are always exempt; shared IPs (CGNAT, mobile networks) are only denied verification and never auto-banned. Not every decision is reviewed by a human first.",
@@ -912,6 +916,7 @@ const DE: LegalDoc[] = [
         heading: "6. Rechtsgrundlage",
         paragraphs: [
           "Für Daten, die zum Betrieb von Bot und Dashboard nötig sind, verarbeiten wir auf Grundlage der Vertragserfüllung nach den Nutzungsbedingungen und unseres berechtigten Interesses am Schutz des Systems vor Missbrauch. Für IP- und Gerätesignale bei der Web-Verifizierung stützen wir uns auf deine Einwilligung: Daten werden erst gesendet, nachdem du auf der Verifizierungsseite das Kästchen angekreuzt hast, und du kannst ablehnen, indem du die Seite schließt (dann wirst du nicht verifiziert). Wo das Gesetz die Verarbeitung aufgrund berechtigter Interessen oder gesetzlicher Pflichten erlaubt, beschränken wir die Daten trotzdem auf das Minimum.",
+          "Für Personen in Vietnam sind IP- und Geräte-/Verhaltenssignale bei der Web-Verifizierung sensible personenbezogene Daten nach Artikel 4(l) der Verordnung 356/2025/NĐ-CP (Daten zur Nachverfolgung von Verhalten und Nutzung sozialer Netzwerke und anderer Online-Dienste). Vor der Einwilligung weist die Verifizierungsseite gemäß Artikel 6(4) ausdrücklich darauf hin; das Kästchen ist standardmäßig leer, Zwecke werden nicht gebündelt, und du kannst ablehnen.",
           "Wenn du in Vietnam bist, wenden wir das Gesetz zum Schutz personenbezogener Daten Nr. 91/2025/QH15 und die Verordnung 356/2025/NĐ-CP an. Wenn du im Europäischen Wirtschaftsraum (EWR) oder im Vereinigten Königreich bist, wenden wir die entsprechenden GDPR-Rechte an. Wir respektieren diese Rechte für alle Nutzer, auch wenn lokales Recht sie noch nicht zwingend vorschreibt.",
         ],
       },
@@ -948,7 +953,7 @@ const DE: LegalDoc[] = [
           "Convex: beherbergt die Datenbank und das Backend des Dashboards.",
           "GitHub: erhält Backup-Dateien nur, wenn du den Gist-Upload mit deinem Schlüssel aktivierst.",
           "KI-Anbieter: verarbeiten die notwendigen Gesprächsausschnitte, wenn du Raid-Berichte oder den Assistenten Haimiya nutzt — nur für diese Anfrage.",
-          "ipapi.is: erhält nur die IP-Adresse, wenn ein Server die Web-Verifizierung aktiviert, um Land/ASN und VPN-/Proxy-/Tor-/Rechenzentrums-Signale nachzuschlagen. Discord-ID, Nutzername oder andere identifizierende Daten werden nicht übermittelt. Ergebnisse werden 24 Stunden per serverbezogenem Hash zwischengespeichert.",
+          "ipapi.is: erhält nur die IP-Adresse, wenn ein Server die Web-Verifizierung aktiviert, um Land/ASN und VPN-/Proxy-/Tor-/Rechenzentrums-Signale nachzuschlagen. Die Daten werden in Deutschland, den USA oder Singapur verarbeitet; ipapi.is verarbeitet sie in unserem Auftrag gemäß der veröffentlichten DPA. Discord-ID, Nutzername oder andere identifizierende Daten werden nicht übermittelt. Ergebnisse werden 24 Stunden per serverbezogenem Hash zwischengespeichert.",
           "Web-/Domain-Hosting: liefert Dashboard und Verifizierungsseite aus und verarbeitet IP-Adressen wie jeder Webserver, wenn dein Browser sich verbindet.",
         ],
       },
@@ -996,11 +1001,12 @@ const DE: LegalDoc[] = [
         heading: "13. Web-Verifizierung: IP, Gerät, automatisierte Entscheidungen",
         paragraphs: [
           "Wenn der Serverbesitzer die Web-Verifizierung aktiviert (Methode „Web“), erfasst die Verifizierungsseite einige Signale, um Fake-Accounts, VPNs/Proxys und Alt-Accounts zu blockieren. Das geschieht nur, wenn du den vom Bot gesendeten Verifizierungslink öffnest und das Einwilligungskästchen ankreuzt; ohne Einwilligung sendet die Seite keine IP-/Gerätedaten und du wirst nicht verifiziert.",
+          "Dies sind sensible personenbezogene Daten nach Artikel 4(l) der Verordnung 356/2025/NĐ-CP. Die Verifizierungsseite weist vor der Einwilligung gemäß Artikel 6(4) ausdrücklich darauf hin; das Kästchen ist standardmäßig leer, Zwecke werden nicht gebündelt, und du kannst jederzeit vor dem Klick auf Verifizieren ablehnen.",
         ],
         bullets: [
           "IP-Adresse: Der Server liest die Quelladresse der Verbindung (letzter, vom Edge ergänzter X-Forwarded-For-Eintrag, sonst Convex-Metadaten), niemals einen vom Client behaupteten Wert. Die rohe IP wird nur im Speicher für diese Verifizierung verarbeitet und nicht in die Datenbank geschrieben.",
           "Hashing: Die IP wird mit HMAC-SHA-256 und einem geheimen Schlüssel gehasht, getrennt pro Server. Dieselbe IP ergibt auf zwei Servern verschiedene Werte; neue Sitzungen speichern keinen globalen Hash. Ein Hash ist pseudonyme personenbezogene Daten, ohne den geheimen Schlüssel nicht rückrechenbar, wird aber weiterhin als personenbezogene Daten geschützt.",
-          "Netzwerkabfrage: Die IP wird für genau diese eine Abfrage an ipapi.is gesendet, um Land/ASN und VPN-/Proxy-/Tor-/Rechenzentrums-/Mobilfunk-Signale zu erhalten. Discord-ID oder Nutzername senden wir nicht. Das Ergebnis wird 24 Stunden per serverbezogenem Hash zwischengespeichert.",
+          "Netzwerkabfrage: Die IP wird für genau diese eine Abfrage an ipapi.is gesendet, um Land/ASN und VPN-/Proxy-/Tor-/Rechenzentrums-/Mobilfunk-Signale zu erhalten. Die Daten werden in Deutschland, den USA oder Singapur gemäß der veröffentlichten DPA von ipapi.is verarbeitet. Discord-ID oder Nutzername senden wir nicht. Das Ergebnis wird 24 Stunden per serverbezogenem Hash zwischengespeichert.",
           "Geräte-/Browser-Fingerabdruck: User-Agent, Canvas, WebGL, Bildschirmgröße, Sprachen, Zeitzone, CPU-Kerne und eine zufällige, von der Seite gesetzte ID — alles nur als Hash gespeichert.",
           "Menschlichkeitsprüfung: verstecktes Honeypot-Feld, Mindestverweildauer sowie Maus- und Tastaturbewegung — kein Bild-Captcha.",
           "Automatisierte Entscheidung: Je nach Konfiguration des Serverbesitzers kann das Ergebnis Allow, Deny, Timeout, Kick oder Ban sein. Serverbesitzer, Administratoren, Bots und Whitelist-Nutzer sind immer ausgenommen; geteilte IPs (CGNAT, Mobilfunk) werden nur abgelehnt, nie automatisch gebannt. Nicht jede Entscheidung wird vorher von einem Menschen geprüft.",

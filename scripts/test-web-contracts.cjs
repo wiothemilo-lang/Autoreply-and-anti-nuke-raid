@@ -238,6 +238,29 @@ check(
   ) && ["24 giờ", "24 hours", "24 Stunden"].every((s) => legalContent.includes(s)),
   "thiếu điều quyền riêng tư mới",
 );
+check(
+  "privacy: nêu dữ liệu xác minh là nhạy cảm + ipapi.is xử lý ở 3 nước (Điều 4(l), 6(4) NĐ 356)",
+  [
+    "dữ liệu cá nhân nhạy cảm theo Điều 4(l)",
+    "sensitive personal data under Article 4(l)",
+    "sensible personenbezogene Daten nach Artikel 4(l)",
+  ].every((s) => legalContent.includes(s)) &&
+    [
+      "Đức, Hoa Kỳ hoặc Singapore",
+      "Germany, the United States, or Singapore",
+      "Deutschland, den USA oder Singapur",
+    ].every((s) => legalContent.includes(s)),
+  "thiếu thông báo dữ liệu nhạy cảm hoặc nơi xử lý của ipapi.is",
+);
+const verifyPageSrc = files.get("pages/VerifyPage.tsx") ?? "";
+check(
+  "VerifyPage: thông báo dữ liệu nhạy cảm + ipapi.is + nơi xử lý TRƯỚC ô đồng ý",
+  verifyPageSrc.includes("Dữ liệu cá nhân nhạy cảm") &&
+    verifyPageSrc.includes("ipapi.is") &&
+    verifyPageSrc.includes("Đức, Hoa Kỳ và Singapore") &&
+    verifyPageSrc.indexOf("Dữ liệu cá nhân nhạy cảm") < verifyPageSrc.indexOf("checked={consent}"),
+  "trang xác minh thiếu thông báo nhạy cảm trước khi xin đồng ý",
+);
 const authConsentSrc = files.get("pages/AuthPage.tsx") ?? "";
 check(
   "AuthPage: nêu điều khoản + quyền riêng tư TRƯỚC nút đăng nhập (Điều 11.4 Luật TMĐT 122/2025)",
