@@ -727,6 +727,18 @@ const sweepFn = () => calls.sweeps.get("interactionVerify").fn();
       check(`webStart: ${label} → báo đang tắt`, /đang tắt/.test(inter._replies[0].content));
     }
 
+    // Khoá toàn cục (convex/ipCollectionLock.ts) khác "guild tự tắt web": phải
+    // nói rõ là tạm khoá để thành viên biết đường bấm nút thường, không tưởng
+    // server hỏng.
+    {
+      const inter = mkInteraction({ guild: mkGuild("g1", mkMember("w1")), userId: "w1" });
+      await verify.handleVerifyWebStart(
+        mkStore({ ...webConfig, verifyWebEnabled: false, ipCollectionEnabled: false }),
+        inter,
+      );
+      check("webStart: khoá toàn cục → báo tạm khoá", /tạm khoá/.test(inter._replies[0].content));
+    }
+
     // Server dùng phương thức khác → chỉ sang panel đúng, không tạo phiên.
     {
       const before = ctl.webCalls;

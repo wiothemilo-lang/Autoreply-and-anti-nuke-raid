@@ -9,16 +9,14 @@
   nhân nên hồ sơ đứng tên cá nhân — nếu lập hộ kinh doanh/công ty thì cập nhật
   trong 10 ngày (Điều 20(2) NĐ 356).
 
-- 🚧 **Verify web đã bật cho RFTV (12/11/2026) nhưng bot VPS chưa restart**:
-  `IP_HASH_SECRET` + `IPINTEL_API_KEY` đã đặt trên Convex prod
-  `accomplished-chipmunk-74`; self-test trả `ok:true` (XFF `probe_missing`
-  advisory nhưng `ip.source=xff`, chainLength 1, spoofRisk false). Đã bật
-  `verifyMethod=web`, `verifyWebEnabled=true` cho guild RFTV
-  `1524054368524173454`; roles/kênh/bot đều xanh. **Còn**: bot VPS phải
-  `git pull` + restart để dùng link ephemeral; test tài khoản thật; DPA ipapi.is
-  đã xác nhận cơ chế tự động khi dùng API (bản ký song phương là tuỳ chọn); rà
-  bản dịch EN/DE. `IP_HASH_SECRET` đang lưu tạm 0600 ở
-  `~/.secrets/protogon-ip-hash-secret` — chuyển vào password manager rồi xoá.
+- 🚧 **Verify web RFTV đang TẠM KHOÁ (12/11/2026)**: chưa có người đủ năng lực
+  pháp lý đứng tên bên kiểm soát nên `convex/ipCollectionLock.ts` đặt
+  `IP_COLLECTION_ENABLED=false` — HTTP `/verify/complete` từ chối **trước khi
+  đọc IP**, action không gọi ipapi.is, bot tự lùi về xác minh bằng nút.
+  **Còn**: đổi RFTV sang Button/Captcha trên dashboard ngay (hiệu lực tức thì,
+  không chờ deploy); merge PR → CI deploy Convex → `/deploy` VPS; chỉ mở lại
+  sau khi có người đứng tên + nộp DPIA/CTIA. `IP_HASH_SECRET` vẫn ở
+  `~/.secrets/protogon-ip-hash-secret` 0600 — chuyển vào password manager rồi xoá.
 
 - ✅ **XFF production đã xác nhận (12/11/2026)** — self-test trên edge
   `accomplished-chipmunk-74.convex.site` trả `ip.source=xff`, `chainLength=1`,
@@ -97,6 +95,24 @@
 ---
 
 ---
+
+## 2026-11-12 (6) — Tạm khoá thu thập IP, bot vẫn chạy
+
+- ✅ Xong: công tắc `IP_COLLECTION_ENABLED=false` trong `convex/ipCollectionLock.ts`;
+  `/verify/complete` từ chối **trước** `getRequestMetadata()` (503
+  `ip_collection_disabled`), action không gọi ipapi.is, `botCreateSession`
+  không tạo phiên; payload guild hạ `web → button` nên bot tự dùng xác minh
+  bằng nút; dashboard khoá lựa chọn Web + hiện băng "tạm khoá"; `updateSettings`
+  từ chối GHI trạng thái web (tránh tự bật lại khi mở công tắc)
+- 📁 File đụng: `convex/ipCollectionLock.ts`, `convex/{http,verify,verifyActions,guilds,bot_tick}.ts`,
+  `convex/guilds/updateSettings.ts`, `src/components/dashboard/VerifyPanel.tsx`,
+  `src/pages/VerifyPage.tsx`, `src/lib/{types,i18n.en,i18n.de}.ts`,
+  `scripts/test-{verify-flow,web-contracts}.*`, `docs/{decision-log,verify-ip-architecture}.md`
+- 🧪 Kiểm chứng: 90/90 CJS · 34/34 TS · typecheck/lint/format sạch · i18n OK ·
+  settings-signal OK; test mới khoá đúng hàng rào (web→button, không tạo phiên)
+- ▶️ Tiếp theo: **đổi RFTV sang Button/Captcha trên dashboard NGAY**; merge PR →
+  CI deploy Convex → `/deploy` VPS; chỉ mở lại sau khi có người đứng tên +
+  nộp DPIA/CTIA
 
 ## 2026-11-12 (5) — Thông báo dữ liệu nhạy cảm + bỏ bước DPA rườm rà
 

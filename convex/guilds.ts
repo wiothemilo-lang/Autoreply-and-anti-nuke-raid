@@ -4,6 +4,11 @@ import { getUserByToken, canManageGuild, listBotGuildsForUser } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { hiddenPasswordIsSet, isBotOwnerUser } from "./hidden";
 import { clampReportMinEvents, clampReportMinIntervalMinutes } from "./reports";
+import {
+  effectiveVerifyMethod,
+  effectiveVerifyWebEnabled,
+  isIpCollectionEnabled,
+} from "./ipCollectionLock";
 import { planForGuild, planLimits } from "./plans";
 import {
   ANTI_NUKE_MODULES,
@@ -296,7 +301,7 @@ export const getGuild = query({
         warnStrikePunish: guild.warnStrikePunish ?? WARN_STRIKE_DEFAULTS.punish,
         safetyPercent,
         verifyEnabled: guild.verifyEnabled ?? false,
-        verifyMethod: guild.verifyMethod ?? "button",
+        verifyMethod: effectiveVerifyMethod(guild.verifyMethod),
         verifyChannelId: guild.verifyChannelId ?? null,
         unverifiedRoleId: guild.unverifiedRoleId ?? null,
         verifiedRoleId: guild.verifiedRoleId ?? null,
@@ -306,7 +311,12 @@ export const getGuild = query({
         verifyWelcomeColor: guild.verifyWelcomeColor ?? null,
         verifySendPanel: guild.verifySendPanel ?? false,
         /** Verify web (Double Counter style): thu IP/fingerprint, chặn VPN, link alt. */
-        verifyWebEnabled: guild.verifyWebEnabled ?? false,
+        verifyWebEnabled: effectiveVerifyWebEnabled(guild.verifyWebEnabled),
+        /**
+         * Công tắc toàn cục đang mở hay khoá. Dashboard dùng để hiện băng cảnh
+         * báo + khoá lựa chọn "Web"; KHÔNG phải quyền của từng guild.
+         */
+        ipCollectionEnabled: isIpCollectionEnabled(),
         ipBanAction: guild.ipBanAction ?? "deny",
         ipBanAcknowledgedAt: guild.ipBanAcknowledgedAt ?? null,
         ipBanWhitelistHashes: guild.ipBanWhitelistHashes ?? [],
@@ -624,7 +634,7 @@ export const getBotConfig = query({
       dmMessage: guild.dmMessage ?? null,
       backupAutoDays: guild.backupAutoDays ?? 0,
       verifyEnabled: guild.verifyEnabled ?? false,
-      verifyMethod: guild.verifyMethod ?? "button",
+      verifyMethod: effectiveVerifyMethod(guild.verifyMethod),
       verifyChannelId: guild.verifyChannelId ?? null,
       unverifiedRoleId: guild.unverifiedRoleId ?? null,
       verifiedRoleId: guild.verifiedRoleId ?? null,
@@ -634,7 +644,9 @@ export const getBotConfig = query({
       verifyWelcomeColor: guild.verifyWelcomeColor ?? null,
       verifySendPanel: guild.verifySendPanel ?? false,
       /** Verify web: bot dựng link DM + xử lý grant/ban sau khi trình duyệt hoàn tất. */
-      verifyWebEnabled: guild.verifyWebEnabled ?? false,
+      verifyWebEnabled: effectiveVerifyWebEnabled(guild.verifyWebEnabled),
+      /** false = tính năng bị khoá toàn cục, khác với guild tự tắt web. */
+      ipCollectionEnabled: isIpCollectionEnabled(),
       ipBanAction: guild.ipBanAction ?? "deny",
       ipBanWhitelistHashes: guild.ipBanWhitelistHashes ?? [],
       // Alt account + VPN detection — bot cần đủ các field này để joinGate chạy
@@ -1006,7 +1018,7 @@ export const getVerifySendPanelGuilds = query({
         verifyChannelId: g.verifyChannelId!,
         unverifiedRoleId: g.unverifiedRoleId ?? null,
         verifiedRoleId: g.verifiedRoleId ?? null,
-        verifyMethod: g.verifyMethod ?? "button",
+        verifyMethod: effectiveVerifyMethod(g.verifyMethod),
       }));
   },
 });

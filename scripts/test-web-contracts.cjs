@@ -3263,5 +3263,68 @@ check(
   `default=${prepDefaultMs}ms`,
 );
 
+// ─── Tạm khoá thu thập IP (12/11/2026) ────────────────────────────────────
+// Không phải bug UI: đây là hàng rào pháp lý. Nếu ai bỏ cờ này mà chưa nộp
+// DPIA/CTIA thì IP thô lại chảy sang Convex (Mỹ) + ipapi.is ngay lập tức.
+const lockSrc = fs.readFileSync(path.join(ROOT, "convex/ipCollectionLock.ts"), "utf8");
+check(
+  "công tắc IP đang TẮT (chưa có bên kiểm soát đủ năng lực)",
+  /export const IP_COLLECTION_ENABLED = false;/.test(lockSrc),
+);
+
+const httpLockSrc = fs.readFileSync(path.join(ROOT, "convex/http.ts"), "utf8");
+const httpGateAt = httpLockSrc.indexOf("if (!isIpCollectionEnabled())");
+const metaIpAt = httpLockSrc.indexOf("ctx.meta.getRequestMetadata()");
+check(
+  "HTTP /verify/complete chặn TRƯỚC khi đọc IP",
+  httpGateAt > 0 && metaIpAt > 0 && httpGateAt < metaIpAt,
+);
+
+const actionsLockSrc = fs.readFileSync(path.join(ROOT, "convex/verifyActions.ts"), "utf8");
+const actionGateAt = actionsLockSrc.indexOf("if (!isIpCollectionEnabled())");
+const ipapiAt = actionsLockSrc.indexOf("api.ipapi.is");
+check(
+  "action chặn TRƯỚC khi gọi ipapi.is",
+  actionGateAt > 0 && ipapiAt > 0 && actionGateAt < ipapiAt,
+);
+
+const guildsLockSrc = fs.readFileSync(path.join(ROOT, "convex/guilds.ts"), "utf8");
+check(
+  "payload guild hạ web về button khi khoá",
+  guildsLockSrc.includes("effectiveVerifyMethod(") &&
+    guildsLockSrc.includes("effectiveVerifyWebEnabled("),
+);
+check(
+  "dashboard nhận cờ ipCollectionEnabled",
+  guildsLockSrc.includes("ipCollectionEnabled: isIpCollectionEnabled()"),
+);
+
+const verifyLockSrc = fs.readFileSync(path.join(ROOT, "convex/verify.ts"), "utf8");
+check(
+  "bot không tạo được phiên verify web khi khoá",
+  /if \(!isIpCollectionEnabled\(\)\) throw new Error/.test(verifyLockSrc),
+);
+
+const updateSettingsLockSrc = fs.readFileSync(
+  path.join(ROOT, "convex/guilds/updateSettings.ts"),
+  "utf8",
+);
+check(
+  "updateSettings từ chối GHI trạng thái web khi khoá",
+  updateSettingsLockSrc.includes("args.verifyWebEnabled === true") &&
+    updateSettingsLockSrc.includes("IP_COLLECTION_LOCK_REASON"),
+);
+
+const verifyPanelSrc = files.get("components/dashboard/VerifyPanel.tsx") ?? "";
+check(
+  "dashboard khoá lựa chọn Web + hiện băng tạm khoá",
+  /value="web"\s+disabled={!g\.ipCollectionEnabled}/.test(verifyPanelSrc) &&
+    verifyPanelSrc.includes("Xác minh web đang tạm khoá"),
+);
+check(
+  "trang verify hiểu mã ip_collection_disabled",
+  verifyPageSrc.includes("ip_collection_disabled"),
+);
+
 console.log(`\nKết quả web contracts: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

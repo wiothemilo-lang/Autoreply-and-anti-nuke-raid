@@ -31,6 +31,7 @@ import {
   hashVerifyToken,
 } from "./verifyCrypto";
 import { decideVerify, type VerifyLink, type VpnMode, type AltPunish } from "./verifyPolicy";
+import { isIpCollectionEnabled, IP_COLLECTION_LOCK_REASON } from "./ipCollectionLock";
 
 /** Số phiên bot nhận mỗi lượt tick — trần để một server lỗi không nuốt cả lượt. */
 const GRANT_TAKE = 60;
@@ -305,6 +306,7 @@ export const botCreateSession = mutation({
   },
   handler: async (ctx, args) => {
     await requireBotKeyStrict(ctx, args.botKey);
+    if (!isIpCollectionEnabled()) throw new Error(IP_COLLECTION_LOCK_REASON);
     const guild = await guildByDiscordId(ctx, args.guildId);
     if (!guild) throw new Error("Server chưa được đồng bộ");
     if (!guild.verifyWebEnabled) throw new Error("Server chưa bật xác minh web");

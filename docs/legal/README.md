@@ -9,6 +9,11 @@ Thư mục này chứa **hồ sơ pháp lý bắt buộc** theo Luật Bảo v�
 > Nghị định 356, và để người có trách nhiệm pháp lý đọc lại. Không thay thế ý
 > kiến luật sư.
 
+> **12/11/2026 — tính năng đang TẮT:** `convex/ipCollectionLock.ts` đặt
+> `IP_COLLECTION_ENABLED = false` vì chưa có người đủ năng lực pháp lý đứng tên
+> bên kiểm soát. Không có IP nào được thu cho tới khi cờ này được bật lại có
+> chủ đích. Hồ sơ dưới đây vẫn phải hoàn tất **trước** khi bật.
+
 ## 1. Chỉ cần nộp 2 hồ sơ
 
 | Hồ sơ                                                   | Tệp                                    | Căn cứ                       | Trạng thái             |

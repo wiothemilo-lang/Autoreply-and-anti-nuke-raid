@@ -1960,4 +1960,10 @@ export const EN: Record<string, string> = {
   "Heartbeat quá cũ": "Heartbeat is stale",
   "Có lỗi trong 24 giờ": "Errors in the last 24 hours",
   "Không có": "None",
+  /* ==== Tạm khoá thu thập IP (12/11/2026) ==== Xem convex/ipCollectionLock.ts. */
+  "Xác minh web đang tạm khoá": "Web verification is temporarily locked",
+  "Hệ thống chưa hoàn tất hồ sơ bảo vệ dữ liệu cá nhân nên không thu IP. Server tự dùng xác minh bằng nút; lựa chọn Web sẽ mở lại sau khi hồ sơ hoàn tất.":
+    "The data-protection dossier is not complete, so no IP addresses are collected. The server falls back to button verification; the Web option reopens once the dossier is finished.",
+  "Xác minh web đang tạm khoá — server chưa thu thập IP. Hãy bấm nút xác minh trong Discord.":
+    "Web verification is temporarily locked — the server is not collecting IP addresses. Use the verify button in Discord.",
 };

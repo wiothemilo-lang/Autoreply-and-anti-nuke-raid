@@ -511,6 +511,10 @@ function codeMessage(code: string): string {
       return translate("Không xác định được kết nối của bạn — hãy thử lại bằng mạng khác.");
     case "consent_required":
       return translate("Hãy đọc và đồng ý với chính sách quyền riêng tư trước khi xác minh.");
+    case "ip_collection_disabled":
+      return translate(
+        "Xác minh web đang tạm khoá — server chưa thu thập IP. Hãy bấm nút xác minh trong Discord.",
+      );
     case "rate_limited":
       return translate("Bạn thao tác quá nhanh — chờ một phút rồi thử lại.");
     case "forbidden_origin":

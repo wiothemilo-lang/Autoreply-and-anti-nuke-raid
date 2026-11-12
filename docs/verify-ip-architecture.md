@@ -1,7 +1,18 @@
 # Kiến trúc thu thập IP cho Verify — IP ban & VPN
 
-> **Trạng thái:** thiết kế **đã chốt 4 quyết định** (11/11/2026), **chưa triển
-> khai**. Ngày 11/11/2026.
+> **TRẠNG THÁI 12/11/2026 — ĐANG TẠM KHOÁ THU THẬP IP.**
+> `convex/ipCollectionLock.ts` đặt `IP_COLLECTION_ENABLED = false`. Hệ quả:
+> `/verify/complete` từ chối **trước khi đọc IP**, action không gọi ipapi.is,
+> bot không tạo phiên web, payload guild hạ `web → button`. Bot vẫn chạy bình
+> thường với xác minh bằng nút. **Chỉ bật lại sau khi** có người đủ năng lực
+> pháp lý đứng tên bên kiểm soát và DPIA/CTIA đã nộp. Xem
+> `docs/legal/README.md` mục 5 và `docs/decision-log.md` (12/11/2026).
+>
+> Phần dưới đây là thiết kế đã triển khai — giữ nguyên để bật lại đúng, không
+> phải thiết kế lại.
+
+> **Trạng thái thiết kế:** đã chốt 4 quyết định (11/11/2026), **đã triển khai**.
+> Ngày 11/11/2026.
 > **Phạm vi:** `bot/` (verify + join gate), `convex/` (HTTP action, schema, job),
 > `src/` (trang verify + panel quản trị).
 > **Nguyên tắc:** không đổi hành vi hiện tại khi chưa bật cờ; mọi field mới là

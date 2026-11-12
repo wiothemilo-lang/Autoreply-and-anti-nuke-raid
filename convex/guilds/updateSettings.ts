@@ -6,7 +6,7 @@
  * `convex/guilds.ts` để tên function + validator không đổi (hợp đồng bot ⇄
  * Convex). Thân hàm nằm ở đây — chỉ tách file, không đổi hành vi.
  */
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import type { ObjectType } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -15,6 +15,7 @@ import { getUserByToken, canManageGuild } from "../auth";
 import { HEAT_DEFAULTS } from "../modules";
 import { GREETING_IMAGE_SLOTS, storageIdFromUrl } from "./greetingImages";
 import { assertWithinLimit, planForGuild } from "../plans";
+import { isIpCollectionEnabled, IP_COLLECTION_LOCK_REASON } from "../ipCollectionLock";
 
 /**
  * Ngôn ngữ nhãn log bot thật sự có bản dịch. Thêm ngôn ngữ ở đây thì PHẢI thêm
@@ -549,6 +550,19 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   }
   if (args.warnStrikePunish !== undefined) patch.warnStrikePunish = args.warnStrikePunish;
   if (args.verifyEnabled !== undefined) patch.verifyEnabled = args.verifyEnabled;
+  // Tạm khoá thu thập IP: từ chối GHI trạng thái web thay vì chỉ hạ giá trị đọc.
+  // Nếu cho ghi, guild sẽ mang cấu hình "web" sẵn và tự bật lại khi công tắc mở —
+  // đúng lúc không ai kiểm tra lại consent/hồ sơ.
+  if (!isIpCollectionEnabled()) {
+    if (args.verifyMethod === "web" || args.verifyWebEnabled === true) {
+      // ConvexError để dashboard đọc được lý do: production mask message của
+      // Error thường, còn `data` thì vẫn forward.
+      throw new ConvexError({
+        code: "IP_COLLECTION_LOCKED",
+        message: IP_COLLECTION_LOCK_REASON,
+      });
+    }
+  }
   if (args.verifyMethod !== undefined) patch.verifyMethod = args.verifyMethod;
   if (args.verifyWebEnabled !== undefined) patch.verifyWebEnabled = args.verifyWebEnabled;
   // Auto-ban theo IP là quyết định có rủi ro ban nhầm — bắt buộc admin đã tick

@@ -225,8 +225,17 @@ async function handleVerifyWebStart(store, interaction) {
   const guild = interaction.guild;
   if (!guild) return;
   const config = await store.getConfig(guild.id);
+  // Giữ MỘT câu cho cả "verify tắt" và "web tắt" — phân biệt hai trạng thái này
+  // chỉ giúp người ngoài dò cấu hình nội bộ. Trạng thái khoá toàn cục thì công
+  // khai (dashboard + trang verify đều hiện), nên nói rõ được.
   if (!config?.verifyEnabled || !config.verifyWebEnabled) {
-    return interaction.reply({ content: "❌ Xác minh web đang tắt.", ephemeral: true });
+    return interaction.reply({
+      content:
+        config?.ipCollectionEnabled === false
+          ? "🔒 Xác minh web đang tạm khoá — hãy bấm nút xác minh thường (nếu panel cũ chỉ có nút web, nhờ quản trị server gửi lại panel)."
+          : "❌ Xác minh web đang tắt.",
+      ephemeral: true,
+    });
   }
   if (config.verifyMethod !== "web") {
     return interaction.reply({

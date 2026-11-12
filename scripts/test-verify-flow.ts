@@ -23,6 +23,7 @@ import { complete as completeAction } from "../convex/verifyActions";
 import { authorize as preflightAuthorize } from "../convex/verifyPreflightData";
 import { ipapiLooksValid } from "../convex/verifyPreflight";
 import { createIpBan, ipBanSummary, listIpBans } from "../convex/verifyBans";
+import { effectiveVerifyMethod, effectiveVerifyWebEnabled } from "../convex/ipCollectionLock";
 import { computeBotKey } from "../convex/botAuth";
 import {
   VERIFY_CONSENT_VERSION,
@@ -253,6 +254,12 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     ...extra,
   });
 }
+
+// Production đang TẠM KHOÁ thu thập IP (convex/ipCollectionLock.ts). Bộ test này
+// kiểm tra toàn bộ luồng verify nên bật cờ test — cùng khuôn với
+// `__resetGeoGuardForTest`. Cuối bộ test có một mục khoá lại để kiểm chính hàng rào.
+(globalThis as { __PROTOGON_IP_COLLECTION_TEST__?: boolean }).__PROTOGON_IP_COLLECTION_TEST__ =
+  true;
 
 (async () => {
   // ═══ 1. Token chỉ lưu băm ═══
@@ -1044,6 +1051,25 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     check("admin A: vẫn có ipHashShort", typeof mine?.[0]?.ipHashShort === "string");
     const summary = await banSummaryH(ctx, { token: DASH_TOKEN, guildId: GUILD });
     check("admin A: summary chỉ đếm guild A", summary?.active === 1, summary);
+  }
+
+  // ═══ 16. Tạm khoá thu thập IP: hàng rào phải đóng ở tầng hàm ═══
+  console.log("\n── tạm khoá IP: botCreateSession từ chối ──");
+  {
+    const { ctx } = makeCtx({ verifyWebEnabled: true });
+    (globalThis as { __PROTOGON_IP_COLLECTION_TEST__?: boolean }).__PROTOGON_IP_COLLECTION_TEST__ =
+      false;
+    let locked = false;
+    try {
+      await newSession(ctx);
+    } catch (e: any) {
+      locked = /tạm khoá/.test(String(e?.message ?? ""));
+    }
+    check("khoá → method web hạ về button", effectiveVerifyMethod("web") === "button");
+    check("khoá → cờ verifyWebEnabled luôn false", effectiveVerifyWebEnabled(true) === false);
+    (globalThis as { __PROTOGON_IP_COLLECTION_TEST__?: boolean }).__PROTOGON_IP_COLLECTION_TEST__ =
+      true;
+    check("khoá → botCreateSession ném lỗi có lý do", locked);
   }
 
   console.log(`\n${pass}/${pass + fail} assertion xanh`);

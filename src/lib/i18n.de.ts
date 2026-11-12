@@ -1891,4 +1891,10 @@ export const DE: Record<string, string> = {
   "Bot offline": "Bot offline",
   "Heartbeat quá cũ": "Heartbeat ist veraltet",
   "Có lỗi trong 24 giờ": "Fehler in den letzten 24 Stunden",
+  /* ==== Tạm khoá thu thập IP (12/11/2026) ==== Xem convex/ipCollectionLock.ts. */
+  "Xác minh web đang tạm khoá": "Web-Verifizierung ist vorübergehend gesperrt",
+  "Hệ thống chưa hoàn tất hồ sơ bảo vệ dữ liệu cá nhân nên không thu IP. Server tự dùng xác minh bằng nút; lựa chọn Web sẽ mở lại sau khi hồ sơ hoàn tất.":
+    "Die Datenschutzunterlagen sind noch nicht vollständig, daher werden keine IP-Adressen erhoben. Der Server nutzt die Button-Verifizierung; die Web-Option wird nach Abschluss der Unterlagen wieder freigegeben.",
+  "Xác minh web đang tạm khoá — server chưa thu thập IP. Hãy bấm nút xác minh trong Discord.":
+    "Die Web-Verifizierung ist vorübergehend gesperrt — der Server erhebt keine IP-Adressen. Bitte nutze den Verifizierungsbutton in Discord.",
 };
