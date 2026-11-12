@@ -957,6 +957,27 @@ export const botRunRetention = mutation({
       deleted++;
     }
 
+    // Phiên đăng nhập dashboard: hết hiệu lực sau 30 ngày nhưng trước đây chỉ
+    // bị từ chối khi đọc, không bao giờ xoá khỏi DB.
+    const oldDashboardSessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", now - 30 * DAY))
+      .take(200);
+    for (const row of oldDashboardSessions) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
+    // Góp ý công khai có thể chứa email tự nguyện nhập — không cần giữ quá 1 năm.
+    const oldFeedback = await ctx.db
+      .query("feedback")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", now - 365 * DAY))
+      .take(100);
+    for (const row of oldFeedback) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
     const staleSignals = await ctx.db
       .query("verifySignals")
       .withIndex("by_lastSeenAt", (q) => q.lt("lastSeenAt", now - 730 * DAY))
@@ -1010,6 +1031,73 @@ export const botRunRetention = mutation({
       } else if (row.active) {
         await ctx.db.patch(row._id, { active: false });
       }
+    }
+
+    // ── Dữ liệu vận hành theo server ─────────────────────────────────────
+    // Trước đây các bảng dưới không có cơ chế dọn nào, dù chính sách công bố
+    // thời hạn. Chính sách nói một đằng mà code giữ vĩnh viễn là rủi ro pháp
+    // lý trực tiếp, nên job này xoá thật theo tuổi bản ghi.
+
+    // Lượt vào server (Join Gate): tên/avatar/điểm rủi ro chỉ cần đủ lâu để
+    // phát hiện alt quay lại. 90 ngày là đủ cho mọi cửa sổ chống lạm dụng.
+    const oldJoins = await ctx.db
+      .query("memberJoins")
+      .withIndex("by_joinedAt", (q) => q.lt("joinedAt", now - 90 * DAY))
+      .take(200);
+    for (const row of oldJoins) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
+    // Lịch sử hình phạt: mod cần tra năm gần nhất, không cần vĩnh viễn.
+    const oldModActions = await ctx.db
+      .query("modActions")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", now - 365 * DAY))
+      .take(200);
+    for (const row of oldModActions) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
+    // Sự kiện chống nuke/raid: cùng hạn với lịch sử hình phạt để đối chiếu.
+    const oldAntinukeEvents = await ctx.db
+      .query("antinukeEvents")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", now - 365 * DAY))
+      .take(200);
+    for (const row of oldAntinukeEvents) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
+    // Mẫu raid dùng cho "ambient learning": đủ cũ thì mô hình đã học xong,
+    // giữ thêm chỉ tăng lượng dữ liệu cá nhân (tên app, người thực thi).
+    const oldRaidSamples = await ctx.db
+      .query("raidSamples")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", now - 180 * DAY))
+      .take(200);
+    for (const row of oldRaidSamples) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
+    // Ticket đã đóng: nội dung người dùng viết + transcript là dữ liệu nhạy
+    // cảm nhất trong hệ thống. Xoá file trong storage TRƯỚC, chỉ xoá hàng DB
+    // khi file đã xoá xong — lỗi storage thì giữ hàng lại để lượt sau thử lại,
+    // tránh để lại blob mồ côi không còn đường dọn.
+    const oldTickets = await ctx.db
+      .query("tickets")
+      .withIndex("by_closedAt", (q) => q.lt("closedAt", now - 180 * DAY))
+      .take(50);
+    for (const row of oldTickets) {
+      if (row.transcriptStorageId) {
+        try {
+          await ctx.storage.delete(row.transcriptStorageId);
+        } catch {
+          continue;
+        }
+      }
+      await ctx.db.delete(row._id);
+      deleted++;
     }
 
     return { deleted };

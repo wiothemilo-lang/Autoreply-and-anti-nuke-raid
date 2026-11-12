@@ -71,10 +71,22 @@ function makeCtx(guildOverrides: Row = {}) {
     ipBans: [],
     ipIntelCache: [],
     guildBans: [],
+    memberJoins: [],
+    modActions: [],
+    antinukeEvents: [],
+    raidSamples: [],
+    tickets: [],
+    feedback: [],
   };
   let seq = 0;
   const all = () => Object.values(tables).flat();
+  const deletedStorage: string[] = [];
   const ctx: any = {
+    storage: {
+      delete: async (id: string) => {
+        deletedStorage.push(id);
+      },
+    },
     db: {
       insert: async (table: string, doc: Row) => {
         const id = `${table}-${++seq}`;
@@ -110,11 +122,15 @@ function makeCtx(guildOverrides: Row = {}) {
             (r) =>
               Object.entries(eqs).every(([f, v]) => r[f] === v) &&
               ranges.every(([op, f, v]) =>
-                op === "lt"
-                  ? convexCmp(r[f], v) < 0
-                  : op === "lte"
-                    ? convexCmp(r[f], v) <= 0
-                    : convexCmp(r[f], v) > 0,
+                // Convex KHÔNG đưa document thiếu field vào index, nên một
+                // range trên field optional không bao giờ khớp hàng undefined.
+                r[f] === undefined
+                  ? false
+                  : op === "lt"
+                    ? convexCmp(r[f], v) < 0
+                    : op === "lte"
+                      ? convexCmp(r[f], v) <= 0
+                      : convexCmp(r[f], v) > 0,
               ) &&
               filters.every(([f, v]) => r[f] === v),
           );
@@ -173,7 +189,7 @@ function makeCtx(guildOverrides: Row = {}) {
       },
     },
   };
-  return { ctx, tables };
+  return { ctx, tables, deletedStorage };
 }
 
 const createH = (botCreateSession as any)._handler;
@@ -671,7 +687,7 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
   // ═══ 13d. Retention dọn link/audit/ipBan cũ ═══
   console.log("\n── botRunRetention: dọn bảng chưa có TTL ──");
   {
-    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    const { ctx, tables, deletedStorage } = makeCtx({ verifyWebEnabled: true });
     const old = Date.now() - 800 * 24 * 3600_000;
     tables.verifySessions.push({
       _id: "old-s",
@@ -720,6 +736,91 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
       checkedAt: old,
       expiresAt: Date.now() - 3600_000,
     });
+    // Dữ liệu vận hành từng không có cơ chế dọn — chính sách lại công bố
+    // thời hạn. Các hàng dưới phải bị xoá thật, không chỉ nằm trong docs.
+    tables.memberJoins.push({
+      _id: "old-j",
+      guildId: GUILD,
+      userId: USER_A,
+      username: "nguoi-vao-cu",
+      joinedAt: old,
+      riskScore: 10,
+      riskFactors: [],
+    });
+    tables.modActions.push({
+      _id: "old-m",
+      guildId: GUILD,
+      action: "ban",
+      createdAt: old,
+    });
+    tables.antinukeEvents.push({
+      _id: "old-e",
+      guildId: GUILD,
+      module: "massBan",
+      action: "ban",
+      count: 10,
+      windowSeconds: 10,
+      threshold: 5,
+      punish: "ban",
+      createdAt: old,
+    });
+    tables.raidSamples.push({
+      _id: "old-r",
+      guildId: GUILD,
+      module: "spam",
+      count: 10,
+      windowSeconds: 10,
+      threshold: 5,
+      createdAt: old,
+    });
+    tables.tickets.push({
+      _id: "old-t",
+      guildId: GUILD,
+      channelId: "chan-cu",
+      kind: "support",
+      openerId: USER_A,
+      openerName: "nguoi-mo-cu",
+      body: "nội dung ticket cũ",
+      createdAt: old,
+      closedAt: old,
+      transcriptStorageId: "storage-cu",
+    });
+    // Ticket còn mở (không có closedAt) và ticket mới đóng KHÔNG được xoá.
+    tables.tickets.push({
+      _id: "open-t",
+      guildId: GUILD,
+      channelId: "chan-mo",
+      kind: "support",
+      openerId: USER_A,
+      openerName: "nguoi-mo",
+      body: "đang chờ xử lý",
+      createdAt: old,
+    });
+    tables.tickets.push({
+      _id: "new-t",
+      guildId: GUILD,
+      channelId: "chan-moi",
+      kind: "support",
+      openerId: USER_A,
+      openerName: "nguoi-mo-moi",
+      body: "vừa đóng",
+      createdAt: Date.now() - 3600_000,
+      closedAt: Date.now() - 3600_000,
+    });
+    tables.sessions.push({
+      _id: "old-dash",
+      token: "token-cu",
+      userId: "u1",
+      createdAt: old,
+      authVersion: 1,
+    });
+    tables.feedback.push({
+      _id: "old-fb",
+      kind: "other",
+      message: "góp ý cũ",
+      email: "cu@example.com",
+      createdAt: old,
+    });
 
     const res = await retentionH(ctx, { botKey: BOT_KEY });
     check("xoá phiên quá hạn 7 ngày", !tables.verifySessions.some((r) => r._id === "old-s"));
@@ -730,7 +831,26 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
       "xoá cache ipapi.is NGAY khi hết hạn",
       !tables.ipIntelCache.some((r) => r._id === "old-i"),
     );
-    check("trả số đã xoá", res.deleted >= 5, res.deleted);
+    check("xoá lượt join quá 90 ngày", !tables.memberJoins.some((r) => r._id === "old-j"));
+    check("xoá hình phạt quá 365 ngày", !tables.modActions.some((r) => r._id === "old-m"));
+    check(
+      "xoá sự kiện antinuke quá 365 ngày",
+      !tables.antinukeEvents.some((r) => r._id === "old-e"),
+    );
+    check("xoá mẫu raid quá 180 ngày", !tables.raidSamples.some((r) => r._id === "old-r"));
+    check("xoá ticket đóng quá 180 ngày", !tables.tickets.some((r) => r._id === "old-t"));
+    check("xoá file transcript trước khi xoá hàng ticket", deletedStorage.includes("storage-cu"));
+    check(
+      "GIỮ ticket còn mở",
+      tables.tickets.some((r) => r._id === "open-t"),
+    );
+    check(
+      "GIỮ ticket mới đóng",
+      tables.tickets.some((r) => r._id === "new-t"),
+    );
+    check("xoá phiên dashboard quá 30 ngày", !tables.sessions.some((r) => r._id === "old-dash"));
+    check("xoá góp ý quá 365 ngày", !tables.feedback.some((r) => r._id === "old-fb"));
+    check("trả số đã xoá", res.deleted >= 12, res.deleted);
   }
 
   // ═══ 13e. Self-test đọc đúng cấu hình, không lộ secret ═══

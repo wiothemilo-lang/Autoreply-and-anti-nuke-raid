@@ -784,6 +784,10 @@ export const EN: Record<string, string> = {
   "Sự cố / lỗi": "Incidents / errors",
   "Threat Intel — bot tự học": "Threat Intel — the bot learns",
   "Threat relay liên server": "Cross-server threat relay",
+  "Chia sẻ chữ ký raid ẩn danh với các server khác dùng Protogon — server của bạn được bảo vệ bằng kinh nghiệm toàn mạng.":
+    "Share anonymous raid signatures with other servers using Protogon — your server benefits from network-wide experience.",
+  "Khi bật đóng góp: đoạn nội dung spam tối đa 60 ký tự (đã lược mention) và tên bot lạ được chia sẻ ẩn danh trong 24 giờ; không gửi ID người dùng, server nguồn bị băm một chiều.":
+    "When contribution is on: a spam snippet of up to 60 characters (mentions stripped) and suspicious bot names are shared anonymously for 24 hours; no user IDs are sent, and the source server is one-way hashed.",
   "Thumbnail (ảnh nhỏ, tùy chọn)": "Thumbnail (small image, optional)",
   "Thành viên": "Members",
   "Thành viên sở hữu role này được bỏ qua toàn bộ kiểm tra moderation, anti-raid và anti-nuke của":

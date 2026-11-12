@@ -25,9 +25,10 @@
 | 5   | Groq / OpenAI            | Hoa Kỳ                   | Nội dung lệnh AI (khi provider được chọn)                           | Trả lời lệnh                             | HTTPS/TLS   |
 | 6   | GitHub                   | Hoa Kỳ                   | Bản backup guild (nếu chủ server bật Gist)                          | Sao lưu do chủ server kiểm soát          | HTTPS/TLS   |
 | 7   | Nhà cung cấp VPS/Dokploy | `[NƯỚC]`                 | Log hạ tầng, không chứa IP thô trong DB                             | Chạy bot                                 | HTTPS/SSH   |
+| 8   | ZaloPay                  | Việt Nam                 | Mã đơn, số tiền, trạng thái; thông tin thẻ/tài khoản do ZaloPay giữ | Xử lý thanh toán, đối soát               | HTTPS/TLS   |
 
-Luồng 4 không phải chuyển xuyên biên giới (xử lý tại Việt Nam) nhưng vẫn ghi để
-đầy đủ chuỗi.
+Luồng 4 và 8 không phải chuyển xuyên biên giới (xử lý tại Việt Nam) nhưng vẫn
+ghi để đầy đủ chuỗi.
 
 ## 2. Đánh giá sự cần thiết
 

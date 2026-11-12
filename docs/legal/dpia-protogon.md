@@ -25,6 +25,11 @@
 | 3   | Xác minh qua web            | Người được xác minh  | IP (chỉ trong RAM), hash HMAC tách guild, tín hiệu thiết bị đã băm, kết quả ipapi, audit, liên kết alt, ban IP | Chặn tài khoản giả/VPN/proxy khi chủ server bật  | Bên kiểm soát và xử lý                     |
 | 4   | Tính năng AI (Haimiya)      | Người gọi lệnh       | Nội dung lệnh/tin nhắn liên quan, ID server/kênh                                                               | Trả lời, tóm tắt, kiểm duyệt                     | Bên xử lý                                  |
 | 5   | Sao lưu                     | Chủ server           | Cấu hình, bản ghi hành động, heat                                                                              | Khôi phục khi sự cố                              | Bên xử lý                                  |
+| 6   | Ticket hỗ trợ               | Người mở ticket      | Nội dung/bằng chứng/ô bổ sung do người dùng gửi, transcript kênh ticket, ID người mở, staff xử lý              | Xử lý khiếu nại/hỗ trợ                           | Bên xử lý (chủ server quyết định)          |
+| 7   | Threat relay liên server    | Thành viên server    | Đoạn spam ≤60 ký tự đã lược mention, tên bot lạ; không có ID người dùng, guild nguồn băm một chiều             | Chặn raid sớm ở server khác (opt-in hai phía)    | Bên kiểm soát và xử lý                     |
+| 8   | Học mẫu raid (ambient)      | Thành viên server    | Module, hành động, phân loại AI, lý do AI, tên app; không có ID server/người dùng khi bot đọc toàn mạng        | Cải thiện nhận diện raid, giảm phạt nhầm         | Bên kiểm soát và xử lý                     |
+| 9   | Thanh toán / ủng hộ         | Người mua            | ID Discord, gói, số tiền, mã đơn ZaloPay, trạng thái, thời điểm, phiên bản điều khoản; không có dữ liệu thẻ    | Xử lý đơn, đối soát, nghĩa vụ kế toán            | Bên kiểm soát                              |
+| 10  | Góp ý                       | Người gửi            | Nội dung góp ý, email tự nguyện, ngôn ngữ, trang gửi                                                           | Cải thiện sản phẩm, phản hồi khi cần             | Bên kiểm soát                              |
 
 ## 2. Luồng dữ liệu
 
@@ -32,6 +37,7 @@
 Discord (US) ──gateway/HTTP──► Bot (VPS) ──► Convex (US) ──► Dashboard (web)
                                    │              │
                                    │              ├─► ipapi.is (DE/US/SG): chỉ IP
+                                   │              ├─► ZaloPay (VN): mã đơn + số tiền khi thanh toán
                                    │              └─► GitHub (US): Gist nếu chủ server bật
                                    └─► Nhà cung cấp AI (Kira VN; Groq/OpenAI US) khi có lệnh
 ```
@@ -40,12 +46,17 @@ Chi tiết endpoint, biến môi trường và cách đọc XFF: `docs/verify-ip
 
 ## 3. Cơ sở pháp lý và nguyên tắc
 
-| Hoạt động | Cơ sở                                                                              |
-| --------- | ---------------------------------------------------------------------------------- |
-| 1, 5      | Hợp đồng/hợp tác với chủ server; lợi ích hợp pháp (an ninh server)                 |
-| 2         | Thực hiện hợp đồng; lợi ích hợp pháp (vận hành dịch vụ)                            |
-| 3         | **Sự đồng ý** của người được xác minh (checkbox, ghi `consentVersion`/`consentAt`) |
-| 4         | Thực hiện yêu cầu của người dùng                                                   |
+| Hoạt động | Cơ sở                                                                                |
+| --------- | ------------------------------------------------------------------------------------ |
+| 1, 5      | Hợp đồng/hợp tác với chủ server; lợi ích hợp pháp (an ninh server)                   |
+| 2         | Thực hiện hợp đồng; lợi ích hợp pháp (vận hành dịch vụ)                              |
+| 3         | **Sự đồng ý** của người được xác minh (checkbox, ghi `consentVersion`/`consentAt`)   |
+| 4         | Thực hiện yêu cầu của người dùng                                                     |
+| 6         | Thực hiện dịch vụ hỗ trợ theo yêu cầu của người dùng/chủ server                      |
+| 7         | **Sự đồng ý** của chủ server (opt-in `relayShare`/`relayReceive`) + lợi ích hợp pháp |
+| 8         | Lợi ích hợp pháp (an ninh hệ thống); dữ liệu đã bỏ định danh trước khi bot đọc       |
+| 9         | Thực hiện hợp đồng mua/ủng hộ + nghĩa vụ kế toán                                     |
+| 10        | Sự đồng ý của người gửi (tự nguyện gửi form)                                         |
 
 Nguyên tắc: tối thiểu hoá (không lưu IP thô, không lưu nội dung tin nhắn thường),
 giới hạn mục đích (không quảng cáo, không bán), tách theo guild, có thời hạn xoá.
@@ -58,33 +69,52 @@ giới hạn mục đích (không quảng cáo, không bán), tách theo guild, 
 - IP thô không vào DB; hash HMAC-SHA-256 với khoá bí mật, **tách theo từng guild**
   nên không thể ghép một người giữa hai server.
 - Tín hiệu thiết bị chỉ lưu dạng băm; không đọc nội dung tin nhắn riêng tư.
+- Ngoại lệ liên server được kiểm soát: threat relay chỉ chạy khi cả hai phía opt-in,
+  chỉ gửi đoạn spam ≤60 ký tự/tên bot (không ID người dùng, nguồn băm, TTL 24h);
+  mẫu raid bot đọc toàn mạng đã bỏ ID server/người dùng và chỉ dùng để cải thiện
+  phân loại.
+- Nội dung ticket/transcript chỉ staff của chính server đó đọc được; job dọn xoá
+  file storage trước rồi mới xoá hàng DB, tránh blob mồ côi.
 - Thời hạn ngắn hơn mức tối đa cần thiết ở phần lớn hạng mục (xem §6).
 
 ## 5. Đánh giá rủi ro
 
-| Rủi ro                                           | Khả năng   | Tác động   | Biện pháp                                                                         | Dư               |
-| ------------------------------------------------ | ---------- | ---------- | --------------------------------------------------------------------------------- | ---------------- |
-| Lộ hash IP/thiết bị → liên kết hành vi           | Thấp       | Cao        | HMAC tách guild; khoá trong env Convex; không trả hash qua API; audit 365 ngày    | Thấp             |
-| Admin guild đọc dữ liệu thành viên ngoài phạm vi | Trung bình | Trung bình | Kiểm tra quyền theo guild ở backend; team admin không đọc xuyên server; test IDOR | Thấp             |
-| Chặn nhầm người thật (CGNAT, mạng di động)       | Trung bình | Trung bình | IP dùng chung chỉ bị từ chối xác minh, không auto-ban; whitelist; khiếu nại       | Thấp             |
-| Chuyển dữ liệu ra nước ngoài bị yêu cầu dừng     | Thấp       | Cao        | Tối thiểu hoá; CTIA; tắt được theo guild                                          | Trung bình       |
-| Nhà cung cấp AI giữ nội dung lệnh                | Trung bình | Trung bình | Chỉ gửi khi có lệnh; cần xác nhận điều khoản không huấn luyện                     | **Cần xác minh** |
-| Trẻ em dùng Discord                              | Thấp       | Cao        | Không thu ngày sinh; Discord yêu cầu 13+; không dùng dữ liệu cho quảng cáo        | Thấp             |
-| Sự cố không báo kịp 72 giờ                       | Trung bình | Cao        | Runbook + biểu mẫu biên bản (`runbook-du-lieu-ca-nhan.md`)                        | Thấp             |
-| Backup Gist bị lộ                                | Thấp       | Trung bình | Chủ server tự chọn; mã hoá AES-256-GCM; huỷ gist khi xoá                          | Thấp             |
+| Rủi ro                                           | Khả năng   | Tác động   | Biện pháp                                                                                | Dư               |
+| ------------------------------------------------ | ---------- | ---------- | ---------------------------------------------------------------------------------------- | ---------------- |
+| Lộ hash IP/thiết bị → liên kết hành vi           | Thấp       | Cao        | HMAC tách guild; khoá trong env Convex; không trả hash qua API; audit 365 ngày           | Thấp             |
+| Admin guild đọc dữ liệu thành viên ngoài phạm vi | Trung bình | Trung bình | Kiểm tra quyền theo guild ở backend; team admin không đọc xuyên server; test IDOR        | Thấp             |
+| Chặn nhầm người thật (CGNAT, mạng di động)       | Trung bình | Trung bình | IP dùng chung chỉ bị từ chối xác minh, không auto-ban; whitelist; khiếu nại              | Thấp             |
+| Chuyển dữ liệu ra nước ngoài bị yêu cầu dừng     | Thấp       | Cao        | Tối thiểu hoá; CTIA; tắt được theo guild                                                 | Trung bình       |
+| Nhà cung cấp AI giữ nội dung lệnh                | Trung bình | Trung bình | Chỉ gửi khi có lệnh; cần xác nhận điều khoản không huấn luyện                            | **Cần xác minh** |
+| Trẻ em dùng Discord                              | Thấp       | Cao        | Không thu ngày sinh; Discord yêu cầu 13+; không dùng dữ liệu cho quảng cáo               | Thấp             |
+| Sự cố không báo kịp 72 giờ                       | Trung bình | Cao        | Runbook + biểu mẫu biên bản (`runbook-du-lieu-ca-nhan.md`)                               | Thấp             |
+| Backup Gist bị lộ                                | Thấp       | Trung bình | Chủ server tự chọn; mã hoá AES-256-GCM; huỷ gist khi xoá                                 | Thấp             |
+| Ticket/transcript lộ nội dung nhạy cảm           | Trung bình | Cao        | Chỉ staff guild đọc; không trả qua API công khai; xoá storage + hàng DB sau 180 ngày     | Thấp             |
+| Relay bị đầu độc/lộ nội dung sang server khác    | Thấp       | Trung bình | Opt-in hai phía; lược mention, cắt 60 ký tự; weight ≥2; TTL 24h; nguồn băm               | Thấp             |
+| Dữ liệu cũ không được dọn (retention trên giấy)  | Trung bình | Cao        | `botRunRetention` xoá thật + test chặn hồi quy; chạy mỗi tick bot                        | Thấp             |
+| Lộ dữ liệu đơn thanh toán                        | Thấp       | Trung bình | Chỉ lưu mã đơn/số tiền/ID Discord; không lưu thẻ hay tài khoản; quyền admin có kiểm soát | Thấp             |
+| Email trong góp ý bị lạm dụng                    | Thấp       | Thấp       | Chỉ chủ bot đọc; xoá sau 365 ngày; không hiển thị công khai                              | Thấp             |
 
 ## 6. Thời hạn lưu và xoá
 
-| Dữ liệu                | Thời hạn                             | Cơ chế               |
-| ---------------------- | ------------------------------------ | -------------------- |
-| Phiên xác minh         | 7 ngày sau khi hết hạn               | `botRunRetention`    |
-| Liên kết tài khoản phụ | 180 ngày                             | `botRunRetention`    |
-| Nhật ký xác minh       | 365 ngày                             | `botRunRetention`    |
-| Ban IP                 | Xoá hẳn 90 ngày sau khi hết hiệu lực | `botRunRetention`    |
-| Tín hiệu thiết bị/IP   | 730 ngày kể từ lần cuối              | `botRunRetention`    |
-| Cache ipapi            | 24 giờ                               | Xoá ngay khi hết hạn |
-| Phiên dashboard        | 30 ngày                              | Đăng xuất xoá ngay   |
-| Backup                 | Theo lịch chủ server (2–30 ngày/bản) | Bot xoá bản cũ       |
+| Dữ liệu                | Thời hạn                              | Cơ chế                               |
+| ---------------------- | ------------------------------------- | ------------------------------------ |
+| Phiên xác minh         | 7 ngày sau khi hết hạn                | `botRunRetention`                    |
+| Liên kết tài khoản phụ | 180 ngày                              | `botRunRetention`                    |
+| Nhật ký xác minh       | 365 ngày                              | `botRunRetention`                    |
+| Ban IP                 | Xoá hẳn 90 ngày sau khi hết hiệu lực  | `botRunRetention`                    |
+| Tín hiệu thiết bị/IP   | 730 ngày kể từ lần cuối               | `botRunRetention`                    |
+| Cache ipapi            | 24 giờ                                | Xoá ngay khi hết hạn                 |
+| Phiên dashboard        | 30 ngày                               | Đăng xuất xoá ngay + sweep           |
+| Backup                 | Theo lịch chủ server (2–30 ngày/bản)  | Bot xoá bản cũ                       |
+| Góp ý                  | 365 ngày                              | `botRunRetention`                    |
+| Thanh toán/đối soát    | Theo thời hạn kế toán (tối đa 10 năm) | Không tự động xoá — rà soát thủ công |
+| Lượt join (Join Gate)  | 90 ngày                               | `botRunRetention`                    |
+| Hành động hình phạt    | 365 ngày                              | `botRunRetention`                    |
+| Sự kiện antinuke/raid  | 365 ngày                              | `botRunRetention`                    |
+| Mẫu raid (ẩn danh)     | 180 ngày                              | `botRunRetention`                    |
+| Ticket đã đóng         | 180 ngày sau khi đóng                 | `botRunRetention`                    |
+| Threat relay           | 24 giờ                                | `botCleanupRelay`                    |
 
 ## 7. Biện pháp kỹ thuật và tổ chức
 
@@ -114,6 +144,9 @@ bình**. Điều kiện để kết luận này đứng vững:
 2. Xác nhận điều khoản của nhà cung cấp AI về việc không dùng dữ liệu để huấn luyện.
 3. Không bật xác minh web cho guild mới khi chưa chạy `/verify/self-test`.
 4. Cập nhật hồ sơ trong 10 ngày khi thay đổi bên kiểm soát/nhà cung cấp.
+5. Duy trì test `scripts/test-verify-flow.ts` cho các sweep của `botRunRetention`
+   (join, hình phạt, antinuke, mẫu raid, ticket + transcript) — retention chỉ có
+   giá trị pháp lý khi code thực sự xoá.
 
 **Người lập:** `[HỌ TÊN]` — **Ngày:** `[NGÀY]`
 **Phê duyệt:** `[HỌ TÊN]` — **Chữ ký:** `[KÝ]`

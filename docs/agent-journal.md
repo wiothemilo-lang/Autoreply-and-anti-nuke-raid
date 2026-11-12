@@ -96,6 +96,20 @@
 
 ---
 
+## 2026-11-12 (4) — Retention thật cho dữ liệu vận hành + ticket
+
+- ✅ Xong: `botRunRetention` xoá thật phiên dashboard >30d, góp ý >365d, lượt join
+  > 90d, hình phạt/antinuke >365d, mẫu raid >180d, ticket đóng >180d (xoá file
+  > transcript trong storage TRƯỚC hàng DB); thêm index `by_createdAt` cho
+  > `sessions`/`modActions`, `by_joinedAt`, `by_closedAt` (chỉ thêm, không đổi field)
+- 📄 Chính sách VI/EN/DE + DPIA/CTIA/vendor/runbook khớp số liệu mới: nêu ticket &
+  transcript, threat relay, mẫu raid ẩn danh, thanh toán ZaloPay, góp ý; §4.1
+  runbook có checklist xoá guild theo thứ tự con → cha
+- 🧪 Kiểm chứng: `bun run test` 90/90 · `bun run test:ts` 34/34 (verify-flow
+  116/116) · typecheck/lint/format sạch · 9 cổng hợp đồng OK
+- ▶️ Tiếp theo: commit + push PR #111; điền họ tên/địa chỉ/email rồi nộp DPIA/CTIA;
+  restart bot VPS để nhận link ephemeral
+
 ## 2026-11-12 (3) — Hồ sơ pháp lý theo Luật 91/2025 + NĐ 356/2025
 
 - ✅ Xong: rà văn bản gốc (Luật 91/2025/QH15, NĐ 356/2025/NĐ-CP, NĐ 330/2026/NĐ-CP); bỏ 2 dẫn chiếu NĐ 13/2023 đã hết hiệu lực; chính sách VI/EN/DE đổi thời hạn quyền thành phản hồi 02 ngày làm việc + thực hiện 10/15/20 ngày, thông báo vi phạm 72 giờ, nêu tên luật

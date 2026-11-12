@@ -103,7 +103,44 @@ nộp cơ quan. Không xoá log của sự cố trước khi có kết luận.
 1. Chạy `botRunRetention` và đối chiếu số bản ghi còn hạn.
 2. Kiểm tra cache ipapi không còn bản ghi quá 24h.
 3. Kiểm tra phiên xác minh quá 7 ngày sau hết hạn đã bị xoá.
-4. Ghi kết quả vào nhật ký nội bộ; lệch → mở issue sửa code, không sửa tay DB.
+4. Kiểm tra phiên dashboard quá 30 ngày, góp ý quá 365 ngày, lượt join quá 90
+   ngày, hình phạt/antinuke quá 365 ngày, mẫu raid quá 180 ngày và ticket đóng
+   quá 180 ngày đã bị xoá.
+5. Kiểm tra transcript của ticket đã xoá không còn trong Convex storage (mở
+   dashboard Storage, đối chiếu `transcriptStorageId`).
+6. Ghi kết quả vào nhật ký nội bộ; lệch → mở issue sửa code, không sửa tay DB.
+
+### 4.1 Xoá dữ liệu một server (theo yêu cầu)
+
+Chỉ làm sau khi đã xác minh người yêu cầu là chủ server (hoặc người được uỷ
+quyền) và đã ghi lại guild ID. Thứ tự bắt buộc:
+
+1. **Xuất dữ liệu trước nếu chủ server yêu cầu** (dashboard đã có nút xuất; nếu
+   không, tổng hợp thủ công từ các bảng dưới).
+2. **Xoá file transcript trong storage trước**: duyệt `tickets` theo
+   `by_guildId`, gọi `ctx.storage.delete(transcriptStorageId)` cho từng ticket.
+   Không xoá hàng DB trước khi file đã xoá — nếu không sẽ mất đường dẫn tới blob.
+3. Xoá hàng DB theo thứ tự con → cha:
+   - `backupChunks` (theo `backupId` của các `guildBackups`), rồi `guildBackups`
+   - `tickets`, rồi `ticketKinds`
+   - `verifyLinks`, `verifySignals`, `verifySessions`, `verifyAudit`, `ipBans`
+   - `memberJoins`, `modActions`, `antinukeEvents`, `raidSamples`, `incidentMarks`
+   - `auditLog`, `guildWebhooks`
+   - `reactionRolePanels`, `giveaways`, `autoReplies`, `antinukeModules`,
+     `heatStates`, `channelLocks`, `guildChannels`, `guildRoles`, `guildEmojis`
+   - `entitlements` có `guildId` tương ứng (gói premium gắn server)
+   - `guilds` (dòng cuối cùng)
+4. **Không xoá** `payments` (nghĩa vụ kế toán; chỉ chứa ID Discord, mã đơn, số
+   tiền — không có thẻ/tài khoản), `ipIntelCache` và `relaySignatures` (không có
+   guildId; tự hết hạn theo TTL).
+5. Kiểm tra lại: mỗi bảng trên phải trả 0 dòng với `guildId` đó; storage không
+   còn transcript của guild.
+6. Ghi vào bảng theo dõi: thời điểm, người thực hiện, bảng đã xoá, số dòng, bằng
+   chứng (ảnh chụp/CLI output). Phản hồi chủ server trong 20 ngày theo mục 1.3.
+
+> Chưa có mutation xoá-guild tự động trong code. Nếu số yêu cầu tăng, ưu tiên
+> viết `botPurgeGuildData` có `botKey`, xác nhận chuỗi và test trước khi dùng —
+> không thao tác tay hàng loạt trên production.
 
 ## 5. Đào tạo và rà soát
 
