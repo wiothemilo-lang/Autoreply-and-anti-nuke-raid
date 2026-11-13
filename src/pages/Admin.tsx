@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import PageReveal from "../components/PageReveal";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -473,8 +473,12 @@ function AdminContent() {
                           ),
                         );
                         setOwnerSeedInput("");
-                      } catch {
-                        setSecretMsg(translate("Lỗi khi đặt seed — thử lại."));
+                      } catch (e) {
+                        // Giữ nguyên thông điệp thật (thiếu quyền, phiên hết hạn,
+                        // seed bị từ chối…) thay vì nuốt lỗi và bảo "thử lại".
+                        setSecretMsg(
+                          friendlyConvexError(e, translate("Lỗi khi đặt seed — thử lại.")),
+                        );
                       }
                     }}
                     className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
@@ -1224,7 +1228,7 @@ function ThreatIntelCard({
         <input
           type="checkbox"
           className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
-          checked={threat?.aiWeeklyEnabled ?? true}
+          checked={threat?.aiWeeklyEnabled === true}
           onChange={(e) => onToggleAi(e.target.checked)}
         />
         {translate(
@@ -1485,11 +1489,25 @@ function TeamAdminsCard({
   const ids = (data?.members ?? []).map((m) => m.discordId);
   const max = data?.max ?? 20;
 
+  // Danh sách để GHI phải là bản mới nhất ta biết, không phải snapshot của lượt
+  // render này: bấm ✕ hai người liên tiếp trước khi subscription kịp cập nhật thì
+  // lượt sau ghi đè lượt trước và người đầu được khôi phục quyền.
+  const idsRef = useRef<string[]>(ids);
+  useEffect(() => {
+    idsRef.current = (data?.members ?? []).map((m) => m.discordId);
+  }, [data?.members]);
+
   async function save(next: string[]) {
+    idsRef.current = next;
     setBusy(true);
     setMsg(null);
     const res = await onSave(next);
     setBusy(false);
+    if (!res.ok) {
+      // Ghi lỗi → trả ref về đúng trạng thái server để lượt sau không cộng dồn
+      // trên một danh sách ảo.
+      idsRef.current = (data?.members ?? []).map((m) => m.discordId);
+    }
     if (res.ok) {
       setMsg({ kind: "ok", text: translate("Đã lưu danh sách quản trị viên nhóm.") });
     } else {
@@ -1520,7 +1538,7 @@ function TeamAdminsCard({
               {teamMemberRow(data.owner, "owner", {
                 canRemove: false,
                 busy,
-                onRemove: (id) => void save(ids.filter((x) => x !== id)),
+                onRemove: (id) => void save(idsRef.current.filter((x) => x !== id)),
               })}
             </ul>
           )}
@@ -1534,7 +1552,7 @@ function TeamAdminsCard({
                 teamMemberRow(m, "admin", {
                   canRemove: isOwner,
                   busy,
-                  onRemove: (id) => void save(ids.filter((x) => x !== id)),
+                  onRemove: (id) => void save(idsRef.current.filter((x) => x !== id)),
                 }),
               )}
             </ul>
@@ -1558,7 +1576,7 @@ function TeamAdminsCard({
                   disabled={busy || input.trim().length === 0 || ids.length >= max}
                   onClick={async () => {
                     const added = input.trim();
-                    if (await save([...ids, added])) setInput("");
+                    if (await save([...idsRef.current, added])) setInput("");
                   }}
                   className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
@@ -1854,9 +1872,14 @@ function AnnounceCard({
   const [verBusy, setVerBusy] = useState(false);
   const [verMsg, setVerMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
-  // Đồng bộ ô bản cập nhật với server khi feed vừa tải / admin khác vừa đổi.
+  // Đồng bộ ô bản cập nhật với server khi feed vừa tải / admin khác vừa đổi —
+  // nhưng KHÔNG đè lên chữ đang gõ: chỉ nhận giá trị mới khi ô còn trống hoặc
+  // vẫn đang bằng đúng giá trị server của lượt trước.
+  const lastVersion = useRef(currentVersion ?? "");
   useEffect(() => {
-    setVerInput(currentVersion ?? "");
+    const next = currentVersion ?? "";
+    setVerInput((current) => (current === "" || current === lastVersion.current ? next : current));
+    lastVersion.current = next;
   }, [currentVersion]);
 
   const resetForm = () => {

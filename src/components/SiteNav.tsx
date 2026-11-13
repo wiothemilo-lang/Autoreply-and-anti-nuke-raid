@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ChevronDown, Grid2x2, MessageCircle, Moon, Sun, Wifi, WifiOff } from "lucide-react";
 import { useQuery } from "convex/react";
@@ -14,6 +14,42 @@ import { isNavItemActive, navLabelFor, visibleNavGroups } from "../lib/navItems"
 import { translate } from "../lib/i18n";
 
 type ThemeMode = "light" | "dark";
+
+/**
+ * Theme là trạng thái TOÀN CỤC (một class `dark` trên `<html>`), nhưng header và
+ * dock là HAI instance độc lập của cùng `usePagesMenu`. Trước đây mỗi instance
+ * giữ `useState` riêng: đổi sáng/tối ở bảng này thì `aria-pressed` ở bảng kia
+ * vẫn chỉ mode cũ cho tới khi tải lại trang. Store ngoài React + `useSyncExternalStore`
+ * cho cả hai đọc đúng một nguồn.
+ */
+const THEME_KEY = "protogon-theme";
+const themeListeners = new Set<() => void>();
+let themeValue: ThemeMode | null = null;
+
+function readTheme(): ThemeMode {
+  if (typeof window === "undefined") return "light";
+  const saved = window.localStorage.getItem(THEME_KEY);
+  if (saved === "dark" || saved === "light") return saved;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function themeSnapshot(): ThemeMode {
+  themeValue ??= readTheme();
+  return themeValue;
+}
+
+function subscribeTheme(listener: () => void) {
+  themeListeners.add(listener);
+  return () => {
+    themeListeners.delete(listener);
+  };
+}
+
+function setThemeGlobal(next: ThemeMode) {
+  if (themeValue === next) return;
+  themeValue = next;
+  themeListeners.forEach((listener) => listener());
+}
 
 /**
  * Ba mảnh của điều hướng trang, cố ý tách nhau:
@@ -110,16 +146,11 @@ function usePagesMenu(instanceId: string) {
     setOpen(next);
   }, []);
 
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    if (typeof window === "undefined") return "light";
-    const saved = window.localStorage.getItem("protogon-theme");
-    if (saved === "dark" || saved === "light") return saved;
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
+  const theme = useSyncExternalStore(subscribeTheme, themeSnapshot, () => "light" as ThemeMode);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    window.localStorage.setItem("protogon-theme", theme);
+    window.localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
   const toggle = useCallback(() => {
@@ -165,7 +196,7 @@ function usePagesMenu(instanceId: string) {
     close,
     triggerRef,
     theme,
-    setTheme,
+    setTheme: setThemeGlobal,
     groups: visibleNavGroups({ isAdmin: isAdmin === true }),
     current: navLabelFor(location.pathname),
   };
