@@ -39,22 +39,12 @@ import {
   type PeriodComparison,
 } from "../lib/incidentStats";
 import { ANTINUKE_MODULE_META, PUNISH_LABEL } from "../lib/constants";
-import { cn } from "../lib/utils";
+import { cn, formatDateTime } from "../lib/utils";
 import type { GuildData } from "../lib/types";
 
 import LangSwitch from "../components/LangSwitch";
 
 import { dateLocale, translate } from "../lib/i18n";
-
-function formatDateTime(ts: number): string {
-  return new Date(ts).toLocaleString(dateLocale(), {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 /**
  * So sánh kỳ này với kỳ trước (A4). Nói rõ là số liệu ƯỚC LƯỢNG trên dữ liệu

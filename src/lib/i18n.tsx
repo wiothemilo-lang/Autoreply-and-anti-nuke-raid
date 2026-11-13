@@ -111,7 +111,7 @@ export async function prepareInitialLanguage(timeoutMs = 250): Promise<void> {
 }
 
 /** Thay {ten} bằng giá trị biến — kiểu gettext format, không cần lib ngoài. */
-function formatVars(s: string, vars?: Record<string, string | number>): string {
+export function formatVars(s: string, vars?: Record<string, string | number>): string {
   if (!vars) return s;
   return s.replace(/\{(\w+)\}/g, (m, name) =>
     Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : m,

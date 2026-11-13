@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { Plus, Save, ShieldCheck, Trash2, UserCheck, Users } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -83,7 +84,7 @@ export default function WhitelistPanel({ data }: { data: GuildData }) {
       });
       toast.success(translate("Đã lưu danh sách trắng — bot áp dụng trong khoảng 3 phút"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     } finally {
       setSaving(false);
     }

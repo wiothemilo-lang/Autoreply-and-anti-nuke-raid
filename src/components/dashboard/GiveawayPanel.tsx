@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { Gift, Plus, Timer, Trash2, Trophy, Users } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
@@ -100,7 +101,7 @@ export default function GiveawayPanel({ data }: { data: GuildData }) {
       setImageUrl("");
       setEndMessage("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Tạo thất bại"));
+      toastConvexError(e, translate("Tạo thất bại"));
     } finally {
       setSaving(false);
     }
@@ -178,7 +179,7 @@ export default function GiveawayPanel({ data }: { data: GuildData }) {
                       await cancelGiveaway({ token, guildId, giveawayId: g._id });
                       toast.success(translate("Đã hủy giveaway"));
                     } catch (e) {
-                      toast.error(e instanceof Error ? e.message : translate("Hủy thất bại"));
+                      toastConvexError(e, translate("Hủy thất bại"));
                     }
                   }}
                 >

@@ -40,6 +40,7 @@ import {
 import { usePublicConfig } from "../lib/usePublicConfig";
 import type { MeData } from "../lib/types";
 import { toast } from "sonner";
+import { toastConvexError } from "../lib/toastError";
 
 import LangSwitch from "../components/LangSwitch";
 
@@ -107,7 +108,7 @@ export default function Dashboard() {
       }
       setSelected([]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     } finally {
       setBatchBusy(false);
     }

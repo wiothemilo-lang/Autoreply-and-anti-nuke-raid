@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import {
   BadgeCheck,
   CalendarClock,
@@ -79,7 +80,7 @@ export default function JoinGatePanel({ data }: { data: GuildData }) {
       if (msg) toast.success(msg);
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     }
   }

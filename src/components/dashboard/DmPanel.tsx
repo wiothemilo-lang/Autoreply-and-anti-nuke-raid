@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { Mail, Send } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
@@ -34,7 +35,7 @@ export default function DmPanel({ data }: { data: GuildData }) {
       setUserId("");
       setMessage("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Gửi thất bại"));
+      toastConvexError(e, translate("Gửi thất bại"));
     } finally {
       setSending(false);
     }

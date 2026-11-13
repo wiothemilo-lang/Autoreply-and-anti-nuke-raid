@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { MessageSquareQuote, Pencil, Plus, Power, Search, Smile, Trash2, X } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
@@ -353,7 +354,7 @@ export default function ReactionRolesPanel({ data }: { data: GuildData }) {
       setChannelId("");
       setRows([{ emoji: "✅", roleId: "" }]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     } finally {
       setSaving(false);
     }
@@ -444,7 +445,7 @@ export default function ReactionRolesPanel({ data }: { data: GuildData }) {
                         await togglePanel({ token, guildId, panelId: p._id });
                         toast.success(translate(p.enabled ? "Đã tắt bảng" : "Đã bật bảng"));
                       } catch (e) {
-                        toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+                        toastConvexError(e, translate("Thất bại"));
                       }
                     }}
                   >
@@ -460,7 +461,7 @@ export default function ReactionRolesPanel({ data }: { data: GuildData }) {
                         await deletePanel({ token, guildId, panelId: p._id });
                         toast.success(translate("Đã xóa bảng (tin nhắn cũ trong Discord vẫn còn)"));
                       } catch (e) {
-                        toast.error(e instanceof Error ? e.message : translate("Xóa thất bại"));
+                        toastConvexError(e, translate("Xóa thất bại"));
                       }
                     }}
                   >

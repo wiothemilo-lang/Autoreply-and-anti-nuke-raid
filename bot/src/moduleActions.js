@@ -8,7 +8,6 @@
  */
 
 const MEMBER_ACTIONS = ["warn", "kick", "ban", "timeout"];
-const MESSAGE_ACTIONS = ["deleteMessages", "purgeMessages"];
 const ACTION_STRENGTH = { warn: 1, timeout: 2, kick: 3, ban: 4 };
 
 /** Lấy danh sách hành động hiệu lực của module (fallback về punish cũ). */
@@ -112,6 +111,5 @@ module.exports = {
   cleanupMessages,
   purgeChannelMessages,
   MEMBER_ACTIONS,
-  MESSAGE_ACTIONS,
   ACTION_STRENGTH,
 };

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import {
   AlertTriangle,
   CalendarClock,
@@ -638,7 +639,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       // chỉ để báo kết quả (tạo mới / không đổi / lỗi) và cảnh báo khi chờ quá lâu.
       setBackupWatch({ startedAt: Date.now() });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     } finally {
       setBusy(null);
     }
@@ -660,7 +661,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
           : translate("Đã tắt tự động backup"),
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     } finally {
       setAutoBusy(false);
     }
@@ -695,7 +696,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
           : translate("Phần khôi phục: {p0} (tất cả).", { p0: applied.join(", ") }),
       });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     } finally {
       setRestoreOptBusy(false);
     }
@@ -741,7 +742,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       // Bắt đầu theo dõi: bot quét mỗi ~20s, server lớn có thể mất 1-2 phút.
       setImportWatch({ startedAt: Date.now() });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Tải file thất bại"));
+      toastConvexError(e, translate("Tải file thất bại"));
     } finally {
       setImportBusy(false);
     }
@@ -804,7 +805,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
         ),
       });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     } finally {
       setBusy(null);
     }
@@ -835,7 +836,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
         },
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     } finally {
       setRetentionBusy(false);
     }

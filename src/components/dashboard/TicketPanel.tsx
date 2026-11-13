@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import {
   FileText,
   LifeBuoy,
@@ -129,7 +130,7 @@ export default function TicketPanel({ data }: { data: GuildData }) {
       await updateSettings({ token: TOKEN(), guildId: g.discordId, ...p });
       if (msg) toast.success(msg);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 
@@ -1169,7 +1170,7 @@ function TranscriptBody({ ticket, guildId }: { ticket: TicketRow; guildId: strin
       })
       .catch((e) => {
         if (alive.current) {
-          toast.error(e instanceof Error ? e.message : translate("Không đọc được transcript"));
+          toastConvexError(e, translate("Không đọc được transcript"));
           setTranscript(null);
         }
       });

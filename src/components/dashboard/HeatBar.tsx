@@ -1,6 +1,7 @@
 import { Flame, RotateCcw, Trash2 } from "lucide-react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { api } from "../../../convex/_generated/api";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -59,7 +60,7 @@ export function SafetyBar({ data }: { data: GuildData }) {
       await resetHeat({ token: TOKEN(), guildId: data.guild.discordId });
       toast.success(translate("Đã xóa toàn bộ nhiệt độ vi phạm"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Xóa thất bại"));
+      toastConvexError(e, translate("Xóa thất bại"));
     }
   }
 
@@ -133,7 +134,7 @@ export function TopOffenders({ data, limit = 5 }: { data: GuildData; limit?: num
       await resetHeat({ token: TOKEN(), guildId: data.guild.discordId, userId });
       toast.success(translate("Đã xóa nhiệt của {p0}", { p0: username || userId }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Xóa thất bại"));
+      toastConvexError(e, translate("Xóa thất bại"));
     }
   }
 
@@ -206,7 +207,7 @@ export function HeatTable({ data, limit = 20 }: { data: GuildData; limit?: numbe
       await resetHeat({ token: TOKEN(), guildId: g.discordId, userId });
       toast.success(translate("Đã xóa nhiệt của {p0}", { p0: username || userId }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Xóa thất bại"));
+      toastConvexError(e, translate("Xóa thất bại"));
     }
   }
 

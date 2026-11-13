@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import {
   AtSign,
   Bot,
@@ -149,7 +150,7 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
       }
       setDialogOpen(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     } finally {
       setSaving(false);
     }
@@ -164,7 +165,7 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
         translate(enabled ? 'Đã bật rule "{p0}"' : 'Đã tắt rule "{p0}"', { p0: rule.name }),
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     }
   }
 
@@ -174,7 +175,7 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
       await removeRule({ token: TOKEN(), id: rule._id });
       toast.success(translate('Đã xóa "{p0}"', { p0: rule.name }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Xóa thất bại"));
+      toastConvexError(e, translate("Xóa thất bại"));
     }
   }
 

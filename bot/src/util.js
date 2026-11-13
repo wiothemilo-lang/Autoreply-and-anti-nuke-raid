@@ -15,6 +15,16 @@ function isAdmin(member) {
 }
 
 /**
+ * Diễn giải thời lượng phút cho người đọc ("90" → "1.5 giờ").
+ * Một bản duy nhất cho modTools / channelLock / timeoutWatch.
+ */
+function formatDuration(minutes) {
+  if (minutes >= 1440) return `${minutes / 1440} ngày`;
+  if (minutes >= 60) return `${minutes / 60} giờ`;
+  return `${minutes} phút`;
+}
+
+/**
  * Quản lý auto reply: quyền Manage Guild/Administrator, HOẶC có role Mod/Admin
  * đã được cấu hình qua /setup mod-role, /setup admin-role.
  */
@@ -214,6 +224,7 @@ module.exports = {
   canManageGuild,
   isAdmin,
   canManageWithConfig,
+  formatDuration,
   fillPlaceholders,
   logEmbed,
   sendLog,

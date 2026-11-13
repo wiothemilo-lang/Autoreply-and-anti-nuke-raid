@@ -27,7 +27,6 @@ import {
   MIN_VERIFY_DWELL_MS,
   VERIFY_CONSENT_VERSION,
   VERIFY_SESSION_TTL_MS,
-  clampBanDays,
   generateVerifyToken,
   hashVerifyToken,
 } from "./verifyCrypto";
@@ -811,27 +810,6 @@ export const listLinks = query({
   },
 });
 
-/** Dashboard: bỏ qua một cặp link (admin xác nhận không phải alt). */
-export const dismissLink = mutation({
-  args: { token: v.string(), guildId: v.string(), id: v.id("verifyLinks") },
-  handler: async (ctx, args) => {
-    const user = await getUserByToken(ctx, args.token);
-    if (!user) throw new Error("Chưa đăng nhập");
-    const guild = await guildByDiscordId(ctx, args.guildId);
-    if (!guild || !canManageGuild(user, guild)) throw new Error("Không có quyền");
-    const row = await ctx.db.get(args.id);
-    if (!row || row.guildId !== args.guildId) throw new Error("Không tìm thấy");
-    await ctx.db.patch(args.id, { status: "dismissed", updatedAt: Date.now() });
-    await audit(ctx, {
-      guildId: args.guildId,
-      action: "verify_link_dismissed",
-      actor: user.discordId ?? String(user._id),
-      details: JSON.stringify({ userId: row.userId, linkedUserId: row.linkedUserId }),
-    });
-    return { ok: true };
-  },
-});
-
 /** Trần xoá mỗi lượt — một mutation không được đọc/ghi vô hạn. */
 const DELETE_TAKE = 200;
 
@@ -957,12 +935,6 @@ export const deleteUserVerifyData = mutation({
     });
     return { ok: true as const, ...counts };
   },
-});
-
-/** Nhãn hạn ban mặc định cho UI (tránh hardcode 2 nơi). */
-export const banDefaults = query({
-  args: {},
-  handler: async () => ({ defaultDays: clampBanDays(undefined), maxDays: 90 }),
 });
 
 /**

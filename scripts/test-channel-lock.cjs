@@ -41,8 +41,10 @@ fs.writeFileSync(
 fs.writeFileSync(
   UTIL_STUB,
   `const calls = [];
+const real = require(${JSON.stringify(path.join(__dirname, "..", "bot", "src", "util.js"))});
 module.exports = {
   calls,
+  formatDuration: real.formatDuration,
   logEmbed: (o) => o,
   sendLog: async (guild, cfg, embed) => { calls.push({ guildId: guild && guild.id, embed }); },
 };

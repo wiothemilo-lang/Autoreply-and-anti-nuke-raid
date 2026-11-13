@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { translate } from "./i18n";
+import { dateLocale, translate } from "./i18n";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -93,4 +93,18 @@ export function timeAgo(ts: number | null | undefined): string {
   const h = Math.floor(m / 60);
   if (h < 24) return translate("{p} giờ trước", { p: h });
   return translate("{p} ngày trước", { p: Math.floor(h / 24) });
+}
+
+/**
+ * Ngày + giờ đầy đủ theo locale đang chọn — dùng chung cho các trang lịch sử/sự cố
+ * (trước đây mỗi trang copy một bản, dễ lệch định dạng khi đổi ngôn ngữ).
+ */
+export function formatDateTime(ts: number): string {
+  return new Date(ts).toLocaleString(dateLocale(), {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

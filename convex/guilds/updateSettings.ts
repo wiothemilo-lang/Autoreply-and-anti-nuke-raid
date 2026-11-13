@@ -16,6 +16,7 @@ import { HEAT_DEFAULTS } from "../modules";
 import { GREETING_IMAGE_SLOTS, storageIdFromUrl } from "./greetingImages";
 import { assertWithinLimit, planForGuild } from "../plans";
 import { isIpCollectionEnabled, IP_COLLECTION_LOCK_REASON } from "../ipCollectionLock";
+import { THEME_KEYS } from "../guildConfig";
 
 /**
  * Ngôn ngữ nhãn log bot thật sự có bản dịch. Thêm ngôn ngữ ở đây thì PHẢI thêm
@@ -173,24 +174,10 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   // schema.ts). `updatedAt` không dùng được vì chính bot bump nó mỗi lượt sync.
   const patch: Record<string, unknown> = { updatedAt: Date.now(), settingsChangedAt: Date.now() };
   if (args.theme !== undefined) {
-    // Five grayscale keys are the current dashboard contract. Legacy color keys
-    // remain accepted during deployment skew; the UI maps them to Graphite.
-    const THEME_KEYS = [
-      "graphite",
-      "slate",
-      "steel",
-      "mist",
-      "fog",
-      "pink",
-      "rose",
-      "orange",
-      "amber",
-      "green",
-      "teal",
-      "sky",
-      "violet",
-    ];
-    if (!THEME_KEYS.includes(args.theme)) throw new Error("Chủ đề màu không hợp lệ");
+    // Năm khoá xám là hợp đồng dashboard hiện tại. Khoá màu cũ vẫn được nhận
+    // trong lúc deploy lệch phiên bản; UI ánh xạ chúng về Graphite.
+    if (!(THEME_KEYS as readonly string[]).includes(args.theme))
+      throw new Error("Chủ đề màu không hợp lệ");
     patch.theme = args.theme;
   }
   if (args.dailyReportEnabled !== undefined) patch.dailyReportEnabled = args.dailyReportEnabled;

@@ -1,4 +1,4 @@
-const { canManageWithConfig } = require("../util");
+const { canManageWithConfig, formatDuration } = require("../util");
 const { sendCaseLog, CASE_LABEL } = require("../caseLog");
 const timeoutWatch = require("../timeoutWatch");
 // MISFIRE FEEDBACK (vòng 11): mod gỡ phạt tự động của bot = phạt nhầm đã xác
@@ -17,12 +17,6 @@ function parseDuration(input) {
     unit === "s" ? Math.ceil(n / 60) : unit === "h" ? n * 60 : unit === "d" ? n * 1440 : n;
   if (minutes > 10080) return null; // tối đa 7 ngày
   return Math.max(1, minutes);
-}
-
-function formatDuration(minutes) {
-  if (minutes >= 1440) return `${minutes / 1440} ngày`;
-  if (minutes >= 60) return `${minutes / 60} giờ`;
-  return `${minutes} phút`;
 }
 
 /** Kiểm tra quyền mod: Manage Guild / Administrator / role Mod-Admin đã cấu hình. */

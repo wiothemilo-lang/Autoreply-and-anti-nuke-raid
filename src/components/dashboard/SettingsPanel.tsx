@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useUnsavedChanges } from "../../lib/useUnsavedChanges";
 import { useMutation, useQuery, useConvex } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import {
   BarChart3,
   BellRing,
@@ -106,7 +107,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
       );
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     }
   }
@@ -121,7 +122,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
       toast.success(v ? translate("Đã bật cảnh báo khẩn") : translate("Đã tắt cảnh báo khẩn"));
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     }
   }
@@ -137,7 +138,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
       });
       toast.success(translate("Đã lưu chính sách báo cáo khẩn"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 
@@ -151,7 +152,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
       toast.success(v ? translate("Đã bật ping @everyone") : translate("Đã tắt ping @everyone"));
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     }
   }
@@ -195,7 +196,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
       });
       toast.success(translate("Đã lưu cài đặt, bot áp dụng trong khoảng 3 phút"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     } finally {
       setSaving(false);
     }
@@ -220,7 +221,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
       URL.revokeObjectURL(url);
       toast.success(translate("Đã tải cấu hình về máy"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Nạp thất bại"));
+      toastConvexError(e, translate("Nạp thất bại"));
     } finally {
       setConfigBusy(false);
     }
@@ -253,7 +254,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
       if (r.invalid.length > 0)
         toast.warning(translate("Bỏ {p0} mục vì giá trị không hợp lệ", { p0: r.invalid.length }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("File không phải JSON hợp lệ"));
+      toastConvexError(e, translate("File không phải JSON hợp lệ"));
     } finally {
       setConfigBusy(false);
       if (configFileRef.current) configFileRef.current.value = "";
@@ -713,7 +714,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                         toast.success(translate("Đã đặt mật khẩu tính năng ẩn"));
                         setHiddenPasswordInput("");
                       } catch (e) {
-                        toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+                        toastConvexError(e, translate("Lưu thất bại"));
                       } finally {
                         setHiddenSaving(false);
                       }
@@ -736,7 +737,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                           });
                           toast.success(translate("Đã xóa mật khẩu tính năng ẩn"));
                         } catch (e) {
-                          toast.error(e instanceof Error ? e.message : translate("Xóa thất bại"));
+                          toastConvexError(e, translate("Xóa thất bại"));
                         } finally {
                           setHiddenSaving(false);
                         }
@@ -813,7 +814,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                       });
                       toast.success(translate("Đã áp dụng sắc độ mới"));
                     } catch (e) {
-                      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+                      toastConvexError(e, translate("Lưu thất bại"));
                     } finally {
                       setThemeSaving(false);
                     }

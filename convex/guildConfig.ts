@@ -43,8 +43,8 @@ import {
  */
 export const PORTABLE_CONFIG_VERSION = 1;
 
-/** Sơn màu dashboard — trùng danh sách trong `updateSettings`. */
-const THEME_KEYS = [
+/** Sơn màu dashboard — nguồn duy nhất, `updateSettings` import lại để không lệch. */
+export const THEME_KEYS = [
   "graphite",
   "slate",
   "steel",
