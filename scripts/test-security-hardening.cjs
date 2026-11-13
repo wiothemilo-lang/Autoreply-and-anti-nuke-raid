@@ -366,7 +366,10 @@ check(
 );
 check(
   "silent refresh chỉ báo thành công khi action trả ok",
-  callbackSrc.includes('refreshed.ok ? "silent=ok" : "silent=err"'),
+  // Cờ được dựng qua `silentUrl(...)` để đường dẫn đã có query sẵn không bị
+  // ghép thành `?a=1?silent=ok` (dashboard khi đó không đọc được cờ).
+  callbackSrc.includes('refreshed.ok ? "ok" : "err"') &&
+    callbackSrc.includes('searchParams.set("silent", value)'),
 );
 check(
   "session purge dùng index _creation_time ẩn, schema không khai báo index thừa",

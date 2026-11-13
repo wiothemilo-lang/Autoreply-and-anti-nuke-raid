@@ -131,15 +131,20 @@ function emojiCode(e: EmojiInfo) {
 /** Xem trước nhanh dạng chữ (dùng cho DM — DM là tin nhắn thường, không embed). */
 function previewText(template: string, guildName: string, memberCount: number) {
   return (
-    template.trim() ||
-    translate("Chào mừng {user} đã đến {server}! Bạn là thành viên thứ {count} 🎉")
-  )
-    .replaceAll("{user}", "@ThànhViênMới")
-    .replaceAll("{username}", translate("ThànhViênMới"))
-    .replaceAll("{server}", guildName)
-    .replaceAll("{count}", String(memberCount ?? 0))
-    .replaceAll("{created}", "365")
-    .replaceAll("{boost}", "7");
+    (
+      template.trim() ||
+      translate("Chào mừng {user} đã đến {server}! Bạn là thành viên thứ {count} 🎉")
+    )
+      .replaceAll("{user}", "@ThànhViênMới")
+      .replaceAll("{username}", translate("ThànhViênMới"))
+      .replaceAll("{server}", guildName)
+      .replaceAll("{count}", String(memberCount ?? 0))
+      .replaceAll("{created}", "365")
+      // {joined} cũng nằm trong TOKENS/PLACEHOLDER_BADGE — thiếu dòng này thì
+      // preview DM hiện nguyên chữ "{joined}" và người dùng tưởng biến hỏng.
+      .replaceAll("{joined}", "128")
+      .replaceAll("{boost}", "7")
+  );
 }
 
 /** Ô soạn tin có thanh chèn emoji / kênh / biến, giữ con trỏ sau mỗi lần chèn. */
@@ -153,6 +158,7 @@ function TemplateField({
   emojis,
   badge,
   className,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -163,6 +169,9 @@ function TemplateField({
   emojis: EmojiInfo[];
   badge?: string;
   className?: string;
+  /** Trần ký tự PHẢI khớp với `slice()` phía Convex (updateSettings) — thiếu nó
+   *  thì bài dài được lưu "thành công" nhưng bị server cắt im lặng. */
+  maxLength?: number;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -326,6 +335,7 @@ function TemplateField({
         rows={rows}
         value={value}
         placeholder={placeholder}
+        maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
       />
     </div>
@@ -639,6 +649,16 @@ function GreetingCard({
             value={channel}
             onValueChange={(v) => {
               setChannel(v);
+              // Bỏ kênh gửi trong khi tính năng đang BẬT = bot im lặng vĩnh viễn
+              // mà badge vẫn ghi "đang bật" (không chỗ nào báo lỗi). Tắt công tắc
+              // luôn và nói rõ lý do thay vì lưu một cấu hình chết.
+              if (v === "none" && enabled) {
+                void onSave(
+                  { [`${kind}ChannelId`]: "", [`${kind}Enabled`]: false },
+                  translate("Đã tắt tính năng vì chưa chọn kênh gửi"),
+                );
+                return;
+              }
               // Lưu NGAY khi chọn kênh: nếu chỉ giữ ở state rồi bật công tắc trước khi
               // bấm "Lưu cài đặt", cấu hình sẽ là "đang bật + chưa có kênh" → bot
               // không gửi gì và người dùng không hiểu vì sao.
@@ -671,6 +691,7 @@ function GreetingCard({
               value={msg}
               onChange={setMsg}
               rows={3}
+              maxLength={1000}
               channels={channels}
               emojis={emojis}
               placeholder={
@@ -697,6 +718,7 @@ function GreetingCard({
                 value={randomMsg}
                 onChange={setRandomMsg}
                 rows={3}
+                maxLength={4000}
                 channels={channels}
                 emojis={emojis}
                 placeholder={translate(
@@ -727,6 +749,7 @@ function GreetingCard({
                     value={title}
                     onChange={setTitle}
                     rows={1}
+                    maxLength={256}
                     channels={channels}
                     emojis={emojis}
                     placeholder={
@@ -964,6 +987,7 @@ function DmCard({
           value={msg}
           onChange={setMsg}
           rows={2}
+          maxLength={1000}
           channels={data.channels ?? []}
           emojis={data.emojis ?? []}
           placeholder={translate(

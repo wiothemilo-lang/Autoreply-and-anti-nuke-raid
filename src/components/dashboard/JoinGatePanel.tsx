@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import {
@@ -62,12 +62,25 @@ export default function JoinGatePanel({ data }: { data: GuildData }) {
   const [whitelistInput, setWhitelistInput] = useState("");
   const locked = g.lockdownUntil !== null && g.lockdownUntil > Date.now();
 
-  async function patch(p: Record<string, unknown>, msg?: string) {
+  /**
+   * Bản sao danh sách trắng để TÍNH giá trị kế tiếp. Đọc thẳng props ở 2 lần
+   * bấm liên tiếp là mất một ID: lần 2 vẫn thấy mảng cũ (subscription chưa
+   * push) nên ghi đè lần 1. Ref này nhận giá trị vừa gửi ngay lập tức, rồi
+   * đồng bộ lại theo server mỗi khi props đổi.
+   */
+  const whitelistRef = useRef<string[]>(g.joinGateWhitelist ?? []);
+  useEffect(() => {
+    whitelistRef.current = g.joinGateWhitelist ?? [];
+  }, [g.joinGateWhitelist]);
+
+  async function patch(p: Record<string, unknown>, msg?: string): Promise<boolean> {
     try {
       await updateSettings({ token: TOKEN(), guildId: g.discordId, ...p });
       if (msg) toast.success(msg);
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      return false;
     }
   }
 
@@ -76,23 +89,30 @@ export default function JoinGatePanel({ data }: { data: GuildData }) {
     if (!/^\d{15,20}$/.test(id)) {
       return toast.error(translate("Nhập đúng ID người dùng Discord (15-20 chữ số)"));
     }
-    const current = g.joinGateWhitelist || [];
+    const current = whitelistRef.current;
     if (current.includes(id)) {
       setWhitelistInput("");
       return toast.info(translate("ID này đã có trong danh sách trắng"));
     }
-    await patch(
-      { joinGateWhitelist: [...current, id] },
+    const next = [...current, id];
+    whitelistRef.current = next;
+    const ok = await patch(
+      { joinGateWhitelist: next },
       translate("Đã thêm {p0} vào danh sách trắng", { p0: id }),
     );
+    // Ghi lỗi → bỏ giá trị lạc quan để lần sau không "hồi sinh" ID chưa lưu.
+    if (!ok) whitelistRef.current = g.joinGateWhitelist ?? [];
     setWhitelistInput("");
   }
 
   async function removeWhitelist(id: string) {
-    await patch(
-      { joinGateWhitelist: (g.joinGateWhitelist || []).filter((x) => x !== id) },
+    const next = whitelistRef.current.filter((x) => x !== id);
+    whitelistRef.current = next;
+    const ok = await patch(
+      { joinGateWhitelist: next },
       translate("Đã xóa {p0} khỏi danh sách trắng", { p0: id }),
     );
+    if (!ok) whitelistRef.current = g.joinGateWhitelist ?? [];
   }
 
   const activeChecks = [

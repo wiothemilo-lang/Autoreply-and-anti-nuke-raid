@@ -1,5 +1,6 @@
 import { Crown, ShieldCheck, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
+import { planDisplayName } from "../lib/constants";
 import { translate } from "../lib/i18n";
 
 /**
@@ -27,12 +28,8 @@ export default function UserTags({
   plan?: string | null;
   className?: string;
 }) {
-  const planLabel =
-    plan === "supporter"
-      ? translate("Đồng hành")
-      : plan === "pioneer"
-        ? translate("Tiên phong")
-        : null;
+  const planText = planDisplayName(plan);
+  const planLabel = planText ? translate(planText) : null;
   if (!isOwner && !isAdmin && !planLabel) return null;
 
   return (
@@ -51,7 +48,7 @@ export default function UserTags({
         )
       )}
       {planLabel && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-warn/40 bg-warn/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn">
+        <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">
           <Sparkles className="h-3 w-3" aria-hidden />
           {planLabel}
         </span>

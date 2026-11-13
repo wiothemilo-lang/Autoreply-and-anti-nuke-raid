@@ -32,8 +32,9 @@ export default function ConfigHealthCard({
   // Bot chưa ở trong server thì không chấm (xem lib/configHealth.ts).
   if (data.guild.botInGuild === false) return null;
 
-  // Badge chỉ có success/danger trong bộ hiện tại → mức "cần xem lại" dùng
-  // danger cho thẳng tính mạo hiểm thay vì tạo màu mới chỉ dùng ở đúng 1 chỗ.
+  // Badge/tone: ok → success, cần xem lại → danger (đỏ = mạo hiểm); thanh điểm
+  // chia 3 mức success/warning/danger, cả ba đều là token có thật trong
+  // tailwind.config.ts (trước đây success/warning không tồn tại nên thanh vô hình).
   const tone = grade.tone === "ok" ? "success" : "danger";
   const barColor = score >= 80 ? "bg-success" : score >= 50 ? "bg-warning" : "bg-danger";
 

@@ -339,6 +339,23 @@ export default function BackupPanel({ data }: { data: GuildData }) {
 
   const refresh = () => setRefreshAt((n) => n + 1);
 
+  /**
+   * Hẹn đọc lại trạng thái sau 2.5s (bot ghi kết quả trễ một nhịp).
+   * Timer phải được dọn khi panel đóng — trước đây `setTimeout` trần nên vẫn
+   * chạy sau khi người dùng đã chuyển panel.
+   */
+  const refreshTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
+    },
+    [],
+  );
+  const scheduleRefresh = () => {
+    if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
+    refreshTimer.current = window.setTimeout(refresh, 2500);
+  };
+
   // Bot báo lỗi xử lý file import → hiện ngay lý do; xử lý xong → báo kết quả.
   //
   // KHÔNG đọc thẳng `importStatus`: sau khi bấm, nó còn là bản CŨ của lượt trước
@@ -387,26 +404,33 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       });
     }
     setImportWatch(null);
-    window.setTimeout(refresh, 2500);
+    scheduleRefresh();
   }, [importWatch, importStatus]);
 
   // Chờ quá 3 phút mà bot chưa xử lý → nhắc kiểm tra bot (không treo vô thời hạn).
+  //
+  // Deps chỉ là giá trị nguyên thuỷ: `importStatus` là object MỚI mỗi nhịp bot
+  // sync (~180s), phụ thuộc cả object sẽ dựng lại timer 3 phút đúng lúc nó sắp
+  // nổ ⇒ cảnh báo "bot chưa xử lý" không bao giờ hiện.
+  const importRequested = importStatus?.requested;
+  const importError = importStatus?.error;
+  const importBotOnline = importStatus?.botOnline;
   useEffect(() => {
     if (!importWatch) return;
     const timer = window.setTimeout(() => {
       if (Date.now() - importWatch.startedAt > 180_000) {
         // Việc đã xong trong lúc chưa kịp quan sát cờ yêu cầu bật (bot nhanh hơn
         // nhịp cập nhật) → dọn lượt theo dõi, KHÔNG cảnh báo oan "bot chưa xử lý".
-        if (importStatus && importStatus.requested === false && !importStatus.error) {
+        if (importRequested === false && !importError) {
           setImportWatch(null);
           return;
         }
         const hint =
-          importStatus?.botOnline === false
+          importBotOnline === false
             ? translate(
                 "Bot đang OFFLINE (không nhận được heartbeat) — hãy khởi động bot trên host rồi tải lại file.",
               )
-            : importStatus?.botOnline === true
+            : importBotOnline === true
               ? translate(
                   "Bot online nhưng chưa xử lý — có thể bot đang chạy bản cũ, hãy cập nhật bot lên bản mới nhất rồi thử lại.",
                 )
@@ -418,7 +442,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       }
     }, 180_000);
     return () => window.clearTimeout(timer);
-  }, [importWatch, importStatus]);
+  }, [importWatch, importRequested, importError, importBotOnline]);
 
   // Bot báo lỗi khôi phục / xử lý xong cờ restore → hiện ngay kết quả.
   // Quá 3 phút chưa xong → cảnh báo chẩn đoán (bot offline / bản cũ) thay vì treo.
@@ -474,7 +498,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       });
     }
     setRestoreWatch(null);
-    window.setTimeout(refresh, 2500);
+    scheduleRefresh();
   }, [restoreWatch, importStatus]);
 
   // Kết quả của lượt "Backup ngay": lỗi → báo lý do; xong → báo ĐÃ TẠO BẢN MỚI
@@ -555,12 +579,13 @@ export default function BackupPanel({ data }: { data: GuildData }) {
   }, [backupWatch, importStatus]);
 
   // Restore chờ quá 3 phút → cảnh báo thay vì treo vô thời hạn.
+  // Cùng lý do như watchdog import: deps nguyên thuỷ, không phải cả object.
   useEffect(() => {
     if (!restoreWatch) return;
     const timer = window.setTimeout(() => {
       if (Date.now() - restoreWatch.startedAt > 180_000) {
         const hint =
-          importStatus?.botOnline === false
+          importBotOnline === false
             ? translate("Bot đang OFFLINE — khởi động bot trên host rồi bấm Khôi phục lại.")
             : translate(
                 "Bot online nhưng chưa xử lý xong — server lớn kèm tin nhắn có thể mất vài phút; nếu quá lâu hãy cập nhật bot lên bản mới nhất.",
@@ -572,7 +597,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       }
     }, 180_000);
     return () => window.clearTimeout(timer);
-  }, [restoreWatch, importStatus]);
+  }, [restoreWatch, importBotOnline]);
 
   async function createBackup() {
     // Bot OFFLINE → yêu cầu sẽ không bao giờ được xử lý (bot quét mỗi ~20-60s);
@@ -939,7 +964,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
                 </>
               ) : (
                 <>
-                  <CloudUpload className="h-4 w-4" /> Backup ngay
+                  <CloudUpload className="h-4 w-4" /> {translate("Backup ngay")}
                 </>
               )}
             </Button>

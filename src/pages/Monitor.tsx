@@ -5,6 +5,7 @@ import PageReveal from "../components/PageReveal";
 import {
   INCIDENT_SLOW,
   LATENCY_SLOW,
+  incidentLabel,
   latencyLabel,
   useBotMonitor,
   fmtVietnam,
@@ -185,8 +186,17 @@ function botDetail(
 }
 
 export default function Monitor() {
-  const { status, latency, history, avg, incidents, lastUpdate, nextUpdate, refresh, backendPing } =
-    useBotMonitor(30000);
+  const {
+    status,
+    latency,
+    history,
+    avg,
+    incidents,
+    sampleIntervalMs,
+    lastUpdate,
+    nextUpdate,
+    backendPing,
+  } = useBotMonitor(30000);
 
   const lat = latency ?? avg;
   const rate = lat !== null ? latencyLabel(lat) : null;
@@ -318,7 +328,9 @@ export default function Monitor() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="font-display text-base font-bold">
-                      {translate("Biểu đồ độ trễ (5 giây / mẫu)")}{" "}
+                      {translate("Biểu đồ độ trễ ({p0} giây / mẫu)", {
+                        p0: sampleIntervalMs / 1000,
+                      })}{" "}
                     </h2>
                     <p className="text-xs text-muted-foreground">
                       {translate("Trung bình:")}{" "}
@@ -371,7 +383,7 @@ export default function Monitor() {
                       >
                         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger" />
                         <span>
-                          {inc.text}{" "}
+                          {incidentLabel(inc)}{" "}
                           <span className="text-muted-foreground">
                             ·{" "}
                             {new Date(inc.time).toLocaleTimeString(dateLocale(), {
@@ -389,7 +401,7 @@ export default function Monitor() {
             </div>
 
             <div className="space-y-4">
-              <UpdateWindow lastUpdate={lastUpdate} nextUpdate={nextUpdate} onRefresh={refresh} />
+              <UpdateWindow lastUpdate={lastUpdate} nextUpdate={nextUpdate} />
               <div className="rounded-xl border border-border bg-secondary/30 p-4 text-xs leading-relaxed text-muted-foreground">
                 <p className="mb-1 font-semibold text-foreground">{translate("ℹ️ Ghi chú")}</p>
                 <p>{translate("• Không hiển thị tên server — chỉ hiện số lượng để bảo mật.")}</p>

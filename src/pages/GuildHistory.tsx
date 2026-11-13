@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { discordGuildIconUrl, getSessionToken } from "../lib/discord";
-import { ANTINUKE_MODULE_META, ANTINUKE_ORDER, PUNISH_LABEL } from "../lib/constants";
+import { ANTINUKE_MODULE_META, ANTINUKE_ORDER, PUNISH_LABEL, moduleMeta } from "../lib/constants";
 import type { GuildData } from "../lib/types";
 
 import LangSwitch from "../components/LangSwitch";
@@ -174,7 +174,7 @@ export default function GuildHistory() {
                 <SelectItem value="all">{translate("Tất cả module")}</SelectItem>
                 {ANTINUKE_ORDER.map((m) => (
                   <SelectItem key={m} value={m}>
-                    {translate(ANTINUKE_MODULE_META[m].label)}
+                    {translate(moduleMeta(m).label)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -231,9 +231,9 @@ export default function GuildHistory() {
         ) : (
           <Card className="mt-4">
             <CardContent className="divide-y divide-border p-0">
-              {results.map((e) => (
+              {results.map((e, index) => (
                 <div
-                  key={`${e.createdAt}-${e.module}`}
+                  key={`${e.createdAt}-${e.module}-${index}`}
                   className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-accent/40"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger/10 text-danger">

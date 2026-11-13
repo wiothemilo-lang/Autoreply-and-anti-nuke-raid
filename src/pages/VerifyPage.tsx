@@ -162,10 +162,22 @@ export default function VerifyPage() {
   const honeypot = useRef<HTMLInputElement | null>(null);
   const moved = useRef(false);
 
+  /**
+   * Đồng hồ riêng để link hết hạn TỰ đổi trạng thái khi tab để mở — trước đây
+   * `expired` chỉ tính lại khi `session` đổi, nên người dùng thấy nút "Xác minh
+   * ngay" vẫn sáng và chỉ bị server từ chối sau khi bấm.
+   */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (session?.status !== "pending") return;
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, [session?.status]);
+
   const expired = useMemo(() => {
     if (!session) return false;
-    return session.status === "pending" && session.expiresAt < Date.now();
-  }, [session]);
+    return session.status === "pending" && session.expiresAt < now;
+  }, [session, now]);
 
   // Theo dõi cử động chuột/chạm — bot headless thường không phát sinh sự kiện.
   useEffect(() => {

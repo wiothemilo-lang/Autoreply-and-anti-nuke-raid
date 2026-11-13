@@ -2798,12 +2798,16 @@ check(
 // và i18n. Gate này khoá phần UI — lỡ ai gỡ thẻ Cấp gói hoặc đổi cổng query
 // về owner-only là test đỏ ngay, đúng như mong đợi của chủ bot.
 const userTagsSrc = files.get("components/UserTags.tsx") ?? "";
+const planLabelsSrc = files.get("lib/constants.ts") ?? "";
 check(
   "UserTags có tag Owner + Admin + nhãn gói, và được gắn ở Dashboard (cạnh logo) lẫn Admin (danh sách team)",
   userTagsSrc.includes('translate("Owner")') &&
     userTagsSrc.includes('translate("Admin")') &&
-    userTagsSrc.includes('translate("Đồng hành")') &&
-    userTagsSrc.includes('translate("Tiên phong")') &&
+    // Nhãn gói dịch qua planDisplayName() — một nguồn duy nhất cho cả UserTags
+    // lẫn trang Admin (trước đây mỗi nơi tự map nên Admin in enum thô).
+    userTagsSrc.includes("planDisplayName(") &&
+    planLabelsSrc.includes('"Đồng hành"') &&
+    planLabelsSrc.includes('"Tiên phong"') &&
     adminSrc.includes("<UserTags") &&
     dashboardSrc.includes("<UserTags"),
   "thiếu component tag hoặc chưa gắn vào trang",

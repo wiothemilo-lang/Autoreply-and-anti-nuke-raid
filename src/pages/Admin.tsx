@@ -32,7 +32,8 @@ import type { Id } from "../../convex/_generated/dataModel";
 import RequireAuth from "../components/RequireAuth";
 import UpdateWindow from "../components/UpdateWindow";
 import { discordAvatarUrl, getSessionToken } from "../lib/discord";
-import { latencyLabel, useBotMonitor } from "../lib/useBotMonitor";
+import { planDisplayName } from "../lib/constants";
+import { incidentLabel, latencyLabel, useBotMonitor } from "../lib/useBotMonitor";
 import { cn } from "../lib/utils";
 
 import LangSwitch from "../components/LangSwitch";
@@ -137,7 +138,7 @@ function AdminContent() {
   // Người đã đăng nhập nhưng CHƯA là admin vẫn mount trang (chỉ thấy thẻ thông
   // báo) — skip mọi subscription admin-only để không đốt lượt đọc Convex:
   // mỗi cái là 1 lượt user + 1 lượt botStatus, nhân với mọi lần vào /admin.
-  const { status, latency, avg, incidents, lastUpdate, nextUpdate, refresh } = useBotMonitor(
+  const { status, latency, avg, incidents, backendPing, lastUpdate, nextUpdate } = useBotMonitor(
     60000,
     isAdmin === true,
   );
@@ -180,7 +181,9 @@ function AdminContent() {
     );
   }
 
-  const lat = latency ?? avg;
+  // Ping lỗi (latency = null) thì KHÔNG được rơi về trung bình lịch sử: con số
+  // "Độ trễ hiện tại" sẽ trông như vừa đo bình thường và che mất sự cố backend.
+  const lat = latency ?? (backendPing.state === "down" ? null : avg);
   const rate = lat !== null ? latencyLabel(lat) : null;
 
   return (
@@ -259,7 +262,11 @@ function AdminContent() {
                   status?.online ? "text-foreground" : "text-danger",
                 )}
               >
-                {status ? (status.online ? "● Bot online" : "● Bot offline") : ""}
+                {status
+                  ? status.online
+                    ? `● ${translate("Bot đang trực tuyến")}`
+                    : `● ${translate("Bot offline")}`
+                  : ""}
               </p>
             </div>
           </div>
@@ -291,7 +298,7 @@ function AdminContent() {
                   >
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger" />
                     <span>
-                      {inc.text}{" "}
+                      {incidentLabel(inc)}{" "}
                       <span className="text-muted-foreground">
                         ·{" "}
                         {new Date(inc.time).toLocaleTimeString(dateLocale(), {
@@ -318,7 +325,7 @@ function AdminContent() {
               thẻ bị cắt giữa hai cột, mb tạo khoảng cách (space-y không áp
               được cho column children). */}
           <div className="min-w-0 columns-1 gap-4 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
-            <UpdateWindow lastUpdate={lastUpdate} nextUpdate={nextUpdate} onRefresh={refresh} />
+            <UpdateWindow lastUpdate={lastUpdate} nextUpdate={nextUpdate} />
             <SelfDiagnoseCard
               diag={diag}
               onToggle={(enabled) =>
@@ -2174,7 +2181,7 @@ function TransferOrdersCard({
       <p className="flex items-center gap-1.5 font-display text-sm font-bold">
         <Receipt className="h-4 w-4" /> {translate("Đơn chuyển khoản chờ xác nhận")}
         {list.length > 0 && (
-          <span className="ml-auto rounded-full bg-warn/15 px-2 py-0.5 text-[11px] font-bold text-warn">
+          <span className="ml-auto rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-bold text-warning">
             {list.length}
           </span>
         )}
@@ -2205,7 +2212,8 @@ function TransferOrdersCard({
                   </span>
                   {o.kind === "premium" && (
                     <span className="text-muted-foreground">
-                      {translate("Gói")} {o.plan}
+                      {translate("Gói")}{" "}
+                      {planDisplayName(o.plan) ? translate(planDisplayName(o.plan)!) : o.plan}
                     </span>
                   )}
                   <span className="font-bold">{fmtVnd(o.amount)}</span>

@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { simulateAutoReply, type SimRule } from "../../lib/autoreplySim";
+import { parseNumberInput } from "../../lib/useDraft";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -537,7 +538,14 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
                 min={0}
                 max={86400}
                 value={form.cooldownSeconds}
-                onChange={(e) => setForm({ ...form, cooldownSeconds: Number(e.target.value) })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    // Xoá trắng ô không được thành NaN (React cảnh báo value=NaN)
+                    // rồi âm thầm lưu 0 = tắt giãn cách. Giữ số cũ cho tới khi gõ số mới.
+                    cooldownSeconds: parseNumberInput(e.target.value, form.cooldownSeconds),
+                  })
+                }
               />
             </div>
           </div>

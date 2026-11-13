@@ -38,7 +38,7 @@ function onboardingSteps(data: GuildData): Step[] {
       hint: translate(
         "Mọi cảnh báo nuke/raid, hình phạt và backup đều cần kênh log để bạn nhìn thấy.",
       ),
-      target: "webhooks",
+      target: "settings",
       status: g.logChannelId || g.modLogChannelId ? "done" : "todo",
     },
     {

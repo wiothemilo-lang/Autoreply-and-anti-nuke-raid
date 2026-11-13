@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBotStatus, type BotStatus } from "./useBotStatus";
-import { dateLocale } from "./i18n";
+import { dateLocale, translate } from "./i18n";
 import { convexPingUrl } from "./convexUrl";
 import { BOT_SYNC_INTERVAL_MS } from "./utils";
 
@@ -36,9 +36,21 @@ export const INCIDENT_SLOW = 1200;
  */
 export const SYNC_INTERVAL_MS = BOT_SYNC_INTERVAL_MS;
 
-interface MonitorIncident {
+export interface MonitorIncident {
   time: number;
-  text: string;
+  /** Loại sự cố — hook KHÔNG biết ngôn ngữ hiện tại, nên chỉ lưu loại + số đo
+   *  rồi dịch lúc render (`incidentLabel`). Trước đây hook nhét sẵn chuỗi tiếng
+   *  Việt vào `text` và nơi render in thẳng ⇒ người dùng EN/DE thấy tiếng Việt. */
+  kind: "latency" | "down";
+  /** Chỉ có khi `kind === "latency"`. */
+  ms?: number;
+}
+
+/** Chuỗi hiển thị của một sự cố — MỘT nơi duy nhất, dùng cho Monitor + Admin. */
+export function incidentLabel(inc: MonitorIncident): string {
+  return inc.kind === "down"
+    ? translate("Mất kết nối tới máy chủ")
+    : translate("Độ trễ cao: {p0} ms", { p0: inc.ms ?? 0 });
 }
 
 export function latencyLabel(ms: number): { label: string; cls: string } {
@@ -83,6 +95,9 @@ export interface BotMonitor {
   history: number[];
   avg: number | null;
   incidents: MonitorIncident[];
+  /** Chu kỳ đo latency THẬT (đã áp trần 30s) — nhãn biểu đồ phải dùng số này,
+   *  không được hard-code, nếu không UI nói "5 giây/mẫu" trong khi thật là 30s. */
+  sampleIntervalMs: number;
   lastUpdate: number | null;
   nextUpdate: number | null;
   refresh: () => void;
@@ -120,15 +135,13 @@ export function useBotMonitor(intervalMs = 5000, enabled = true): BotMonitor {
       setHistory((h) => [...h.slice(-29), ms]);
       if (ms > INCIDENT_SLOW) {
         setIncidents((arr) =>
-          [{ time: Date.now(), text: `Độ trễ cao: ${ms} ms` }, ...arr].slice(0, 10),
+          [{ time: Date.now(), kind: "latency" as const, ms }, ...arr].slice(0, 10),
         );
       }
     } catch {
       setLatency(null);
       setBackendPing({ state: "down" });
-      setIncidents((arr) =>
-        [{ time: Date.now(), text: "Mất kết nối tới máy chủ" }, ...arr].slice(0, 10),
-      );
+      setIncidents((arr) => [{ time: Date.now(), kind: "down" as const }, ...arr].slice(0, 10));
     }
   }, []);
 
@@ -168,6 +181,7 @@ export function useBotMonitor(intervalMs = 5000, enabled = true): BotMonitor {
     history,
     avg,
     incidents,
+    sampleIntervalMs: effectiveInterval,
     lastUpdate,
     nextUpdate,
     refresh,

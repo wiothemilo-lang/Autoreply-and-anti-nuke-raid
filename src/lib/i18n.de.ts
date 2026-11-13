@@ -434,7 +434,7 @@ export const DE: Record<string, string> = {
   "Đây chỉ là kế hoạch — server chưa bị thay đổi. Bấm “Khôi phục vào server này” ở bản backup tương ứng để thực sự tạo lại.":
     "Das ist nur ein Plan — am Server wurde nichts geändert. Klicke beim passenden Backup auf „In diesen Server wiederherstellen“, um es wirklich zu erstellen.",
   "Backup thất bại: {p0}": "Backup fehlgeschlagen: {p0}",
-  "Biểu đồ độ trễ (5 giây / mẫu)": "Latenzdiagramm (5 s / Messung)",
+  "Biểu đồ độ trễ ({p0} giây / mẫu)": "Latenzdiagramm ({p0} s / Messung)",
   "Bot Discord bảo vệ server, đồng hành cùng trợ lý Haimiya":
     "Discord-Serverschutz-Bot, begleitet von Assistentin Haimiya",
   "Bot vẫn chưa xử lý file backup": "Der Bot hat die Backup-Datei noch nicht verarbeitet",
@@ -528,7 +528,6 @@ export const DE: Record<string, string> = {
   "Đã lưu chính sách báo cáo khẩn": "Richtlinie für Dringend-Berichte gespeichert",
   "Cần cấu hình Client ID": "Client ID muss konfiguriert werden",
   "Cập nhật gần nhất": "Zuletzt aktualisiert",
-  "Cập nhật khung giờ ngay bây giờ": "Zeitfenster jetzt aktualisieren",
   "Cập nhật tiếp theo": "Nächstes Update",
   "Cụm từ mới:": "Neue Ausdrücke:",
   "Cửa sổ (giây)": "Zeitfenster (Sekunden)",
@@ -1904,4 +1903,14 @@ export const DE: Record<string, string> = {
     "Die Datenschutzunterlagen sind noch nicht vollständig, daher werden keine IP-Adressen erhoben. Der Server nutzt die Button-Verifizierung; die Web-Option wird nach Abschluss der Unterlagen wieder freigegeben.",
   "Xác minh web đang tạm khoá — server chưa thu thập IP. Hãy bấm nút xác minh trong Discord.":
     "Die Web-Verifizierung ist vorübergehend gesperrt — der Server erhebt keine IP-Adressen. Bitte nutze den Verifizierungsbutton in Discord.",
+  "Độ trễ cao: {p0} ms": "Hohe Latenz: {p0} ms",
+  "Đã tắt tính năng vì chưa chọn kênh gửi": "Funktion deaktiviert, weil kein Kanal gewählt ist",
+  "Backup ngay": "Jetzt sichern",
+  "Xóa ảnh tùy chỉnh và trở về ảnh mặc định?":
+    "Eigenes Bild löschen und zum Standard zurückkehren?",
+  "{p0} | case N — Offender: @thànhviên": "{p0} | Fall N — Täter: @Mitglied",
+  "{p0} | case N — Offender: @thànhviên · Reason: <lý do vi phạm>":
+    "{p0} | Fall N — Täter: @Mitglied · Reason: <Verstoßgrund>",
+  "{p0} | case N — Offender: @thànhviên · Reason: <lý do> · Responsible moderator: @người áp dụng":
+    "{p0} | Fall N — Täter: @Mitglied · Reason: <Grund> · Responsible moderator: @Moderator",
 };
