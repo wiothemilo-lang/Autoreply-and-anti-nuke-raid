@@ -758,6 +758,9 @@ ${definition.focusCss ?? ""}
     });
   }
   window.addEventListener('message', function (event) {
+    // protogon: chỉ nhận lệnh từ khung cha, không nhận từ bất kỳ origin nào
+    // (trước đây thiếu kiểm nguồn nên một origin lạ có thể đẩy tham số hình ảnh).
+    if (event.source !== window.parent) return;
     if (!event.data || event.data.type !== 'threeui-controls') return;
     var next = event.data.controls || {};
     Object.keys(next).forEach(function (key) { controls[key] = next[key]; });
@@ -874,7 +877,9 @@ function NeuformBatchEffect({
           opacity: safeOpacity,
         },
       },
-      "*",
+      // protogon: gửi đúng origin của app thay vì "*" — iframe srcdoc cùng
+      // origin nên không cần nới rộng đích nhận.
+      window.location.origin,
     );
   }, [resolvedMode, safeDensity, safeGap, safeLength, safeOpacity, safeSize, safeSpeed, safeStrokeWidth, source]);
 

@@ -400,5 +400,23 @@ check(
     /\.slice\(\s*-MAX_SOURCE_HASHES/.test(relaySrc),
 );
 
+// ===== N. Vệ sinh token client + cầu postMessage của cây shader =====
+const discordSrc = read("src/lib/discord.ts");
+const getTokenBody = discordSrc.slice(
+  discordSrc.indexOf("export function getSessionToken"),
+  discordSrc.indexOf("export function setSessionToken"),
+);
+check(
+  "getSessionToken không trả token thô không hạn (định dạng cũ bị xoá)",
+  !/return raw;/.test(getTokenBody) && getTokenBody.includes('return "";'),
+);
+const neuformSrc = read("src/shaders/neuform-isolated/NeuformBatchEffects.tsx");
+check(
+  "cầu postMessage của shader kiểm nguồn gửi và đích nhận tường minh",
+  neuformSrc.includes("event.source !== window.parent") &&
+    neuformSrc.includes("window.location.origin") &&
+    !/\n\s+"\*",\s*\n\s*\)/.test(neuformSrc),
+);
+
 console.log(`\nKết quả security hardening: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail > 0 ? 1 : 0);
