@@ -293,6 +293,24 @@ export default function FeedbackPage() {
                     )}
                   </p>
                 </div>
+
+                {/* Đồng ý + thông tin xử lý phải nằm NGAY chỗ thu dữ liệu, không
+                  chỉ trong chính sách ở trang khác (Điều 9 Luật 91/2025/QH15;
+                  Điều 6 NĐ 356/2025/NĐ-CP). Nội dung nêu đúng 3 trường thực sự
+                  được lưu: nội dung góp ý, email tự nguyện, ngôn ngữ — khớp mục
+                  3 và mục 7 (thời hạn 365 ngày) của /privacy. */}
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {translate(
+                    "Gửi góp ý nghĩa là bạn đồng ý để Protogon xử lý nội dung, email (nếu bạn nhập) và ngôn ngữ theo",
+                  )}{" "}
+                  <Link
+                    to="/privacy"
+                    className="font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    {translate("Chính sách quyền riêng tư")}
+                  </Link>
+                  .
+                </p>
               </div>
             )}
           </motion.section>

@@ -1522,6 +1522,8 @@ export const EN: Record<string, string> = {
     "That email doesn't look right — leave it empty if you don't need a reply.",
   "Không cần đăng nhập. Mình không chia sẻ góp ý của bạn cho ai khác.":
     "No sign-in needed. I don't share your feedback with anyone else.",
+  "Gửi góp ý nghĩa là bạn đồng ý để Protogon xử lý nội dung, email (nếu bạn nhập) và ngôn ngữ theo":
+    "Sending feedback means you agree that Protogon processes your message, email (if provided) and language in accordance with the",
   "Đã nhận góp ý của bạn": "Your feedback has been received",
   "Cảm ơn bạn! Mình đọc hết góp ý và sẽ trả lời qua email nếu bạn có để lại địa chỉ.":
     "Thank you! I read every message and will reply by email if you left an address.",

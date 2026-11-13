@@ -1448,6 +1448,8 @@ export const DE: Record<string, string> = {
     "Diese E-Mail sieht nicht korrekt aus — leer lassen, wenn du keine Antwort brauchst.",
   "Không cần đăng nhập. Mình không chia sẻ góp ý của bạn cho ai khác.":
     "Keine Anmeldung nötig. Dein Feedback wird nicht an Dritte weitergegeben.",
+  "Gửi góp ý nghĩa là bạn đồng ý để Protogon xử lý nội dung, email (nếu bạn nhập) và ngôn ngữ theo":
+    "Mit dem Absenden stimmst du zu, dass Protogon Nachricht, E-Mail (falls angegeben) und Sprache verarbeitet — nach Maßgabe der",
   "Đã nhận góp ý của bạn": "Dein Feedback ist angekommen",
   "Cảm ơn bạn! Mình đọc hết góp ý và sẽ trả lời qua email nếu bạn có để lại địa chỉ.":
     "Danke! Ich lese jede Nachricht und antworte per E-Mail, wenn du eine Adresse hinterlassen hast.",

@@ -3075,6 +3075,14 @@ check(
     files.get("pages/FeedbackPage.tsx") ?? "",
   ),
 );
+// Điều 9 Luật BVDPCN 91/2025: thông tin về xử lý dữ liệu + đường tới chính sách
+// phải nằm NGAY chỗ thu dữ liệu, không chỉ ở trang /privacy. Xoá dòng đồng ý
+// trong lúc dọn UI là mất căn cứ pháp lý cho toàn bộ form (phạt 30–50 triệu).
+const feedbackSrc = files.get("pages/FeedbackPage.tsx") ?? "";
+check(
+  "form Feedback có dòng đồng ý + link /privacy ngay chỗ gửi (Điều 9 Luật 91/2025)",
+  /Gửi góp ý nghĩa là bạn đồng ý/.test(feedbackSrc) && /to="\/privacy"/.test(feedbackSrc),
+);
 
 // ─── Q. Đợt D (09/11/2026): lỗi "báo thành công nhưng không lưu" ────────────
 // Nhóm bug cùng lớp: UI nói đã lưu trong khi mutation từ chối / field không
