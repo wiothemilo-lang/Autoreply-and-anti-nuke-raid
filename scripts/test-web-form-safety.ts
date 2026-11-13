@@ -218,6 +218,35 @@ check(
   /next\.delete\("order"\)/.test(read("src/components/PaymentReturn.tsx")),
 );
 
+// ===== Lô 3: lỗi mức thấp còn lại =====
+const siteNavSrc = read("src/components/SiteNav.tsx");
+check("SiteNav chia sẻ theme qua store ngoài React", /useSyncExternalStore\(/.test(siteNavSrc));
+check("SiteNav không còn theme useState riêng", !/useState<ThemeMode>/.test(siteNavSrc));
+check("SiteNav ghi theme qua một hàm duy nhất", /setTheme: setThemeGlobal/.test(siteNavSrc));
+
+const adminSrc2 = read("src/pages/Admin.tsx");
+check(
+  "Admin giữ thông điệp lỗi thật khi đặt seed",
+  /friendlyConvexError\(e, translate\("Lỗi khi đặt seed/.test(adminSrc2),
+);
+check(
+  "Admin không bật AI weekly khi chưa tải xong",
+  !/threat\?\.aiWeeklyEnabled \?\? true/.test(adminSrc2),
+);
+check(
+  "Admin ghi danh sách team từ ref mới nhất",
+  /idsRef\.current\.filter/.test(adminSrc2) &&
+    /save\(\[\.\.\.idsRef\.current, added\]\)/.test(adminSrc2),
+);
+check(
+  "Admin không đè chữ đang gõ ở ô phiên bản",
+  /current === lastVersion\.current \? next : current/.test(adminSrc2),
+);
+check(
+  "TicketPanel không còn ô defaultValue",
+  !/defaultValue=/.test(read("src/components/dashboard/TicketPanel.tsx")),
+);
+
 console.log("");
 if (fail) {
   console.error(`❌ ${fail} lỗi, ${pass} đạt`);
