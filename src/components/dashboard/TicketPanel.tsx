@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import type { GuildData, TicketRow } from "../../lib/types";
 import { getSessionToken } from "../../lib/discord";
 import { dateLocale, translate } from "../../lib/i18n";
+import { useDraft, clampNumber, parseNumberInput } from "../../lib/useDraft";
 import PanelErrorBoundary from "../PanelErrorBoundary";
 import TicketKindsCard from "./TicketKindsCard";
 
@@ -56,6 +57,26 @@ export default function TicketPanel({ data }: { data: GuildData }) {
   const updateSettings = useMutation(api.guilds.updateSettings);
   const closeTicket = useMutation(api.tickets.closeTicket);
   const g = data.guild;
+
+  /**
+   * 13 ô dưới đây ghi NGAY khi rời ô (`onBlur`). Dùng `useDraft` để ô luôn
+   * phản ánh giá trị server MỚI NHẤT: trước đây `defaultValue` + so với giá
+   * trị server hiện tại khiến chỉ cần focus rồi rời ô là ghi lại chữ CŨ —
+   * âm thầm revert thay đổi vừa lưu từ tab/admin khác. Xem lib/useDraft.ts.
+   */
+  const [maxOpen, setMaxOpen] = useDraft(g.ticketMaxOpen);
+  const [cooldownHours, setCooldownHours] = useDraft(g.ticketCooldownHours);
+  const [closeNote, setCloseNote] = useDraft(g.ticketCloseNote ?? "");
+  const [panelTitle, setPanelTitle] = useDraft(g.ticketOpenPanelTitle ?? "");
+  const [panelColor, setPanelColor] = useDraft(g.ticketOpenPanelColor ?? "");
+  const [panelText, setPanelText] = useDraft(g.ticketOpenPanelText ?? "");
+  const [openNote, setOpenNote] = useDraft(g.ticketOpenNote ?? "");
+  const [idleHours, setIdleHours] = useDraft(g.ticketIdleHours);
+  const [closeGrace, setCloseGrace] = useDraft(g.ticketCloseGraceHours);
+  const [ticketPanelText, setTicketPanelText] = useDraft(g.ticketPanelText ?? "");
+  const [channelTemplate, setChannelTemplate] = useDraft(g.ticketChannelTemplate);
+  const [slowmodeSec, setSlowmodeSec] = useDraft(g.ticketSlowmodeSec);
+  const [messageBudget, setMessageBudget] = useDraft(g.ticketMessageBudget);
 
   const [tab, setTab] = useState<Tab>("open");
   // Nhãn loại tuỳ chỉnh do `TicketKindsCard` báo lên. Rỗng = card lỗi (chưa
@@ -117,9 +138,21 @@ export default function TicketPanel({ data }: { data: GuildData }) {
   /** Màu lưu trong Convex phải là hex 6 chữ số (không `#`) — bot parse thẳng. */
   const validColor = (v: string | null | undefined) => /^[0-9a-fA-F]{6}$/.test(v ?? "");
 
-  /** Lưu màu: bỏ `#`, chấp nhận cả dạng ngắn 3 ký tự. Rác → rỗng (màu mặc định). */
+  /**
+   * Lưu màu: bỏ `#`, chấp nhận cả dạng ngắn 3 ký tự.
+   * - Ô TRỐNG = cố ý về màu mặc định → ghi "".
+   * - Hex SAI = gõ nhầm → báo lỗi, KHÔNG ghi "" (trước đây gõ sai một ký tự là
+   *   xoá màu panel trên server mà vẫn toast "Đã lưu màu panel").
+   */
   function saveColor(raw: string) {
     const v = raw.trim().replace(/^#/, "");
+    if (v === "") {
+      setPanelColor("");
+      if ((g.ticketOpenPanelColor ?? "") !== "") {
+        patch({ ticketOpenPanelColor: "" }, translate("Đã về màu mặc định"));
+      }
+      return;
+    }
     const next = /^[0-9a-fA-F]{6}$/.test(v)
       ? v.toLowerCase()
       : /^[0-9a-fA-F]{3}$/.test(v)
@@ -129,6 +162,12 @@ export default function TicketPanel({ data }: { data: GuildData }) {
             .join("")
             .toLowerCase()
         : "";
+    if (!next) {
+      toast.error(translate("Mã màu không hợp lệ — cần 6 ký tự hex, ví dụ #5865f2."));
+      setPanelColor(g.ticketOpenPanelColor ?? "");
+      return;
+    }
+    setPanelColor(next);
     if ((g.ticketOpenPanelColor ?? "") === next) return;
     patch({ ticketOpenPanelColor: next }, translate("Đã lưu màu panel"));
   }
@@ -380,10 +419,12 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                     type="number"
                     min={1}
                     max={100}
-                    defaultValue={g.ticketMaxOpen}
-                    onBlur={(e) => {
-                      const n = Number(e.target.value);
-                      if (!Number.isNaN(n) && n >= 1 && n <= 100 && n !== g.ticketMaxOpen) {
+                    value={maxOpen}
+                    onChange={(e) => setMaxOpen(parseNumberInput(e.target.value, maxOpen))}
+                    onBlur={() => {
+                      const n = clampNumber(maxOpen, 1, 100);
+                      setMaxOpen(n);
+                      if (n !== g.ticketMaxOpen) {
                         patch({ ticketMaxOpen: n }, translate("Đã cập nhật giới hạn"));
                       }
                     }}
@@ -398,10 +439,14 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                     type="number"
                     min={0}
                     max={720}
-                    defaultValue={g.ticketCooldownHours}
-                    onBlur={(e) => {
-                      const n = Number(e.target.value);
-                      if (!Number.isNaN(n) && n >= 0 && n <= 720 && n !== g.ticketCooldownHours) {
+                    value={cooldownHours}
+                    onChange={(e) =>
+                      setCooldownHours(parseNumberInput(e.target.value, cooldownHours))
+                    }
+                    onBlur={() => {
+                      const n = clampNumber(cooldownHours, 0, 720);
+                      setCooldownHours(n);
+                      if (n !== g.ticketCooldownHours) {
                         patch({ ticketCooldownHours: n }, translate("Đã cập nhật thời gian chờ"));
                       }
                     }}
@@ -443,12 +488,12 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                 <Textarea
                   id="ticket-close-note"
                   rows={2}
-                  defaultValue={g.ticketCloseNote ?? ""}
+                  value={closeNote}
+                  onChange={(e) => setCloseNote(e.target.value)}
                   placeholder={translate("VD: Ticket đã được xử lý, cảm ơn bạn đã liên hệ.")}
-                  onBlur={(e) => {
-                    const v = e.target.value;
-                    if ((g.ticketCloseNote ?? "") !== v) {
-                      patch({ ticketCloseNote: v }, translate("Đã lưu ghi chú"));
+                  onBlur={() => {
+                    if ((g.ticketCloseNote ?? "") !== closeNote) {
+                      patch({ ticketCloseNote: closeNote }, translate("Đã lưu ghi chú"));
                     }
                   }}
                 />
@@ -475,12 +520,15 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                   <Input
                     id="ticket-open-panel-title"
                     maxLength={256}
-                    defaultValue={g.ticketOpenPanelTitle ?? ""}
+                    value={panelTitle}
+                    onChange={(e) => setPanelTitle(e.target.value)}
                     placeholder={translate("Cần trợ giúp?")}
-                    onBlur={(e) => {
-                      const v = e.target.value;
-                      if ((g.ticketOpenPanelTitle ?? "") !== v) {
-                        patch({ ticketOpenPanelTitle: v }, translate("Đã lưu tiêu đề panel"));
+                    onBlur={() => {
+                      if ((g.ticketOpenPanelTitle ?? "") !== panelTitle) {
+                        patch(
+                          { ticketOpenPanelTitle: panelTitle },
+                          translate("Đã lưu tiêu đề panel"),
+                        );
                       }
                     }}
                   />
@@ -490,38 +538,32 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                   <div className="flex items-center gap-2">
                     {/* Ô chọn màu ghi khi BLUR, không ghi khi kéo: onChange của
                         input[type=color] bắn liên tục mỗi bước kéo chuột, gọi
-                        mutation mỗi bước là spam Convex vô ích. Cùng quy ước
-                        defaultValue + onBlur như các ô khác trong file này. */}
+                        mutation mỗi bước là spam Convex vô ích. */}
                     <input
                       type="color"
                       aria-label={translate("Chọn màu panel")}
-                      // `key` = giá trị đang lưu: ô này dùng defaultValue (không
-                      // phản ánh state), nên bấm "Mặc định" hay gõ hex sai bị
-                      // từ chối sẽ để màn hình vẫn hiện màu/mã CŨ → người dùng
-                      // tưởng chưa đổi. Đổi key = remount = hiện đúng trạng thái.
-                      key={`swatch-${g.ticketOpenPanelColor ?? "none"}`}
                       className="h-9 w-9 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-1"
-                      defaultValue={
-                        validColor(g.ticketOpenPanelColor) ? g.ticketOpenPanelColor! : "#5865f2"
-                      }
-                      onBlur={(e) => saveColor(e.target.value)}
+                      value={validColor(panelColor) ? panelColor : "#5865f2"}
+                      onChange={(e) => setPanelColor(e.target.value)}
+                      onBlur={() => saveColor(panelColor)}
                     />
                     <Input
                       id="ticket-open-panel-color"
-                      key={`hex-${g.ticketOpenPanelColor ?? "none"}`}
                       className="w-28 font-mono text-xs uppercase"
                       maxLength={7}
-                      defaultValue={g.ticketOpenPanelColor ?? ""}
+                      value={panelColor}
+                      onChange={(e) => setPanelColor(e.target.value)}
                       placeholder="#5865f2"
-                      onBlur={(e) => saveColor(e.target.value)}
+                      onBlur={() => saveColor(panelColor)}
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() =>
-                        patch({ ticketOpenPanelColor: "" }, translate("Đã về màu mặc định"))
-                      }
+                      onClick={() => {
+                        setPanelColor("");
+                        patch({ ticketOpenPanelColor: "" }, translate("Đã về màu mặc định"));
+                      }}
                     >
                       {translate("Mặc định")}
                     </Button>
@@ -539,14 +581,17 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                 <Textarea
                   id="ticket-open-panel-text"
                   rows={3}
-                  defaultValue={g.ticketOpenPanelText ?? ""}
+                  value={panelText}
+                  onChange={(e) => setPanelText(e.target.value)}
                   placeholder={translate(
                     "Bấm nút bên dưới, kể lại vấn đề của bạn. {server} đang có {open} ticket chờ.",
                   )}
-                  onBlur={(e) => {
-                    const v = e.target.value;
-                    if ((g.ticketOpenPanelText ?? "") !== v) {
-                      patch({ ticketOpenPanelText: v }, translate("Đã lưu nội dung panel mở"));
+                  onBlur={() => {
+                    if ((g.ticketOpenPanelText ?? "") !== panelText) {
+                      patch(
+                        { ticketOpenPanelText: panelText },
+                        translate("Đã lưu nội dung panel mở"),
+                      );
                     }
                   }}
                 />
@@ -586,14 +631,14 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                 <Textarea
                   id="ticket-open-note"
                   rows={3}
-                  defaultValue={g.ticketOpenNote ?? ""}
+                  value={openNote}
+                  onChange={(e) => setOpenNote(e.target.value)}
                   placeholder={translate(
                     "Chào {user}! Bạn đang ở ticket #{number} của {server}. Staff phản hồi trong 24 giờ.",
                   )}
-                  onBlur={(e) => {
-                    const v = e.target.value;
-                    if ((g.ticketOpenNote ?? "") !== v) {
-                      patch({ ticketOpenNote: v }, translate("Đã lưu lời dặn đầu kênh"));
+                  onBlur={() => {
+                    if ((g.ticketOpenNote ?? "") !== openNote) {
+                      patch({ ticketOpenNote: openNote }, translate("Đã lưu lời dặn đầu kênh"));
                     }
                   }}
                 />
@@ -647,13 +692,14 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                     type="number"
                     min={0}
                     max={720}
-                    defaultValue={g.ticketIdleHours ?? 24}
-                    onBlur={(e) => {
-                      const n = Number(e.target.value);
-                      if (!Number.isFinite(n)) return;
+                    value={idleHours}
+                    onChange={(e) => setIdleHours(parseNumberInput(e.target.value, idleHours))}
+                    onBlur={() => {
+                      const n = clampNumber(idleHours, 0, 720);
+                      setIdleHours(n);
                       if ((g.ticketIdleHours ?? 24) === n) return;
                       patch(
-                        { ticketIdleHours: Math.max(0, Math.min(720, Math.floor(n))) },
+                        { ticketIdleHours: n },
                         n > 0 ? translate("Đã lưu thời gian tự đóng") : translate("Đã tắt tự đóng"),
                       );
                     }}
@@ -671,11 +717,11 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                     type="number"
                     min={1}
                     max={720}
-                    defaultValue={g.ticketCloseGraceHours ?? 24}
-                    onBlur={(e) => {
-                      const n = Number(e.target.value);
-                      if (!Number.isFinite(n)) return;
-                      const v = Math.max(1, Math.min(720, Math.floor(n)));
+                    value={closeGrace}
+                    onChange={(e) => setCloseGrace(parseNumberInput(e.target.value, closeGrace))}
+                    onBlur={() => {
+                      const v = clampNumber(closeGrace, 1, 720);
+                      setCloseGrace(v);
                       if ((g.ticketCloseGraceHours ?? 24) === v) return;
                       patch({ ticketCloseGraceHours: v }, translate("Đã lưu thời gian giữ kênh"));
                     }}
@@ -693,14 +739,14 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                 <Textarea
                   id="ticket-panel-text"
                   rows={2}
-                  defaultValue={g.ticketPanelText ?? ""}
+                  value={ticketPanelText}
+                  onChange={(e) => setTicketPanelText(e.target.value)}
                   placeholder={translate(
                     "Chào {user}! Kênh này dành riêng cho bạn — staff sẽ phản hồi sớm.",
                   )}
-                  onBlur={(e) => {
-                    const v = e.target.value;
-                    if ((g.ticketPanelText ?? "") !== v) {
-                      patch({ ticketPanelText: v }, translate("Đã lưu nội dung panel"));
+                  onBlur={() => {
+                    if ((g.ticketPanelText ?? "") !== ticketPanelText) {
+                      patch({ ticketPanelText }, translate("Đã lưu nội dung panel"));
                     }
                   }}
                 />
@@ -734,9 +780,18 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                           variant={picked ? "default" : "outline"}
                           onClick={() => {
                             const cur = g.ticketPingRoleIds ?? [];
+                            if (!picked && cur.length >= 3) {
+                              // `.slice(0, 3)` trước đây trả mảng CŨ nhưng vẫn
+                              // patch + toast "Đã lưu" → người dùng tưởng nút
+                              // hỏng. Chặn rõ ràng thay vì im lặng.
+                              toast.error(
+                                translate("Chỉ chọn tối đa 3 role — bỏ một role trước khi thêm."),
+                              );
+                              return;
+                            }
                             const next = picked
                               ? cur.filter((x: string) => x !== r.roleId)
-                              : [...cur, r.roleId].slice(0, 3);
+                              : [...cur, r.roleId];
                             patch({ ticketPingRoleIds: next }, translate("Đã lưu role được tag"));
                           }}
                         >
@@ -765,9 +820,11 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                 <Input
                   id="ticket-channel-template"
                   placeholder="{kind}-{number}"
-                  defaultValue={g.ticketChannelTemplate ?? ""}
-                  onBlur={(e) => {
-                    const v = e.target.value.trim().slice(0, 100);
+                  value={channelTemplate}
+                  onChange={(e) => setChannelTemplate(e.target.value)}
+                  onBlur={() => {
+                    const v = channelTemplate.trim().slice(0, 100);
+                    setChannelTemplate(v);
                     if (v === (g.ticketChannelTemplate ?? "")) return;
                     patch({ ticketChannelTemplate: v }, translate("Đã lưu mẫu tên kênh"));
                   }}
@@ -789,9 +846,11 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                   type="number"
                   min={0}
                   max={21600}
-                  defaultValue={g.ticketSlowmodeSec ?? 0}
-                  onBlur={(e) => {
-                    const n = Math.max(0, Math.min(21600, Math.floor(Number(e.target.value)) || 0));
+                  value={slowmodeSec}
+                  onChange={(e) => setSlowmodeSec(parseNumberInput(e.target.value, slowmodeSec))}
+                  onBlur={() => {
+                    const n = clampNumber(slowmodeSec, 0, 21600);
+                    setSlowmodeSec(n);
                     if (n === (g.ticketSlowmodeSec ?? 0)) return;
                     patch({ ticketSlowmodeSec: n }, translate("Đã lưu slowmode"));
                   }}
@@ -808,9 +867,13 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                   type="number"
                   min={0}
                   max={1000}
-                  defaultValue={g.ticketMessageBudget ?? 0}
-                  onBlur={(e) => {
-                    const n = Math.max(0, Math.min(1000, Math.floor(Number(e.target.value)) || 0));
+                  value={messageBudget}
+                  onChange={(e) =>
+                    setMessageBudget(parseNumberInput(e.target.value, messageBudget))
+                  }
+                  onBlur={() => {
+                    const n = clampNumber(messageBudget, 0, 1000);
+                    setMessageBudget(n);
                     if (n === (g.ticketMessageBudget ?? 0)) return;
                     patch({ ticketMessageBudget: n }, translate("Đã lưu ngân sách tin nhắn"));
                   }}
@@ -1110,6 +1173,12 @@ function TranscriptBody({ ticket, guildId }: { ticket: TicketRow; guildId: strin
           setTranscript(null);
         }
       });
+    // Phải trả cleanup: trước đây effect không dọn gì nên `alive` luôn true —
+    // mở transcript #12 (action tới 10s), đóng rồi mở #13 thì phản hồi chậm
+    // của #12 ghi đè nội dung #13, staff đọc nhầm hội thoại của người khác.
+    return () => {
+      alive.current = false;
+    };
   }, [ticket.id, guildId]);
   return (
     <>

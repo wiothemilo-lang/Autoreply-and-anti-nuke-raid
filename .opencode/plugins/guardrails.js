@@ -233,7 +233,7 @@ const FAIL_PATTERNS = [
 
 // Chỉ tính là kiểm chứng khi lệnh chạy TRỌN bộ 4 lớp và KHÔNG có dấu hiệu lỗi.
 // Mỗi segment phải khớp CHÍNH XÁC whitelist — trước đây dùng `includes()` nên
-// `bun run test:ts` (31 suite TS) khớp "bun run test" và mở cổng dù chưa chạy
+// `bun run test:ts` (35 suite TS) khớp "bun run test" và mở cổng dù chưa chạy
 // 90 suite .cjs; `echo "bun run test tsc lint format:check"` cũng mở cổng.
 const VERIFY_SEGMENTS = [
   /^git pull(?: --[a-z-]+)*$/,

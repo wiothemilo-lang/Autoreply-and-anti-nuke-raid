@@ -817,14 +817,15 @@ module.exports = {
     path.join(__dirname, "..", "src", "components", "dashboard", "TicketPanel.tsx"),
     "utf8",
   );
+  // 13/11/2026 — hai ô màu chuyển sang CONTROLLED (`value` + `useDraft`).
+  // `key` remount trước đây chỉ để chữa triệu chứng của `defaultValue` không
+  // phản ánh state; giờ bỏ key vì draft tự đồng bộ. Luật mới: KHÔNG dùng
+  // defaultValue cho các ô này (đó chính là bug revert dữ liệu admin khác).
   check(
-    "ô chọn màu có key theo giá trị đang lưu (remount khi đổi màu)",
-    /key=\{`swatch-\$\{g\.ticketOpenPanelColor \?\? "none"\}`\}/.test(panelSrc),
+    "ô chọn màu dùng value controlled (không defaultValue)",
+    /value=\{validColor\(panelColor\) \? panelColor : "#5865f2"\}/.test(panelSrc),
   );
-  check(
-    "ô hex có key theo giá trị đang lưu",
-    /key=\{`hex-\$\{g\.ticketOpenPanelColor \?\? "none"\}`\}/.test(panelSrc),
-  );
+  check("ô hex dùng value={panelColor}", /maxLength=\{7\}\s*value=\{panelColor\}/.test(panelSrc));
 
   // ═════════ TRANSCRIPT PHẢI CÓ NƠI XEM ═════════
   // Bot lưu transcript vào storage rồi xoá kênh. Trước 28/09/2026 query

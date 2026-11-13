@@ -1620,13 +1620,23 @@ function PremiumGrantCard({
   const run = async () => {
     const who = discordId.trim();
     if (busy || !who) return;
+    // Trước đây `Number(days) || 30`: xoá trống / gõ 0 / gõ chữ đều ÂM THẦM
+    // cấp 30 ngày. Giờ từ chối thẳng thay vì đoán ý người dùng.
+    const dayCount = Number(days.trim());
+    if (!Number.isInteger(dayCount) || dayCount < 1 || dayCount > 365) {
+      setMsg({
+        kind: "err",
+        text: translate("Số ngày phải là số nguyên từ 1 đến 365."),
+      });
+      return;
+    }
     setBusy(true);
     setMsg(null);
     const res = await onGrant({
       discordId: who,
       ...(guildId.trim() ? { guildId: guildId.trim() } : {}),
       plan,
-      days: Number(days) || 30,
+      days: dayCount,
     });
     setBusy(false);
     if (res.ok) {
@@ -2214,9 +2224,9 @@ function TransferOrdersCard({
                   type="button"
                   // Bận theo TỪNG DÒNG đúng như chú thích đầu component: xác
                   // nhận đơn này KHÔNG khoá nút các đơn còn lại (server xử lý
-                  // từng appTransId độc lập). Nút dòng đang xác nhận vẫn khoá
-                  // để không bấm nhây gửi 2 lần.
-                  disabled={confirming !== null && confirming !== o.appTransId}
+                  // từng appTransId độc lập). Chỉ nút của dòng ĐANG xác nhận bị
+                  // khoá để không bấm nhây gửi 2 lần.
+                  disabled={confirming === o.appTransId}
                   onClick={() => void onConfirm(o.appTransId)}
                   className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                 >
