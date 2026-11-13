@@ -9,21 +9,24 @@
   nhân nên hồ sơ đứng tên cá nhân — nếu lập hộ kinh doanh/công ty thì cập nhật
   trong 10 ngày (Điều 20(2) NĐ 356).
 
-- 🚧 **Verify web RFTV đang TẠM KHOÁ (12/11/2026)**: chưa có người đủ năng lực
-  pháp lý đứng tên bên kiểm soát nên `convex/ipCollectionLock.ts` đặt
-  `IP_COLLECTION_ENABLED=false` — HTTP `/verify/complete` từ chối **trước khi
-  đọc IP**, action không gọi ipapi.is, bot tự lùi về xác minh bằng nút.
-  **Còn**: đổi RFTV sang Button/Captcha trên dashboard ngay (hiệu lực tức thì,
-  không chờ deploy); merge PR → CI deploy Convex → `/deploy` VPS; chỉ mở lại
-  sau khi có người đứng tên + nộp DPIA/CTIA. `IP_HASH_SECRET` vẫn ở
-  `~/.secrets/protogon-ip-hash-secret` 0600 — chuyển vào password manager rồi xoá.
+- 🚧 **Verify web RFTV đang TẠM KHOÁ — chờ NGƯỜI dùng (13/11/2026)**: bản
+  khoá đã lên Convex prod (probe `/verify/complete` trả 503
+  `ip_collection_disabled`) và bot VPS đã restart chạy code mới, tự lùi về xác
+  minh bằng nút. **Còn (việc người dùng)**: đổi RFTV sang Button/Captcha trên
+  dashboard (hiệu lực tức thì); chỉ mở lại sau khi có người đứng tên + nộp
+  DPIA/CTIA; `IP_HASH_SECRET` vẫn ở `~/.secrets/protogon-ip-hash-secret` 0600 —
+  chuyển vào password manager rồi xoá.
 
-- 🚧 **PR gia cố web 13/11/2026 (`fix/web-security-privacy-hardening`)**: P1
-  (localhost trong bundle), P2 (bỏ geo-detect + font Google), P3–P8 đã vá + test.
-  **Còn**: mở PR → CI xanh → merge → CI deploy Convex; người dùng sửa
-  `VITE_CONVEX_SITE_URL` trên Vercel (code đã fail-closed nên không chặn deploy).
-  P8 (ghim CSP) hoãn có lý do trong `docs/decision-log.md`; P9/P10 (token trong
-  localStorage, `OWNER_SEED` đi qua browser) vẫn backlog.
+- ✅ **PR gia cố web 13/11/2026 — ĐÃ MERGE + DEPLOY**: 7 commit đã ở `main`
+  (`88eecc0`…), CI deploy Convex xanh (khoá IP sống trên prod), bot VPS đã
+  `git pull` + `pm2 restart` (11 server online, welcomeCard OK). **Còn (việc
+  người dùng)**: sửa `VITE_CONVEX_SITE_URL` trên Vercel (code fail-closed nên
+  không chặn deploy). P8 (ghim CSP) hoãn có lý do trong `docs/decision-log.md`;
+  P9/P10 (token trong localStorage, `OWNER_SEED` đi qua browser) vẫn backlog.
+
+- 📄 **File chưa track**: `scripts/audit-ai-provider.cjs` (833 dòng, 12/10) —
+  công cụ audit AI provider chạy tay, không tham chiếu ở đâu, lint sạch. Chờ
+  người dùng quyết: commit làm công cụ dev hay xoá.
 
 - ✅ **XFF production đã xác nhận (12/11/2026)** — self-test trên edge
   `accomplished-chipmunk-74.convex.site` trả `ip.source=xff`, `chainLength=1`,
@@ -102,6 +105,27 @@
 ---
 
 ---
+
+## 2026-11-13 (2) — Kiểm tra môi trường + deploy bot sau pull
+
+- ✅ Môi trường VPS: bun 1.4.2 · node 20.20.2 · đĩa 11% (67G trống) · RAM
+  984Mi/32Gi · bot `protogon-bot` online. `main` sau pull khớp `origin/main`
+  (7 commit verify web + pháp lý); lockfile/package.json KHÔNG đổi → không cần
+  `bun install`.
+- ✅ Kiểm chứng trước restart: format · lint · typecheck · **90/90 CJS suites**
+  (147,6s) xanh; 10 cổng hợp đồng OK (repo-map, convex-contract,
+  settings-signal, cron-boundary, timer-allowlist, bot-payload,
+  retention-clamp, log-lang, ai-status, i18n 0 FAIL).
+- ✅ Xác nhận Convex prod đã deploy bản khoá IP: `POST /verify/complete` trả
+  503 `ip_collection_disabled` (từ chối trước khi đọc IP).
+- ✅ `pm2 restart protogon-bot` → online, 11 server, 20 slash commands,
+  welcomeCard sẵn sàng, không crash loop. Bot giờ chạy code verify web mới
+  (link ephemeral, SSRF welcomeCard, lùi về nút khi IP bị khoá).
+- 🧹 Ghi nhận: `scripts/audit-ai-provider.cjs` vẫn untracked; 106 bản dịch
+  i18n không còn dùng (ℹ️, không phải lỗi).
+- ▶️ Tiếp theo: việc người dùng — đổi RFTV sang Button/Captcha, sửa
+  `VITE_CONVEX_SITE_URL` trên Vercel, chuyển `IP_HASH_SECRET` vào password
+  manager; phần còn lại là backlog audit trong "Đang dở".
 
 ## 2026-11-13 (1) — PR gia cố bảo mật web + bỏ geo-detect/font Google
 
