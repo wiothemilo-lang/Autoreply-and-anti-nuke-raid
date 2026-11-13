@@ -24,9 +24,8 @@
   không chặn deploy). P8 (ghim CSP) hoãn có lý do trong `docs/decision-log.md`;
   P9/P10 (token trong localStorage, `OWNER_SEED` đi qua browser) vẫn backlog.
 
-- 📄 **File chưa track**: `scripts/audit-ai-provider.cjs` (833 dòng, 12/10) —
-  công cụ audit AI provider chạy tay, không tham chiếu ở đâu, lint sạch. Chờ
-  người dùng quyết: commit làm công cụ dev hay xoá.
+- ✅ **`scripts/audit-ai-provider.cjs` đã vào repo** (PR #117, 13/11): công cụ
+  audit AI provider 833 dòng chạy tay, không vào suite CI (cần key/mạng thật).
 
 - ✅ **XFF production đã xác nhận (12/11/2026)** — self-test trên edge
   `accomplished-chipmunk-74.convex.site` trả `ip.source=xff`, `chainLength=1`,
