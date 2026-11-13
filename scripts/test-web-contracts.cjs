@@ -2899,10 +2899,14 @@ check(
   "nội dung người dùng bị tra trong từ điển i18n — trùng khoá UI là đổi chữ khách thấy",
 );
 
+// 13/11/2026 — biểu thức cũ (`confirming !== null && confirming !== o.appTransId`)
+// bị ĐẢO chiều so với chú thích: nút của đơn ĐANG xác nhận vẫn bấm được (gửi
+// 2 lần) còn mọi đơn khác bị khoá. Cổng cũ khớp đúng chuỗi sai nên vẫn xanh.
+// Luật đúng: chỉ nút của dòng đang xác nhận bị khoá.
 check(
   "nút xác nhận đơn chuyển khoản bận theo TỪNG DÒNG — không khoá cả bảng",
-  adminSrc.includes("confirming !== null && confirming !== o.appTransId"),
-  "một đơn đang xác nhận khoá luôn nút các đơn khác (chú thích trong code cam kết per-row)",
+  adminSrc.includes("disabled={confirming === o.appTransId}"),
+  "phải khoá ĐÚNG nút của đơn đang xác nhận, không khoá các đơn khác",
 );
 
 // ─── X5. 09/11/2026 — thẻ lỗi panel chỉ được nói câu lỗi MỘT lần ────────────

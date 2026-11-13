@@ -73,7 +73,7 @@ thôi. Khi nghi file có thể sửa dở: xem `git diff` trước khi sửa ti�
 Đơn vị công việc chỉ coi là XONG khi tất cả điều này thoả:
 
 - [ ] `bun run test` — toàn bộ suites xanh (hiện tại **90 suites** — số liệu 10/11/2026; đếm theo lệnh này, KHÔNG cộng suite .ts của `bun run test:ts`. Nếu runner báo ít hơn nhiều → có suite bị bỏ sót, điều tra trước khi kết luận xanh). Số liệu này phải khớp với `CONTRACT_SUITES` trong `.opencode/plugins/guardrails.js` — đổi suite mới phải sửa CẢ HAI chỗ trong cùng commit
-- [ ] `bun run test:ts` — 34 suite tầng Convex/Haimiya/bot/web viết bằng TypeScript (chạy bằng bun; tách khỏi `bun run test` để không đụng phép đo coverage c8). Đụng `convex/`, `bot/src/ai.js`, logic panel hoặc thẻ ảnh `bot/src/handlers/welcomeCard.js` thì bắt buộc chạy
+- [ ] `bun run test:ts` — 35 suite tầng Convex/Haimiya/bot/web viết bằng TypeScript (chạy bằng bun; tách khỏi `bun run test` để không đụng phép đo coverage c8). Đụng `convex/`, `bot/src/ai.js`, logic panel hoặc thẻ ảnh `bot/src/handlers/welcomeCard.js` thì bắt buộc chạy
 - [ ] `bun run typecheck` — typecheck sạch CẢ web (`src/`) LẪN `convex/` (lệnh cũ `bun tsc -b --noEmit` chỉ build 2 project con của root, bỏ sót `convex/tsconfig.json`)
 - [ ] `bun run test:coverage` + `bun run coverage:floor` — khi đụng engine bảo vệ trong `bot/src` (CI chạy cả hai; sàn theo file chặn engine tụt)
 - [ ] `bun run lint` — sạch

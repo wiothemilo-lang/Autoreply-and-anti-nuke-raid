@@ -34,6 +34,8 @@ import { MIN_IMPORT_BOT_VERSION } from "../../lib/constants";
 import { getSessionToken } from "../../lib/discord";
 import { judgeJobWatch, type JobWatch } from "../../lib/backupWatch";
 import { safeGithubUrl } from "../../lib/safeUrl";
+import { clampNumber, parseNumberInput } from "../../lib/useDraft";
+import { useUnsavedChanges } from "../../lib/useUnsavedChanges";
 
 import { dateLocale, translate } from "../../lib/i18n";
 const TOKEN = () => getSessionToken();
@@ -108,8 +110,13 @@ export default function BackupPanel({ data }: { data: GuildData }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [refreshAt, setRefreshAt] = useState(0);
   const [autoOn, setAutoOn] = useState((data.guild.backupAutoDays ?? 0) > 0);
+  // Khi đang tắt tự động (0) ô số vẫn phải có giá trị mặc định hợp lệ để gõ lại;
+  // dùng CÙNG công thức với `serverAutoDaysShown` bên dưới, nếu lệch thì panel
+  // vừa mở đã tự coi là "có thay đổi chưa lưu".
   const [autoDays, setAutoDays] = useState(
-    Math.max(2, Math.min(30, data.guild.backupAutoDays ?? 7)),
+    (data.guild.backupAutoDays ?? 0) > 0
+      ? Math.max(2, Math.min(30, data.guild.backupAutoDays ?? 7))
+      : 7,
   );
   const [autoBusy, setAutoBusy] = useState(false);
   /** Quy tắc giữ bản: N bản gần nhất + dọn theo tuổi (0 = tắt). Mặc định 3 bản. */
@@ -136,6 +143,104 @@ export default function BackupPanel({ data }: { data: GuildData }) {
   const [restoreOptBusy, setRestoreOptBusy] = useState(false);
   /** Theo dõi trạng thái xử lý file import: null = không chờ, active = đang chờ bot. */
   const [importWatch, setImportWatch] = useState<JobWatch | null>(null);
+
+  // ── Giá trị ĐANG CÓ TRÊN SERVER (đã chuẩn hoá) ────────────────────────────
+  const serverAutoDays = data.guild.backupAutoDays ?? 0;
+  const serverKeepCount = clampNumber(data.guild.backupKeepCount ?? 3, 2, 50);
+  const serverKeepDays = clampNumber(data.guild.backupKeepDays ?? 0, 0, 365);
+  const serverRestoreRoles = data.guild.restoreRolesEnabled ?? true;
+  const serverRestoreEmojis = data.guild.restoreEmojisEnabled ?? true;
+  const serverRestoreMeta = data.guild.restoreMetaEnabled ?? true;
+  const serverRestoreExtras = data.guild.restoreExtrasEnabled ?? false;
+  const serverRestoreClearChannels = data.guild.restoreClearChannelsEnabled ?? false;
+  const serverRestoreChannels = data.guild.restoreChannelsEnabled ?? true;
+  const serverRestoreMessages = data.guild.restoreMessagesEnabled ?? true;
+  /** Chu kỳ hiển thị khi server đang tắt tự động (ô vẫn phải có một số hợp lệ). */
+  const serverAutoDaysShown = clampNumber(serverAutoDays > 0 ? serverAutoDays : 7, 2, 30);
+
+  /**
+   * Nạp lại bản nháp khi cấu hình TRÊN SERVER đổi (admin khác, tab khác, bot tự ghi).
+   *
+   * Vì sao: các `useState` ở trên chỉ đọc prop MỘT lần. Tab mở lâu rồi bấm
+   * "Lưu" sẽ ghi đè cấu hình mới hơn — kể cả `restoreClearChannels` (cờ XOÁ
+   * KÊNH khi khôi phục, không hoàn tác được) và lịch tự động vừa bị tắt.
+   * So với lần cuối nhìn thấy nên chỉ field server THẬT SỰ đổi mới bị nạp lại,
+   * bản nháp đang sửa ở field khác không bị xoá oan.
+   */
+  const lastServer = useRef({
+    autoDays: serverAutoDays,
+    keepCount: serverKeepCount,
+    keepDays: serverKeepDays,
+    restoreRoles: serverRestoreRoles,
+    restoreEmojis: serverRestoreEmojis,
+    restoreMeta: serverRestoreMeta,
+    restoreExtras: serverRestoreExtras,
+    restoreClearChannels: serverRestoreClearChannels,
+    restoreChannels: serverRestoreChannels,
+    restoreMessages: serverRestoreMessages,
+  });
+  useEffect(() => {
+    const prev = lastServer.current;
+    const now = {
+      autoDays: serverAutoDays,
+      keepCount: serverKeepCount,
+      keepDays: serverKeepDays,
+      restoreRoles: serverRestoreRoles,
+      restoreEmojis: serverRestoreEmojis,
+      restoreMeta: serverRestoreMeta,
+      restoreExtras: serverRestoreExtras,
+      restoreClearChannels: serverRestoreClearChannels,
+      restoreChannels: serverRestoreChannels,
+      restoreMessages: serverRestoreMessages,
+    };
+    lastServer.current = now;
+    if (prev.autoDays !== now.autoDays) {
+      setAutoOn(now.autoDays > 0);
+      // Tắt tự động (0) thì ô số quay về mặc định 7 — trùng `serverAutoDaysShown`,
+      // nếu không panel sẽ kẹt trạng thái "chưa lưu" mãi sau khi lưu thành công.
+      setAutoDays(clampNumber(now.autoDays > 0 ? now.autoDays : 7, 2, 30));
+    }
+    if (prev.keepCount !== now.keepCount) setKeepCount(now.keepCount);
+    if (prev.keepDays !== now.keepDays) setKeepDays(now.keepDays);
+    if (prev.restoreRoles !== now.restoreRoles) setRestoreRoles(now.restoreRoles);
+    if (prev.restoreEmojis !== now.restoreEmojis) setRestoreEmojis(now.restoreEmojis);
+    if (prev.restoreMeta !== now.restoreMeta) setRestoreMeta(now.restoreMeta);
+    if (prev.restoreExtras !== now.restoreExtras) setRestoreExtras(now.restoreExtras);
+    if (prev.restoreClearChannels !== now.restoreClearChannels)
+      setRestoreClearChannels(now.restoreClearChannels);
+    if (prev.restoreChannels !== now.restoreChannels) setRestoreChannels(now.restoreChannels);
+    if (prev.restoreMessages !== now.restoreMessages) setRestoreMessages(now.restoreMessages);
+  }, [
+    serverAutoDays,
+    serverKeepCount,
+    serverKeepDays,
+    serverRestoreRoles,
+    serverRestoreEmojis,
+    serverRestoreMeta,
+    serverRestoreExtras,
+    serverRestoreClearChannels,
+    serverRestoreChannels,
+    serverRestoreMessages,
+  ]);
+
+  /**
+   * Bản nháp chưa lưu → hỏi trước khi rời panel.
+   * Trước đây panel này KHÔNG đăng ký gì với `useUnsavedChanges`, nên sửa xong
+   * bấm sang tab khác là mất sạch mà không một lời cảnh báo.
+   */
+  const dirty =
+    autoOn !== serverAutoDays > 0 ||
+    autoDays !== serverAutoDaysShown ||
+    keepCount !== serverKeepCount ||
+    keepDays !== serverKeepDays ||
+    restoreRoles !== serverRestoreRoles ||
+    restoreEmojis !== serverRestoreEmojis ||
+    restoreMeta !== serverRestoreMeta ||
+    restoreExtras !== serverRestoreExtras ||
+    restoreClearChannels !== serverRestoreClearChannels ||
+    restoreChannels !== serverRestoreChannels ||
+    restoreMessages !== serverRestoreMessages;
+  useUnsavedChanges("backup", dirty);
   const requestBackup = useMutation(api.backup.requestBackup);
   const requestRestore = useMutation(api.backup.requestRestore);
   const generateUploadUrl = useMutation(api.backup.generateImportUploadUrl);
@@ -516,15 +621,17 @@ export default function BackupPanel({ data }: { data: GuildData }) {
 
   async function saveAuto() {
     setAutoBusy(true);
+    const days = clampNumber(autoDays, 2, 30);
+    setAutoDays(days);
     try {
       await setAutoBackup({
         token: TOKEN(),
         guildId: data.guild.discordId,
-        days: autoOn ? autoDays : 0,
+        days: autoOn ? days : 0,
       });
       toast.success(
         autoOn
-          ? translate("Đã bật tự động backup mỗi {p0} ngày", { p0: autoDays })
+          ? translate("Đã bật tự động backup mỗi {p0} ngày", { p0: days })
           : translate("Đã tắt tự động backup"),
       );
     } catch (e) {
@@ -680,17 +787,21 @@ export default function BackupPanel({ data }: { data: GuildData }) {
 
   async function saveRetention() {
     setRetentionBusy(true);
+    const keep = clampNumber(keepCount, 2, 50);
+    const days = clampNumber(keepDays, 0, 365);
+    setKeepCount(keep);
+    setKeepDays(days);
     try {
       await setRetention({
         token: TOKEN(),
         guildId: data.guild.discordId,
-        keepCount,
-        keepDays,
+        keepCount: keep,
+        keepDays: days,
       });
       toast.success(
         translate("Đã lưu quy tắc giữ bản: giữ {p0} bản gần nhất, xoá bản cũ hơn {p1} ngày.", {
-          p0: keepCount,
-          p1: keepDays,
+          p0: keep,
+          p1: days,
         }),
         {
           description: translate(
@@ -1013,9 +1124,8 @@ export default function BackupPanel({ data }: { data: GuildData }) {
                 max={30}
                 value={autoDays}
                 disabled={!autoOn}
-                onChange={(e) =>
-                  setAutoDays(Math.max(2, Math.min(30, parseInt(e.target.value || "2", 10) || 2)))
-                }
+                onChange={(e) => setAutoDays(parseNumberInput(e.target.value, autoDays))}
+                onBlur={() => setAutoDays((v) => clampNumber(v, 2, 30))}
                 className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60 disabled:opacity-40"
               />
               {translate("ngày")}{" "}
@@ -1033,9 +1143,8 @@ export default function BackupPanel({ data }: { data: GuildData }) {
                 min={2}
                 max={50}
                 value={keepCount}
-                onChange={(e) =>
-                  setKeepCount(Math.max(2, Math.min(50, parseInt(e.target.value || "3", 10) || 3)))
-                }
+                onChange={(e) => setKeepCount(parseNumberInput(e.target.value, keepCount))}
+                onBlur={() => setKeepCount((v) => clampNumber(v, 2, 50))}
                 className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60"
               />{" "}
               {translate("bản gần nhất")}{" "}
@@ -1047,9 +1156,8 @@ export default function BackupPanel({ data }: { data: GuildData }) {
                 min={0}
                 max={365}
                 value={keepDays}
-                onChange={(e) =>
-                  setKeepDays(Math.max(0, Math.min(365, parseInt(e.target.value || "0", 10) || 0)))
-                }
+                onChange={(e) => setKeepDays(parseNumberInput(e.target.value, keepDays))}
+                onBlur={() => setKeepDays((v) => clampNumber(v, 0, 365))}
                 className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60"
               />{" "}
               {translate("ngày (0 = không xoá theo tuổi)")}{" "}

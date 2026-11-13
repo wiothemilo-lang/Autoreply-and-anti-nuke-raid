@@ -609,7 +609,7 @@ export default function GuildPage() {
                   <div className="mb-4">
                     <OnboardingChecklist
                       data={data}
-                      onOpenSection={(key) => setSection(key as SectionKey)}
+                      onOpenSection={(key) => goToSection(key as SectionKey)}
                     />
                   </div>
                 )}

@@ -1312,6 +1312,8 @@ export const EN: Record<string, string> = {
     "This role gets pinged whenever a new ticket opens. Leave empty to ping nobody.",
   "Chưa có role nào trong server.": "This server has no roles yet.",
   "Đã lưu role được tag": "Ping roles saved",
+  "Chỉ chọn tối đa 3 role — bỏ một role trước khi thêm.":
+    "Only 3 roles can be selected — remove one before adding another.",
   "Đã lưu thời gian tự đóng": "Auto-close time saved",
   "Đã tắt tự đóng": "Auto-close turned off",
   "Đã có người nhận": "Claimed",
@@ -1352,6 +1354,8 @@ export const EN: Record<string, string> = {
   "Sẽ DM khi mở ticket": "Will DM on ticket open",
   "Không DM khi mở ticket": "No DM on ticket open",
   "Đã lưu màu panel": "Panel color saved",
+  "Mã màu không hợp lệ — cần 6 ký tự hex, ví dụ #5865f2.":
+    "Invalid color code — needs 6 hex characters, e.g. #5865f2.",
   "Mã hex 6 chữ số, ví dụ #5865f2. Ô trống = màu mặc định của bot.":
     "A 6-digit hex code, e.g. #5865f2. Leave empty to use the bot's default color.",
   // ── Xem transcript (tab "Đã lưu trữ") — 28/09/2026 ──
@@ -1720,6 +1724,7 @@ export const EN: Record<string, string> = {
   "Discord ID người được cấp (15-21 chữ số)": "Recipient's Discord ID (15-21 digits)",
   "Server ID (tùy chọn — 15-21 chữ số)": "Server ID (optional — 15-21 digits)",
   "Số ngày (1–365)": "Number of days (1–365)",
+  "Số ngày phải là số nguyên từ 1 đến 365.": "Days must be a whole number from 1 to 365.",
   "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.":
     "You are a team admin — the bot owner manages this list. Ask the bot owner to add or remove people.",
   "Chưa từng đăng nhập web": "Never signed in on the web",
