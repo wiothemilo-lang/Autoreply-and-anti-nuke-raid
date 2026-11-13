@@ -1,10 +1,18 @@
 # Protogon Bot — Auto Reply & Anti Nuke Raid
 
 [![CI — Lint, Test & Deploy](https://github.com/wiothemilo-lang/Autoreply-and-anti-nuke-raid/actions/workflows/ci.yml/badge.svg)](https://github.com/wiothemilo-lang/Autoreply-and-anti-nuke-raid/actions/workflows/ci.yml)
+[![CodeRabbit — AI review](https://img.shields.io/badge/CodeRabbit-AI%20review-FF6B35)](https://coderabbit.ai)
+[![Security — gitleaks + bun audit](https://img.shields.io/badge/security-gitleaks%20%2B%20audit-2ea44f)](.github/workflows/ci.yml)
+[![Tests — 90 CJS + 35 TS](https://img.shields.io/badge/tests-90%20CJS%20%2B%2035%20TS-2ea44f)](scripts/run-all-tests.cjs)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
+[![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Convex backend](https://img.shields.io/badge/backend-Convex-EE342F)](https://convex.dev)
+[![Vite 6](https://img.shields.io/badge/build-Vite%206-646CFF?logo=vite&logoColor=white)](https://vite.dev)
+[![Bun 1.3.3](https://img.shields.io/badge/runtime-Bun%201.3.3-fbf0df?logo=bun&logoColor=black)](https://bun.sh)
 
 Bot Discord tự động trả lời tin nhắn thành viên theo **từ khóa** hoặc khi bị **tag @mention** (nội dung do bạn tùy chỉnh), hỗ trợ đầy đủ **prefix (`!`) + slash commands**, kèm hệ thống **chống nuke/raid** bật tắt từng phần theo ý mod & owner — tất cả quản lý qua một **dashboard web** tùy chỉnh.
 
-> **Chất lượng**: 89 CJS + 31 TS test suites · coverage c8 (95,6% dòng / 97,7% hàm / 81,1% nhánh — toàn bộ engine chống nuke + alt detection + ticket + lớp dẫn log được phủ test trực tiếp, **không còn file nào dưới 80%**, **sàn coverage theo file** chặn engine bảo vệ tụt) · **mutation score 100%** (`bun run test:mutation`) · property-based + fuzz test · **memGuard sweeper bộ nhớ tập trung** · ESLint sạch · typecheck sạch · smoke test VPS · CI 4 job (lint + security + test → deploy): gitleaks chặn secret lộ, bun audit chặn CVE critical (`bun run test` để chạy local).
+> **Chất lượng**: 90 CJS + 35 TS test suites · coverage c8 (95,6% dòng / 97,7% hàm / 81,1% nhánh — toàn bộ engine chống nuke + alt detection + ticket + lớp dẫn log được phủ test trực tiếp, **không còn file nào dưới 80%**, **sàn coverage theo file** chặn engine bảo vệ tụt) · **mutation score 100%** (`bun run test:mutation`) · property-based + fuzz test · **memGuard sweeper bộ nhớ tập trung** · ESLint sạch · typecheck sạch · smoke test VPS · CI 4 job (lint + security + test → deploy): gitleaks chặn secret lộ, bun audit chặn CVE critical (`bun run test` để chạy local).
 >
 > **Hệ sinh thái**: threat relay liên server (chia sẻ signature raid ẩn danh, opt-in từng chiều) · preset bảo mật 1 chạm (server nhỏ / cộng đồng / rủi ro cao) — bật trên dashboard, tab Chống nuke.
 
@@ -143,7 +151,7 @@ bun run format:check    # CI dùng lệnh này để chặn code chưa format
 
 **Dependabot** (`.github/dependabot.yml`) quét weekly: root `bun`, `bot/` (discord.js, convex) và `github-actions` — tự tạo PR cập nhật, group các bump minor/patch thành 1 PR. Bot bảo mật không được để deps cũ.
 
-**Thứ tự gate trong CI**: `lint` (ESLint + Prettier + check repo-map/hợp đồng bot⇄Convex/đa ngôn ngữ) → `test` (89 CJS + 31 TS suites + coverage + typecheck) → `deploy` Convex production. Job sau chỉ chạy khi job trước pass.
+**Thứ tự gate trong CI**: `lint` (ESLint + Prettier + check repo-map/hợp đồng bot⇄Convex/đa ngôn ngữ) → `test` (90 CJS + 35 TS suites + coverage + typecheck) → `deploy` Convex production. Job sau chỉ chạy khi job trước pass.
 
 ## AI coding agent trên VPS (OpenCode)
 
