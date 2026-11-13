@@ -105,6 +105,25 @@
 
 ---
 
+## 2026-11-13 (3) — Audit khoá thu thập IP
+
+- ✅ Xong: rà 5 lớp khoá — cờ `IP_COLLECTION_ENABLED=false`; HTTP
+  `/verify/complete` trả 503 TRƯỚC `getRequestMetadata()`/XFF/body; action
+  `verifyActions.complete` chặn lần 2 trước ipapi/DB; `botCreateSession` ném
+  lỗi; `updateSettings` từ chối ghi `web`. Payload `getGuild`/`getBotConfig`/
+  `getVerifySendPanelGuilds`/`bot_tick` đều hạ web→button; dashboard khoá option
+  Web + banner, bot tự lùi về nút.
+- 🧪 Kiểm chứng: `test-web-contracts` 474 PASS (9 assertion khoá, gồm thứ tự
+  gate trước khi đọc IP), `test-verify-flow` 123/123 (3 assertion khoá); probe
+  prod `/verify/complete` → 503 `ip_collection_disabled`; bot online 3h.
+- ⚠️ Còn hở nhỏ: `/verify/self-test` vẫn đọc IP admin (metadata/XFF) để
+  rate-limit + dò spoof khi khoá — không lưu, không gửi ipapi (probe dùng
+  1.1.1.1), UI đã ẩn card nhưng gọi thẳng API vẫn chạy. Muốn "không đọc IP mọi
+  đường" thì gate self-test khi khoá.
+- ▶️ Tiếp theo: chờ người dùng quyết có vá self-test không; dữ liệu cũ giữ
+  theo retention DPIA §6 (session 7 ngày, intel 24h, signal 730 ngày, ipBan
+  90 ngày sau hết hiệu lực).
+
 ## 2026-11-13 (2) — Kiểm tra môi trường + deploy bot sau pull
 
 - ✅ Môi trường VPS: bun 1.4.2 · node 20.20.2 · đĩa 11% (67G trống) · RAM
