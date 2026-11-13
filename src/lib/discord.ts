@@ -64,9 +64,13 @@ export function getSessionToken(): string {
       return parsed.t;
     }
   } catch {
-    // dữ liệu cũ (token thô chưa có hạn) — vẫn chấp nhận.
+    // Dữ liệu hỏng hoặc định dạng cũ (token thô KHÔNG kèm hạn) — không dùng.
   }
-  return raw;
+  /* Trước đây hàm trả `raw` cho qua: client giữ một token vô hạn hạn, gửi lên
+     server (server vẫn từ chối nhờ sessionExpired/isCurrentSession) rồi hiện
+     "Vui lòng đăng nhập" thay vì đá về /auth. Xoá luôn để lần sau sạch. */
+  localStorage.removeItem(SESSION_TOKEN_KEY);
+  return "";
 }
 
 /** Lưu token theo lựa chọn "Lưu đăng nhập" của người dùng. */
