@@ -346,7 +346,7 @@ const VI: LegalDoc[] = [
           "Phần lớn dữ liệu bạn xoá được mà không cần chờ ai: mỗi panel đều có nút xoá tương ứng.",
         ],
         bullets: [
-          "Xoá file backup không cần dùng nữa, kể cả bản đã đẩy lên GitHub.",
+          "Xoá file backup không cần dùng nữa: đặt trần lưu trữ (số bản hoặc số ngày) để bot tự xoá bản cũ ngay khi lưu bản mới; bản đã đẩy lên GitHub Gist bằng khoá của bạn thì bạn tự xoá trong Gist. Muốn xoá ngay một bản cụ thể, gửi yêu cầu ở kênh hỗ trợ.",
           "Xoá danh sách whitelist, câu tự trả lời, giveaway, bảng reaction role khi không còn dùng.",
           "Trong panel Xác minh web, quản trị viên có thể xoá dữ liệu xác minh của một thành viên (phiên, tín hiệu, liên kết tài khoản phụ).",
           "Đặt lại điểm nhiệt và số lần cảnh báo của một thành viên.",
@@ -708,7 +708,7 @@ const EN: LegalDoc[] = [
           "Most data can be deleted without waiting for anyone: every panel has its own delete control.",
         ],
         bullets: [
-          "Delete backups you no longer need, including ones already pushed to GitHub.",
+          "Delete backups you no longer need: set a retention cap (by count or by days) so the bot removes older copies as soon as it saves a new one; copies pushed to GitHub Gist with your own key are yours to delete there. To delete a specific copy right away, send a request in the support channel.",
           "Delete whitelist entries, auto-replies, giveaways, and reaction-role panels you no longer use.",
           "In the Web Verification panel, administrators can delete a member's verification data (sessions, signals, alt-account links).",
           "Reset a member's heat score and warning count.",
@@ -1072,7 +1072,7 @@ const DE: LegalDoc[] = [
           "Die meisten Daten kannst du ohne Wartezeit löschen: jedes Panel hat eine eigene Löschfunktion.",
         ],
         bullets: [
-          "Backups löschen, die du nicht mehr brauchst, auch bereits zu GitHub hochgeladene.",
+          "Backups löschen, die du nicht mehr brauchst: Aufbewahrungsgrenze setzen (Anzahl oder Tage), damit der Bot ältere Kopien beim Speichern einer neuen löscht; mit deinem eigenen Schlüssel zu GitHub Gist hochgeladene Kopien löschst du dort selbst. Soll eine bestimmte Kopie sofort weg, sende eine Anfrage im Support-Kanal.",
           "Whitelist-Einträge, Auto-Antworten, Giveaways und Reaction-Role-Panels löschen, die nicht mehr genutzt werden.",
           "Im Panel Web-Verifizierung können Administratoren die Verifizierungsdaten eines Mitglieds löschen (Sitzungen, Signale, Alt-Konto-Verknüpfungen).",
           "Hitzewert und Verwarnungen eines Mitglieds zurücksetzen.",
