@@ -458,7 +458,7 @@ export const EN: Record<string, string> = {
   "Đây chỉ là kế hoạch — server chưa bị thay đổi. Bấm “Khôi phục vào server này” ở bản backup tương ứng để thực sự tạo lại.":
     'This is only a plan — the server is unchanged. Press "Restore into this server" on the matching backup to actually create it.',
   "Backup thất bại: {p0}": "Backup failed: {p0}",
-  "Biểu đồ độ trễ (5 giây / mẫu)": "Latency chart (5s / sample)",
+  "Biểu đồ độ trễ ({p0} giây / mẫu)": "Latency chart ({p0}s / sample)",
   "Bot Discord bảo vệ server, đồng hành cùng trợ lý Haimiya":
     "Discord server-protection bot, with the Haimiya assistant",
   "Bot vẫn chưa xử lý file backup": "The bot has not processed the backup file yet",
@@ -549,7 +549,6 @@ export const EN: Record<string, string> = {
   "Đã lưu chính sách báo cáo khẩn": "Emergency report policy saved",
   "Cần cấu hình Client ID": "Client ID required",
   "Cập nhật gần nhất": "Last updated",
-  "Cập nhật khung giờ ngay bây giờ": "Update the schedule now",
   "Cập nhật tiếp theo": "Next update",
   "Cụm từ mới:": "New phrases:",
   "Cửa sổ (giây)": "Window (seconds)",
@@ -1973,4 +1972,13 @@ export const EN: Record<string, string> = {
     "The data-protection dossier is not complete, so no IP addresses are collected. The server falls back to button verification; the Web option reopens once the dossier is finished.",
   "Xác minh web đang tạm khoá — server chưa thu thập IP. Hãy bấm nút xác minh trong Discord.":
     "Web verification is temporarily locked — the server is not collecting IP addresses. Use the verify button in Discord.",
+  "Độ trễ cao: {p0} ms": "High latency: {p0} ms",
+  "Đã tắt tính năng vì chưa chọn kênh gửi": "Turned the feature off because no channel is selected",
+  "Backup ngay": "Back up now",
+  "Xóa ảnh tùy chỉnh và trở về ảnh mặc định?": "Delete the custom image and return to the default?",
+  "{p0} | case N — Offender: @thànhviên": "{p0} | case N — Offender: @member",
+  "{p0} | case N — Offender: @thànhviên · Reason: <lý do vi phạm>":
+    "{p0} | case N — Offender: @member · Reason: <violation reason>",
+  "{p0} | case N — Offender: @thànhviên · Reason: <lý do> · Responsible moderator: @người áp dụng":
+    "{p0} | case N — Offender: @member · Reason: <reason> · Responsible moderator: @moderator",
 };

@@ -90,14 +90,24 @@ export default function DiscordCallback() {
         const silentReturn = safeRedirectPath(sessionStorage.getItem("wio_silent_return"));
         sessionStorage.removeItem("wio_silent_return");
         async function runSilent() {
+          /**
+           * `silentReturn` đã qua `safeRedirectPath` nhưng vẫn có thể mang query
+           * sẵn — nối chuỗi `${silentReturn}?silent=err` sẽ tạo `?a=1?silent=err`
+           * và dashboard không đọc được cờ. Dựng URL đúng cách.
+           */
+          const silentUrl = (value: "ok" | "err") => {
+            const url = new URL(silentReturn, window.location.origin);
+            url.searchParams.set("silent", value);
+            return `${url.pathname}${url.search}${url.hash}`;
+          };
           if (oauthError || !code || !silentVerifier) {
-            window.location.replace(`${silentReturn}?silent=err`);
+            window.location.replace(silentUrl("err"));
             return;
           }
           try {
             const sessToken = getSessionToken();
             if (!sessToken) {
-              window.location.replace(`${silentReturn}?silent=err`);
+              window.location.replace(silentUrl("err"));
               return;
             }
             const refreshed = await refreshGuildsServer({
@@ -106,9 +116,9 @@ export default function DiscordCallback() {
               codeVerifier: silentVerifier,
               redirectUri: window.location.origin + "/discord/callback",
             });
-            window.location.replace(`${silentReturn}?${refreshed.ok ? "silent=ok" : "silent=err"}`);
+            window.location.replace(silentUrl(refreshed.ok ? "ok" : "err"));
           } catch {
-            window.location.replace(`${silentReturn}?silent=err`);
+            window.location.replace(silentUrl("err"));
           }
         }
         void runSilent();

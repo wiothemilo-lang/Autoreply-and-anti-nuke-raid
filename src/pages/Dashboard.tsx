@@ -484,7 +484,11 @@ export default function Dashboard() {
                                         "Bạn sẽ được chuyển tới trang mời bot.",
                                       ),
                                     });
-                                    window.open(buildBotInviteUrl(clientId), "_blank");
+                                    window.open(
+                                      buildBotInviteUrl(clientId),
+                                      "_blank",
+                                      "noopener,noreferrer",
+                                    );
                                     return;
                                   }
                                   navigate(`/dashboard/${guild.discordId}`);

@@ -1,20 +1,22 @@
-import { CalendarClock, RefreshCw } from "lucide-react";
+import { CalendarClock } from "lucide-react";
 import { fmtVietnam, SYNC_INTERVAL_MS } from "../lib/useBotMonitor";
 
 import { translate } from "../lib/i18n";
 /**
  * Khung giờ cập nhật của bot — hiển thị theo giờ Việt Nam (UTC+7).
- * Dùng chung cho trang Giám sát bot và Cửa sổ Admin (liên kết với nhau);
- * Admin có thêm nút "Cập nhật ngay" để làm mới.
+ * Dùng chung cho trang Giám sát bot và Cửa sổ Admin.
+ *
+ * KHÔNG có nút "cập nhật ngay": hai mốc giờ này đọc từ subscription trạng thái
+ * bot nên tự đổi khi bot heartbeat; nút cũ chỉ gọi `refresh()` của
+ * useBotMonitor (đo lại độ trễ) nên bấm vào KHÔNG làm mốc giờ nhích — một nút
+ * nói dối người dùng. Muốn đo lại độ trễ thì đọc ở thẻ độ trễ.
  */
 export default function UpdateWindow({
   lastUpdate,
   nextUpdate,
-  onRefresh,
 }: {
   lastUpdate: number | null;
   nextUpdate: number | null;
-  onRefresh?: () => void;
 }) {
   return (
     <div className="rounded-xl border border-border bg-secondary/40 p-4">
@@ -50,15 +52,6 @@ export default function UpdateWindow({
         </b>
         .
       </p>
-      {onRefresh && (
-        <button
-          onClick={onRefresh}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          {translate("Cập nhật khung giờ ngay bây giờ")}{" "}
-        </button>
-      )}
     </div>
   );
 }

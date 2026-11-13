@@ -55,6 +55,18 @@ const config: Config = {
           DEFAULT: "hsl(var(--danger))",
           foreground: "hsl(var(--danger-foreground))",
         },
+        /* success/warning là màu NGỮ NGHĨA (trạng thái tốt/cần chú ý), không
+           phải màu trang trí — cùng nhóm với danger. Trước đây vài nơi dùng
+           `bg-success`/`text-warn` nhưng token không tồn tại nên Tailwind
+           không sinh CSS: thanh "Điểm cấu hình" vô hình, badge gói mất màu. */
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

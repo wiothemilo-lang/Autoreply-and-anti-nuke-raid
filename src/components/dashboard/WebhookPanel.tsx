@@ -349,7 +349,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
               checked={defaultWh.enabled}
               onCheckedChange={async (v) => {
                 try {
-                  await toggleDefaultWebhook({ token, guildId: g.discordId });
+                  await toggleDefaultWebhook({ token, guildId: g.discordId, enabled: v });
                   toast.success(
                     translate(v ? "Đã bật webhook mặc định" : "Đã tắt webhook mặc định"),
                   );

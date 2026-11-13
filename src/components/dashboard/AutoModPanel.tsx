@@ -10,7 +10,7 @@ import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
-  ANTINUKE_MODULE_META,
+  moduleMeta,
   DEFAULT_MODULE_ACTIONS,
   MODERATION_GROUPS,
   MODERATION_MODULES,
@@ -49,7 +49,7 @@ export default function AutoModPanel({ data }: { data: GuildData }) {
 
   function configFor(module: string): ModuleConfig {
     const found = data.modules.find((m) => m.module === module);
-    const meta = ANTINUKE_MODULE_META[module];
+    const meta = moduleMeta(module);
     return (
       found ?? {
         module,

@@ -74,8 +74,11 @@ function RecentEvents({ data }: { data: GuildData }) {
           </p>
         ) : (
           <ul className="mt-4 divide-y divide-border">
-            {recent.map((e) => (
-              <li key={`${e.createdAt}-${e.module}`} className="flex items-center gap-3 py-2.5">
+            {recent.map((e, index) => (
+              <li
+                key={`${e.createdAt}-${e.module}-${index}`}
+                className="flex items-center gap-3 py-2.5"
+              >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger">
                   <ShieldAlert className="h-4 w-4" />
                 </span>

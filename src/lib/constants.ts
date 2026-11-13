@@ -418,6 +418,26 @@ export const ANTINUKE_MODULE_META: Record<string, ModuleMeta> = {
   },
 };
 
+/**
+ * Meta của một module, LUÔN có giá trị. Bot có thể ghi một module mới trước khi
+ * bản web biết tới nó (deploy lệch nhau) — khi đó `ANTINUKE_MODULE_META[module]`
+ * là `undefined` và `meta.label` ném lỗi, làm cả panel trắng. Fallback dùng
+ * chính tên module thay vì đoán nhãn.
+ */
+export function moduleMeta(module: string): ModuleMeta {
+  return (
+    ANTINUKE_MODULE_META[module] ?? {
+      label: module,
+      description: "",
+      group: "",
+      defaultThreshold: 5,
+      defaultWindowSeconds: 10,
+      defaultPunish: "warn",
+      defaultHeat: 10,
+    }
+  );
+}
+
 export const ANTINUKE_ORDER = [
   "massBan",
   "massKick",
@@ -690,3 +710,14 @@ export const SERVER_THEMES: Record<string, ServerTheme> = {
 };
 
 export const DEFAULT_THEME = "graphite";
+
+/**
+ * Tên hiển thị (tiếng Việt, CHƯA dịch) của gói trả phí. Một nguồn duy nhất cho
+ * UserTags + Admin — trước đây Admin in thẳng enum `supporter`/`pioneer` còn
+ * badge lại hiện "Đồng hành"/"Tiên phong", cùng một dữ liệu hai cách gọi.
+ */
+export function planDisplayName(plan?: string | null): string | null {
+  if (plan === "supporter") return "Đồng hành";
+  if (plan === "pioneer") return "Tiên phong";
+  return null;
+}

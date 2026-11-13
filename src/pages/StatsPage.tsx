@@ -309,7 +309,11 @@ export default function StatsPage() {
                         <BarRow
                           values={summary.weekly.map((d) => d.joins)}
                           labels={[
-                            new Date(summary.weekly[0].dayStart).toLocaleDateString(dateLocale()),
+                            summary.weekly[0]
+                              ? new Date(summary.weekly[0].dayStart).toLocaleDateString(
+                                  dateLocale(),
+                                )
+                              : "",
                             translate("Hôm nay"),
                           ]}
                           ariaLabel={translate("Người vào 7 ngày gần nhất")}

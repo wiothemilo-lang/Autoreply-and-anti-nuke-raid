@@ -78,7 +78,16 @@ export default function PaymentReturn({ token }: { token: string | null }) {
   if (status === "idle") return null;
 
   const done = () => {
-    setParams({}, { replace: true });
+    // Chỉ xoá `order` của đơn vừa xem — `setParams({})` xoá sạch query, nuốt
+    // luôn tham số khác của /donate (vd nguồn chiến dịch) mà người dùng không hay.
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("order");
+        return next;
+      },
+      { replace: true },
+    );
     setStatus("idle");
     setResult(null);
   };

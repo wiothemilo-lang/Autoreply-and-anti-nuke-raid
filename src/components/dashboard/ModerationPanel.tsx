@@ -29,16 +29,21 @@ const LEVEL_BADGE: Record<string, string> = {
 
 /** Xem trước embed hình phạt bot sẽ gửi theo mức chi tiết đã chọn. */
 function previewFor(action: string, level: PunishNoticeLevel): string {
-  const label = PUNISH_NOTICE_ACTION_LABEL[action] ?? action;
+  const label = translate(PUNISH_NOTICE_ACTION_LABEL[action] ?? action);
   switch (level) {
     case "none":
-      return "Bot không gửi embed nào sau khi trừng phạt (dashboard vẫn ghi nhận case).";
+      return translate("Bot không gửi embed nào sau khi trừng phạt (dashboard vẫn ghi nhận case).");
     case "action":
-      return `${label} | case N — Offender: @thànhviên`;
+      return translate("{p0} | case N — Offender: @thànhviên", { p0: label });
     case "reason":
-      return `${label} | case N — Offender: @thànhviên · Reason: <lý do vi phạm>`;
+      return translate("{p0} | case N — Offender: @thànhviên · Reason: <lý do vi phạm>", {
+        p0: label,
+      });
     case "full":
-      return `${label} | case N — Offender: @thànhviên · Reason: <lý do> · Responsible moderator: @người áp dụng`;
+      return translate(
+        "{p0} | case N — Offender: @thànhviên · Reason: <lý do> · Responsible moderator: @người áp dụng",
+        { p0: label },
+      );
   }
 }
 

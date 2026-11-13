@@ -8,12 +8,7 @@ import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { useState } from "react";
-import {
-  ANTINUKE_MODULE_META,
-  DEFAULT_MODULE_ACTIONS,
-  NUKE_GROUPS,
-  NUKE_MODULES,
-} from "../../lib/constants";
+import { moduleMeta, DEFAULT_MODULE_ACTIONS, NUKE_GROUPS, NUKE_MODULES } from "../../lib/constants";
 import ModuleCard, { ModuleNumber } from "./ModuleCard";
 import type { GuildData, ModuleConfig, RaidIntel } from "../../lib/types";
 import { getSessionToken } from "../../lib/discord";
@@ -40,7 +35,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
 
   function configFor(module: string): ModuleConfig {
     const found = data.modules.find((m) => m.module === module);
-    const meta = ANTINUKE_MODULE_META[module];
+    const meta = moduleMeta(module);
     return (
       found ?? {
         module,

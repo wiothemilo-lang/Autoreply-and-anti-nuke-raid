@@ -113,6 +113,111 @@ check(
   /onOpenSection=\{\(key\) => goToSection\(key as SectionKey\)\}/.test(guildPage),
 );
 
+console.log("Nguồn: token màu ngữ nghĩa phải có thật trong Tailwind");
+const tw = read("tailwind.config.ts");
+const css = read("src/index.css");
+check("tailwind.config.ts khai báo success", /success:\s*\{/.test(tw));
+check("tailwind.config.ts khai báo warning", /warning:\s*\{/.test(tw));
+check("index.css có biến --success", /--success:/.test(css));
+check("index.css có biến --warning", /--warning:/.test(css));
+check(
+  "UserTags không dùng token warn không tồn tại",
+  !/\b(?:border|bg|text)-warn\b/.test(read("src/components/UserTags.tsx")),
+);
+
+console.log("Nguồn: nhật ký sự cố phải dịch LÚC RENDER, không phải lúc ghi");
+const monitorHook = read("src/lib/useBotMonitor.ts");
+check(
+  "useBotMonitor phát kind thay vì câu tiếng Việt",
+  /kind:\s*"latency"\s*\|\s*"down"/.test(monitorHook),
+);
+check("useBotMonitor có incidentLabel", /export function incidentLabel/.test(monitorHook));
+check("Monitor không render inc.text thô", !/inc\.text/.test(read("src/pages/Monitor.tsx")));
+check("Admin không render inc.text thô", !/inc\.text/.test(admin));
+check(
+  "Monitor lấy sampleIntervalMs cho nhãn",
+  /sampleIntervalMs/.test(read("src/pages/Monitor.tsx")),
+);
+
+console.log("Nguồn: nút cập nhật khung giờ không được hứa suông");
+check(
+  "UpdateWindow không còn onRefresh",
+  !/onRefresh/.test(read("src/components/UpdateWindow.tsx")),
+);
+
+console.log("Nguồn: công tắc webhook gửi trạng thái TƯỜNG MINH");
+check(
+  "WebhookPanel gửi enabled: v",
+  /enabled:\s*v\b/.test(read("src/components/dashboard/WebhookPanel.tsx")),
+);
+const webhooks = read("convex/webhooks.ts");
+check("mutation nhận enabled optional", /enabled:\s*v\.optional\(v\.boolean\(\)\)/.test(webhooks));
+check("mutation dùng giá trị tường minh trước", /enabled \?\? !wh\.enabled/.test(webhooks));
+
+console.log("Nguồn: WelcomePanel chặn cắt chuỗi + token {joined}");
+const welcome = read("src/components/dashboard/WelcomePanel.tsx");
+check("preview thay {joined}", /replaceAll\("\{joined\}"/.test(welcome));
+check("ô nội dung có maxLength 1000", /maxLength=\{1000\}/.test(welcome));
+check("ô danh sách câu có maxLength 4000", /maxLength=\{4000\}/.test(welcome));
+check("ô tiêu đề embed có maxLength 256", /maxLength=\{256\}/.test(welcome));
+check("chọn “Không dùng” thì tắt tính năng luôn", /\$\{kind\}Enabled`\]: false/.test(welcome));
+
+console.log("Nguồn: onboarding trỏ đúng panel có ô chọn kênh log");
+check(
+  "bước kênh log nhắm SettingsPanel",
+  /target: "settings"/.test(read("src/components/dashboard/OnboardingChecklist.tsx")),
+);
+
+console.log("Nguồn: module lạ không làm sập panel");
+const constants = read("src/lib/constants.ts");
+check("constants có moduleMeta fallback", /export function moduleMeta/.test(constants));
+for (const file of [
+  "src/components/dashboard/ModuleCard.tsx",
+  "src/components/dashboard/AntiNukePanel.tsx",
+  "src/components/dashboard/AutoModPanel.tsx",
+  "src/pages/GuildHistory.tsx",
+]) {
+  check(`${file} dùng moduleMeta`, /moduleMeta\(/.test(read(file)));
+}
+check("constants có planDisplayName", /export function planDisplayName/.test(constants));
+check("Admin không in enum gói thô", !/\{translate\("Gói"\)\} \{o\.plan\}/.test(admin));
+
+console.log("Nguồn: các lỗi im lặng còn lại");
+const backupSrc = read("src/components/dashboard/BackupPanel.tsx");
+check(
+  "JoinGate giữ whitelistRef (chống ghi đè)",
+  /whitelistRef/.test(read("src/components/dashboard/JoinGatePanel.tsx")),
+);
+check(
+  "Dashboard mở tab mới có noopener",
+  /"noopener,noreferrer"/.test(read("src/pages/Dashboard.tsx")),
+);
+check(
+  "StatsPage guard weekly rỗng",
+  /summary\.weekly\[0\]\s*\?/.test(read("src/pages/StatsPage.tsx")),
+);
+check(
+  "DiscordCallback dựng URL bằng searchParams",
+  /searchParams\.set\("silent"/.test(read("src/pages/DiscordCallback.tsx")),
+);
+check(
+  "BackupPanel watchdog dùng dep nguyên thuỷ",
+  /[importWatch, importRequested, importError, importBotOnline]/.test(backupSrc),
+);
+check("BackupPanel dọn timer refresh khi đóng", /refreshTimer/.test(backupSrc));
+check(
+  "ModerationPanel dịch preview embed",
+  /translate\("\{p0\} \| case N/.test(read("src/components/dashboard/ModerationPanel.tsx")),
+);
+check(
+  "VerifyPage có đồng hồ hết hạn",
+  /setInterval\(\(\) => setNow\(Date\.now\(\)\)/.test(read("src/pages/VerifyPage.tsx")),
+);
+check(
+  "PaymentReturn chỉ xoá param order",
+  /next\.delete\("order"\)/.test(read("src/components/PaymentReturn.tsx")),
+);
+
 console.log("");
 if (fail) {
   console.error(`❌ ${fail} lỗi, ${pass} đạt`);

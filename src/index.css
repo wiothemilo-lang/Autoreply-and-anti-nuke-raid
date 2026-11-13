@@ -72,6 +72,12 @@
     --destructive-foreground: 0 0% 100%;
     --danger: 0 72% 45%;
     --danger-foreground: 0 0% 100%;
+    /* Màu NGỮ NGHĨA cho trạng thái (điểm cấu hình, xu hướng sự cố, badge gói).
+       Chỉ dùng để báo tốt/xấu — không dùng làm màu nhấn trang trí. */
+    --success: 145 60% 34%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 92% 40%;
+    --warning-foreground: 0 0% 100%;
     --border: 0 0% 90%;
     --input: 0 0% 87%;
     --ring: 0 0% 9%;
@@ -131,6 +137,11 @@
     --destructive-foreground: 0 0% 100%;
     --danger: 0 62% 55%;
     --danger-foreground: 0 0% 100%;
+    /* Nền tối: nâng độ sáng để vẫn đọc được trên #0a0a0a. */
+    --success: 145 55% 48%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 90% 55%;
+    --warning-foreground: 0 0% 10%;
     --border: 0 0% 18%;
     --input: 0 0% 22%;
     --ring: 0 0% 85%;

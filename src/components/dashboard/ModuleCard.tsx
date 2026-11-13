@@ -38,7 +38,7 @@ import { cn } from "../../lib/utils";
 import {
   ACTION_LABEL,
   ACTION_STRENGTH,
-  ANTINUKE_MODULE_META,
+  moduleMeta,
   MEMBER_PUNISH_OPTIONS,
   MESSAGE_CLEAN_OPTIONS,
   strongestPunish,
@@ -162,7 +162,7 @@ export default function ModuleCard({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const meta = ANTINUKE_MODULE_META[module];
+  const meta = moduleMeta(module);
   const Icon = MODULE_ICONS[module] ?? ShieldAlert;
   const roleOptions = data.roles
     .filter((r) => r.name !== "@everyone")

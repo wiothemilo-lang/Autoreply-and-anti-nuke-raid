@@ -96,7 +96,7 @@ export default function BrandingPanel({ data }: { data: GuildData }) {
         throw new Error(
           translate("Máy chủ không trả về ID ảnh — hãy thử dán đường dẫn ảnh thay thế"),
         );
-      const out = await saveBrandingUpload({
+      await saveBrandingUpload({
         token,
         guildId,
         storageId: storageId as GenericId<"_storage">,
@@ -108,7 +108,6 @@ export default function BrandingPanel({ data }: { data: GuildData }) {
           : translate("Đã đổi avatar Haimiya, áp dụng ngay toàn web 🎀"),
       );
       setUrls((u) => ({ ...u, [slot]: "" }));
-      void out;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : translate("Tải ảnh thất bại"));
     } finally {
@@ -139,6 +138,8 @@ export default function BrandingPanel({ data }: { data: GuildData }) {
   }
 
   async function removeAvatar(slot: Slot) {
+    // Xoá ảnh là thao tác không hoàn tác được (phải upload lại) → hỏi trước.
+    if (!window.confirm(translate("Xóa ảnh tùy chỉnh và trở về ảnh mặc định?"))) return;
     try {
       await setBotBranding({
         token,
