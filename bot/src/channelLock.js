@@ -27,7 +27,7 @@
  */
 
 const { PermissionFlagsBits, Colors } = require("discord.js");
-const { logEmbed, sendLog } = require("./util");
+const { logEmbed, sendLog, formatDuration } = require("./util");
 
 /** Trần thời lượng khoá: 30 ngày. Quá dài thì chủ server sai số, không phải chủ ý. */
 const MAX_MINUTES = 30 * 24 * 60;
@@ -64,9 +64,7 @@ function parseLockMinutes(raw) {
 /** Diễn giải thời lượng cho người đọc. `null` → "vô hạn". */
 function formatLockDuration(minutes) {
   if (minutes === null || minutes === undefined) return "vô hạn";
-  if (minutes >= 1440) return `${minutes / 1440} ngày`;
-  if (minutes >= 60) return `${minutes / 60} giờ`;
-  return `${minutes} phút`;
+  return formatDuration(minutes);
 }
 
 /**

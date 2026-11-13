@@ -186,12 +186,3 @@ export function clampBanDays(days: unknown, fallback = IP_BAN_DEFAULT_DAYS): num
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.max(1, Math.min(IP_BAN_MAX_DAYS, Math.floor(n)));
 }
-
-/** Hex ngẫu nhiên dùng cho whitelist hash hiển thị/so khớp — 128 bit. */
-export function randomHex(bytes = 16): string {
-  const buf = new Uint8Array(bytes);
-  crypto.getRandomValues(buf);
-  let s = "";
-  for (const b of buf) s += b.toString(16).padStart(2, "0");
-  return s;
-}

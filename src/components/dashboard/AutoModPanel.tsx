@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { AlertTriangle, Flame, ListX, Plus, ShieldCheck, X } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Card, CardContent } from "../ui/card";
@@ -75,7 +76,7 @@ export default function AutoModPanel({ data }: { data: GuildData }) {
       if (successMsg) toast.success(successMsg);
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false; // Switch tự trả núm về giá trị thật
     }
   }
@@ -91,7 +92,7 @@ export default function AutoModPanel({ data }: { data: GuildData }) {
       );
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
       return false;
     }
   }
@@ -111,7 +112,7 @@ export default function AutoModPanel({ data }: { data: GuildData }) {
       toast.success(translate("Đã lưu cài đặt hệ thống nhiệt độ"));
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     }
   }
@@ -150,7 +151,7 @@ export default function AutoModPanel({ data }: { data: GuildData }) {
       toast.success(translate("Đã lưu cài đặt warn tích lũy"));
     } catch (e) {
       setStrikes(prev);
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 
@@ -195,7 +196,7 @@ export default function AutoModPanel({ data }: { data: GuildData }) {
       setBadWordInput("");
       toast.success(translate('Đã thêm "{p0}"', { p0: word }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     }
   }
 
@@ -208,7 +209,7 @@ export default function AutoModPanel({ data }: { data: GuildData }) {
       });
       toast.success(translate('Đã xóa "{p0}"', { p0: word }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     }
   }
 
@@ -226,7 +227,7 @@ export default function AutoModPanel({ data }: { data: GuildData }) {
           : translate("Đã tắt nhóm ({p0} module)", { p0: modules.length }),
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 

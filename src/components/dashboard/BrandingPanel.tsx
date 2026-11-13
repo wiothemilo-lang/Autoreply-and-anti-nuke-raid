@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { ImagePlus, Link2, Palette, Trash2, Upload } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
@@ -109,7 +110,7 @@ export default function BrandingPanel({ data }: { data: GuildData }) {
       );
       setUrls((u) => ({ ...u, [slot]: "" }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : translate("Tải ảnh thất bại"));
+      toastConvexError(err, translate("Tải ảnh thất bại"));
     } finally {
       setUploading(null);
     }
@@ -131,7 +132,7 @@ export default function BrandingPanel({ data }: { data: GuildData }) {
       toast.success(translate("Đã lưu ảnh mới, áp dụng ngay toàn web"));
       setUrls((u) => ({ ...u, [slot]: "" }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : translate("Lưu thất bại"));
+      toastConvexError(err, translate("Lưu thất bại"));
     } finally {
       setSavingUrl(null);
     }
@@ -148,7 +149,7 @@ export default function BrandingPanel({ data }: { data: GuildData }) {
       });
       toast.success(translate("Đã xóa ảnh tùy chỉnh, trở về mặc định"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : translate("Xóa thất bại"));
+      toastConvexError(err, translate("Xóa thất bại"));
     }
   }
 

@@ -33,16 +33,8 @@ import type { GuildData } from "../lib/types";
 import LangSwitch from "../components/LangSwitch";
 import ExportCsvButton from "../components/dashboard/ExportCsvButton";
 
-import { dateLocale, translate } from "../lib/i18n";
-function formatDateTime(ts: number): string {
-  return new Date(ts).toLocaleString(dateLocale(), {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { translate } from "../lib/i18n";
+import { formatDateTime } from "../lib/utils";
 
 /** Chuyển ngày đầu/cuối theo múi giờ của người dùng, tránh lệch ngày ở Việt Nam. */
 function dateToTs(d: string, endOfDay: boolean): number | undefined {

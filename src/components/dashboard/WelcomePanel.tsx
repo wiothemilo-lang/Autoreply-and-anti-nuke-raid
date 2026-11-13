@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import {
   DoorClosed,
   Hash,
@@ -404,7 +405,7 @@ function ImageSlot({
       });
       toast.success(translate("Đã lưu ảnh — bot dùng ảnh mới trong khoảng 1 phút"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : translate("Tải ảnh thất bại"));
+      toastConvexError(err, translate("Tải ảnh thất bại"));
     } finally {
       setBusy(false);
     }
@@ -428,7 +429,7 @@ function ImageSlot({
       toast.success(translate("Đã lưu ảnh — bot dùng ảnh mới trong khoảng 1 phút"));
       setUrlDraft("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : translate("Lưu ảnh thất bại"));
+      toastConvexError(err, translate("Lưu ảnh thất bại"));
     } finally {
       setBusy(false);
     }
@@ -440,7 +441,7 @@ function ImageSlot({
       await removeImage({ token: TOKEN(), guildId, slot });
       toast.success(translate("Đã xoá ảnh"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : translate("Xoá ảnh thất bại"));
+      toastConvexError(err, translate("Xoá ảnh thất bại"));
     } finally {
       setBusy(false);
     }
@@ -1129,7 +1130,7 @@ export default function WelcomePanel({ data }: { data: GuildData }) {
       await updateSettings({ token: TOKEN(), guildId: g.discordId, ...patch });
       toast.success(msg);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 

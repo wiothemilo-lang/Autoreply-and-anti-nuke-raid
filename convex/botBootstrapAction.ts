@@ -9,6 +9,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { computeBotKey } from "./botAuth";
 import { BOT_SYNC_INTERVAL_MS } from "./heartbeat";
+import { bytesToHex, sha256Hex } from "./sha256";
 
 /**
  * TỰ CẤP PHÁT CHÌA KHÓA BOT (bootstrap) — đóng cửa hậu "botKeySeed chưa đặt
@@ -96,13 +97,6 @@ const KNOWN_GOOD_TOKEN_TTL_MS = 10 * 60_000;
  */
 let knownGoodToken: { hash: string; at: number } | null = null;
 
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 function isKnownGoodToken(hash: string): boolean {
   return Boolean(
     knownGoodToken &&
@@ -136,17 +130,8 @@ function allowBootstrapCall(): boolean {
 
 /**
  * Hex ngẫu nhiên 32 bytes — dùng webcrypto global (có trong cả Node 18+ actions
- * "use node" lẫn V8 runtime) + mã hex thủ công. KHÔNG dùng node:crypto để file
- * vẫn typecheck được trong chương trình TS của web (tsconfig.app không có types node).
+ * "use node" lẫn V8 runtime) + `bytesToHex` dùng chung với sha256.ts.
  */
-function randomHex32(): string {
-  const buf = new Uint8Array(32);
-  crypto.getRandomValues(buf);
-  let out = "";
-  for (const b of buf) out += b.toString(16).padStart(2, "0");
-  return out;
-}
-
 export const requestBotKey = action({
   args: { botToken: v.string() },
   handler: async (ctx, { botToken }): Promise<BootstrapResult> => {
@@ -155,7 +140,7 @@ export const requestBotKey = action({
     if (token.length > 200) {
       return { ok: false as const, error: "Token bot không hợp lệ (Discord từ chối)" };
     }
-    const tokenHash = await sha256Hex(token);
+    const tokenHash = sha256Hex(token);
     // Token lạ mới tiêu bucket chung — token thật đã xác minh trước đó được
     // miễn để token rác không khoá đường self-heal của bot.
     if (!isKnownGoodToken(tokenHash) && !allowBootstrapCall()) {
@@ -185,7 +170,7 @@ export const requestBotKey = action({
     // không thể khóa bot thật trong 10 phút chỉ bằng một request sai.
     const gate = await ctx.runMutation(internal.botBootstrap.markBootstrapAttempt);
     if (!gate.ok) return gate;
-    const botKey = randomHex32();
+    const botKey = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
     // computeBotKey = SHA-256("protogon-bot-key::" + key) — thuần TS, khớp protocol botAuth.
     const seed = computeBotKey(botKey);
     const stored = await ctx.runMutation(internal.botBootstrap.storeBotKeySeed, {

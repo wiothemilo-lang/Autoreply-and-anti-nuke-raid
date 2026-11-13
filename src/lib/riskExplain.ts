@@ -13,6 +13,8 @@
  *  - phân loại tín hiệu: ❌ mạnh / ⚠️ yếu / ✅ dấu hiệu tốt.
  */
 
+import { formatVars } from "./i18n";
+
 /** Nhãn tiếng Việt cho mã yếu tố rủi ro. Mã KHÔNG có ở đây → hiện nguyên mã. */
 export const RISK_FACTOR_LABEL: Record<string, string> = {
   account_age_1day: "Tài khoản mới tạo dưới 1 ngày",
@@ -91,13 +93,8 @@ export function explainRiskFactor(raw: string): {
   return { code, label: code, strength };
 }
 
-/** Thay placeholder `{p0}` — cùng cú pháp với `translate()` (lib/i18n.tsx). */
-export function formatLabel(label: string, vars?: Record<string, string | number>): string {
-  if (!vars) return label;
-  return label.replace(/\{(\w+)\}/g, (m, name) =>
-    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : m,
-  );
-}
+/** Thay placeholder `{p0}` — dùng chung `formatVars` với `translate()` (lib/i18n.tsx). */
+export const formatLabel = formatVars;
 
 /** Hình phạt → nhãn tiếng Việt (khớp `PUNISH_LABEL` ở panel chính). */
 export const ACTION_LABEL: Record<string, string> = {

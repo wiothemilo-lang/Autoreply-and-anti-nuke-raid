@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { KeyRound, Lock, ShieldCheck, ShieldX } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
@@ -77,7 +78,7 @@ export default function UnlockPanel({
         toast.error(translate("Sai mật khẩu rồi, thử lại nhé!"));
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Mở khóa thất bại"));
+      toastConvexError(e, translate("Mở khóa thất bại"));
     } finally {
       setChecking(false);
     }

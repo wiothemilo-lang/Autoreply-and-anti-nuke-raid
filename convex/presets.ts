@@ -132,8 +132,6 @@ export const SECURITY_PRESETS = {
   },
 } as const;
 
-export type PresetKey = keyof typeof SECURITY_PRESETS;
-
 /** Áp 1 preset cho guild — chỉ đụng antinukeModules + global an toàn (không whitelist). */
 export const applyPreset = mutation({
   args: {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { Crosshair, Database, Lock, ShieldAlert, Unlock } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Card, CardContent } from "../ui/card";
@@ -61,7 +62,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
       if (successMsg) toast.success(successMsg);
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false; // Switch tự trả núm về giá trị thật
     }
   }
@@ -74,7 +75,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
       );
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
       return false;
     }
   }
@@ -95,7 +96,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
         }),
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Áp preset thất bại"));
+      toastConvexError(e, translate("Áp preset thất bại"));
     } finally {
       setPresetApplying(null);
     }
@@ -112,7 +113,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
       );
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
       return false;
     }
   }
@@ -123,7 +124,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
       toast.success(translate("Đã lưu cài đặt khóa kênh"));
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     }
   }
@@ -133,7 +134,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
       await requestUnlock({ token: TOKEN(), guildId: data.guild.discordId });
       toast.success(translate("Đã yêu cầu mở khóa — bot thực hiện trong vài giây"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Thất bại"));
+      toastConvexError(e, translate("Thất bại"));
     }
   }
 
@@ -147,7 +148,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
       toast.success(translate("Đã lưu cài đặt Raid Intel — bot áp dụng trong khoảng 3 phút"));
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     }
   }
@@ -166,7 +167,7 @@ export default function AntiNukePanel({ data }: { data: GuildData }) {
           : translate("Đã tắt nhóm ({p0} module)", { p0: modules.length }),
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 

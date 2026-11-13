@@ -24,6 +24,7 @@
  * key = `${guildId}:${userId}` → thời điểm hết hạn (ms).
  */
 const { sendCaseLog } = require("./caseLog");
+const { formatDuration } = require("./util");
 
 const timeouts = new Map(); // key -> { until, durationMs } (ms)
 const timers = new Map(); // key -> setTimeout id
@@ -88,11 +89,7 @@ async function maybeLogExpired(guildId, userId, until, durationMs) {
   const extra = [];
   if (durationMs && durationMs > 0) {
     const mins = Math.round(durationMs / 60_000);
-    let durStr;
-    if (mins >= 1440) durStr = `${Math.round(mins / 1440)} ngày`;
-    else if (mins >= 60) durStr = `${Math.round(mins / 60)} giờ`;
-    else durStr = `${mins} phút`;
-    extra.push(`**Thời lượng ban đầu:** ${durStr}`);
+    extra.push(`**Thời lượng ban đầu:** ${formatDuration(mins)}`);
   }
   await sendCaseLog({
     guild,

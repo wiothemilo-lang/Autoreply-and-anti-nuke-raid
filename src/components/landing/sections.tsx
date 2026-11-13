@@ -25,17 +25,6 @@ import { Button } from "../ui/button";
 import { DashboardCta, SafeHaimiyaAvatar, fadeUp, stagger } from "./shared";
 
 import { translate } from "../../lib/i18n";
-/** Thanh nhiệt mini mô phỏng trong mockup chat. */
-function HeatBar({ value, color }: { value: number; color: string }) {
-  return (
-    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-      <div
-        className={`h-full rounded-full transition-all ${color}`}
-        style={{ width: `${value}%` }}
-      />
-    </div>
-  );
-}
 
 export function Features() {
   const items = [
@@ -584,5 +573,3 @@ export function CtaBanner() {
     </section>
   );
 }
-
-export { HeatBar };

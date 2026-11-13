@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
+import { toastConvexError } from "../../lib/toastError";
 import { ArrowDown, ArrowUp, ListPlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -188,7 +189,7 @@ export default function TicketKindsCard({
       );
       setDialogOpen(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     } finally {
       setSaving(false);
     }
@@ -199,7 +200,7 @@ export default function TicketKindsCard({
       await setKindEnabled({ token: TOKEN(), guildId: g.discordId, key: k.key, enabled });
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
       return false;
     }
   }
@@ -215,7 +216,7 @@ export default function TicketKindsCard({
         keyB: other.key,
       });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 
@@ -224,7 +225,7 @@ export default function TicketKindsCard({
       await removeKind({ token: TOKEN(), guildId: g.discordId, key: k.key });
       toast.success(translate('Đã xoá loại ticket "{p0}"', { p0: k.label }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : translate("Lưu thất bại"));
+      toastConvexError(e, translate("Lưu thất bại"));
     }
   }
 

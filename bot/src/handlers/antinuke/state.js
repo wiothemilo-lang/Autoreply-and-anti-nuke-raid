@@ -52,15 +52,22 @@ module.exports = function createAntiNukeState({ client, store }) {
   const staleUnlockSwept = new Set(); // guild key mốc đã quét (chống spam log mở khóa)
   const punishedRecently = new Map(); // `${guildId}:${module}:${userId}` -> ts (chống phạt/case lặp)
 
-  function record(guildId, module, cfg) {
-    const key = `${guildId}:${module}`;
-    const arr = buckets.get(key) ?? [];
+  /**
+   * Đẩy mốc thời gian vào bucket rồi cắt phần ngoài cửa sổ — một bản duy nhất
+   * cho `record` (mọi người) và `recordExempt` (từng executor được miễn).
+   */
+  function pushPrune(map, key, windowSeconds) {
+    const arr = map.get(key) ?? [];
     const now = Date.now();
     arr.push(now);
-    const cutoff = now - cfg.windowSeconds * 1000;
+    const cutoff = now - windowSeconds * 1000;
     const pruned = arr.filter((t) => t >= cutoff);
-    buckets.set(key, pruned);
+    map.set(key, pruned);
     return pruned.length;
+  }
+
+  function record(guildId, module, cfg) {
+    return pushPrune(buckets, `${guildId}:${module}`, cfg.windowSeconds);
   }
 
   /**
@@ -69,14 +76,7 @@ module.exports = function createAntiNukeState({ client, store }) {
    * giải thích ở khai báo `exemptBuckets`.
    */
   function recordExempt(guildId, module, cfg, executorId) {
-    const key = `${guildId}:${module}:${executorId}`;
-    const arr = exemptBuckets.get(key) ?? [];
-    const now = Date.now();
-    arr.push(now);
-    const cutoff = now - cfg.windowSeconds * 1000;
-    const pruned = arr.filter((t) => t >= cutoff);
-    exemptBuckets.set(key, pruned);
-    return pruned.length;
+    return pushPrune(exemptBuckets, `${guildId}:${module}:${executorId}`, cfg.windowSeconds);
   }
 
   /** Danh dau 1 vu da phat/hanh dong — window chong lap phat + lap case log. */
