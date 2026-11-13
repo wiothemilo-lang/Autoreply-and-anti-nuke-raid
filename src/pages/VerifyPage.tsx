@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -16,6 +16,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import LangSwitch from "../components/LangSwitch";
 import { api } from "../../convex/_generated/api";
+import { MIN_VERIFY_DWELL_MS } from "../../convex/verifyCrypto";
 import { convexSiteUrl } from "../lib/convexUrl";
 import { translate } from "../lib/i18n";
 
@@ -35,8 +36,8 @@ import { translate } from "../lib/i18n";
  */
 
 const COOKIE_KEY = "pg_vid";
-/** Ở trang ít nhất 1.5s mới coi là người thật — bot điền form thường nhanh hơn. */
-const MIN_DWELL_MS = 1500;
+/** Ở trang ít nhất 1.5s mới coi là người thật — bot điền form thường nhanh hơn.
+ *  Hằng số nằm ở convex/verifyCrypto để server và client không lệch nhau. */
 /** Ở lâu hơn ngưỡng này thì không bắt buộc phải có cử động (người dùng chậm). */
 const SLOW_HUMAN_MS = 4000;
 
@@ -143,6 +144,14 @@ async function buildFingerprint(): Promise<string> {
 export default function VerifyPage() {
   const { token = "" } = useParams();
   const session = useQuery(api.verify.getSession, token ? { token } : "skip");
+  const markServed = useMutation(api.verify.markServed);
+
+  // Báo server mốc trang đã mở — server dùng `servedAt` để chốt dwell. Gọi lại
+  // (StrictMode/F5) không đẩy mốc; lỗi mạng thì `complete` sẽ từ chối an toàn.
+  useEffect(() => {
+    if (!token) return;
+    void markServed({ token }).catch(() => {});
+  }, [token, markServed]);
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [message, setMessage] = useState("");
@@ -218,9 +227,9 @@ export default function VerifyPage() {
     // 3 điều kiện vô hình. Thiếu bất kỳ điều nào → server từ chối, không phạt.
     // Cử động chuột/chạm/phím là tín hiệu thật; người dùng chậm (đọc kỹ, mạng
     // lag) được miễn để không chặn oan — trước đây điều kiện `moved` bị vô hiệu
-    // vì `dwell >= MIN_DWELL_MS` đã bắt buộc ở vế trước.
+    // vì `dwell >= MIN_VERIFY_DWELL_MS` đã bắt buộc ở vế trước.
     const looksHuman =
-      dwell >= MIN_DWELL_MS &&
+      dwell >= MIN_VERIFY_DWELL_MS &&
       nav.webdriver !== true &&
       !honeypot.current?.value &&
       (moved.current || dwell >= SLOW_HUMAN_MS);

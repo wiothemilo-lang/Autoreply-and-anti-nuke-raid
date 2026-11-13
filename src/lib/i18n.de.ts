@@ -1575,6 +1575,8 @@ export const DE: Record<string, string> = {
   "Số tiền khác (VND)": "Anderer Betrag (VND)",
   "Không tạo được đơn thanh toán — thử lại sau ít phút.":
     "Zahlungsauftrag konnte nicht erstellt werden – bitte in wenigen Minuten erneut versuchen.",
+  "Cổng thanh toán trả về địa chỉ không hợp lệ — thử lại sau.":
+    "Das Zahlungsgateway hat eine ungültige Adresse zurückgegeben – bitte später erneut versuchen.",
   "Số tiền phải từ 10.000đ đến 100.000.000đ.":
     "Der Betrag muss zwischen 10.000 ₫ und 100.000.000 ₫ liegen.",
   "Thanh toán một lần qua ZaloPay — không lưu thông tin thẻ, không tự động trừ tiền.":

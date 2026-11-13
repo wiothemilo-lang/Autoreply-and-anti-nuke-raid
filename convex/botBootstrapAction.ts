@@ -81,6 +81,35 @@ type BootstrapResult =
 const bootstrapCalls: number[] = [];
 const BOOTSTRAP_WINDOW_MS = 60_000;
 const BOOTSTRAP_MAX_PER_WINDOW = 30;
+/** Token đã xác minh thành công được miễn trần trong 10 phút (xem handler). */
+const KNOWN_GOOD_TOKEN_TTL_MS = 10 * 60_000;
+
+/**
+ * Token bot đã từng xác minh THÀNH CÔNG trong instance này.
+ *
+ * Vì sao cần: trần 30 lượt/phút là bucket TOÀN CỤC (action không có IP ổn
+ * định). Kẻ gửi token rác có thể lấp đầy bucket, khiến bot thật không
+ * bootstrap lại được khi self-heal — đúng kiểu DoS khả dụng. Token thật đã
+ * qua Discord một lần thì được miễn trần; token lạ vẫn bị chặn trước khi gọi
+ * Discord (không đốt quota API). Vẫn xác minh lại với Discord mỗi lần để
+ * token bị thu hồi không được dùng tiếp.
+ */
+let knownGoodToken: { hash: string; at: number } | null = null;
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function isKnownGoodToken(hash: string): boolean {
+  return Boolean(
+    knownGoodToken &&
+    knownGoodToken.hash === hash &&
+    Date.now() - knownGoodToken.at < KNOWN_GOOD_TOKEN_TTL_MS,
+  );
+}
 
 /**
  * Guard chống xoay seed ngoài luồng — sự cố 06/10: một tiến trình khác có
@@ -121,13 +150,22 @@ function randomHex32(): string {
 export const requestBotKey = action({
   args: { botToken: v.string() },
   handler: async (ctx, { botToken }): Promise<BootstrapResult> => {
-    if (!allowBootstrapCall()) {
+    // Token Discord ~70 ký tự; cắt sớm để không băm chuỗi khổng lồ từ client.
+    const token = botToken.trim();
+    if (token.length > 200) {
+      return { ok: false as const, error: "Token bot không hợp lệ (Discord từ chối)" };
+    }
+    const tokenHash = await sha256Hex(token);
+    // Token lạ mới tiêu bucket chung — token thật đã xác minh trước đó được
+    // miễn để token rác không khoá đường self-heal của bot.
+    if (!isKnownGoodToken(tokenHash) && !allowBootstrapCall()) {
       return { ok: false, error: "Quá nhiều lượt bootstrap; thử lại sau ít phút" };
     }
-    const bot = await verifyDiscordBotToken(botToken);
+    const bot = await verifyDiscordBotToken(token);
     if (!bot) {
       return { ok: false as const, error: "Token bot không hợp lệ (Discord từ chối)" };
     }
+    knownGoodToken = { hash: tokenHash, at: Date.now() };
     const status = await ctx.runQuery(internal.botAuth.getBotKeyStatusInternal);
     const applicationError = assertExpectedBotApplication(bot, status.botApplicationId);
     if (applicationError) return { ok: false as const, error: applicationError };

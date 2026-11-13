@@ -22,11 +22,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { rateLimitPublicAction, __resetRateGuardForTest } from "../convex/rateGuard";
 import {
-  allowGeoRequest,
-  __resetGeoGuardForTest,
-  GEO_MAX_PER_IP_PER_MIN,
-  GEO_MAX_GLOBAL_PER_MIN,
-} from "../convex/geoGuard";
+  allowVerifyRequest,
+  __resetHttpRateGuardForTest,
+  VERIFY_MAX_PER_IP_PER_MIN,
+  VERIFY_MAX_GLOBAL_PER_MIN,
+} from "../convex/httpRateGuard";
 import { isPublicIp, parseClientIp } from "../convex/clientIp";
 import { isExternalAppSpam, messageFingerprint } from "../bot/src/externalAppGuard.js";
 import { isAuthLoopTarget, resolveAuthPageState } from "../src/lib/authRoute";
@@ -111,52 +111,52 @@ console.log("═══ MÔ PHỎNG TẤN CÔNG (offline — gọi hàm phòng th
   );
 }
 
-/* ── V3. Flood một IP vào /geo_lang ───────────────────────────────────────── */
+/* ── V3. Flood một IP vào /verify/complete ────────────────────────────────── */
 {
-  __resetGeoGuardForTest();
+  __resetHttpRateGuardForTest();
   const ATTEMPTS = 200;
   const ip = "198.51.100.9";
   let allowed = 0;
   let blockedFrom: number | null = null;
   for (let i = 1; i <= ATTEMPTS; i++) {
-    if (allowGeoRequest(ip, Date.now())) allowed++;
+    if (allowVerifyRequest(ip, Date.now())) allowed++;
     else {
       blockedFrom = i;
       break;
     }
   }
   record(
-    "Flood 1 IP → /geo_lang",
+    "Flood 1 IP → /verify/complete",
     ATTEMPTS,
     allowed,
     blockedFrom,
-    allowed === GEO_MAX_PER_IP_PER_MIN && blockedFrom === GEO_MAX_PER_IP_PER_MIN + 1,
-    `trần per-IP ${GEO_MAX_PER_IP_PER_MIN}/phút`,
+    allowed === VERIFY_MAX_PER_IP_PER_MIN && blockedFrom === VERIFY_MAX_PER_IP_PER_MIN + 1,
+    `trần per-IP ${VERIFY_MAX_PER_IP_PER_MIN}/phút`,
   );
 }
 
-/* ── V4. Botnet NHIỀU IP vào /geo_lang (trần toàn cục) ────────────────────── */
+/* ── V4. Botnet NHIỀU IP vào /verify/complete (trần toàn cục) ─────────────── */
 {
-  __resetGeoGuardForTest();
+  __resetHttpRateGuardForTest();
   const ATTEMPTS = 2_000;
   let allowed = 0;
   let blockedFrom: number | null = null;
   for (let i = 1; i <= ATTEMPTS; i++) {
     // Mỗi i một IP công cộng khác nhau → né trần per-IP.
     const ip = `9.9.${Math.floor(i / 250)}.${i % 250}`;
-    if (allowGeoRequest(ip, Date.now())) allowed++;
+    if (allowVerifyRequest(ip, Date.now())) allowed++;
     else {
       blockedFrom = i;
       break;
     }
   }
   record(
-    "Botnet nhiều IP → /geo_lang",
+    "Botnet nhiều IP → /verify/complete",
     ATTEMPTS,
     allowed,
     blockedFrom,
-    allowed === GEO_MAX_GLOBAL_PER_MIN && blockedFrom === GEO_MAX_GLOBAL_PER_MIN + 1,
-    `trần toàn cục ${GEO_MAX_GLOBAL_PER_MIN}/phút`,
+    allowed === VERIFY_MAX_GLOBAL_PER_MIN && blockedFrom === VERIFY_MAX_GLOBAL_PER_MIN + 1,
+    `trần toàn cục ${VERIFY_MAX_GLOBAL_PER_MIN}/phút`,
   );
 }
 

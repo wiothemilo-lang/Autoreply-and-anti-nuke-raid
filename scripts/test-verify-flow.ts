@@ -18,6 +18,7 @@ import {
   getSession,
   listLinks,
   listSessions,
+  markServed,
 } from "../convex/verify";
 import { complete as completeAction } from "../convex/verifyActions";
 import { authorize as preflightAuthorize } from "../convex/verifyPreflightData";
@@ -195,6 +196,7 @@ function makeCtx(guildOverrides: Row = {}) {
 
 const createH = (botCreateSession as any)._handler;
 const finalizeH = (finalize as any)._handler;
+const markServedH = (markServed as any)._handler;
 const getSessionH = (getSession as any)._handler;
 const claimH = (botClaimGrant as any)._handler;
 const finishH = (botFinishGrant as any)._handler;
@@ -246,6 +248,14 @@ function signalsFor(ip: string, fp: string, cookie: string, ua = "UA-Test") {
 }
 
 async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {}) {
+  // Trang verify luôn gọi markServed lúc mở; test mô phỏng người dùng đã ở
+  // trang >1,5s bằng cách đẩy mốc về quá khứ (server đọc `session.servedAt`).
+  await markServedH(ctx, { token });
+  const session = await ctx.db
+    .query("verifySessions")
+    .withIndex("by_tokenHash", (q: any) => q.eq("tokenHash", hashVerifyToken(token)))
+    .first();
+  if (session) await ctx.db.patch(session._id, { servedAt: Date.now() - 5_000 });
   return await finalizeH(ctx, {
     tokenHash: hashVerifyToken(token),
     sharedIp: false,
@@ -257,7 +267,7 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
 
 // Production đang TẠM KHOÁ thu thập IP (convex/ipCollectionLock.ts). Bộ test này
 // kiểm tra toàn bộ luồng verify nên bật cờ test — cùng khuôn với
-// `__resetGeoGuardForTest`. Cuối bộ test có một mục khoá lại để kiểm chính hàng rào.
+// `__resetHttpRateGuardForTest`. Cuối bộ test có một mục khoá lại để kiểm chính hàng rào.
 (globalThis as { __PROTOGON_IP_COLLECTION_TEST__?: boolean }).__PROTOGON_IP_COLLECTION_TEST__ =
   true;
 
@@ -404,6 +414,46 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     check("lý do human_check_failed", tables.verifySessions[0].reason === "human_check_failed");
     check("KHÔNG tự kick vì bẫy người-thật", !tables.verifySessions[0].punish);
     check("vẫn xếp việc để bot đóng phiên", tables.verifySessions[0].grantPending === true);
+  }
+
+  // ═══ 7b. Dwell do SERVER quyết định (không tin body.human) ═══
+  console.log("\n── finalize: dwell server-side ──");
+  {
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    const { token } = await newSession(ctx);
+    const res = await finalizeH(ctx, {
+      tokenHash: hashVerifyToken(token),
+      sharedIp: false,
+      human: true,
+      ...signalsFor("203.0.113.70", "fp-dwell-a", "ck-dwell-a"),
+    });
+    check(
+      "chưa mở trang (không có servedAt) → KHÔNG allow",
+      res.ok && res.decision === "deny",
+      res,
+    );
+    check(
+      "lý do human_check_failed khi thiếu servedAt",
+      tables.verifySessions[0].reason === "human_check_failed",
+    );
+  }
+  {
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    const { token } = await newSession(ctx);
+    await markServedH(ctx, { token });
+    const firstServedAt = tables.verifySessions[0].servedAt;
+    await markServedH(ctx, { token });
+    check(
+      "markServed lần 2 KHÔNG đẩy mốc về hiện tại",
+      tables.verifySessions[0].servedAt === firstServedAt,
+    );
+    const res = await finalizeH(ctx, {
+      tokenHash: hashVerifyToken(token),
+      sharedIp: false,
+      human: true,
+      ...signalsFor("203.0.113.71", "fp-dwell-b", "ck-dwell-b"),
+    });
+    check("mở trang rồi gửi ngay (<1,5s) → KHÔNG allow", res.ok && res.decision === "deny", res);
   }
 
   // ═══ 8. IP ban + action ban → ban ═══

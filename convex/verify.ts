@@ -24,6 +24,7 @@ import type { Id } from "./_generated/dataModel";
 import { canManageGuild, getUserByToken } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import {
+  MIN_VERIFY_DWELL_MS,
   VERIFY_CONSENT_VERSION,
   VERIFY_SESSION_TTL_MS,
   clampBanDays,
@@ -339,6 +340,33 @@ export const botCreateSession = mutation({
   },
 });
 
+/**
+ * Ghi mốc "trang đã được mở" — MỘT LẦN cho mỗi phiên.
+ *
+ * `getSession` là query nên không ghi được; trang verify gọi mutation này lúc
+ * mount. Chốt dwell nằm ở `finalize`: thiếu `servedAt` hoặc gửi quá sớm thì
+ * KHÔNG BAO GIỜ allow. Nhờ vậy script có token hợp lệ không thể bỏ qua bước mở
+ * trang rồi POST thẳng `human: true`.
+ */
+export const markServed = mutation({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    const token = args.token.trim();
+    if (!token || token.length > 128) return { ok: false as const };
+    const session = await ctx.db
+      .query("verifySessions")
+      .withIndex("by_tokenHash", (q) => q.eq("tokenHash", hashVerifyToken(token)))
+      .first();
+    if (!session || session.status !== "pending") return { ok: false as const };
+    if (session.expiresAt < Date.now()) return { ok: false as const };
+    // Chỉ ghi lần đầu: gọi lại (StrictMode, F5) không được đẩy mốc về hiện tại.
+    if (session.servedAt === undefined) {
+      await ctx.db.patch(session._id, { servedAt: Date.now() });
+    }
+    return { ok: true as const };
+  },
+});
+
 /** Action Node đọc phiên trước khi xử lý (không trả tokenHash ra ngoài phạm vi nội bộ). */
 export const getSessionForAction = internalQuery({
   args: { tokenHash: v.string() },
@@ -509,7 +537,13 @@ export const finalize = internalMutation({
 
     // Chốt chống lách: honeypot/bẫy người-thật không đạt thì KHÔNG BAO GIỜ allow,
     // kể cả khi mọi tín hiệu sạch. Đây là thứ thay captcha hình ảnh.
-    const humanFailed = !args.human && result.decision === "allow";
+    //
+    // Dwell do SERVER quyết định: `servedAt` do `markServed` ghi lúc trang mở,
+    // client không ghi đè được. Thiếu mốc (POST thẳng, không mở trang) hoặc gửi
+    // trước 1,5s đều tính là trượt — trước đây `body.human === true` là đủ.
+    const dwellOk =
+      typeof session.servedAt === "number" && Date.now() - session.servedAt >= MIN_VERIFY_DWELL_MS;
+    const humanFailed = (!args.human || !dwellOk) && result.decision === "allow";
 
     const decision = humanFailed ? "deny" : result.decision;
     const reason = humanFailed ? "human_check_failed" : (result.reasons[0] ?? "allow");

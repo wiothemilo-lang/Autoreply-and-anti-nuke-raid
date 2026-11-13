@@ -125,6 +125,46 @@ async function inkOf(png: Buffer) {
     }
   }
 
+  console.log("\n── SSRF qua REDIRECT: kiểm lại từng chặng ──");
+  {
+    const backupMod = require("../bot/src/handlers/backup");
+    const origAssert = backupMod.assertSafeRemoteUrl;
+    const origFetch = (globalThis as any).fetch;
+    const requested: string[] = [];
+    const redirects: unknown[] = [];
+    backupMod.assertSafeRemoteUrl = async (u: string) => {
+      const host = new URL(u).hostname;
+      if (host === "127.0.0.1" || host === "localhost") throw new Error("IP nội bộ");
+      return u;
+    };
+    (globalThis as any).fetch = async (u: string, init: { redirect?: string }) => {
+      requested.push(String(u));
+      redirects.push(init?.redirect);
+      return {
+        status: 302,
+        ok: false,
+        headers: {
+          get: (k: string) =>
+            k.toLowerCase() === "location" ? "http://127.0.0.1/secret.png" : null,
+        },
+        arrayBuffer: async () => basic,
+      };
+    };
+    try {
+      await card.renderCard({
+        eyebrow: "A",
+        name: "B",
+        meta: "C",
+        backgroundUrl: "https://example.test/chuyen-huong.png",
+      });
+      check("redirect sang 127.0.0.1 bị chặn, KHÔNG tải chặng 2", requested.length === 1);
+      check("fetch dùng redirect=manual (không để fetch tự đi theo)", redirects[0] === "manual");
+    } finally {
+      backupMod.assertSafeRemoteUrl = origAssert;
+      (globalThis as any).fetch = origFetch;
+    }
+  }
+
   console.log("\n── Emoji bị bỏ khỏi ẢNH (không vẽ ô tofu) ──");
   const FONT = "24px ProtogonCard";
   const drawable = (t: string) => card._drawableTextForTest(FONT, t);

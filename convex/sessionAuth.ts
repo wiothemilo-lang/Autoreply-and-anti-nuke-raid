@@ -177,13 +177,16 @@ export const exchangeAndLogin = action({
     // Chỉ lỗi NỘI BỘ bất ngờ (DB) mới ném ra ngoài.
     const fail = (reason: string) => ({ ok: false as const, reason });
 
-    const rl = checkLoginRateLimit("public");
-    if (rl) return fail(rl);
+    // Validate RẺ trước khi tiêu lượt rate-limit: code/redirect sai định dạng
+    // không được phép đốt bucket chung của mọi người (DoS đăng nhập). Chỉ
+    // request đã qua validate mới tiêu lượt gọi Discord.
     const redirectErr = checkAllowedRedirectUri(redirectUri);
     if (redirectErr) return fail(redirectErr);
     if (!hasValidOAuthParams(code, codeVerifier)) {
       return fail("Mã OAuth hoặc PKCE không hợp lệ");
     }
+    const rl = checkLoginRateLimit("public");
+    if (rl) return fail(rl);
 
     const status = await ctx.runQuery(internal.botAuth.getBotKeyStatusInternal).catch(() => null);
     const clientId =

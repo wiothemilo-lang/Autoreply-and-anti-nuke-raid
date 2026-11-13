@@ -92,6 +92,39 @@ if (!trimmedConvexUrl) {
 }
 process.env.VITE_CONVEX_URL = trimmedConvexUrl;
 
+// Cùng lớp bảo vệ cho HTTP actions: Vite sẽ nướng NGUYÊN VĂN giá trị vào bundle.
+// Bug thật 13/11: Vercel đặt VITE_CONVEX_SITE_URL=http://127.0.0.1:3211 → bundle
+// production gọi localhost, geo-detect chết và VerifyWebCard gửi Bearer session
+// token tới máy người dùng. Production chỉ nhận HTTPS *.convex.site; giá trị
+// localhost/rác bị XOÁ khỏi env để client tự lùi về đổi hậu tố.
+const rawSiteUrl = (process.env.VITE_CONVEX_SITE_URL ?? "").trim().replace(/\/+$/, "");
+let siteUrlForBuild = "";
+if (rawSiteUrl) {
+  try {
+    const parsedSiteUrl = new URL(rawSiteUrl);
+    const isLocal = /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(parsedSiteUrl.hostname);
+    const valid =
+      !isLocal &&
+      parsedSiteUrl.protocol === "https:" &&
+      /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.convex\.site$/i.test(parsedSiteUrl.hostname) &&
+      !parsedSiteUrl.username &&
+      !parsedSiteUrl.password &&
+      !parsedSiteUrl.search &&
+      !parsedSiteUrl.hash &&
+      (!parsedSiteUrl.pathname || parsedSiteUrl.pathname === "/");
+    if (!valid) throw new Error("phải là HTTPS *.convex.site, không localhost/path/query");
+    siteUrlForBuild = rawSiteUrl;
+  } catch (error) {
+    console.warn(
+      `[build] Bỏ VITE_CONVEX_SITE_URL không hợp lệ cho production (${error.message}) — client tự đổi hậu tố .cloud → .site.`,
+    );
+  }
+}
+// Ghi đè CẢ giá trị đến từ file .env: Vite đọc .env riêng và sẽ nướng nguyên
+// văn vào bundle dù process.env không có. Chuỗi rỗng = client bỏ qua biến này
+// và tự đổi hậu tố, nên không còn 127.0.0.1 trong JS production.
+process.env.VITE_CONVEX_SITE_URL = siteUrlForBuild;
+
 const rawClientId = process.env.VITE_DISCORD_CLIENT_ID || process.env.DISCORD_CLIENT_ID || "";
 const trimmedClientId = rawClientId.trim();
 if (rawClientId && !/^\d{15,21}$/.test(trimmedClientId)) {

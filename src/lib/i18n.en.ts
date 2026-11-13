@@ -1646,6 +1646,8 @@ export const EN: Record<string, string> = {
   "Số tiền khác (VND)": "Other amount (VND)",
   "Không tạo được đơn thanh toán — thử lại sau ít phút.":
     "Couldn't create the payment order — try again in a few minutes.",
+  "Cổng thanh toán trả về địa chỉ không hợp lệ — thử lại sau.":
+    "The payment gateway returned an invalid address — try again later.",
   "Số tiền phải từ 10.000đ đến 100.000.000đ.": "Amount must be between 10,000₫ and 100,000,000₫.",
   "Thanh toán một lần qua ZaloPay — không lưu thông tin thẻ, không tự động trừ tiền.":
     "One-time payment via ZaloPay — no card details stored, no automatic charges.",

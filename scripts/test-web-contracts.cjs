@@ -404,10 +404,13 @@ check(
 // origin khai báo sẵn trong môi trường, và origin đó chỉ được nhận đúng
 // https *.convex.site hoặc localhost — không mở vô điều kiện.
 check(
-  "convexSiteUrl ưu tiên VITE_CONVEX_SITE_URL (convex dev tách cổng 3210/3211)",
+  "convexSiteUrl ưu tiên VITE_CONVEX_SITE_URL nhưng bỏ localhost ngoài dev",
   /VITE_CONVEX_SITE_URL/.test(convexUrl) &&
     /CONVEX_SITE_HOST_RE/.test(convexUrl) &&
-    /if \(explicit\) return explicit;/.test(convexUrl),
+    /explicitIsLocal/.test(convexUrl) &&
+    /if \(explicit && \(import\.meta\.env\.DEV \|\| !explicitIsLocal\)\) return explicit;/.test(
+      convexUrl,
+    ),
 );
 check(
   "origin HTTP actions chỉ nhận https *.convex.site hoặc localhost",
@@ -729,67 +732,125 @@ check(
   ),
 );
 
-// ─── N. IP-detect ngôn ngữ ban đầu (không persist) ─────────────────────────
-// Bug thực tế: người quốc tế mở landing lần đầu vẫn đọc tiếng Việt vì web chỉ
-// theo navigator.language. Dò theo IP qua endpoint Convex /geo_lang (CSP chỉ
-// cho *.convex.cloud) — chỉ khi CHƯA có lựa chọn lưu, và KHÔNG ghi
-// localStorage (người dùng chưa từng chọn thì lần sau vẫn dò lại).
+// ─── N. KHÔNG dò ngôn ngữ theo IP + font tự host (quyền riêng tư) ──────────
+// 13/11/2026: endpoint /geo_lang gửi IP người dùng sang api.country.is ngay lần
+// đầu mở web, trước mọi consent và không có trong chính sách. Đã bỏ hẳn. Test
+// chặn tái diễn: không được xuất hiện lại lời gọi IP → bên thứ ba trong web.
 const i18nSrc = files.get("lib/i18n.tsx") ?? "";
 check(
-  "i18n.tsx có detectLangByIp gọi /geo_lang qua Convex (không fetch API ngoài trực tiếp)",
-  /export async function detectLangByIp/.test(i18nSrc) &&
-    /\/geo_lang/.test(i18nSrc) &&
-    /convexSiteUrl\(\)/.test(i18nSrc) &&
-    !/fetch\("https:\/\/api\.country/.test(i18nSrc),
-);
-// Bug thật 26/09: HTTP actions của Convex phục vụ ở .convex.site — fetch nhầm
-// .convex.cloud → 404 âm thầm (catch → null) → geo-detect chết dù test xanh.
-check(
-  "detectLangByIp gọi qua helper convexSiteUrl (không fetch .cloud trực tiếp)",
-  /convexSiteUrl\(\)/.test(i18nSrc) &&
-    !/resolveConvexUrl\(\)\s*;[\s\S]{0,120}\/geo_lang/.test(i18nSrc),
-);
-check(
-  "IP-detect chỉ áp dụng khi CHƯA có lựa chọn lưu, không ghi localStorage",
-  /if \(saved\) return;/.test(i18nSrc) &&
-    /setLangState\(detected\)/.test(i18nSrc) &&
-    !/localStorage\.setItem\(LANG_KEY, detected\)/.test(i18nSrc),
-);
-check(
-  "IP-detect chỉ ảnh hưởng ngôn ngữ hỗ trợ (VN→vi, DE/AT/CH/LI→de), còn lại giữ nguyên",
-  /country === "VN"/.test(i18nSrc) &&
-    /"AT"/.test(i18nSrc) &&
-    /"CH"/.test(i18nSrc) &&
-    /return null;/.test(i18nSrc),
+  "i18n.tsx KHÔNG còn detectLangByIp / /geo_lang (không gửi IP trước consent)",
+  !/detectLangByIp/.test(i18nSrc) && !/\/geo_lang/.test(i18nSrc) && !/country\.is/.test(i18nSrc),
 );
 const httpSrc = fs.readFileSync(path.join(ROOT, "convex", "http.ts"), "utf8");
 check(
-  "convex/http.ts route /geo_lang: đọc x-forwarded-for, fail-open về country rỗng",
-  /x-forwarded-for/.test(httpSrc) &&
-    /api\.country\.is/.test(httpSrc) &&
-    /httpRouter\(\)/.test(httpSrc) &&
-    /country: ""/.test(httpSrc),
+  "convex/http.ts KHÔNG còn route /geo_lang hay proxy api.country.is",
+  !/\/geo_lang/.test(httpSrc) && !/api\.country\.is/.test(httpSrc),
+);
+const indexHtmlSrc = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+check(
+  "index.html KHÔNG nạp Google Fonts (không gửi IP/UA sang Google)",
+  !/fonts\.googleapis\.com/.test(indexHtmlSrc) && !/fonts\.gstatic\.com/.test(indexHtmlSrc),
+);
+const indexCssSrc = fs.readFileSync(path.join(ROOT, "src", "index.css"), "utf8");
+check(
+  "index.css khai @font-face tự host cho Inter + JetBrains Mono",
+  /@font-face/.test(indexCssSrc) &&
+    /font-family: "Inter"/.test(indexCssSrc) &&
+    /font-family: "JetBrains Mono"/.test(indexCssSrc) &&
+    /\/fonts\/inter-latin\.woff2/.test(indexCssSrc),
+);
+const fontDir = path.join(ROOT, "public", "fonts");
+const fontFiles = fs.existsSync(fontDir) ? fs.readdirSync(fontDir) : [];
+check(
+  "public/fonts có đủ woff2 + license OFL (tự host hợp lệ)",
+  ["inter-latin.woff2", "inter-vietnamese.woff2", "jetbrains-mono-latin.woff2"].every((f) =>
+    fontFiles.includes(f),
+  ) &&
+    fontFiles.some((f) => /^OFL-Inter/i.test(f)) &&
+    fontFiles.some((f) => /^OFL-JetBrainsMono/i.test(f)),
+);
+
+// ─── N2. Gia cố bảo mật web 13/11/2026 ─────────────────────────────────────
+// Các lỗi đã audit: rate-limit bị đốt bởi request rác trước khi validate,
+// bootstrap bot bị khoá bởi token spam, dwell do client khai, SSRF qua redirect,
+// URL `javascript:` từ API bên ngoài. Test khoá THỨ TỰ/đường đi, không chỉ tên hàm.
+const sessionAuthSrc = fs.readFileSync(path.join(ROOT, "convex", "sessionAuth.ts"), "utf8");
+check(
+  "sessionAuth: validate redirect + OAuth params TRƯỚC khi tiêu bucket login",
+  /checkAllowedRedirectUri\(redirectUri\);[\s\S]{0,500}?checkLoginRateLimit\("public"\)/.test(
+    sessionAuthSrc,
+  ),
+);
+const bootstrapSrc = fs.readFileSync(path.join(ROOT, "convex", "botBootstrapAction.ts"), "utf8");
+check(
+  "bootstrap: token đã xác minh được miễn trần (token rác không khoá self-heal)",
+  /sha256Hex\(token\)/.test(bootstrapSrc) &&
+    /isKnownGoodToken\(tokenHash\)/.test(bootstrapSrc) &&
+    /knownGoodToken = \{ hash: tokenHash/.test(bootstrapSrc) &&
+    /verifyDiscordBotToken\(token\)/.test(bootstrapSrc),
+);
+const verifySrc = fs.readFileSync(path.join(ROOT, "convex", "verify.ts"), "utf8");
+check(
+  "verify: dwell do server quyết định qua servedAt + MIN_VERIFY_DWELL_MS",
+  /export const markServed = mutation/.test(verifySrc) &&
+    /session\.servedAt/.test(verifySrc) &&
+    /MIN_VERIFY_DWELL_MS/.test(verifySrc) &&
+    /!args\.human \|\| !dwellOk/.test(verifySrc),
+);
+const verifyPageHardenedSrc = fs.readFileSync(
+  path.join(ROOT, "src", "pages", "VerifyPage.tsx"),
+  "utf8",
 );
 check(
-  "/geo_lang không lưu DB hay IP (chỉ pass-through), có CORS + cache",
-  !/ctx\.db/.test(httpSrc) &&
-    /access-control-allow-origin/.test(httpSrc) &&
-    /cache-control/.test(httpSrc),
+  "VerifyPage: báo markServed lúc mở trang + dùng chung hằng dwell với server",
+  /markServed\(\{ token \}\)/.test(verifyPageHardenedSrc) &&
+    /MIN_VERIFY_DWELL_MS/.test(verifyPageHardenedSrc),
 );
-// Bug thật 28/09/2026: đáp án theo IP từng người gọi nhưng gửi kèm
-// `Cache-Control: public, max-age=86400` — cache dùng chung (CDN/proxy) được
-// phép đưa đáp án của người A cho người B. Phải `private`.
-check(
-  "cache /geo_lang là PRIVATE (đáp án theo IP từng người, không cho cache dùng chung)",
-  /const CACHE_OK = "private, max-age=/.test(httpSrc) &&
-    /const CACHE_MISS = "private, max-age=/.test(httpSrc) &&
-    !/cache-control[^"]*public|public, max-age/.test(httpSrc),
+const welcomeCardHardenedSrc = fs.readFileSync(
+  path.join(ROOT, "bot", "src", "handlers", "welcomeCard.js"),
+  "utf8",
 );
-// Route phải được đăng ký đúng method — codegenConvex không chặn việc quên route.
 check(
-  "/geo_lang đăng ký đủ GET + OPTIONS",
-  /path: "\/geo_lang", method: "GET"/.test(httpSrc) &&
-    /path: "\/geo_lang", method: "OPTIONS"/.test(httpSrc),
+  "welcomeCard: fetch redirect=manual + kiểm lại TỪNG chặng (chống SSRF redirect)",
+  /redirect: "manual"/.test(welcomeCardHardenedSrc) &&
+    /assertSafeRemoteUrl\(new URL\(location, target\)/.test(welcomeCardHardenedSrc),
+);
+const paymentsSrc = fs.readFileSync(path.join(ROOT, "convex", "paymentsAction.ts"), "utf8");
+check(
+  "paymentsAction: order_url phải HTTPS + host zalopay.vn trước khi trả client",
+  /safeZaloPayUrl\(data\.order_url\)/.test(paymentsSrc) && /ZALOPAY_HOST_RE/.test(paymentsSrc),
+);
+const backupWritesSrc = fs.readFileSync(
+  path.join(ROOT, "convex", "bot_writes", "backup.ts"),
+  "utf8",
+);
+check(
+  "botSetBackupGithub: chỉ lưu URL HTTPS thuộc GitHub (chặn javascript: trong href)",
+  /allowedHosts\.has\(parsed\.hostname\.toLowerCase\(\)\)/.test(backupWritesSrc),
+);
+const donateHardenedSrc = fs.readFileSync(
+  path.join(ROOT, "src", "pages", "DonatePage.tsx"),
+  "utf8",
+);
+const backupPanelHardenedSrc = fs.readFileSync(
+  path.join(ROOT, "src", "components", "dashboard", "BackupPanel.tsx"),
+  "utf8",
+);
+check(
+  "UI kiểm lại allowlist trước khi redirect/mở link (lớp hai)",
+  /safeZaloPayUrl\(r\.paymentUrl\)/.test(donateHardenedSrc) &&
+    /safeGithubUrl\(url\)/.test(backupPanelHardenedSrc),
+);
+const convexUrlSrc = fs.readFileSync(path.join(ROOT, "src", "lib", "convexUrl.ts"), "utf8");
+check(
+  "convexSiteUrl: production bỏ qua VITE_CONVEX_SITE_URL localhost (không bake 127.0.0.1)",
+  /explicitIsLocal/.test(convexUrlSrc) &&
+    /import\.meta\.env\.DEV \|\| !explicitIsLocal/.test(convexUrlSrc),
+);
+const buildSrc = fs.readFileSync(path.join(ROOT, "scripts", "build.mjs"), "utf8");
+check(
+  "build: VITE_CONVEX_SITE_URL localhost/rác bị xoá khỏi bundle production",
+  /process\.env\.VITE_CONVEX_SITE_URL = siteUrlForBuild/.test(buildSrc),
 );
 
 // ─── O. Trang /features — SEO quốc tế ────────────────────────────────
@@ -2486,6 +2547,15 @@ check(
     "script-src chỉ 'self' (không unsafe-inline/unsafe-eval/wildcard)",
     scriptSrc.length === 1 && scriptSrc[0] === "'self'",
     JSON.stringify(scriptSrc),
+  );
+  const styleSrc = sec.CSP_DIRECTIVES.find(([d]) => d === "style-src")?.[1] ?? [];
+  const fontSrc = sec.CSP_DIRECTIVES.find(([d]) => d === "font-src")?.[1] ?? [];
+  check(
+    "style-src/font-src KHÔNG còn Google Fonts (font tự host cùng origin)",
+    !styleSrc.some((s) => /fonts\\.googleapis\\.com/.test(s)) &&
+      fontSrc.length === 1 &&
+      fontSrc[0] === "'self'",
+    JSON.stringify({ styleSrc, fontSrc }),
   );
   check(
     "connect-src phủ Convex (https + wss) và Discord OAuth",

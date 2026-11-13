@@ -33,9 +33,27 @@ import type { GuildData, BackupInfo } from "../../lib/types";
 import { MIN_IMPORT_BOT_VERSION } from "../../lib/constants";
 import { getSessionToken } from "../../lib/discord";
 import { judgeJobWatch, type JobWatch } from "../../lib/backupWatch";
+import { safeGithubUrl } from "../../lib/safeUrl";
 
 import { dateLocale, translate } from "../../lib/i18n";
 const TOKEN = () => getSessionToken();
+
+/**
+ * Link Gist chỉ render khi URL qua allowlist HTTPS + host GitHub.
+ * `githubUrl` đến từ action GitHub (dữ liệu ngoài) — nếu bị đổi thành
+ * `javascript:` thì href trở thành XSS khi bấm.
+ */
+function GistLink({ url }: { url: string | null }) {
+  const href = url ? safeGithubUrl(url) : null;
+  if (!href) return null;
+  return (
+    <a href={href} target="_blank" rel="noreferrer">
+      <Button variant="secondary" size="sm">
+        <ExternalLink className="h-3.5 w-3.5" /> Gist
+      </Button>
+    </a>
+  );
+}
 
 /** "v47" → 47; "1.0.0"/khác → 0 (coi là bản cũ). */
 function parseBotVersion(v: string | null): number {
@@ -1442,13 +1460,7 @@ function BackupListCard({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {b.githubUrl && (
-                    <a href={b.githubUrl} target="_blank" rel="noreferrer">
-                      <Button variant="secondary" size="sm">
-                        <ExternalLink className="h-3.5 w-3.5" /> Gist
-                      </Button>
-                    </a>
-                  )}
+                  <GistLink url={b.githubUrl} />
                   <Button
                     variant="outline"
                     size="sm"

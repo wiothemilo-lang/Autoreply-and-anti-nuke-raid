@@ -112,6 +112,23 @@ function status(over: Partial<Status>): Status {
     );
   }
 
+  // 2b. Token rác lấp đầy bucket KHÔNG được khoá token thật đã xác minh.
+  //     Đây là DoS khả dụng: bucket là toàn cục vì action không có IP ổn định.
+  {
+    mockFetch(false);
+    const { ctx } = makeCtx(status({ lastHeartbeat: Date.now() - 10 * 60_000 }));
+    for (let i = 0; i < 40; i++) {
+      await handler(ctx, { botToken: `token-rac-${i}` });
+    }
+    mockFetch(true);
+    const res: any = await handler(ctx, { botToken: "token-that" });
+    check(
+      "bucket đầy bởi token rác → token thật vẫn bootstrap được",
+      res?.ok === true,
+      JSON.stringify({ ok: res?.ok, error: res?.error }),
+    );
+  }
+
   // 3. Chưa có seed → heartbeat mới vẫn cho bootstrap (chưa có gì để bảo vệ).
   {
     mockFetch(true);
