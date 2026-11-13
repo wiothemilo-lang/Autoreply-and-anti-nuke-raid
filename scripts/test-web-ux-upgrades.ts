@@ -29,6 +29,7 @@ import {
 import { ensureDictionary, lookupTranslation, translate } from "../src/lib/i18n";
 import { safeRedirectPath } from "../src/lib/discord";
 import { friendlyConvexError } from "../src/lib/convexError";
+import { safeGithubUrl, safeZaloPayUrl } from "../src/lib/safeUrl";
 import { AVATAR_MAX_DIM, planAvatarResize } from "../src/lib/avatarImage";
 import { CHUNK_RELOAD_COOLDOWN_MS, installStaleChunkRecovery } from "../src/lib/staleChunk";
 import { hiddenUnlockKey } from "../src/lib/hiddenUnlock";
@@ -1558,6 +1559,32 @@ console.log("── #17 friendlyConvexError ──");
 check("hiddenUnlockKey ổn định và không phụ thuộc server", () => {
   const k = hiddenUnlockKey();
   return k === "protogon_hidden_unlocked" && !/guild|\d{15,}/i.test(k);
+});
+
+// ── Allowlist URL mở từ dữ liệu server (chống javascript:/host lạ) ──────────
+check("ZaloPay: https + host *.zalopay.vn được nhận", () => {
+  return (
+    safeZaloPayUrl("https://sbgateway.zalopay.vn/v2/create?x=1") !== null &&
+    safeZaloPayUrl("https://zalopay.vn/thanh-toan") !== null
+  );
+});
+check("ZaloPay: http/javascript/host giả bị từ chối", () => {
+  return (
+    safeZaloPayUrl("http://gateway.zalopay.vn/x") === null &&
+    safeZaloPayUrl("javascript:alert(1)") === null &&
+    safeZaloPayUrl("https://gateway.zalopay.vn.evil.com/x") === null &&
+    safeZaloPayUrl("https://evil.com/?next=zalopay.vn") === null &&
+    safeZaloPayUrl("https://user:pass@gateway.zalopay.vn/x") === null
+  );
+});
+check("GitHub: chỉ https + host gist/github chính chủ", () => {
+  return (
+    safeGithubUrl("https://gist.github.com/user/abc123") !== null &&
+    safeGithubUrl("https://github.com/user/repo") !== null &&
+    safeGithubUrl("https://github.com.evil.com/x") === null &&
+    safeGithubUrl("javascript:alert(1)") === null &&
+    safeGithubUrl("data:text/html,<script>alert(1)</script>") === null
+  );
 });
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);

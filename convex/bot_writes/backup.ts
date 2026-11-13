@@ -206,8 +206,28 @@ export async function botSetBackupGithubHandler(
   await requireBotKeyStrict(ctx, botKey);
   const backup = await ctx.db.get(backupId);
   if (!backup) return { ok: true };
+  // URL này được dashboard render thành href. Dữ liệu do action GitHub trả về
+  // nhưng vẫn là dữ liệu ngoài: chỉ nhận HTTPS + host GitHub, tránh lưu
+  // `javascript:`/host lạ rồi biến link "Gist" thành XSS khi bấm.
+  const parsed = (() => {
+    try {
+      return new URL(url.trim());
+    } catch {
+      return null;
+    }
+  })();
+  const allowedHosts = new Set(["gist.github.com", "github.com", "www.github.com"]);
+  if (
+    !parsed ||
+    parsed.protocol !== "https:" ||
+    parsed.username ||
+    parsed.password ||
+    !allowedHosts.has(parsed.hostname.toLowerCase())
+  ) {
+    return { ok: false, error: "URL GitHub không hợp lệ" };
+  }
   await ctx.db.patch(backup._id, {
-    githubUrl: url.slice(0, 500),
+    githubUrl: parsed.toString().slice(0, 500),
     pushedToGithub: true,
   });
   return { ok: true };

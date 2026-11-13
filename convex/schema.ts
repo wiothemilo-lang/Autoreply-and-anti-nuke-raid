@@ -1269,6 +1269,12 @@ export default defineSchema({
     /** Bot xác nhận thành viên này là owner/admin/bot → không bao giờ auto-ban. */
     privileged: v.optional(v.boolean()),
     createdAt: v.number(),
+    /**
+     * Lúc trang verify được mở — server ghi MỘT LẦN qua `verify.markServed`.
+     * Dùng để chốt dwell phía server; client không được ghi đè (nếu ghi lại
+     * được thì script reset mốc rồi gửi ngay).
+     */
+    servedAt: v.optional(v.number()),
     /** Hết hạn sau 10 phút; token dùng một lần. */
     expiresAt: v.number(),
     /** Lúc trình duyệt hoàn tất — null/undefined = chưa dùng. */

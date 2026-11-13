@@ -18,6 +18,13 @@
   sau khi có người đứng tên + nộp DPIA/CTIA. `IP_HASH_SECRET` vẫn ở
   `~/.secrets/protogon-ip-hash-secret` 0600 — chuyển vào password manager rồi xoá.
 
+- 🚧 **PR gia cố web 13/11/2026 (`fix/web-security-privacy-hardening`)**: P1
+  (localhost trong bundle), P2 (bỏ geo-detect + font Google), P3–P8 đã vá + test.
+  **Còn**: mở PR → CI xanh → merge → CI deploy Convex; người dùng sửa
+  `VITE_CONVEX_SITE_URL` trên Vercel (code đã fail-closed nên không chặn deploy).
+  P8 (ghim CSP) hoãn có lý do trong `docs/decision-log.md`; P9/P10 (token trong
+  localStorage, `OWNER_SEED` đi qua browser) vẫn backlog.
+
 - ✅ **XFF production đã xác nhận (12/11/2026)** — self-test trên edge
   `accomplished-chipmunk-74.convex.site` trả `ip.source=xff`, `chainLength=1`,
   `spoofRisk=false`; gửi `x-forwarded-for: 8.8.8.8` và `9.9.9.9` tới
@@ -95,6 +102,24 @@
 ---
 
 ---
+
+## 2026-11-13 (1) — PR gia cố bảo mật web + bỏ geo-detect/font Google
+
+- 🔐 Vá P3–P8 sau audit web: validate OAuth/redirect trước khi tiêu bucket login;
+  token bot đã xác minh được miễn trần bootstrap (chống DoS self-heal); dwell
+  verify do server quyết định (`servedAt` + `MIN_VERIFY_DWELL_MS`, thiếu mốc →
+  deny); `welcomeCard` kiểm lại TỪNG chặng redirect (SSRF); allowlist HTTPS
+  cho `paymentUrl`/`githubUrl` ở cả Convex lẫn UI.
+- 🕵️ Bỏ hẳn geo-detect (`/geo_lang` + `country.is`) và Google Fonts — IP người
+  dùng không còn đi sang bên thứ ba trước consent; tự host Inter/JetBrains Mono
+  (OFL, `public/fonts/`), CSP `font-src 'self'`. `convex/geoGuard.ts` đổi tên
+  `httpRateGuard.ts` (chỉ còn trần verify/self-test).
+- 🐛 Vá P1: production bỏ qua `VITE_CONVEX_SITE_URL` localhost; `build.mjs` ghi
+  đè chuỗi rỗng để `.env` không bake `127.0.0.1:3211` (dist đã xác minh 0 lần).
+- 🧪 90/90 CJS · 34/34 TS · coverage 95,67% + sàn engine xanh · typecheck/lint/
+  format + 9 cổng hợp đồng sạch; `bun run build` OK (font copy, CSP đúng).
+- ▶️ Tiếp theo: PR → CI → merge → CI deploy Convex; nhắc RFTV đổi Verify sang
+  Button/Captcha và sửa env Vercel (việc của người dùng).
 
 ## 2026-11-12 (7) — Vá công tắc module biến mất trên dashboard
 

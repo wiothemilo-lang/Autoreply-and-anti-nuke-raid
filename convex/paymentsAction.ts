@@ -48,6 +48,26 @@ function paymentError(code: string, message: string): ConvexError<PaymentErrorDa
   return new ConvexError({ code, message });
 }
 
+const ZALOPAY_HOST_RE = /(^|\.)zalopay\.vn$/i;
+
+/**
+ * Chỉ trả URL thanh toán HTTPS thuộc ZaloPay. Response API là dữ liệu bên
+ * ngoài: nếu bị đổi thành `javascript:`/host lạ thì client redirect là chạy
+ * script trong origin dashboard. Kiểm ở server (nguồn) + client (lớp hai).
+ */
+function safeZaloPayUrl(raw: unknown): string | null {
+  const value = String(raw ?? "").trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (!ZALOPAY_HOST_RE.test(url.hostname)) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 type OrderConfig = { appId: string; key1: string; baseUrl: string };
 
 /**
@@ -199,8 +219,19 @@ export const startPayment = action({
       );
     }
     if (data && data.return_code === 1 && data.order_url) {
+      const paymentUrl = safeZaloPayUrl(data.order_url);
+      if (!paymentUrl) {
+        await ctx.runMutation(internal.payments.recordErrorInternal, {
+          appTransId: intent.appTransId,
+          error: "create: order_url không phải HTTPS thuộc zalopay.vn — từ chối redirect",
+        });
+        throw paymentError(
+          "ZALOPAY_REJECTED",
+          "Cổng thanh toán trả về địa chỉ không hợp lệ — thử lại sau ít phút.",
+        );
+      }
       return {
-        paymentUrl: String(data.order_url),
+        paymentUrl,
         appTransId: intent.appTransId,
         amount: intent.amount,
       };

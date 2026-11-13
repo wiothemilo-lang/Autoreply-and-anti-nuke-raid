@@ -82,6 +82,12 @@ function normalizeConvexSiteUrl(raw: string | null | undefined): string | null {
  */
 export function convexSiteUrl(raw: string | null | undefined = resolveConvexUrl()): string {
   const explicit = normalizeConvexSiteUrl(import.meta.env.VITE_CONVEX_SITE_URL);
-  if (explicit) return explicit;
+  // Production TUYỆT ĐỐI không được trỏ HTTP actions về máy người dùng: bundle
+  // từng bake `http://127.0.0.1:3211` (env Vercel sai) khiến mọi fetch chết và
+  // VerifyWebCard gửi kèm Bearer session token tới localhost. Bỏ qua giá trị
+  // localhost ngoài môi trường dev rồi lùi về đổi hậu tố (.cloud → .site).
+  const explicitIsLocal =
+    explicit !== null && /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(explicit);
+  if (explicit && (import.meta.env.DEV || !explicitIsLocal)) return explicit;
   return resolveConvexUrl(raw).replace(/\.convex\.cloud$/i, ".convex.site");
 }

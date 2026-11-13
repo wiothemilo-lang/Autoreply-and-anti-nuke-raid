@@ -50,15 +50,15 @@ Không cần đoán "hệ thống có chống được DDoS không" — mỗi l�
 đã nằm trong repo **kèm test chứng minh**. Cột cuối là lệnh bạn tự chạy để thấy nó
 hoạt động.
 
-| Lớp                            | Kẻ tấn công làm gì                                                    | Chốt phòng thủ (tệp)                                                                                                   | Bằng chứng (lệnh)                          |
-| ------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Web tĩnh (dashboard)           | Chèn script lạ, clickjacking, dò MIME                                 | CSP + security headers — `scripts/security-headers.cjs` (chèn qua `scripts/build.mjs`)                                 | `node scripts/test-web-contracts.cjs`      |
-| Convex action **public**       | Spam `publicConfig` / `aiStatus` / `/geo_lang` để đốt usage free tier | Trần mỗi danh tính **+ trần toàn cục** — `convex/rateGuard.ts`; trần mỗi IP **+ toàn cục** — `convex/geoGuard.ts`      | `bun scripts/test-rate-guard.ts`           |
-| Đăng nhập / refresh OAuth      | Brute-force login, spam đổi mới phiên                                 | `checkLoginRateLimit` (20 lượt/phút) — `convex/sessionAuth.ts`; phiên — `convex/sessionHardening.ts`, `convex/auth.ts` | `bun run test:ts`                          |
-| Giả mạo bot để đọc dữ liệu     | Gọi `botGetPending` / `getBotConfig` với botKey giả                   | `requireBotKeyStrict` — `convex/botAuth.ts` (KHÔNG còn đường back-compat)                                              | `node scripts/test-security-hardening.cjs` |
-| Bot: raid / spam / mass-join   | Flood tin, đăng app ngoài để lừa, kéo hàng loạt acc                   | `bot/src/externalAppGuard.js` + `bot/src/handlers/antinuke/*` (heat, joinGate, alt)                                    | `node scripts/test-external-app-guard.cjs` |
-| VPS: đốt RAM / treo tiến trình | Tích lũy state trong RAM cho tới khi bot chết                         | `bot/src/memGuard.js` + `bot/src/sweeper.js` (dọn tập trung, KHÔNG timer rời)                                          | `node scripts/test-resource-guard.cjs`     |
-| Lộ secret trong git            | Commit lộ token/key                                                   | gitleaks (job `security` trong CI) + `bun audit` chặn CVE critical                                                     | CI (GitHub Actions)                        |
+| Lớp                            | Kẻ tấn công làm gì                                                           | Chốt phòng thủ (tệp)                                                                                                   | Bằng chứng (lệnh)                          |
+| ------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Web tĩnh (dashboard)           | Chèn script lạ, clickjacking, dò MIME                                        | CSP + security headers — `scripts/security-headers.cjs` (chèn qua `scripts/build.mjs`)                                 | `node scripts/test-web-contracts.cjs`      |
+| Convex action **public**       | Spam `publicConfig` / `aiStatus` / `/verify/complete` để đốt usage free tier | Trần mỗi danh tính **+ trần toàn cục** — `convex/rateGuard.ts`; trần mỗi IP **+ toàn cục** — `convex/httpRateGuard.ts` | `bun scripts/test-rate-guard.ts`           |
+| Đăng nhập / refresh OAuth      | Brute-force login, spam đổi mới phiên                                        | `checkLoginRateLimit` (20 lượt/phút) — `convex/sessionAuth.ts`; phiên — `convex/sessionHardening.ts`, `convex/auth.ts` | `bun run test:ts`                          |
+| Giả mạo bot để đọc dữ liệu     | Gọi `botGetPending` / `getBotConfig` với botKey giả                          | `requireBotKeyStrict` — `convex/botAuth.ts` (KHÔNG còn đường back-compat)                                              | `node scripts/test-security-hardening.cjs` |
+| Bot: raid / spam / mass-join   | Flood tin, đăng app ngoài để lừa, kéo hàng loạt acc                          | `bot/src/externalAppGuard.js` + `bot/src/handlers/antinuke/*` (heat, joinGate, alt)                                    | `node scripts/test-external-app-guard.cjs` |
+| VPS: đốt RAM / treo tiến trình | Tích lũy state trong RAM cho tới khi bot chết                                | `bot/src/memGuard.js` + `bot/src/sweeper.js` (dọn tập trung, KHÔNG timer rời)                                          | `node scripts/test-resource-guard.cjs`     |
+| Lộ secret trong git            | Commit lộ token/key                                                          | gitleaks (job `security` trong CI) + `bun audit` chặn CVE critical                                                     | CI (GitHub Actions)                        |
 
 > Điểm mấu chốt: các trần rate-limit là **in-memory** (sống trong 1 instance) — đủ
 > chặn scripted burst và botnet phân tán ở mức thực tế, **không phải** giải pháp
@@ -84,8 +84,8 @@ quả in ra bảng:
 Kịch bản tấn công                                  Lượt   Cho qua   Chặn từ   Kết
 Flood 1 danh tính → publicConfig                   400       30       31   ✅  trần per-identity 30/phút
 Botnet xoay danh tính → publicConfig              5000      600      601   ✅  trần toàn cục 600/phút chặn botnet phân tán
-Flood 1 IP → /geo_lang                             200       20       21   ✅  trần per-IP 20/phút
-Botnet nhiều IP → /geo_lang                       2000      300      301   ✅  trần toàn cục 300/phút
+Flood 1 IP → /verify/complete                         200       10       11   ✅  trần per-IP 10/phút
+Botnet nhiều IP → /verify/complete                   2000      300      301   ✅  trần toàn cục 300/phút
 Dò cửa hậu botKey                                    6        6        —   ✅  mọi hàm nhạy cảm dùng requireBotKeyStrict
 Flood tin qua app ngoài → bot                        4        2        2   ✅  phát hiện từ tin thứ 2
 Ép vòng lặp /auth (phiên còn sống)                   7        4        —   ✅  chặn mọi đích tự-quay-lại

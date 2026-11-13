@@ -1,8 +1,8 @@
 /**
- * Chuẩn hoá IP client từ header proxy — dùng chung cho `/geo_lang`,
- * `/verify/complete` và `/verify/self-test`.
+ * Chuẩn hoá IP client từ header proxy — dùng chung cho `/verify/complete`
+ * và `/verify/self-test`.
  *
- * Vì sao tách khỏi `geoGuard.ts`: geoGuard chỉ lo trần tần suất; quy tắc
+ * Vì sao tách khỏi `httpRateGuard.ts`: file đó chỉ lo trần tần suất; quy tắc
  * "tin mục nào của X-Forwarded-For" là ranh giới bảo mật của verify, phải
  * test được độc lập và chỉ có MỘT bản trong toàn repo.
  *

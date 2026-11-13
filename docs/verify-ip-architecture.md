@@ -42,11 +42,12 @@
    (`bot/src/altDetection.js:446-449`), nên `vpnCount` trên dashboard luôn 0 và
    bật/tắt `vpnBlockEnabled` không có tác dụng. Hệ thống mới phải thay bằng
    hành động có ngưỡng, không phải boolean.
-5. **`/geo_lang` đã có sẵn hạ tầng đọc IP**: `parseClientIp()` +
-   `isPublicIp()` + rate-limit — hàm thuần nằm ở `convex/clientIp.ts` (tách khỏi
-   `geoGuard.ts` để verify và geo dùng CHUNG một quy tắc), gọi từ
-   `convex/http.ts`. Quy tắc: lấy mục **cuối** của `x-forwarded-for` (proxy
-   append), KHÔNG lấy mục đầu — mục đầu do client tự đặt được. Xem mục 8.
+5. **Hạ tầng đọc IP dùng chung**: `parseClientIp()` + `isPublicIp()` +
+   `resolveClientIp()` — hàm thuần nằm ở `convex/clientIp.ts`, gọi từ
+   `convex/http.ts` cho `/verify/complete` và `/verify/self-test`. Quy tắc: lấy
+   mục **cuối** của `x-forwarded-for` (proxy append), KHÔNG lấy mục đầu — mục
+   đầu do client tự đặt được. Xem mục 8. (`/geo_lang` đã bị bỏ 13/11/2026 vì
+   gửi IP người dùng sang country.is trước consent.)
 
 ## 2. Hiện trạng verification
 
@@ -537,7 +538,7 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
 | Phiên + đồ thị + grant  | `convex/verify.ts`                       | `botCreateSession`, `finalize`, `botPendingGrants`/`botClaimGrant`/`botFinishGrant`, `listSessions`, `listLinks`, `botRunRetention`.               |
 | IP intel                | `convex/verifyActions.ts` (`"use node"`) | Đọc `IP_HASH_SECRET` + `IPINTEL_API_KEY`, cache 24h theo hash **tách guild** (không dùng hash toàn cục). Thiếu key → vẫn verify, chỉ mất phần VPN. |
 | Ban IP                  | `convex/verifyBans.ts`                   | 1..90 ngày (mặc định 7), không ban vĩnh viễn; `botSyncGuildBan` + `botReplaceGuildBans`.                                                           |
-| HTTP                    | `convex/http.ts`                         | `POST /verify/complete` — IP đọc từ `x-forwarded-for`, CORS allowlist, trần tần suất RIÊNG trong `geoGuard` (không chia với `/geo_lang`).          |
+| HTTP                    | `convex/http.ts`                         | `POST /verify/complete` — IP đọc từ `x-forwarded-for`, CORS allowlist, trần tần suất RIÊNG trong `httpRateGuard` (không chia với self-test).       |
 | Bot                     | `bot/src/verifyWeb.js`                   | Tạo phiên + trả link riêng tư trong kênh, DM dự phòng; thi hành grant, đồng bộ ban, bảo trì 1 lần/ngày trong tick.                                 |
 | Web                     | `src/pages/VerifyPage.tsx`               | Fingerprint canvas/WebGL + cookie first-party; honeypot + dwell ≥1.5s + `navigator.webdriver`.                                                     |
 
@@ -553,9 +554,9 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
 
 - **TTL phiên 10 phút**, không phải 15 — đủ cho một lượt bấm link, ngắn hơn thì
   link rò ra ngoài ít giá trị hơn.
-- **Rate-limit tầng HTTP** nằm trong `geoGuard`: `/geo_lang` 20/phút/IP +
-  300/phút toàn cục, `/verify/complete` 10/phút/IP + 300/phút toàn cục với
-  **bộ đếm riêng** — flood endpoint geo công khai không khoá được đường xác
+- **Rate-limit tầng HTTP** nằm trong `httpRateGuard`: `/verify/complete`
+  10/phút/IP + 300/phút toàn cục, self-test 5/phút/IP + 30/phút toàn cục với
+  **bộ đếm riêng** — admin bấm kiểm tra liên tục không khoá được đường xác
   minh. Không dùng bảng đếm DB: Convex free tier không đáng để thêm 3 reads
   mỗi lượt.
 - **Không có `vpnFailClosed`**: provider lỗi → intel `null` → coi như sạch. Chặn
@@ -589,6 +590,7 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
   lượt/phút (chỉ cần ~15 IP) vào `/geo_lang` làm mọi lượt xác minh trên instance
   nhận 429, người thật bị join gate đá ra. Nay `allowVerifyRequest` có Map +
   trần riêng; test `scripts/test-rate-guard.ts` khoá cả hai chiều độc lập.
+  `/geo_lang` đã bị bỏ hẳn 13/11/2026, nên bộ đếm geo không còn tồn tại.
 - **Xác minh thực nghiệm giới hạn tin cậy của IP.** Trên backend Convex local,
   `ctx.meta.getRequestMetadata().ip` và `x-forwarded-for` cùng trả giá trị
   client gửi — nghĩa là đổi sang `ctx.meta` KHÔNG tự khắc phục giả mạo XFF.
@@ -599,7 +601,7 @@ Phần đã có trong code — đọc mục này thay vì suy từ kế hoạch 
 ## 12. Gia cố P0 (11/11/2026)
 
 - **XFF: lấy mục CUỐI, không lấy mục đầu.** `convex/clientIp.ts` là bản duy
-  nhất của quy tắc (dùng cho `/geo_lang`, `/verify/complete`, self-test).
+  nhất của quy tắc (dùng cho `/verify/complete`, self-test).
   `resolveClientIp()` ưu tiên mục cuối nếu công cộng, lùi về metadata Convex,
   và fail-closed khi cả hai private. Đổi `TRUSTED_PROXY_HOPS` chỉ khi biết chắc
   số hop — mặc định 1.

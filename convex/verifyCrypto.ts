@@ -23,6 +23,13 @@ export const VERIFY_TOKEN_BYTES = 32;
 /** TTL mặc định của một phiên verify (10 phút). */
 export const VERIFY_SESSION_TTL_MS = 10 * 60_000;
 
+/**
+ * Thời gian tối thiểu từ lúc trang verify được MỞ (server ghi `servedAt`) tới
+ * lúc gửi kết quả. Chốt dwell phía server — client tự khai `human: true` không
+ * đủ, vì script có token hợp lệ chỉ cần POST một request là qua bẫy.
+ */
+export const MIN_VERIFY_DWELL_MS = 1500;
+
 /** Trần cứng của một lệnh ban IP (ngày) — không cho ban vĩnh viễn. */
 export const IP_BAN_MAX_DAYS = 90;
 

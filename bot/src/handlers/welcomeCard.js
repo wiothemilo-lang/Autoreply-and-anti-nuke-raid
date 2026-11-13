@@ -136,17 +136,36 @@ async function fetchImage(url, opts = {}) {
     const hit = imageCache.get(raw);
     if (hit && Date.now() - hit.at < IMAGE_CACHE_TTL_MS) return hit.buf;
   }
-  let safe;
+  const assertSafeRemoteUrl = require("./backup").assertSafeRemoteUrl;
+  let target;
   try {
-    safe = await require("./backup").assertSafeRemoteUrl(raw);
+    target = await assertSafeRemoteUrl(raw);
   } catch {
     return null; // URL rác / trỏ mạng nội bộ → bỏ, không tải
   }
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(safe, { signal: ctl.signal });
-    if (!res.ok) return null;
+    // Chống SSRF qua REDIRECT: kiểm URL đầu là chưa đủ — server ảnh có thể trả
+    // 302 trỏ về 169.254.169.254/localhost và fetch mặc định đi theo. Dùng
+    // `redirect: "manual"` rồi kiểm lại TỪNG chặng, tối đa 3 lần nhảy (cùng
+    // khuôn với backupMedia.js).
+    let res;
+    for (let hop = 0; hop < 4; hop++) {
+      res = await fetch(target, { signal: ctl.signal, redirect: "manual" });
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get("location");
+        if (!location) return null;
+        try {
+          target = await assertSafeRemoteUrl(new URL(location, target).href);
+        } catch {
+          return null;
+        }
+        continue;
+      }
+      break;
+    }
+    if (!res || !res.ok) return null;
     const type = res.headers.get("content-type") || "";
     if (!type.startsWith("image/")) return null;
     const buf = Buffer.from(await res.arrayBuffer());

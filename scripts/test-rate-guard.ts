@@ -4,17 +4,14 @@
 // để xác minh: vượt trần → fallback NHẸ (không chạm DB) + hợp đồng no-throw.
 import { rateLimitPublicAction, __resetRateGuardForTest } from "../convex/rateGuard";
 import {
-  allowGeoRequest,
   allowVerifyRequest,
   allowVerifySelfTest,
-  __resetGeoGuardForTest,
-  GEO_MAX_PER_IP_PER_MIN,
-  GEO_MAX_GLOBAL_PER_MIN,
-  GEO_WINDOW_MS,
+  __resetHttpRateGuardForTest,
+  RATE_WINDOW_MS,
   SELFTEST_MAX_PER_IP_PER_MIN,
   VERIFY_MAX_PER_IP_PER_MIN,
   VERIFY_MAX_GLOBAL_PER_MIN,
-} from "../convex/geoGuard";
+} from "../convex/httpRateGuard";
 import { isPublicIp, parseClientIp, resolveClientIp } from "../convex/clientIp";
 import { publicConfig } from "../convex/public";
 import { aiStatus } from "../convex/haimiya";
@@ -238,7 +235,7 @@ check(
   last?.configured === false && last?.model === null,
 );
 
-console.log("── geoGuard: /geo_lang chống đốt usage + DDoS ──");
+console.log("── httpRateGuard + clientIp: chuẩn hoá IP & trần verify ──");
 
 // 8. Chuẩn hoá x-forwarded-for: mục CUỐI là IP do proxy append (không spoof được).
 // Lấy mục đầu là lỗ hổng cũ: client tự đặt "X-Forwarded-For: <IP nạn nhân>".
@@ -298,50 +295,8 @@ for (const good of ["1.1.1.1", "8.8.8.8", "2001:4860:4860::8888"]) {
   check(`isPublicIp nhận "${good}"`, isPublicIp(good));
 }
 
-// 10. Trần per-IP (script loop một IP) + trần toàn cục (botnet phân tán).
-__resetGeoGuardForTest();
-let geoAllOk = true;
-for (let i = 0; i < GEO_MAX_PER_IP_PER_MIN; i++) {
-  if (!allowGeoRequest("1.1.1.1", 1000)) geoAllOk = false;
-}
-check(`IP gọi ${GEO_MAX_PER_IP_PER_MIN} lượt trong cửa sổ → ok`, geoAllOk);
-check("lượt vượt trần của cùng IP → chặn", !allowGeoRequest("1.1.1.1", 1000));
-check("IP khác không bị ảnh hưởng (bucket tách riêng)", allowGeoRequest("2.2.2.2", 1000));
-check("qua cửa sổ 60s → IP được gọi lại", allowGeoRequest("1.1.1.1", 1000 + GEO_WINDOW_MS + 1));
-__resetGeoGuardForTest();
-let geoBlockedAt = -1;
-for (let i = 0; i <= GEO_MAX_GLOBAL_PER_MIN + 20; i++) {
-  const ip = `9.9.${Math.floor(i / 250)}.${i % 250}`;
-  if (!allowGeoRequest(ip, 2000)) {
-    geoBlockedAt = i;
-    break;
-  }
-}
-check(
-  "botnet nhiều IP khác nhau → chặn bằng trần toàn cục",
-  geoBlockedAt === GEO_MAX_GLOBAL_PER_MIN,
-  String(geoBlockedAt),
-);
-
-console.log("── geoGuard: /verify/complete có bộ đếm RIÊNG ──");
-
-// 11. Flood /geo_lang tới trần toàn cục KHÔNG được khoá /verify/complete.
-//     Đây là bug thật: dùng chung `allowGeoRequest` thì 300 lượt/phút từ ~15 IP
-//     vào endpoint geo công khai làm mọi người thật nhận 429 khi xác minh.
-__resetGeoGuardForTest();
-let geoFloodBlocked = false;
-for (let i = 0; i < GEO_MAX_GLOBAL_PER_MIN + 20; i++) {
-  const ip = `7.7.${Math.floor(i / 250)}.${i % 250}`;
-  if (!allowGeoRequest(ip, 3000)) {
-    geoFloodBlocked = true;
-    break;
-  }
-}
-check("flood /geo_lang chạm trần toàn cục", geoFloodBlocked);
-check("… nhưng /verify/complete vẫn còn lượt cho IP thật", allowVerifyRequest("5.5.5.5", 3000));
-
-// 12. Trần riêng của verify vẫn hoạt động đúng (không nới vô hạn).
-__resetGeoGuardForTest();
+// 10. Trần per-IP + trần toàn cục của /verify/complete vẫn hoạt động đúng.
+__resetHttpRateGuardForTest();
 let verifyAllOk = true;
 for (let i = 0; i < VERIFY_MAX_PER_IP_PER_MIN; i++) {
   if (!allowVerifyRequest("6.6.6.6", 4000)) verifyAllOk = false;
@@ -349,9 +304,11 @@ for (let i = 0; i < VERIFY_MAX_PER_IP_PER_MIN; i++) {
 check(`/verify/complete: IP gọi ${VERIFY_MAX_PER_IP_PER_MIN} lượt → ok`, verifyAllOk);
 check("/verify/complete: lượt vượt trần cùng IP → chặn", !allowVerifyRequest("6.6.6.6", 4000));
 check("… IP khác vẫn được (bucket riêng)", allowVerifyRequest("8.8.4.4", 4000));
+check("qua cửa sổ 60s → IP được gọi lại", allowVerifyRequest("6.6.6.6", 4000 + RATE_WINDOW_MS + 1));
 
-// 13. Tách là hai chiều: flood verify cũng không khoá /geo_lang.
-__resetGeoGuardForTest();
+// 11. Trần toàn cục chặn botnet phân tán; self-test có bucket riêng nên
+//     flood verify không khoá được thao tác admin.
+__resetHttpRateGuardForTest();
 let verifyBlockedAt = -1;
 for (let i = 0; i <= VERIFY_MAX_GLOBAL_PER_MIN + 20; i++) {
   const ip = `3.3.${Math.floor(i / 250)}.${i % 250}`;
@@ -365,10 +322,10 @@ check(
   verifyBlockedAt === VERIFY_MAX_GLOBAL_PER_MIN,
   String(verifyBlockedAt),
 );
-check("… nhưng /geo_lang vẫn còn lượt", allowGeoRequest("9.9.9.9", 5000));
+check("… nhưng self-test vẫn còn lượt", allowVerifySelfTest("9.9.9.9", 5000));
 
 // 14. Self-test có bucket RIÊNG: admin bấm kiểm tra không tiêu lượt verify.
-__resetGeoGuardForTest();
+__resetHttpRateGuardForTest();
 let selfTestAllOk = true;
 for (let i = 0; i < SELFTEST_MAX_PER_IP_PER_MIN; i++) {
   if (!allowVerifySelfTest("4.4.4.4", 6000)) selfTestAllOk = false;
@@ -376,7 +333,7 @@ for (let i = 0; i < SELFTEST_MAX_PER_IP_PER_MIN; i++) {
 check(`self-test: IP gọi ${SELFTEST_MAX_PER_IP_PER_MIN} lượt → ok`, selfTestAllOk);
 check("self-test: lượt vượt trần cùng IP → chặn", !allowVerifySelfTest("4.4.4.4", 6000));
 check("… /verify/complete vẫn còn lượt cho cùng IP", allowVerifyRequest("4.4.4.4", 6000));
-__resetGeoGuardForTest();
+__resetHttpRateGuardForTest();
 
 console.log(`\nKết quả: ${pass} pass, ${fail} fail`);
 process.exit(fail > 0 ? 1 : 0);

@@ -27,7 +27,7 @@ export const IP_COLLECTION_ENABLED = false;
  *
  * Production luôn trả về hằng số ở trên. `scripts/test-verify-flow.ts` cần chạy
  * trọn luồng verify (23 call site) trong khi production đang khoá, nên đặt cờ
- * qua `globalThis` — cùng khuôn với `__resetGeoGuardForTest`. Đây KHÔNG phải
+ * qua `globalThis` — cùng khuôn với `__resetHttpRateGuardForTest`. Đây KHÔNG phải
  * Convex function: client không có đường nào chạm tới biến này.
  */
 export function isIpCollectionEnabled(): boolean {

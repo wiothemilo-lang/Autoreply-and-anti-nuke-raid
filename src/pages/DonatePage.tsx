@@ -15,6 +15,7 @@ import { usePublicConfig } from "../lib/usePublicConfig";
 import { translate } from "../lib/i18n";
 import { getSessionToken } from "../lib/discord";
 import { friendlyConvexError } from "../lib/convexError";
+import { safeZaloPayUrl } from "../lib/safeUrl";
 import { api } from "../../convex/_generated/api";
 
 /**
@@ -66,7 +67,15 @@ export default function DonatePage() {
     setPayError(null);
     try {
       const r = await startPayment({ token, kind: "donate", plan, customAmount: custom });
-      window.location.assign(r.paymentUrl);
+      // Server đã kiểm allowlist; kiểm lại ở client là lớp thứ hai — nếu response
+      // bị đổi thành javascript:/host lạ thì KHÔNG redirect.
+      const target = safeZaloPayUrl(r.paymentUrl);
+      if (!target) {
+        setPayError(translate("Cổng thanh toán trả về địa chỉ không hợp lệ — thử lại sau."));
+        setBusy(null);
+        return;
+      }
+      window.location.assign(target);
     } catch (e) {
       // Lỗi backend là tiếng Việt qua ConvexError data — friendlyConvexError bóc
       // envelope Convex, khách KHÔNG BAO GIỜ thấy "[Request ID: …] Server Error".
