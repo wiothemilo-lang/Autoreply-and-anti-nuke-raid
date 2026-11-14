@@ -16,6 +16,14 @@ Bot Discord tự động trả lời tin nhắn thành viên theo **từ khóa**
 >
 > **Hệ sinh thái**: threat relay liên server (chia sẻ signature raid ẩn danh, opt-in từng chiều) · preset bảo mật 1 chạm (server nhỏ / cộng đồng / rủi ro cao) — bật trên dashboard, tab Chống nuke.
 
+## Giao diện
+
+Ảnh chụp thật từ [protogon.freebuff.app](https://protogon.freebuff.app).
+
+![Trang chủ Protogon — chat demo, thẻ điểm heat và Join Gate đang chặn selfbot](docs/screenshots/landing.png)
+
+![Trang tính năng — 32 module bảo vệ, 4 mức heat, Join Gate, lọc link độc hại và backup](docs/screenshots/features.png)
+
 ## Kiến trúc
 
 ```
