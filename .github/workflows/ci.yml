@@ -44,7 +44,7 @@ jobs:
       - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
         run: |
           for i in 1 2 3; do
-            npm install -g bun@1.3.3 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            npm install -g bun@1.4.4 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
             echo "npm install bun thất bại lần $i — thử lại sau 5s"
             sleep 5
           done
@@ -117,7 +117,7 @@ jobs:
       - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
         run: |
           for i in 1 2 3; do
-            npm install -g bun@1.3.3 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            npm install -g bun@1.4.4 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
             echo "npm install bun thất bại lần $i — thử lại sau 5s"
             sleep 5
           done
@@ -201,7 +201,7 @@ jobs:
       - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
         run: |
           for i in 1 2 3; do
-            npm install -g bun@1.3.3 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            npm install -g bun@1.4.4 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
             echo "npm install bun thất bại lần $i — thử lại sau 5s"
             sleep 5
           done
@@ -312,7 +312,7 @@ jobs:
       - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
         run: |
           for i in 1 2 3; do
-            npm install -g bun@1.3.3 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            npm install -g bun@1.4.4 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
             echo "npm install bun thất bại lần $i — thử lại sau 5s"
             sleep 5
           done

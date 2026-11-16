@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "packageManager": "bun@1.4.4",
   "scripts": {
     "dev": "vite",
     "build": "node scripts/build.mjs",
@@ -28,7 +29,7 @@
     "@radix-ui/react-tabs": "^1.2.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "convex": "^1.49.0",
+    "convex": "^1.50.0",
     "framer-motion": "^14.10.1",
     "lucide-react": "^1.70.0",
     "react": "^19.3.1",
@@ -47,13 +48,13 @@
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.6.2",
     "c8": "^12.0.0",
-    "eslint": "^10.13.0",
+    "eslint": "^10.15.0",
     "globals": "^17.13.0",
-    "postcss": "^8.5.32",
-    "prettier": "^3.9.10",
+    "postcss": "^8.5.33",
+    "prettier": "^3.10.1",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
-    "typescript-eslint": "^8.72.1",
+    "typescript-eslint": "^8.72.2",
     "vite": "^6.4.6"
   }
 }
