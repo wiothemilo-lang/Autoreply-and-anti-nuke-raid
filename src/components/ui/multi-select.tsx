@@ -118,7 +118,7 @@ export function MultiSelect({
         aria-expanded={open}
         aria-controls={listboxId}
         aria-label={translate(placeholder)}
-        className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-secondary/40 px-3 py-2 text-left text-sm text-foreground transition-colors hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-secondary/40 px-3 py-2 text-left text-sm text-foreground transition-colors hover:border-foreground/30 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/60"
       >
         <span className="min-w-0 truncate">
           {value.length === 0
@@ -150,7 +150,7 @@ export function MultiSelect({
                   type="button"
                   onClick={() => toggle(v)}
                   aria-label={`${translate("Xóa")} ${translate(label)}`}
-                  className="rounded p-0.5 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="rounded p-0.5 hover:bg-primary/20 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -183,13 +183,13 @@ export function MultiSelect({
                 }}
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
-                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                className="w-full bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
               />
               {query && (
                 <button
                   type="button"
                   onClick={() => setQuery("")}
-                  className="rounded p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="rounded p-1 text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label={translate("Xóa tìm kiếm")}
                 >
                   <X className="h-3.5 w-3.5" />
@@ -244,7 +244,7 @@ export function MultiSelect({
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/60",
                     selected && "text-primary",
                   )}
                 >

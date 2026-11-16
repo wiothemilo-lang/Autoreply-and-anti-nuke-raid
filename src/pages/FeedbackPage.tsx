@@ -232,7 +232,7 @@ export default function FeedbackPage() {
                     placeholder={translate(
                       "Mô tả càng rõ càng tốt: bạn đang làm gì, thấy gì, và mong đợi điều gì.",
                     )}
-                    className="mt-3 w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-primary/40"
+                    className="mt-3 w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm leading-relaxed outline-hidden focus:ring-2 focus:ring-primary/40"
                   />
                   <p className="mt-1.5 text-right text-xs text-muted-foreground">
                     {tooShort
@@ -253,7 +253,7 @@ export default function FeedbackPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ban@example.com"
-                    className="mt-3 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                    className="mt-3 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
                   />
                   <p className="mt-1.5 text-xs text-muted-foreground">
                     {translate("Điền nếu bạn muốn mình phản hồi lại — bỏ trống vẫn gửi được.")}

@@ -442,7 +442,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                           Math.max(1, Math.min(360, parseInt(e.target.value || "15", 10) || 15)),
                         )
                       }
-                      className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60"
+                      className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-hidden focus:border-primary/60"
                     />
                   </label>
                   <label className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -457,7 +457,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                           Math.max(1, Math.min(50, parseInt(e.target.value || "1", 10) || 1)),
                         )
                       }
-                      className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60"
+                      className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-hidden focus:border-primary/60"
                     />
                   </label>
                   <Button size="sm" onClick={saveReportPolicy}>
@@ -544,7 +544,7 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                         <button
                           type="button"
                           onClick={() => setWebhookColor("")}
-                          className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           {translate("Mặc định")}
                         </button>

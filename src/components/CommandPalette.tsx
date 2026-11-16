@@ -58,7 +58,7 @@ export default function CommandPalette({
   return (
     <Dialog.Root open onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-background/70 backdrop-blur-xs" />
         <Dialog.Content
           className="fixed left-1/2 top-[12vh] z-50 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
           onKeyDown={onKeyDown}
@@ -75,7 +75,7 @@ export default function CommandPalette({
               onChange={(e) => setQuery(e.target.value)}
               placeholder={translate("Tìm panel hoặc hành động…")}
               aria-label={translate("Tìm panel hoặc hành động")}
-              className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              className="h-12 w-full bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
             />
           </div>
           {results.length === 0 ? (

@@ -1,6 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+/* Nạp cấu hình theme cũ (màu token, bo góc, bóng, keyframes) — Tailwind 4
+   không còn đọc tailwind.config.ts tự động. */
+@config "../tailwind.config.ts";
+/* v3 dùng darkMode: ["class"]; v4 mặc định theo prefers-color-scheme nên phải
+   khai lại variant để .dark trên <html> tiếp tục điều khiển giao diện tối. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* ── Font tự host ──────────────────────────────────────────────────────────
    Trước đây index.html nạp Inter + JetBrains Mono từ fonts.googleapis.com:

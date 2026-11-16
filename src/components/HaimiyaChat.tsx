@@ -567,7 +567,7 @@ export default function HaimiyaChat({
                   pending.length ? translate("Mô tả về ảnh…") : translate("Hỏi tôi điều gì đó…")
                 }
                 aria-label={translate("Hỏi tôi điều gì đó…")}
-                className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="flex-1 bg-transparent text-sm text-foreground outline-hidden placeholder:text-muted-foreground"
               />
               <button
                 onClick={() => send(input)}

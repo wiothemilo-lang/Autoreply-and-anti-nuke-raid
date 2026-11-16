@@ -288,7 +288,7 @@ export default function VerifyPage() {
     <main
       id="main"
       tabIndex={-1}
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 outline-none"
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 outline-hidden"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(88,101,242,0.18),transparent_60%)]" />
       <div className="absolute right-4 top-4">

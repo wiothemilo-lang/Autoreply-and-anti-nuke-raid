@@ -220,7 +220,7 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
       {/* ── "Thử rule": gõ tin nhắn mẫu → thấy ngay bot sẽ trả lời gì ──
           Logic mô phỏng nằm ở lib/autoreplySim.ts (khớp messageCreate.js);
           cooldown là trạng thái in-memory của bot nên không mô phỏng được. */}
-      <Card className="overflow-hidden border border-border/70 bg-card/60 backdrop-blur-sm shadow-sm transition-all duration-200 hover:border-border">
+      <Card className="overflow-hidden border border-border/70 bg-card/60 backdrop-blur-xs shadow-sm transition-all duration-200 hover:border-border">
         <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-4 py-2.5 sm:px-5">
           <Sparkles className="h-4 w-4 text-primary" />
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -316,7 +316,7 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
       </Card>
 
       {data.autoReplies.length === 0 ? (
-        <Card className="border-dashed border-border/80 bg-card/40 backdrop-blur-sm">
+        <Card className="border-dashed border-border/80 bg-card/40 backdrop-blur-xs">
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-8 ring-primary/5 transition-transform duration-200 hover:scale-105">
               <AtSign className="h-6 w-6" />
@@ -339,7 +339,7 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
           {data.autoReplies.map((rule) => (
             <Card
               key={rule._id}
-              className={`group flex flex-col justify-between overflow-hidden border border-border/70 bg-card/70 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${
+              className={`group flex flex-col justify-between overflow-hidden border border-border/70 bg-card/70 backdrop-blur-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${
                 rule.enabled ? "" : "opacity-65"
               }`}
             >

@@ -1152,7 +1152,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
                 disabled={!autoOn}
                 onChange={(e) => setAutoDays(parseNumberInput(e.target.value, autoDays))}
                 onBlur={() => setAutoDays((v) => clampNumber(v, 2, 30))}
-                className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60 disabled:opacity-40"
+                className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-hidden focus:border-primary/60 disabled:opacity-40"
               />
               {translate("ngày")}{" "}
             </label>
@@ -1171,7 +1171,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
                 value={keepCount}
                 onChange={(e) => setKeepCount(parseNumberInput(e.target.value, keepCount))}
                 onBlur={() => setKeepCount((v) => clampNumber(v, 2, 50))}
-                className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60"
+                className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-hidden focus:border-primary/60"
               />{" "}
               {translate("bản gần nhất")}{" "}
             </label>
@@ -1184,7 +1184,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
                 value={keepDays}
                 onChange={(e) => setKeepDays(parseNumberInput(e.target.value, keepDays))}
                 onBlur={() => setKeepDays((v) => clampNumber(v, 0, 365))}
-                className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-none focus:border-primary/60"
+                className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-hidden focus:border-primary/60"
               />{" "}
               {translate("ngày (0 = không xoá theo tuổi)")}{" "}
             </label>

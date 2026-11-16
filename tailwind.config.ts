@@ -1,7 +1,8 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: ["class"],
+  // Dark mode khai ở src/index.css bằng @custom-variant (Tailwind 4 không đọc
+  // darkMode từ config nữa): @custom-variant dark (&:where(.dark, .dark *)).
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     container: {
