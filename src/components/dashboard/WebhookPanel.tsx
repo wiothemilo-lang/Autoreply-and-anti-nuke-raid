@@ -391,7 +391,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
             value={webhookUrl}
             onChange={(e) => setWebhookUrl(e.target.value)}
             placeholder="https://discord.com/api/webhooks/123456789/abc..."
-            className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -402,7 +402,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Protogon Bot"
-                className="mt-1 w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
               />
             </div>
             <div>
@@ -413,7 +413,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                 value={avatarUrl}
                 onChange={(e) => setAvatarUrl(e.target.value)}
                 placeholder="https://..."
-                className="mt-1 w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
               />
             </div>
           </div>
@@ -426,7 +426,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
               onChange={(e) => setContent(e.target.value)}
               placeholder={translate("Nội dung tin nhắn Discord...")}
               rows={2}
-              className="mt-1 w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none resize-none"
+              className="mt-1 w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden resize-none"
             />
           </div>
         </div>
@@ -448,20 +448,20 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                 value={embed.authorName}
                 onChange={(e) => updateEmbed({ authorName: e.target.value })}
                 placeholder={translate("Tên tác giả")}
-                className="w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                className="w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
               />
               <div className="grid gap-2 sm:grid-cols-2">
                 <input
                   value={embed.authorIconUrl}
                   onChange={(e) => updateEmbed({ authorIconUrl: e.target.value })}
                   placeholder="Icon URL (avatar)"
-                  className="w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                  className="w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
                 />
                 <input
                   value={embed.authorUrl}
                   onChange={(e) => updateEmbed({ authorUrl: e.target.value })}
                   placeholder={translate("URL khi nhấn tên")}
-                  className="w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                  className="w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
                 />
               </div>
             </fieldset>
@@ -471,14 +471,14 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
               value={embed.title}
               onChange={(e) => updateEmbed({ title: e.target.value })}
               placeholder={translate("Tiêu đề embed")}
-              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm font-semibold text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm font-semibold text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
             />
             <textarea
               value={embed.description}
               onChange={(e) => updateEmbed({ description: e.target.value })}
               placeholder={translate("Mô tả / nội dung chính...")}
               rows={4}
-              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none resize-none"
+              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden resize-none"
             />
 
             {/* Color */}
@@ -497,7 +497,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                 value={embed.color}
                 onChange={(e) => updateEmbed({ color: e.target.value })}
                 placeholder="#111111"
-                className="w-24 rounded border border-border bg-background/70 px-2 py-1.5 text-xs font-mono text-foreground focus:border-primary/50 focus:outline-none"
+                className="w-24 rounded border border-border bg-background/70 px-2 py-1.5 text-xs font-mono text-foreground focus:border-primary/50 focus:outline-hidden"
               />
             </div>
 
@@ -546,7 +546,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                       updateEmbed({ fields: next });
                     }}
                     placeholder={translate("Tên field")}
-                    className="w-full rounded border border-border bg-background/70 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                    className="w-full rounded border border-border bg-background/70 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
                   />
                   <input
                     value={f.value}
@@ -556,7 +556,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                       updateEmbed({ fields: next });
                     }}
                     placeholder={translate("Giá trị")}
-                    className="w-full rounded border border-border bg-background/70 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                    className="w-full rounded border border-border bg-background/70 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
                   />
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <input
@@ -586,7 +586,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                   value={embed.imageUrl}
                   onChange={(e) => updateEmbed({ imageUrl: e.target.value })}
                   placeholder="https://..."
-                  className="mt-1 w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                  className="mt-1 w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
                 />
               </div>
               <div>
@@ -598,7 +598,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                   value={embed.thumbnailUrl}
                   onChange={(e) => updateEmbed({ thumbnailUrl: e.target.value })}
                   placeholder="https://..."
-                  className="mt-1 w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                  className="mt-1 w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
                 />
               </div>
             </div>
@@ -611,7 +611,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                   value={embed.footerText}
                   onChange={(e) => updateEmbed({ footerText: e.target.value })}
                   placeholder="Protogon · Log"
-                  className="mt-1 w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                  className="mt-1 w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
                 />
               </div>
               <div className="flex-1">
@@ -622,7 +622,7 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                   value={embed.footerIconUrl}
                   onChange={(e) => updateEmbed({ footerIconUrl: e.target.value })}
                   placeholder="https://..."
-                  className="mt-1 w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+                  className="mt-1 w-full rounded border border-border bg-background/70 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-hidden"
                 />
               </div>
             </div>

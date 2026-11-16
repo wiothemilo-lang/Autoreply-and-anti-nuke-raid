@@ -81,7 +81,11 @@ export default function Landing() {
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.7, delay: 0.1 }}
-                  className="mt-4 text-center font-display text-4xl font-bold leading-[1.15] tracking-tight sm:text-5xl lg:mt-0 lg:text-left lg:text-4xl xl:text-[2.75rem]"
+                  /* leading phải khai theo từng breakpoint: Tailwind 4 sắp utility
+                     theo thuộc tính nên leading-[1.15] sẽ đè line-height của
+                     text-5xl/text-4xl, còn Tailwind 3 thì ngược lại — khai rõ để
+                     giao diện không đổi giữa hai bản. */
+                  className="mt-4 text-center font-display text-4xl font-bold leading-[1.15] tracking-tight sm:text-5xl sm:leading-none lg:mt-0 lg:text-left lg:text-4xl lg:leading-[40px] xl:text-[2.75rem]"
                 >
                   Bot Discord
                   <span className="block text-primary">{translate("bảo vệ server toàn diện")}</span>

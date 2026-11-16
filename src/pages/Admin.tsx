@@ -452,7 +452,7 @@ function AdminContent() {
                     value={ownerSeedInput}
                     onChange={(e) => setOwnerSeedInput(e.target.value)}
                     placeholder={translate("Seed bí mật (dòng bất kỳ, ví dụ: chuỗi ngẫu nhiên)")}
-                    className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
                   />
                   <button
                     type="button"
@@ -1569,7 +1569,7 @@ function TeamAdminsCard({
                   onChange={(e) => setInput(e.target.value)}
                   inputMode="numeric"
                   placeholder={translate("Discord ID (15-21 chữ số)")}
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
                 />
                 <button
                   type="button"
@@ -1690,20 +1690,20 @@ function PremiumGrantCard({
           onChange={(e) => setDiscordId(e.target.value)}
           inputMode="numeric"
           placeholder={translate("Discord ID người được cấp (15-21 chữ số)")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
         />
         <input
           value={guildId}
           onChange={(e) => setGuildId(e.target.value)}
           inputMode="numeric"
           placeholder={translate("Server ID (tùy chọn — 15-21 chữ số)")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
         />
         <select
           value={plan}
           onChange={(e) => setPlan(e.target.value as "supporter" | "pioneer")}
           aria-label={translate("Gói cấp")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
         >
           <option value="supporter">{translate("Đồng hành")}</option>
           <option value="pioneer">{translate("Tiên phong")}</option>
@@ -1714,7 +1714,7 @@ function PremiumGrantCard({
           inputMode="numeric"
           placeholder={translate("Số ngày (1–365)")}
           aria-label={translate("Số ngày (1–365)")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
         />
       </div>
 
@@ -1993,7 +1993,7 @@ function AnnounceCard({
             onChange={(e) => setVerInput(e.target.value)}
             maxLength={32}
             placeholder={translate("vd 1.4.0 — để trống để ẩn nhãn")}
-            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
           />
           <button
             type="button"
@@ -2027,7 +2027,7 @@ function AnnounceCard({
           onChange={(e) => setTitle(e.target.value)}
           maxLength={120}
           placeholder={translate("Tiêu đề thông báo")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
         />
         <div className="flex gap-2">
           <input
@@ -2035,7 +2035,7 @@ function AnnounceCard({
             onChange={(e) => setVersion(e.target.value)}
             maxLength={32}
             placeholder={translate("Phiên bản (tuỳ chọn — vd 1.4.0)")}
-            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
           />
         </div>
         <textarea
@@ -2044,7 +2044,7 @@ function AnnounceCard({
           rows={3}
           maxLength={4000}
           placeholder={translate("Nội dung thông báo — điều người dùng cần biết")}
-          className="min-h-0 resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          className="min-h-0 resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
         />
         <div className="flex flex-wrap items-center gap-2">
           <button
