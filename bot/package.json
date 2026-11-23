@@ -14,8 +14,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@napi-rs/canvas": "1.1.0",
-    "convex": "^1.50.0",
+    "@napi-rs/canvas": "1.1.1",
+    "convex": "^1.51.0",
     "discord.js": "^14.28.1",
     "prom-client": "^15.1.3"
   },
