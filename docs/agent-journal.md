@@ -105,6 +105,13 @@
 
 ---
 
+## 2026-11-25 — Rút gọn auto-reply theo cụm ký tự
+
+- ✅ Giữ nguyên cụm Unicode ở vị trí cắt và sửa phép kiểm tiến trình zombie trên Linux.
+- 📁 `bot/src/handlers/messageCreate.js`, `scripts/test-message-create.cjs`, `scripts/test-run-all-tests.cjs`.
+- 🧪 90/90 suites CommonJS ở chế độ nghiêm ngặt, 35/35 suites TypeScript, typecheck, lint và format đạt.
+- ▶️ Đẩy nhánh `fix/autoreply-emoji-truncation` và mở PR vào `main`.
+
 ## 2026-11-13 (3) — Audit khoá thu thập IP
 
 - ✅ Xong: rà 5 lớp khoá — cờ `IP_COLLECTION_ENABLED=false`; HTTP

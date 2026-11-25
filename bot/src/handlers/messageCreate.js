@@ -2,6 +2,16 @@ const prefixCommands = require("../commands/prefix");
 const { fillPlaceholders } = require("../util");
 const { verifyCode } = require("../captchaStore");
 
+const AUTO_REPLY_LIMIT = 1900;
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+function truncateAutoReply(text) {
+  if (text.length <= AUTO_REPLY_LIMIT) return text;
+  // Cụm chứa ký tự đầu tiên ngoài giới hạn có thể bắt đầu trước giới hạn.
+  const { index } = graphemes.segment(text).containing(AUTO_REPLY_LIMIT);
+  return text.slice(0, index) + "…";
+}
+
 function channelAllowed(rule, message) {
   if (!rule.channels || rule.channels.length === 0) return true;
   return rule.channels.includes(message.channel.id);
@@ -42,12 +52,7 @@ async function handleAutoReply(client, message, config, store) {
 
     store.recordReply(message.guild.id, rule._id);
     try {
-      let text = fillPlaceholders(rule.response, message.author);
-      if (text.length > 1900) {
-        // Nếu ký tự cuối chiếm hai đơn vị UTF-16, giữ hoặc bỏ cả cặp.
-        const end = text.codePointAt(1899) > 0xffff ? 1899 : 1900;
-        text = text.slice(0, end) + "…";
-      }
+      const text = truncateAutoReply(fillPlaceholders(rule.response, message.author));
       await message.reply({ content: text, allowedMentions: { parse: ["users"] } });
     } catch (err) {
       console.error(`[autoreply] ${message.guild.id}/${rule.name}:`, err.message);
