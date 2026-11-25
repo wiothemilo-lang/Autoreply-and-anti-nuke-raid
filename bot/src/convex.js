@@ -185,6 +185,7 @@ class ConvexStore {
     // getConfig; khi cache hết TTL/invalidate, cả 5 tạo 5 query Convex trùng
     // (và 5 chuỗi retry nếu Convex lỗi). Chỉ giữ promise đang bay — xong là xoá.
     this._configInflight = new Map(); // guildId -> Promise<config>
+    this.openTicketChannels = new Map();
     this.ruleCooldowns = new Map(); // `${guildId}:${ruleId}` -> timestamp
     this._heartbeatOk = false;
 
@@ -417,7 +418,35 @@ class ConvexStore {
         removed++;
       }
     }
+    for (const guildId of this.openTicketChannels.keys()) {
+      if (!liveGuildIds.has(guildId)) this.openTicketChannels.delete(guildId);
+    }
     return removed;
+  }
+
+  async getOpenTicketChannels(guildId) {
+    const cached = this.openTicketChannels.get(guildId);
+    if (cached?.pending) return cached.pending;
+    if (cached && Date.now() < cached.expiresAt) return cached.channels;
+
+    const entry = { channels: cached?.channels ?? new Set(), expiresAt: 0, pending: null };
+    this.openTicketChannels.set(guildId, entry);
+    entry.pending = this.client
+      .query("tickets:botTicketSummary", { guildId })
+      .then((summary) => {
+        entry.channels = new Set(summary?.openChannelIds ?? []);
+      })
+      .catch((err) => console.error(`[ticketActivity:${guildId}]`, err.message))
+      .finally(() => {
+        entry.expiresAt = Date.now() + 60_000;
+        entry.pending = null;
+      })
+      .then(() => entry.channels);
+    return entry.pending;
+  }
+
+  invalidateOpenTicketChannels(guildId) {
+    this.openTicketChannels.delete(guildId);
   }
 
   /** Send health check heartbeat to Convex. */

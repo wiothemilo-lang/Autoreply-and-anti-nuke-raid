@@ -15,6 +15,7 @@ import {
   ticketSummary,
   ticketStats,
   closeTicket,
+  botTicketSummary,
   botTicketState,
   botTicketById,
   ticketTranscript,
@@ -543,6 +544,23 @@ const throws = async (fn: () => Promise<unknown>) => {
       await closeH(e.ctx, { token: "tok", guildId: "g1", ticketId: "t1" });
     }),
   );
+
+  {
+    const e = env();
+    const handler = (botTicketSummary as any)._handler;
+    e.tickets.push(
+      ticket("moved"),
+      ticket("pending", { channelId: "pending" }),
+      ticket("closed", { status: "closed" }),
+      ticket("other", { guildId: "g2" }),
+    );
+    const summary = await handler(e.ctx, { guildId: "g1", botKey: BOT_KEY });
+    check("đếm cả ticket mở đang chờ tạo kênh cho panel cũ", summary.openCount === 2);
+    check(
+      "chỉ trả ID thật của kênh ticket mở đúng server",
+      JSON.stringify(summary.openChannelIds) === JSON.stringify(["ch-moved"]),
+    );
+  }
 
   // ═══ botTicketState: hàng rào chống spam ═══
   console.log("\n── botTicketState ──");

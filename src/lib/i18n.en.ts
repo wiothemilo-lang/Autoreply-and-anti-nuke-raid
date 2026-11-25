@@ -104,6 +104,8 @@ export const EN: Record<string, string> = {
   "điểm rủi ro tích luỹ cao": "accumulated risk score is high",
   "Tình hình hôm nay": "Today at a glance",
   "Tính từ 00:00 hôm nay theo giờ Việt Nam.": "Counted from 00:00 today, Vietnam time.",
+  "Số liệu có thể thiếu vì đã đạt giới hạn tải dữ liệu.":
+    "Some figures may be incomplete because the data limit was reached.",
   "Đe doạ đã chặn": "Threats blocked",
   "Người mới vào": "New members",
   "Tài khoản bị xử lý": "Accounts actioned",

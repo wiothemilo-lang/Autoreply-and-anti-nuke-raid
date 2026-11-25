@@ -432,7 +432,8 @@ module.exports = {
     // Bản async: event loop VẪN chạy trong lúc quét (bản sync chặn bot đã xoá).
     let ticks = 0;
     const timer = setInterval(() => ticks++, 1);
-    const pending = alt.scanGuildForAltsAsync(guild, {});
+    // Chừa thời gian cho c8 và các suite chạy song song. Ca deadline ở dưới.
+    const pending = alt.scanGuildForAltsAsync(guild, {}, { deadlineMs: 120_000 });
     await new Promise((r) => setTimeout(r, 20));
     const ticksWhileRunning = ticks;
     const res = await pending;

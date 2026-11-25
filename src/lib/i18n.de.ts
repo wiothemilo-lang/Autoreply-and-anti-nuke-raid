@@ -95,6 +95,8 @@ export const DE: Record<string, string> = {
   "điểm rủi ro tích luỹ cao": "akkumulierter Risikowert ist hoch",
   "Tình hình hôm nay": "Heute im Überblick",
   "Tính từ 00:00 hôm nay theo giờ Việt Nam.": "Gezählt ab 00:00 heute (Vietnam-Zeit).",
+  "Số liệu có thể thiếu vì đã đạt giới hạn tải dữ liệu.":
+    "Einige Zahlen können unvollständig sein, da das Datenlimit erreicht wurde.",
   "Đe doạ đã chặn": "Blockierte Bedrohungen",
   "Người mới vào": "Neue Mitglieder",
   "Tài khoản bị xử lý": "Maßnahmen gegen Konten",

@@ -333,13 +333,15 @@ export const botTicketSummary = query({
   },
   handler: async (ctx, { guildId, botKey }) => {
     await requireBotKeyStrict(ctx, botKey);
-    // `.take(1_000)` chứ không `.collect()`: chỉ cần số, không cần cả danh
-    // sách. Trần mềm giữ để không kéo hàng nghìn doc khi server bị lạm dụng.
+    // Giữ trần mềm để không kéo hàng nghìn doc khi server bị lạm dụng.
     const open = await ctx.db
       .query("tickets")
       .withIndex("by_guildId_status", (q) => q.eq("guildId", guildId).eq("status", "open"))
       .take(1_000);
-    return { openCount: open.length };
+    return {
+      openCount: open.length,
+      openChannelIds: open.map((ticket) => ticket.channelId).filter((id) => id !== "pending"),
+    };
   },
 });
 

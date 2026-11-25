@@ -89,6 +89,33 @@ function freshStore() {
 }
 
 (async () => {
+  {
+    const store = freshStore();
+    let reads = 0;
+    let openChannelIds = ["a"];
+    store._rawClient.query = async () => {
+      reads++;
+      return { openChannelIds };
+    };
+    const [first, second] = await Promise.all([
+      store.getOpenTicketChannels("g"),
+      store.getOpenTicketChannels("g"),
+    ]);
+    check(
+      "cache ticket mở gom hai truy vấn song song",
+      first === second && first.has("a") && reads === 1,
+    );
+    openChannelIds = ["a", "b"];
+    store.invalidateOpenTicketChannels("g");
+    check(
+      "ticket vừa mở có mặt ngay sau khi làm mới cache",
+      (await store.getOpenTicketChannels("g")).has("b") && reads === 2,
+    );
+    store.pruneCache(new Set());
+    await store.getOpenTicketChannels("g");
+    check("cache ticket mở được dọn khi bot rời server", reads === 3);
+  }
+
   // ── 1. withRetry: 4xx (trừ 429) fail NGAY — không retry ───────────────────
   {
     const store = freshStore();

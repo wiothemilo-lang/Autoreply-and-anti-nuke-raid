@@ -112,6 +112,13 @@
 - 🧪 90/90 suites CommonJS ở chế độ nghiêm ngặt, 35/35 suites TypeScript, sàn coverage, typecheck, lint và build đạt.
 - ▶️ Còn luồng upload có theo dõi chủ sở hữu file và phiên quản trị qua cookie cùng miền.
 
+## 2026-11-25 — Giữ hoạt động ticket và thống nhất bản thử auto-reply
+
+- ✅ Ghi hoạt động ticket theo ID khi đổi danh mục, dùng chung hàm rút gọn phản hồi và cảnh báo thống kê chạm trần.
+- 📁 `bot/src/handlers/ticketActivity.js`, `convex/tickets.ts`, `src/lib/autoreplySim.ts`, `convex/guildStats.ts`, `src/pages/StatsPage.tsx`.
+- 🧪 90/90 suites CommonJS ở chế độ nghiêm ngặt, 35/35 suites TypeScript, sàn coverage, typecheck, lint và build đạt.
+- ▶️ Còn tổng hợp thống kê theo ngày và xác thực phiên quản trị bằng cookie cùng miền.
+
 ## 2026-11-25 — Rút gọn auto-reply theo cụm ký tự
 
 - ✅ Giữ nguyên cụm Unicode ở vị trí cắt và sửa phép kiểm tiến trình zombie trên Linux.

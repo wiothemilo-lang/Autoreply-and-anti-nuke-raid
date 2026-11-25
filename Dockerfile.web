@@ -22,7 +22,8 @@ RUN bun install --frozen-lockfile
 
 # Copy phần còn lại rồi build (build-args từ Dokploy tới đây qua ENV)
 COPY index.html vite.config.ts tailwind.config.ts postcss.config.js tsconfig*.json ./
-COPY scripts/build.mjs ./scripts/build.mjs
+COPY scripts/build.mjs scripts/security-headers.cjs ./scripts/
+COPY bot/src/autoReplyText.mjs bot/src/autoReplyText.d.mts ./bot/src/
 COPY src ./src
 COPY public ./public
 COPY convex ./convex
