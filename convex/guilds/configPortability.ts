@@ -14,6 +14,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getUserByToken, canManageGuild } from "../auth";
 import { buildGuildConfigExport, sanitizeImportedConfig } from "../guildConfig";
 import { assertWithinLimit, planForGuild } from "../plans";
+import { reconcileGreetingImages } from "./greetingImages";
 
 /**
  * Xuất cấu hình server ra JSON (để lưu ở nơi khác / dán lại sau khi đổi host).
@@ -82,6 +83,7 @@ export async function importGuildConfigHandler(
     return { ok: false, applied: [], ignored: result.ignored, invalid: result.invalid };
   }
 
+  await reconcileGreetingImages(ctx, guild, result.patch);
   const now = Date.now();
   await ctx.db.patch(guild._id, {
     ...result.patch,

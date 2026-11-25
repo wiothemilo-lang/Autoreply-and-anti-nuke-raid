@@ -25,6 +25,15 @@ export default defineSchema({
     // bị TỪ CHỐI khi đọc chứ không bao giờ bị xoá — bảng phình mãi.
     .index("by_createdAt", ["createdAt"]),
 
+  dashboardUploads: defineTable({
+    storageId: v.id("_storage"),
+    guildId: v.string(),
+    purpose: v.union(v.literal("greeting"), v.literal("import")),
+    url: v.optional(v.string()),
+  })
+    .index("by_storageId", ["storageId"])
+    .index("by_url", ["url"]),
+
   /**
    * Ngôn ngữ được đểt bằng `/language`. Để được chưa dùng của mình
    * (locale client Discord) thì Bot nhền ra được dùng gì.

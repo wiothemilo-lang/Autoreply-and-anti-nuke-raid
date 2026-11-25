@@ -1,5 +1,5 @@
-import { internalMutation, mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
+import { v, type ObjectType } from "convex/values";
 import { getUserByToken, canManageGuild, guildAccessibleBy } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { reassembleBackupJsonForRead } from "./backupChunks";
@@ -10,6 +10,8 @@ import { assertWithinLimit, planForGuild } from "./plans";
 // tự khai 180s (bằng đúng nhịp sync) nên bảng Backup báo "bot offline" trong
 // khi bot vẫn sync đều. Xem convex/heartbeat.ts.
 import { BOT_ONLINE_WINDOW_MS } from "./heartbeat";
+import { deleteOwnedUpload, findOwnedUpload } from "./guilds/uploadOwnership";
+import { MAX_DASHBOARD_UPLOAD_BYTES } from "./guilds/greetingImages";
 
 /**
  * Backup server → đám mây GitHub.
@@ -31,7 +33,7 @@ import { BOT_ONLINE_WINDOW_MS } from "./heartbeat";
  * Convex file storage (không giới hạn kích thước) chứ không nhét vào document
  * (document chỉ chứa tối đa 1 MB).
  */
-const MAX_IMPORT_FILE_BYTES = 8_000_000;
+const MAX_IMPORT_FILE_BYTES = MAX_DASHBOARD_UPLOAD_BYTES;
 /**
  * Trần số bản backup ĐỌC RA cho mỗi server (danh sách chat/dashboard/audit).
  * PHẢI bằng trần của quy tắc giữ bản (`backupKeepCount`: 2-50 ở botStoreBackup
@@ -498,48 +500,75 @@ export const generateImportUploadUrl = mutation({
  * server hiện tại theo đúng thứ tự role/kênh/tin nhắn có trong file. File đã nằm
  * trong Convex file storage — chỉ cần lưu mã file (storageId) vào guild.
  */
+const requestImportRestoreArgs = {
+  token: v.string(),
+  guildId: v.string(),
+  fileName: v.string(),
+  storageId: v.id("_storage"),
+};
+
+async function requestImportRestoreHandler(
+  ctx: MutationCtx,
+  { token, guildId, fileName, storageId }: ObjectType<typeof requestImportRestoreArgs>,
+  owned = false,
+) {
+  const user = await getUserByToken(ctx, token);
+  const guild = await ctx.db
+    .query("guilds")
+    .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
+    .first();
+  if (!guild || !canManageGuild(user, guild)) {
+    throw new Error("Không có quyền quản lý server này");
+  }
+  if (!guild.botInGuild) throw new Error("Bot chưa có trong server này");
+  if (claimIsActive(guild.restoreClaimedAt, guild.restoreLeaseUntil)) {
+    throw new Error("Bot đang xử lý yêu cầu khôi phục trước; hãy đợi hoàn tất rồi thử lại");
+  }
+  const meta = await ctx.storage.getMetadata(storageId);
+  if (!meta) {
+    throw new Error("File không tồn tại hoặc đã bị xóa — hãy chọn lại file");
+  }
+  if (meta.size > MAX_IMPORT_FILE_BYTES) {
+    throw new Error(
+      `File quá lớn (tối đa ${MAX_IMPORT_FILE_BYTES / 1_000_000} MB — file này ${(meta.size / 1_000_000).toFixed(1)} MB). Hãy nén hoặc bỏ bớt media nặng rồi thử lại.`,
+    );
+  }
+  const upload = await findOwnedUpload(ctx, storageId);
+  if (upload && (upload.guildId !== guildId || upload.purpose !== "import")) {
+    throw new Error("File không thuộc lượt import của server này");
+  }
+  if (owned && !upload) {
+    await ctx.db.insert("dashboardUploads", { storageId, guildId, purpose: "import" });
+  }
+  if (guild.importStorageId && guild.importStorageId !== storageId) {
+    await deleteOwnedUpload(
+      ctx,
+      guildId,
+      "import",
+      await findOwnedUpload(ctx, guild.importStorageId),
+    );
+  }
+  await ctx.db.patch(guild._id, {
+    importRestoreRequested: true,
+    importFileName: String(fileName || "backup.msc").slice(0, 120),
+    importStorageId: storageId,
+    importError: undefined,
+    importErrorAt: undefined,
+    restoreClaimedAt: undefined,
+    restoreLeaseUntil: undefined,
+    updatedAt: Date.now(),
+  });
+  return { ok: true };
+}
+
 export const requestImportRestore = mutation({
-  args: {
-    token: v.string(),
-    guildId: v.string(),
-    fileName: v.string(),
-    storageId: v.id("_storage"),
-  },
-  handler: async (ctx, { token, guildId, fileName, storageId }) => {
-    const user = await getUserByToken(ctx, token);
-    const guild = await ctx.db
-      .query("guilds")
-      .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
-      .first();
-    if (!guild || !canManageGuild(user, guild)) {
-      throw new Error("Không có quyền quản lý server này");
-    }
-    if (!guild.botInGuild) throw new Error("Bot chưa có trong server này");
-    if (claimIsActive(guild.restoreClaimedAt, guild.restoreLeaseUntil)) {
-      throw new Error("Bot đang xử lý yêu cầu khôi phục trước; hãy đợi hoàn tất rồi thử lại");
-    }
-    const meta = await ctx.storage.getMetadata(storageId);
-    if (!meta) {
-      throw new Error("File không tồn tại hoặc đã bị xóa — hãy chọn lại file");
-    }
-    if (meta.size > MAX_IMPORT_FILE_BYTES) {
-      throw new Error(
-        `File quá lớn (tối đa ${MAX_IMPORT_FILE_BYTES / 1_000_000} MB — file này ${(meta.size / 1_000_000).toFixed(1)} MB). Hãy nén hoặc bỏ bớt media nặng rồi thử lại.`,
-      );
-    }
-    // Chỉ lưu tham chiếu; storageId do dashboard gửi không chứng minh quyền sở hữu.
-    await ctx.db.patch(guild._id, {
-      importRestoreRequested: true,
-      importFileName: String(fileName || "backup.msc").slice(0, 120),
-      importStorageId: storageId,
-      importError: undefined,
-      importErrorAt: undefined,
-      restoreClaimedAt: undefined,
-      restoreLeaseUntil: undefined,
-      updatedAt: Date.now(),
-    });
-    return { ok: true };
-  },
+  args: requestImportRestoreArgs,
+  handler: requestImportRestoreHandler,
+});
+
+export const requestOwnedImportRestore = internalMutation({
+  args: requestImportRestoreArgs,
+  handler: (ctx, args) => requestImportRestoreHandler(ctx, args, true),
 });
 
 /**

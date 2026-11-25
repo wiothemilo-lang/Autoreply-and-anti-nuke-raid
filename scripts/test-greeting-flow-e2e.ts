@@ -31,11 +31,13 @@ import {
   updateSettings,
   getBotConfig,
   saveGreetingImage,
+  saveOwnedGreetingImage,
   removeGreetingImage,
 } from "../convex/guilds";
 import { botLockState } from "../convex/bot_writes";
 import { getPendingJobs } from "../convex/bot_tick";
 import { computeBotKey } from "../convex/botAuth";
+import http from "../convex/http";
 
 import { createRequire } from "node:module";
 /** Bot là CommonJS — nạp module THẬT của production qua createRequire. */
@@ -779,6 +781,66 @@ async function applyDashboard(h: ReturnType<typeof seed>, store: any, client: an
       h.deletedStorage.length === dBefore && h.rows("guilds")[1].welcomeEmbedImage?.endsWith(idDel),
     );
     check("7g: ô bị xoá được đặt về trống", h.rows("guilds")[0].welcomeEmbedImage === undefined);
+
+    let managedId = "";
+    const uploadToken = "fixture-upload";
+    const [upload] = http.lookup("/dashboard/upload", "POST")!;
+    const response = await (upload as any)._handler(
+      {
+        runQuery: async (_ref: unknown, args: Row) =>
+          args.token === uploadToken ? { manageableGuildIds: [GID] } : null,
+        runMutation: async (_ref: unknown, args: Row) =>
+          (saveOwnedGreetingImage as any)._handler(h.ctx, { ...args, token: TOKEN }),
+        storage: {
+          store: async (blob: Blob) => {
+            managedId = h.putStorage(Buffer.from(await blob.arrayBuffer()), blob.type);
+            return managedId;
+          },
+          delete: h.ctx.storage.delete,
+        },
+      },
+      new Request(
+        `https://test.convex.site/dashboard/upload?guild=${GID}&purpose=greeting&slot=welcomeEmbedImage`,
+        {
+          method: "POST",
+          headers: {
+            origin: "https://protogon.freebuff.app",
+            authorization: `Bearer ${uploadToken}`,
+          },
+          body: new Uint8Array(PNG_1PX),
+        },
+      ),
+    );
+    check(
+      "7h: HTTP upload ảnh qua origin chính phục vụ đúng CORS",
+      response.ok &&
+        response.headers.get("access-control-allow-origin") === "https://protogon.freebuff.app",
+    );
+    const managedUrl = h.rows("guilds")[0].welcomeEmbedImage;
+    check(
+      "7h: upload server-side ghi chủ sở hữu và URL tương ứng",
+      h.rows("dashboardUploads").some((row) => row.storageId === managedId && row.guildId === GID),
+    );
+    await (updateSettings as any)._handler(h.ctx, {
+      token: TOKEN,
+      guildId: GID,
+      goodbyeEmbedImage: managedUrl,
+    });
+    await (removeGreetingImage as any)._handler(h.ctx, {
+      token: TOKEN,
+      guildId: GID,
+      slot: "welcomeEmbedImage",
+    });
+    check("7h: giữ ảnh còn tham chiếu ở slot khác", !h.deletedStorage.includes(managedId));
+    await (removeGreetingImage as any)._handler(h.ctx, {
+      token: TOKEN,
+      guildId: GID,
+      slot: "goodbyeEmbedImage",
+    });
+    check(
+      "7h: dọn ảnh có chủ sở hữu khi tham chiếu cuối được gỡ",
+      h.deletedStorage.includes(managedId) && h.rows("dashboardUploads").length === 0,
+    );
   }
 
   console.log("\n═══ LUỒNG 8: goodbye card — tạm biệt cũng có ảnh riêng ═══");

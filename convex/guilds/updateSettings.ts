@@ -15,6 +15,7 @@ import { HEAT_DEFAULTS } from "../modules";
 import { assertWithinLimit, planForGuild } from "../plans";
 import { isIpCollectionEnabled, IP_COLLECTION_LOCK_REASON } from "../ipCollectionLock";
 import { THEME_KEYS } from "../guildConfig";
+import { reconcileGreetingImages } from "./greetingImages";
 
 /**
  * Ngôn ngữ nhãn log bot thật sự có bản dịch. Thêm ngôn ngữ ở đây thì PHẢI thêm
@@ -592,6 +593,7 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
     patch.verifyPanelError = undefined;
     patch.verifyPanelErrorAt = undefined;
   }
+  await reconcileGreetingImages(ctx, guild, patch);
   await ctx.db.patch(guild._id, patch);
   return { ok: true };
 }

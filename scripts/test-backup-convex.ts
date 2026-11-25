@@ -30,6 +30,7 @@ import {
   importStatus,
   requestBackup,
   requestImportRestore,
+  requestOwnedImportRestore,
   requestRestore,
   setRetention,
   requestRestorePlan,
@@ -90,6 +91,7 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
   const guildRows: Row[] = [];
   // Phiên + người dùng cho getUserByToken (importStatus/requestBackup cần đăng nhập).
   const sessionRows: Row[] = [];
+  const uploadRows: Row[] = [];
   const userRows: Row[] = [];
   const statusRows: Row[] =
     opts.seed === null ? [] : [{ kind: "status", botKeySeed: computeBotKey(opts.seed ?? BOT_KEY) }];
@@ -105,6 +107,7 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     botStatus: statusRows,
     backupChunks: chunkRows,
     entitlements: entitlementRows,
+    dashboardUploads: uploadRows,
   });
   const ctx = {
     now,
@@ -121,6 +124,11 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
         entitlementRows.find((r) => r._id === id) ??
         null,
       delete: async (id: string) => {
+        const upload = uploadRows.findIndex((row) => row._id === id);
+        if (upload >= 0) {
+          uploadRows.splice(upload, 1);
+          return;
+        }
         const i = backupRows.findIndex((r) => r._id === id);
         if (i >= 0) {
           backupRows.splice(i, 1);
@@ -151,6 +159,12 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
           if (table === "sessions") {
             return {
               first: async () => sessionRows.find((s) => s.token === capture.token) ?? null,
+            };
+          }
+          if (table === "dashboardUploads") {
+            return {
+              first: async () =>
+                uploadRows.find((row) => row.storageId === capture.storageId) ?? null,
             };
           }
           // Gói của server: index by_guildId (planForGuild đọc bằng collect).
@@ -398,6 +412,9 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     });
     check("import lỗi vẫn hiển thị lý do", guildRows[0].importError === "File không hợp lệ");
     check("vòng đời import giữ các file chưa xác minh quyền sở hữu", deletedStorage.length === 0);
+    await (requestOwnedImportRestore as any)._handler(importCtx, { ...args, storageId: "owned" });
+    await clearHandler(importCtx, { guildId: "g1", kind: "import", botKey: BOT_KEY });
+    check("dọn file import có chủ sở hữu khi job hoàn tất", deletedStorage.join() === "owned");
   }
 
   {

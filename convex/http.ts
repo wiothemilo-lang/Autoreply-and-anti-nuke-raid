@@ -11,6 +11,8 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { allowVerifyRequest, allowVerifySelfTest } from "./httpRateGuard";
+import { GREETING_IMAGE_SLOTS, MAX_DASHBOARD_UPLOAD_BYTES } from "./guilds/greetingImages";
+import { dashboardUploadOrigins, greetingImageContentType } from "./guilds/uploadOwnership";
 import { isPublicIp, normalizeIpToken, resolveClientIp, splitXff } from "./clientIp";
 import {
   isIpCollectionEnabled,
@@ -96,6 +98,73 @@ function verifyJson(body: unknown, origin: string | null, status = 200): Respons
     headers: { "content-type": "application/json; charset=utf-8", ...verifyCors(origin) },
   });
 }
+
+const uploadDashboardFile = httpAction(async (ctx, request) => {
+  const origin = request.headers.get("origin");
+  const allowed = origin && dashboardUploadOrigins().includes(origin);
+  const headers = {
+    ...verifyCors(origin),
+    "access-control-allow-headers": "authorization, content-type",
+    ...(allowed ? { "access-control-allow-origin": origin } : {}),
+  };
+  const reply = (status: number, code: string) => Response.json({ code }, { status, headers });
+  if (!allowed) return reply(403, "forbidden_origin");
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
+
+  const auth = request.headers.get("authorization");
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  if (!token) return reply(401, "unauthenticated");
+
+  const params = new URL(request.url).searchParams;
+  const guildId = params.get("guild") ?? "";
+  const purpose = params.get("purpose");
+  const slotName = params.get("slot");
+  const slot = GREETING_IMAGE_SLOTS.find((item) => item === slotName);
+  const fileName = params.get("fileName")?.slice(0, 120) || "backup.msc";
+  if (!/^\d{15,21}$/.test(guildId) || (purpose !== "import" && !(purpose === "greeting" && slot))) {
+    return reply(400, "invalid_upload");
+  }
+  const user = await ctx.runQuery(internal.sessionHardening.getUserByTokenInternal, { token });
+  if (!user?.manageableGuildIds?.includes(guildId)) return reply(403, "forbidden");
+  if (Number(request.headers.get("content-length")) > MAX_DASHBOARD_UPLOAD_BYTES) {
+    return reply(413, "file_too_large");
+  }
+
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength === 0) return reply(400, "empty_file");
+  if (bytes.byteLength > MAX_DASHBOARD_UPLOAD_BYTES) return reply(413, "file_too_large");
+  const type =
+    purpose === "greeting"
+      ? greetingImageContentType(new Uint8Array(bytes))
+      : "application/octet-stream";
+  if (!type) return reply(415, "invalid_image_type");
+
+  const storageId = await ctx.storage.store(new Blob([bytes], { type }));
+  try {
+    if (slot && purpose === "greeting") {
+      await ctx.runMutation(internal.guilds.saveOwnedGreetingImage, {
+        token,
+        guildId,
+        storageId,
+        slot,
+      });
+    } else {
+      await ctx.runMutation(internal.backup.requestOwnedImportRestore, {
+        token,
+        guildId,
+        storageId,
+        fileName,
+      });
+    }
+    return reply(200, "ok");
+  } catch {
+    await ctx.storage.delete(storageId).catch(() => {});
+    return reply(409, "upload_not_saved");
+  }
+});
+
+http.route({ path: "/dashboard/upload", method: "POST", handler: uploadDashboardFile });
+http.route({ path: "/dashboard/upload", method: "OPTIONS", handler: uploadDashboardFile });
 
 /**
  * CORS riêng cho self-test: cho phép `authorization` + hai header dò XFF.

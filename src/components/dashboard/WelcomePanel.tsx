@@ -19,6 +19,7 @@ import {
   UserPlus,
   Wand2,
 } from "lucide-react";
+import { uploadDashboardFile } from "../../lib/dashboardUpload";
 import type { GenericId } from "convex/values";
 import { api } from "../../../convex/_generated/api";
 import { Card, CardContent } from "../ui/card";
@@ -347,6 +348,7 @@ function TemplateField({
 function ImageSlot({
   slot,
   guildId,
+  ownedDashboardUploads,
   title,
   hint,
   value,
@@ -354,6 +356,7 @@ function ImageSlot({
 }: {
   slot: ImageSlot;
   guildId: string;
+  ownedDashboardUploads?: boolean;
   title: string;
   hint: string;
   value: string;
@@ -377,32 +380,38 @@ function ImageSlot({
     }
     setBusy(true);
     try {
-      const uploadUrl = await generateUploadUrl({ token: TOKEN(), guildId });
-      // Convex storage nhận POST (không phải PUT) — PUT bị CORS preflight chặn.
-      const res = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type || "image/png" },
-        body: file,
-      });
-      if (!res.ok)
-        throw new Error(translate("Tải ảnh lên máy chủ thất bại (HTTP {p0})", { p0: res.status }));
-      let storageId = "";
-      try {
-        const data = (await res.json()) as { storageId?: string };
-        storageId = data?.storageId ?? "";
-      } catch {
-        // phản hồi không phải JSON
+      if (ownedDashboardUploads) {
+        await uploadDashboardFile(TOKEN(), guildId, file, { purpose: "greeting", slot });
+      } else {
+        const uploadUrl = await generateUploadUrl({ token: TOKEN(), guildId });
+        // Convex storage nhận POST (không phải PUT) — PUT bị CORS preflight chặn.
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type || "image/png" },
+          body: file,
+        });
+        if (!res.ok)
+          throw new Error(
+            translate("Tải ảnh lên máy chủ thất bại (HTTP {p0})", { p0: res.status }),
+          );
+        let storageId = "";
+        try {
+          const data = (await res.json()) as { storageId?: string };
+          storageId = data?.storageId ?? "";
+        } catch {
+          // phản hồi không phải JSON
+        }
+        if (!storageId)
+          throw new Error(
+            translate("Máy chủ không trả về ID ảnh — hãy thử dán đường dẫn ảnh thay thế"),
+          );
+        await saveImage({
+          token: TOKEN(),
+          guildId,
+          storageId: storageId as GenericId<"_storage">,
+          slot,
+        });
       }
-      if (!storageId)
-        throw new Error(
-          translate("Máy chủ không trả về ID ảnh — hãy thử dán đường dẫn ảnh thay thế"),
-        );
-      await saveImage({
-        token: TOKEN(),
-        guildId,
-        storageId: storageId as GenericId<"_storage">,
-        slot,
-      });
       toast.success(translate("Đã lưu ảnh — bot dùng ảnh mới trong khoảng 1 phút"));
     } catch (err) {
       toastConvexError(err, translate("Tải ảnh thất bại"));
@@ -779,6 +788,9 @@ function GreetingCard({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <ImageSlot
+                    ownedDashboardUploads={g.ownedDashboardUploadOrigins?.includes(
+                      window.location.origin,
+                    )}
                     slot={`${kind}EmbedImage`}
                     guildId={g.discordId}
                     title={translate("Ảnh banner")}
@@ -787,6 +799,9 @@ function GreetingCard({
                     previewClass="h-10 w-14"
                   />
                   <ImageSlot
+                    ownedDashboardUploads={g.ownedDashboardUploadOrigins?.includes(
+                      window.location.origin,
+                    )}
                     slot={`${kind}EmbedThumbnail`}
                     guildId={g.discordId}
                     title={translate("Thumbnail")}
@@ -843,6 +858,9 @@ function GreetingCard({
 
                   {cardEnabled && (
                     <ImageSlot
+                      ownedDashboardUploads={g.ownedDashboardUploadOrigins?.includes(
+                        window.location.origin,
+                      )}
                       slot={`${kind}CardBackground`}
                       guildId={g.discordId}
                       title={translate("Ảnh nền thẻ")}

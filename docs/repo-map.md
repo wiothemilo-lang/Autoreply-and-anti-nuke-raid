@@ -12,6 +12,7 @@ bot/ (discord.js, Bun, pm2 `protogon-bot` trên VPS) ⇄ convex/ (DB + backend) 
 ```
 
 - Cấu hình bot ⇄ dashboard đồng bộ qua Convex, trễ ~3 phút (guild sync + tick đều 180 giây).
+- Bảng `dashboardUploads` ghi server sở hữu ảnh chào và file import do HTTP action lưu.
 - Deploy Convex: CI tự chạy sau push main (lint+test xanh); VPS agent cũng
   deploy được qua guardrail 4 lớp (xem `docs/opencode-vps-guide.md`).
 
