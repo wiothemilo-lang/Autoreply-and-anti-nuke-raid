@@ -43,7 +43,11 @@ async function handleAutoReply(client, message, config, store) {
     store.recordReply(message.guild.id, rule._id);
     try {
       let text = fillPlaceholders(rule.response, message.author);
-      if (text.length > 1900) text = text.slice(0, 1900) + "…";
+      if (text.length > 1900) {
+        // Nếu ký tự cuối chiếm hai đơn vị UTF-16, giữ hoặc bỏ cả cặp.
+        const end = text.codePointAt(1899) > 0xffff ? 1899 : 1900;
+        text = text.slice(0, end) + "…";
+      }
       await message.reply({ content: text, allowedMentions: { parse: ["users"] } });
     } catch (err) {
       console.error(`[autoreply] ${message.guild.id}/${rule.name}:`, err.message);
