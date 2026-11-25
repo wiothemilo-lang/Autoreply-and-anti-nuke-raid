@@ -1,0 +1,37 @@
+name: Sao lưu Convex production
+
+# Chạy tay khi cần snapshot toàn bộ dữ liệu production trước một thao tác phá huỷ.
+# Không tải dữ liệu về runner: Convex tạo bản export và in link tải từ dashboard,
+# nhờ vậy dữ liệu người dùng không nằm trong artifact của repo.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      # GitHub Releases hay trả 504 khi tải Bun — cài từ npm như job deploy.
+      - name: Cài Bun từ npm (tránh 504 từ GitHub Releases)
+        run: |
+          for i in 1 2 3; do
+            npm install -g bun@1.4.4 --prefix "$HOME/.bun-npm" --no-audit --no-fund && break
+            echo "npm install bun thất bại lần $i — thử lại sau 5s"
+            sleep 5
+          done
+          echo "$HOME/.bun-npm/bin" >> "$GITHUB_PATH"
+          "$HOME/.bun-npm/bin/bun" --version
+      - run: bun install --frozen-lockfile
+      - name: Tạo bản export production
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          if [ -z "$CONVEX_DEPLOY_KEY" ]; then
+            echo "::error::Thiếu secret CONVEX_DEPLOY_KEY"
+            exit 1
+          fi
+          npx convex export --prod
