@@ -1401,29 +1401,13 @@ export const DE: Record<string, string> = {
   "Đã lưu quyền xem kênh ticket": "Sichtbarkeit der Ticket-Kanäle gespeichert",
   "Đã lưu cách chia danh mục": "Kategorie-Layout gespeichert",
 
-  // ── Seitennavigator + Seiten Unterstützung / Premium ──
+  // ── Seitennavigator ──
   Menu: "Menü",
   "Trang chủ": "Startseite",
   "Thống kê": "Statistiken",
   "Khám phá": "Entdecken",
   "Tài khoản": "Konto",
-  "Ủng hộ": "Unterstützen",
-  "Ủng hộ nhà phát triển": "Entwickler unterstützen",
-  "Gói Premium": "Premium-Tarife",
-  "Gói Premium tạm ngừng bán — Protogon":
-    "Premium-Tarife vorübergehend nicht erhältlich — Protogon",
-  "Gói Premium của Protogon hiện tạm ngừng bán vì chưa đủ điều kiện pháp lý để giao dịch. Gói Miễn phí vẫn dùng được cho mọi server.":
-    "Die Premium-Tarife von Protogon sind vorübergehend nicht käuflich, da ein Verkauf derzeit rechtlich nicht möglich ist. Der kostenlose Tarif bleibt für jeden Server verfügbar.",
-  "Protogon do nhóm RFTV tự bỏ chi phí máy chủ và thời gian duy trì. Mọi tính năng đang mở miễn phí cho mọi server — quyền góp ở đây chỉ để bot có thêm tháng độ ổn định.":
-    "Das RFTV-Team trägt die Serverkosten und die Wartungszeit von Protogon. Alle Funktionen sind derzeit für jeden Server kostenlos — Spenden hier verlängern einfach die Betriebszeit des Bots.",
-  "Ủng hộ qua QR là quà tặng cá nhân, không mở khoá tính năng nào. Cần xác nhận thì nhắn trong Discord.":
-    "Eine QR-Spende ist ein persönliches Geschenk und schaltet keine Funktion frei. Melde dich bei Bedarf im Discord.",
   Mới: "Neu",
-  "Giữ cho Protogon mở cửa miễn phí": "Halt Protogon kostenlos und offen",
-  "Protogon do nhóm RFTV tự bỏ chi phí máy chủ và thời gian duy trì. Gói Miễn phí vẫn dùng được cho mọi server — quyền góp ở đây KHÔNG nằm trong luồng mua gói Premium, mà để bot có thêm tháng độ ổn định.":
-    "Das RFTV-Team trägt Serverkosten und Wartungszeit von Protogon. Der kostenlose Tarif bleibt für jeden Server nutzbar — Spenden hier sind NICHT Teil des Premium-Kaufs; sie kaufen dem Bot mehr Laufzeit.",
-  "Ủng hộ qua Discord": "Über Discord unterstützen",
-  "Xem gói Premium": "Premium-Tarife ansehen",
 
   // ── Seite Feedback (/feedback) ──
   "Góp ý": "Feedback",
@@ -1466,34 +1450,6 @@ export const DE: Record<string, string> = {
   "Nếu bạn cần trả lời gấp hoặc muốn cả cộng đồng cùng bàn, vào Discord — kênh hỗ trợ có người theo dõi.":
     "Wenn es schnell gehen soll oder die Community mitreden soll: komm auf Discord — der Support-Kanal wird betreut.",
   "Vào Discord": "Discord beitreten",
-  "Ủng hộ trực tiếp bằng mã QR": "Direkt per QR-Code unterstützen",
-  "Không cần đăng nhập, không qua cổng thanh toán: mở app ngân hàng hoặc ví điện tử của bạn, quét mã rồi chuyển số tiền bạn muốn. Tiền vào thẳng ví nhà phát triển.":
-    "Keine Anmeldung, kein Zahlungsanbieter dazwischen: öffne deine Banking- oder Wallet-App, scanne den Code und sende den Betrag, den du möchtest. Das Geld landet direkt im Wallet des Entwicklers.",
-  "Quét được bằng ZaloPay, MoMo, VietQR và app ngân hàng bất kỳ":
-    "Funktioniert mit ZaloPay, MoMo, VietQR und jeder Banking-App",
-  "Chủ ví: NGUYEN DUY KHIEM — kiểm tra đúng tên trước khi chuyển":
-    "Kontoinhaber: NGUYEN DUY KHIEM — prüfe den Namen, bevor du sendest",
-  "Ủng hộ qua QR là quà tặng cá nhân, không tự mở khoá Premium. Cần xác nhận thì nhắn trong Discord.":
-    "Eine QR-Spende ist ein persönliches Geschenk und schaltet Premium nicht automatisch frei. Schreib uns auf Discord, wenn du eine Bestätigung brauchst.",
-  "Mã QR nhận ủng hộ của NGUYEN DUY KHIEM": "Spenden-QR-Code von NGUYEN DUY KHIEM",
-  "Quét mã bằng app chuyển tiền bất kỳ": "Scanne den Code mit einer beliebigen Überweisungs-App",
-  "Chọn mức tùy khả năng": "Wähle, was dir entspricht",
-  "Đây chỉ là gợi ý. Mọi mức đều được chào đón, kể cả một lời cảm ơn.":
-    "Das sind nur Vorschläge. Jeder Betrag ist willkommen, auch ein einfaches Danke.",
-  "Quyền góp giúp được gì": "Was deine Unterstützung bewirkt",
-  "Nói thẳng: quyền góp KHÔNG tạo ra tính năng độc quyền và không xoá được quảng cáo. Nó giữ cho bot có máy chủ và có người trực sửa lỗi.":
-    "Ganz direkt: Unterstützung schaltet keine Exklusivfunktionen frei und entfernt keine Werbung. Sie hält den Server am Laufen und jemanden da, der Fehler behebt.",
-  "Giúp theo cách khác": "Andere Wege zu helfen",
-  "Tham gia cộng đồng Discord": "Discord-Community beitreten",
-  "Báo lỗi, xin tính năng, hoặc chỉ để chào":
-    "Fehler melden, Features wünschen oder einfach hallo sagen",
-  "Theo dõi trên Facebook": "Auf Facebook folgen",
-  "Cập nhật khi có phiên bản mới": "Updates bei neuen Versionen",
-  "Trả phí để bot có thêm sức làm việc": "Bezahlen, damit der Bot mehr Luft bekommt",
-  "Gói Miễn phí luôn ở đó và không bao giờ bị cắt bớt. Premium chỉ mở thêm tiện ích cho server cần nhiều hơn — và là cách duy nhất để duy trì bot trong dài hạn.":
-    "Der kostenlose Tarif bleibt und wird nie beschnitten. Premium ergänzt nur Extras für Server mit mehr Bedarf — und ist der einzige Weg, den Bot dauerhaft zu betreiben.",
-  "Được nhiều người chọn": "Am beliebtesten",
-  "Đăng ký qua Discord": "Über Discord anmelden",
   // ── Konfigurations-Score (Übersicht, Runde #4) ──
   "Điểm cấu hình": "Konfigurations-Score",
   "Đã bật đủ các lớp bảo vệ chính.": "Alle wichtigen Schutzebenen sind aktiv.",
@@ -1580,46 +1536,6 @@ export const DE: Record<string, string> = {
     "Zugriff auf den Ursprungsserver verloren (Rollen durch Nuke entfernt, rausgeworfen oder Server gelöscht)? Hier den Wiederherstellungsschlüssel eines Backups einfügen, um dessen Struktur im aktuellen Server neu aufzubauen.",
   "Không tìm thấy bản backup nào với mã này — kiểm tra lại mã, hoặc dùng bản backup mới nhất.":
     "Kein Backup passt zu diesem Schlüssel — bitte prüfen oder das neueste Backup verwenden.",
-  /* ==== Thanh toán ZaloPay (06/10/2026) ==== Xem i18n.en.ts. */
-  "Đang mở ZaloPay…": "ZaloPay wird geöffnet…",
-  "Ủng hộ {so}": "{so} spenden",
-  "Ủng hộ số tiền này": "Diesen Betrag spenden",
-  "Số tiền khác (VND)": "Anderer Betrag (VND)",
-  "Không tạo được đơn thanh toán — thử lại sau ít phút.":
-    "Zahlungsauftrag konnte nicht erstellt werden – bitte in wenigen Minuten erneut versuchen.",
-  "Cổng thanh toán trả về địa chỉ không hợp lệ — thử lại sau.":
-    "Das Zahlungsgateway hat eine ungültige Adresse zurückgegeben – bitte später erneut versuchen.",
-  "Số tiền phải từ 10.000đ đến 100.000.000đ.":
-    "Der Betrag muss zwischen 10.000 ₫ und 100.000.000 ₫ liegen.",
-  "Thanh toán một lần qua ZaloPay — không lưu thông tin thẻ, không tự động trừ tiền.":
-    "Einmalige Zahlung über ZaloPay – keine Kartendaten gespeichert, keine automatischen Abbuchungen.",
-  "Miễn phí vĩnh viễn": "Kostenlos auf unbegrenzte Zeit",
-  "Bạn đang có gói cao hơn": "Du hast bereits einen höheren Tarif",
-  "Gia hạn thêm 30 ngày": "Um 30 Tage verlängern",
-  "Gói {goi} đang hoạt động — dùng tới {ngay}": "Tarif {goi} aktiv bis {ngay}",
-  "Gói {goi} đã hết hạn {ngay}": "Tarif {goi} am {ngay} abgelaufen",
-  "Một lần thanh toán cho 30 ngày Premium — không tự động trừ tiền, hết hạn thì mua lại nếu muốn.":
-    "Eine Zahlung deckt 30 Tage Premium – keine automatischen Abbuchungen; bei Bedarf nach Ablauf erneut kaufen.",
-  "Cần giúp trước khi mua?": "Brauchst du Hilfe vor dem Kauf?",
-  "Nhắn một câu trong Discord — mình trả lời trong 24 giờ, kể cả khi bạn chỉ muốn hỏi Premium làm gì.":
-    "Schreib kurz auf Discord – ich antworte innerhalb von 24 Stunden, auch wenn du nur fragen willst, was Premium bringt.",
-  "Đang xác nhận thanh toán…": "Zahlung wird bestätigt…",
-  "Mã đơn": "Bestellnummer",
-  "Thanh toán thành công — cảm ơn bạn!": "Zahlung erfolgreich – danke!",
-  "Đã thanh toán {so}đ qua ZaloPay — gói {goi} đã kích hoạt.":
-    "{so} ₫ über ZaloPay bezahlt – der Tarif {goi} ist jetzt aktiv.",
-  "Đã thanh toán {so}đ qua ZaloPay. Cảm ơn bạn đã giữ Protogon mở cửa miễn phí.":
-    "{so} ₫ über ZaloPay bezahlt. Danke, dass Protogon kostenlos bleibt.",
-  "Hoàn tất": "Fertig",
-  "Chưa nhận được xác nhận": "Noch keine Bestätigung",
-  "ZaloPay chưa báo giao dịch thành công. Nếu bạn ĐÃ thanh toán, quay lại trang này sau vài phút — tiền không bị mất.":
-    "ZaloPay hat die Transaktion noch nicht bestätigt. Wenn du bereits bezahlt hast, kehre in wenigen Minuten zurück – dein Geld ist sicher.",
-  "Thanh toán thất bại": "Zahlung fehlgeschlagen",
-  "Giao dịch bị huỷ hoặc không thành công — chưa có khoản tiền nào bị trừ.":
-    "Die Transaktion wurde abgebrochen oder ist fehlgeschlagen – es wurde nichts abgebucht.",
-  "Đăng nhập lại để kiểm tra đơn": "Erneut anmelden, um diese Bestellung zu prüfen",
-  "Phiên đăng nhập cần thiết để xem trạng thái đơn thanh toán này.":
-    "Für den Status dieser Zahlung musst du angemeldet sein.",
   /* ==== Seitenauswahl im HEADER + Team-Admins (07.10.2026) ==== */
   "Về trang chủ Protogon": "Zurück zur Protogon-Startseite",
   Trang: "Seiten",
@@ -1643,24 +1559,13 @@ export const DE: Record<string, string> = {
   "(do chủ bot đặt). Người dùng khác không thấy nút này và không truy cập được trang này.":
     "(vom Bot-Inhaber festgelegt). Andere Nutzer sehen diesen Eintrag nicht und können die Seite nicht öffnen.",
   /* ==== 10/10/2026 — Team-Admin nutzt das GANZE Admin-Fenster + Badge am
-     Logo + manuelles Plan-Vergeben (payments.grantPlan) ==== */
+     Logo ==== */
   Owner: "Owner",
   Admin: "Admin",
   "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.":
     "Füge Personen zum Team hinzu, damit sie das GANZE Admin-Fenster nutzen (Fehlerüberwachung, Host-Zustand, KI, Threat Research). Sie können das versteckte Passwort/den API-Sicherheitsschlüssel NICHT anfassen und selbst niemanden hinzufügen oder entfernen.",
   "Chưa có ai trong team — hãy thêm thành viên bên dưới.":
     "Noch niemand im Team – füge unten Mitglieder hinzu.",
-  "Cấp gói premium": "Premium-Plan vergeben",
-  "Cấp gói": "Plan vergeben",
-  "Gói cấp": "Vergebener Plan",
-  "Đã cấp gói.": "Plan vergeben.",
-  "Đã cấp gói {goi} — hạn tới {ngay}.": "{goi} vergeben – gültig bis {ngay}.",
-  "Cộng quyền lợi cho một người mà KHÔNG qua đơn thanh toán (bồi thường, đối tác, tài khoản thử). Nhập Discord ID người được cấp; nhập thêm Server ID nếu quyền lợi phải áp đúng cho server đó.":
-    "Berechtigungen vergeben ohne Zahlungsbestellung (Entschädigung, Partner, Testkonto). Gib die Discord-ID des Empfängers ein; füge eine Server-ID hinzu, wenn die Berechtigung nur für diesen Server gelten soll.",
-  "Discord ID người được cấp (15-21 chữ số)": "Discord-ID des Empfängers (15-21 Ziffern)",
-  "Server ID (tùy chọn — 15-21 chữ số)": "Server-ID (optional – 15-21 Ziffern)",
-  "Số ngày (1–365)": "Anzahl Tage (1–365)",
-  "Số ngày phải là số nguyên từ 1 đến 365.": "Tage müssen eine ganze Zahl von 1 bis 365 sein.",
   "Bạn là quản trị viên nhóm — danh sách này do chủ bot quản lý. Cần thêm hoặc bớt người, hãy báo chủ bot.":
     "Du bist Team-Admin — diese Liste verwaltet der Bot-Inhaber. Bitte den Bot-Inhaber, Personen hinzuzufügen oder zu entfernen.",
   "Chưa từng đăng nhập web": "Noch nie im Web angemeldet",
