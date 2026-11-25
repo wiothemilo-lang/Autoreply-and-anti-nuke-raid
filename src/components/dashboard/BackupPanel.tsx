@@ -1,3 +1,4 @@
+import { uploadDashboardFile } from "../../lib/dashboardUpload";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
@@ -712,26 +713,30 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     }
     setImportBusy(true);
     try {
-      // 1) Xin URL upload → 2) POST file thẳng lên Convex file storage (chấp nhận
-      // file lớn hơn giới hạn document) → 3) chỉ lưu mã file + đặt yêu cầu khôi phục.
-      const postUrl = await generateUploadUrl({
-        token: TOKEN(),
-        guildId: data.guild.discordId,
-      });
-      const res = await fetch(postUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
-      });
-      if (!res.ok) throw new Error(translate("Không tải file lên được — thử lại"));
-      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
-      if (!storageId) throw new Error(translate("Không nhận được mã file — thử lại"));
-      await requestImportRestore({
-        token: TOKEN(),
-        guildId: data.guild.discordId,
-        fileName: file.name,
-        storageId,
-      });
+      if (data.guild.ownedDashboardUploadOrigins?.includes(window.location.origin)) {
+        await uploadDashboardFile(TOKEN(), data.guild.discordId, file, { purpose: "import" });
+      } else {
+        // 1) Xin URL upload → 2) POST file thẳng lên Convex file storage (chấp nhận
+        // file lớn hơn giới hạn document) → 3) chỉ lưu mã file + đặt yêu cầu khôi phục.
+        const postUrl = await generateUploadUrl({
+          token: TOKEN(),
+          guildId: data.guild.discordId,
+        });
+        const res = await fetch(postUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!res.ok) throw new Error(translate("Không tải file lên được — thử lại"));
+        const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+        if (!storageId) throw new Error(translate("Không nhận được mã file — thử lại"));
+        await requestImportRestore({
+          token: TOKEN(),
+          guildId: data.guild.discordId,
+          fileName: file.name,
+          storageId,
+        });
+      }
       toast.success(translate('Đã tải "{p0}" lên — bot đang xử lý', { p0: file.name }), {
         description: translate(
           "Bot tự nhận diện định dạng (JSON thường, base64 hoặc có lớp bọc), dựng lại kênh đúng thứ tự cùng role/emoji/sticker theo Tùy chỉnh khôi phục, rồi phục hồi tin nhắn kèm media (ảnh/video…). Lỗi (nếu có) sẽ hiện ngay khi bot báo lại.",

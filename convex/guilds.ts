@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild, listBotGuildsForUser } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
@@ -21,6 +21,7 @@ import {
 // —— Đợt #5 tách file 99KB: thân hàm các nhóm dưới nằm ở `convex/guilds/*`,
 // wrapper + validator giữ nguyên tại đây để hợp đồng tên không đổi. ——
 import { updateSettingsArgs, updateSettingsHandler } from "./guilds/updateSettings";
+import { dashboardUploadOrigins } from "./guilds/uploadOwnership";
 import {
   exportGuildConfigArgs,
   exportGuildConfigHandler,
@@ -178,6 +179,7 @@ export const getGuild = query({
     return {
       guild: {
         discordId: guild.discordId,
+        ownedDashboardUploadOrigins: dashboardUploadOrigins(),
         name: guild.name,
         icon: guild.icon ?? null,
         memberCount: guild.memberCount ?? null,
@@ -764,6 +766,11 @@ export const generateGreetingImageUploadUrl = mutation({
 export const saveGreetingImage = mutation({
   args: saveGreetingImageArgs,
   handler: saveGreetingImageHandler,
+});
+
+export const saveOwnedGreetingImage = internalMutation({
+  args: saveGreetingImageArgs,
+  handler: (ctx, args) => saveGreetingImageHandler(ctx, args, true),
 });
 
 /** Xoá ảnh khỏi một ô + dọn storage — thân hàm ở `guilds/greetingImages.ts`. */

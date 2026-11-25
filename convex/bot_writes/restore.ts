@@ -11,6 +11,7 @@ import { v } from "convex/values";
 import type { ObjectType } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import { requireBotKeyStrict } from "../botAuth";
+import { deleteOwnedUpload, findOwnedUpload } from "../guilds/uploadOwnership";
 import { BACKUP_CLAIM_TTL_MS, claimIsActive, claimMatches } from "./shared";
 
 /** Bot (lệnh !backup restore / /backup restore) đặt cờ khôi phục cho một backup của đúng guild đó. */
@@ -263,7 +264,14 @@ export async function botClearBackupHandler(
     patch.importErrorAt = undefined;
     patch.restoreClaimedAt = undefined;
     patch.restoreLeaseUntil = undefined;
-    // Gỡ tham chiếu; importStorageId đến từ dashboard và chưa có thông tin sở hữu.
+    if (guild.importStorageId) {
+      await deleteOwnedUpload(
+        ctx,
+        guildId,
+        "import",
+        await findOwnedUpload(ctx, guild.importStorageId),
+      );
+    }
   } else if (kind === "plan") {
     // Dry-run KHÔNG đụng server nên không có "xong" để đánh dấu, và tuyệt đối
     // không đụng restoreFinishedAt — nếu không dashboard tưởng đã khôi phục xong.
@@ -374,6 +382,14 @@ export async function botReportImportErrorHandler(
     .first();
   if (!guild) return { ok: true };
   if (!claimMatches(guild, "import", claimAt)) return { ok: false, reason: "stale_claim" };
+  if (guild.importStorageId) {
+    await deleteOwnedUpload(
+      ctx,
+      guildId,
+      "import",
+      await findOwnedUpload(ctx, guild.importStorageId),
+    );
+  }
   await ctx.db.patch(guild._id, {
     importRestoreRequested: false,
     importFileName: undefined,

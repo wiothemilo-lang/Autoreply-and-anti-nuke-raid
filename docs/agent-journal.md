@@ -105,6 +105,12 @@
 
 ---
 
+## 2026-11-25 — Ghi nhận server sở hữu file upload dashboard
+
+- ✅ HTTP upload xác minh quyền, lưu file và ghi quyền sở hữu trước khi gắn ảnh hoặc đặt yêu cầu import.
+- ✅ Dọn file được quản lý khi hết tham chiếu hoặc import kết thúc. File cũ tiếp tục dùng được.
+- 🧪 90/90 suites CommonJS, 35/35 suites TypeScript, sàn coverage, typecheck và lint đạt.
+
 ## 2026-11-25 — Ổn định bộ lọc ký tự thẻ chào trên Canvas 1.1.1
 
 - ✅ Dùng bảng glyph của font nhúng để kết quả giữ chữ không phụ thuộc font hệ thống.

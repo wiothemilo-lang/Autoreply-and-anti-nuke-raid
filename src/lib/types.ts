@@ -106,6 +106,7 @@ export interface EmojiInfo {
 export interface GuildData {
   guild: {
     discordId: string;
+    ownedDashboardUploadOrigins?: string[];
     name: string;
     icon: string | null;
     memberCount: number | null;
