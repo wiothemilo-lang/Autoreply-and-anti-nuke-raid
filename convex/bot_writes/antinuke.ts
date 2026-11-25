@@ -11,6 +11,7 @@ import type { ObjectType } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import { ANTI_NUKE_MODULES, isAntiNukeModule } from "../modules";
 import { requireBotKeyStrict } from "../botAuth";
+import { recordDailyGuildActivity } from "../guildStats";
 import { TRIM_BATCH, dropBeyondCap, shouldTrim } from "./shared";
 
 const ALLOWED_ACTIONS = [
@@ -155,6 +156,7 @@ export async function botRecordAntinukeEventHandler(
       r.threshold === args.threshold,
   );
   if (dup) return { ok: true, deduped: true };
+  const now = Date.now();
   await ctx.db.insert("antinukeEvents", {
     guildId: args.guildId,
     module: args.module,
@@ -166,8 +168,9 @@ export async function botRecordAntinukeEventHandler(
     windowSeconds: args.windowSeconds,
     threshold: args.threshold,
     punish: args.punish,
-    createdAt: Date.now(),
+    createdAt: now,
   });
+  await recordDailyGuildActivity(ctx, args.guildId, now, { blocked: args.count || 0 });
   // Chống phình DB: giữ tối đa 800 sự kiện/server. KHÔNG đọc toàn bộ mỗi lần ghi
   // (tốn ~800 reads/event) — dọn theo xác suất + lô, xem `shouldTrim`.
   if (shouldTrim()) {

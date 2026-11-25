@@ -956,6 +956,15 @@ export const botRunRetention = mutation({
     const DAY = 24 * 3600_000;
     let deleted = 0;
 
+    const oldDailyStats = await ctx.db
+      .query("dailyGuildStats")
+      .withIndex("by_dayStart", (q) => q.lt("dayStart", now - 30 * DAY))
+      .take(200);
+    for (const row of oldDailyStats) {
+      await ctx.db.delete(row._id);
+      deleted++;
+    }
+
     const oldSessions = await ctx.db
       .query("verifySessions")
       .withIndex("by_expiresAt", (q) => q.lt("expiresAt", now - 7 * DAY))

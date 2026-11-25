@@ -318,6 +318,7 @@ export default function StatsPage() {
                             summary.weekly[0]
                               ? new Date(summary.weekly[0].dayStart).toLocaleDateString(
                                   dateLocale(),
+                                  { timeZone: "Asia/Ho_Chi_Minh" },
                                 )
                               : "",
                             translate("Hôm nay"),

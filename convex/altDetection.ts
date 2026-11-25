@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
+import { recordDailyGuildActivity } from "./guildStats";
 import { TRIM_BATCH, dropBeyondCap, shouldTrim } from "./bot_writes/shared";
 
 /** Alt detection configuration per guild. */
@@ -144,6 +145,7 @@ export const recordJoin = mutation({
       ipCountry: args.ipCountry,
       ipOrg: args.ipOrg,
     });
+    await recordDailyGuildActivity(ctx, args.guildId, now, { joined: true });
     // Giữ tối đa 500 lượt join/server. KHÔNG đọc toàn bộ mỗi lần join (tốn ~500
     // reads/join — rất nặng khi raid) — dọn theo xác suất + lô, xem `shouldTrim`.
     if (shouldTrim()) {

@@ -746,6 +746,16 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
   {
     const { ctx, tables, deletedStorage } = makeCtx({ verifyWebEnabled: true });
     const old = Date.now() - 800 * 24 * 3600_000;
+    tables.dailyGuildStats = [
+      { _id: "old-daily", guildId: GUILD, dayStart: old, joins: 5, blocked: 15 },
+      {
+        _id: "new-daily",
+        guildId: GUILD,
+        dayStart: Date.now() - 24 * 3600_000,
+        joins: 2,
+        blocked: 8,
+      },
+    ];
     tables.verifySessions.push({
       _id: "old-s",
       tokenHash: "x",
@@ -880,6 +890,10 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     });
 
     const res = await retentionH(ctx, { botKey: BOT_KEY });
+    check(
+      "dọn số liệu tổng hợp quá 30 ngày và giữ ngày gần đây",
+      tables.dailyGuildStats.length === 1 && tables.dailyGuildStats[0]._id === "new-daily",
+    );
     check("xoá phiên quá hạn 7 ngày", !tables.verifySessions.some((r) => r._id === "old-s"));
     check("xoá link quá 180 ngày", !tables.verifyLinks.some((r) => r._id === "old-l"));
     check("xoá audit quá 365 ngày", !tables.verifyAudit.some((r) => r._id === "old-a"));
