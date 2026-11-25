@@ -7,9 +7,9 @@
  * (src/lib/i18n.tsx import "./i18n.en").
  */
 export const EN: Record<string, string> = {
-  /* ==== ĐẶC QUYỀN DỮ LIỆU — P1–P4 (10/10/2026) ==== Xuất CSV + trần đọc theo
-     gói. Số trong câu lấy TỪ bảng hạn mức convex/plans.ts (CÙNG bảng mà query
-     xuất dữ liệu dùng để cắt) nên trang bán không hứa được nhiều hơn server cho. */
+  /* ==== ĐẶC QUYỀN DỮ LIỆU — P1–P4 (10/10/2026) ==== Xuất CSV + trần đọc.
+     Số trong câu lấy TỪ convex/limits.ts (CÙNG bảng mà query xuất dữ liệu dùng
+     để cắt) nên UI không hứa được nhiều hơn server cho. */
   "Bảng nhiệt hiện top {n} thành viên": "The heat leaderboard shows the top {n} members",
   "Log hành động hiện {n} dòng gần nhất": "The action log shows the latest {n} entries",
   "Top {n} thành viên bị cảnh báo nhiệt độ vi phạm":

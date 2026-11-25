@@ -17,7 +17,7 @@
  * không được biến thành cửa sổ đọc lỗi hạ tầng.
  */
 
-/** Minimal env typing để file này type-check cả từ Vite app (theo paymentsAction.ts). */
+/** Minimal env typing để file này type-check cả từ Vite app. */
 declare const process: {
   env: Record<string, string | undefined>;
 };

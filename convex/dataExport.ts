@@ -6,8 +6,8 @@
  * được dữ liệu của mình ra không?" và "lấy ra được bao nhiêu, xa tới đâu?".
  *
  * HẠN MỨC NẰM Ở ĐÂY, KHÔNG Ở UI: `exportRows` (số dòng mỗi lượt) và `exportDays`
- * (cửa sổ ngày) đọc từ `convex/plans.ts` — cùng bảng mà mọi điểm chặn khác dùng,
- * nên /premium không thể hứa khác hành vi thật. Ẩn nút trên web không phải là
+ * (cửa sổ ngày) đọc từ `convex/limits.ts` — trần kỹ thuật dùng chung cho mọi
+ * server, nên UI không thể hứa khác hành vi thật. Ẩn nút trên web không phải là
  * bảo vệ: gọi API trực tiếp cũng bị cắt đúng trần đó (`.take(cap + 1)` để biết
  * mình vừa bị cắt chứ không im lặng trả về ít hơn).
  *

@@ -1768,8 +1768,8 @@ export default defineSchema({
     /** Khách báo đã chuyển khoản lúc nào (luồng QR CK) — đo cam kết ≤24h. */
     reportedAt: v.optional(v.number()),
     /**
-     * Server được mở quyền lợi (phạm vi gói là THEO SERVER — xem plans.ts).
-     * Bắt buộc với đơn mua premium; đơn ủng hộ (donate) để trống.
+     * Server gắn với đơn cũ — di sản thời còn gói trả phí, nay chỉ để đối soát.
+     * Không còn đường ghi mới; bảng payments chỉ là lưu trữ lịch sử.
      */
     guildId: v.optional(v.string()),
     /**

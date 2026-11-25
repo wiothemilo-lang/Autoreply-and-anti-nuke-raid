@@ -4,13 +4,13 @@
 // VÌ SAO CẦN: đây là bộ khoá chống revert. Một lần ai đó thêm lại nút "Mua
 // gói"/route /donate/IPN ZaloPay là test đỏ ngay, thay vì để web bán một thứ
 // không tồn tại. Nội dung kiểm:
-//   1. Ba module thanh toán cũ chỉ còn tombstone, không export hàm nào.
+//   1. Ba module thanh toán cũ đã bị xoá hẳn khỏi cây nguồn.
 //   2. HTTP backend không còn route/IPN ZaloPay.
 //   3. Web không còn gọi api.payments / api.plans / safeZaloPayUrl.
 //   4. Route /donate, nav, sitemap, llms.txt đã sạch; /premium chỉ redirect.
 //   5. Dữ liệu kế toán cũ vẫn được giữ trong schema (không xoá âm thầm).
 // Hermetic: chỉ đọc file, không mạng, không DB.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 let pass = 0;
 let fail = 0;
@@ -24,15 +24,10 @@ const check = (label: string, ok: boolean, detail?: unknown) => {
 };
 const read = (rel: string) => readFileSync(new URL("../" + rel, import.meta.url), "utf8");
 
-console.log("── 1. Module thanh toán chỉ còn tombstone ──");
+console.log("── 1. Module thanh toán đã bị xoá hẳn ──");
 {
   for (const file of ["convex/payments.ts", "convex/paymentsAction.ts", "convex/plans.ts"]) {
-    const src = read(file);
-    check(
-      file + " không export hàm/const nghiệp vụ",
-      !/export\s+(async\s+)?function|export\s+const\s+\w+\s*=/.test(src),
-    );
-    check(file + " khai báo là module rỗng", /export \{\};/.test(src));
+    check(file + " không còn tồn tại", !existsSync(new URL("../" + file, import.meta.url)));
   }
 }
 
@@ -61,10 +56,13 @@ console.log("\n── 3. Web không còn gọi API thanh toán ──");
       !/api\.(payments|plans)\b|safeZaloPayUrl|planDisplayName/.test(src),
     );
   }
-  check("DonatePage chỉ còn tombstone", /export \{\};/.test(read("src/pages/DonatePage.tsx")));
   check(
-    "PaymentReturn chỉ còn tombstone",
-    /export \{\};/.test(read("src/components/PaymentReturn.tsx")),
+    "DonatePage đã bị xoá",
+    !existsSync(new URL("../src/pages/DonatePage.tsx", import.meta.url)),
+  );
+  check(
+    "PaymentReturn đã bị xoá",
+    !existsSync(new URL("../src/components/PaymentReturn.tsx", import.meta.url)),
   );
 }
 
