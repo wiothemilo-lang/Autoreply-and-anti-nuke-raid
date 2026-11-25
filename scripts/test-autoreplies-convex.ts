@@ -12,6 +12,8 @@
 //   3. TÍN HIỆU — mọi thay đổi đều patch `settingsChangedAt` để bot xoá
 //      cache ngay vòng tick kế tiếp, không phải chờ 30 phút.
 import { add, remove, update } from "../convex/autoreplies";
+import { GUILD_PERMISSIONS_TTL_MS, getUserByToken } from "../convex/auth";
+import { guildsInternal } from "../convex/sessionHardening";
 
 type Row = Record<string, any>;
 
@@ -156,6 +158,37 @@ const BASE = {
 const CH = "123456789012345678"; // 18 chữ số — hợp lệ
 
 (async () => {
+  {
+    const { ctx, sessions, users, guilds, autoReplies } = makeCtx();
+    guilds[0].managers = [users[0].discordId];
+    sessions[0].createdAt = CLOCK.t - GUILD_PERMISSIONS_TTL_MS;
+    await expectThrow(
+      "phiên còn hiệu lực nhưng quyền Discord quá hạn thì từ chối sửa rule",
+      () => addH(ctx, BASE),
+      /quyền quản lý/,
+    );
+    check(
+      "phiên còn hiệu lực để làm mới quyền",
+      (await getUserByToken(ctx as any, BASE.token))?.guildPermissionsStale === true,
+    );
+    const refresh = (guildsInternal as any)._handler;
+    const me = {
+      discordId: users[0].discordId,
+      guilds: [{ id: BASE.guildId, name: "Server", permissions: "32" }],
+    };
+    await refresh(ctx, { ...me, permissionsCheckedAt: CLOCK.t });
+    check("quyền từ Discord vừa xác minh cho phép lưu lại", (await addH(ctx, BASE)).ok === true);
+    tick();
+    await refresh(ctx, { ...me, guilds: [], permissionsCheckedAt: CLOCK.t });
+    await refresh(ctx, { ...me, permissionsCheckedAt: CLOCK.t - 1000 });
+    await expectThrow(
+      "lần làm mới cũ không khôi phục quyền đã thu hồi",
+      () => addH(ctx, { ...BASE, name: "rule khác" }),
+      /quyền quản lý/,
+    );
+    check("chỉ lượt có quyền tạo được rule", autoReplies.length === 1);
+  }
+
   // ═══ 1. add: đường chính ═══
   console.log("\n── add: tạo rule ──");
   {

@@ -19,6 +19,7 @@ import {
   botRenewBackupClaim,
   botReportRestorePlan,
   botSetBackupRetention,
+  botReportImportError,
 } from "../convex/bot_writes";
 import {
   listGuild,
@@ -28,6 +29,7 @@ import {
   botAuditBackups,
   importStatus,
   requestBackup,
+  requestImportRestore,
   requestRestore,
   setRetention,
   requestRestorePlan,
@@ -364,6 +366,40 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
   }
 
   console.log("\n── import/restore fencing: đúng lease + chặn worker cũ ──");
+  {
+    const { ctx, guildRows, sessionRows, userRows } = makeCtx();
+    const deletedStorage: string[] = [];
+    const importCtx = {
+      ...ctx,
+      storage: {
+        getMetadata: async () => ({ size: 4 }),
+        delete: async (id: string) => void deletedStorage.push(id),
+      },
+    };
+    guildRows.push({ _id: "g1", discordId: "g1", botInGuild: true });
+    userRows.push({ _id: "u1", discordId: "owner", manageableGuildIds: ["g1"] });
+    sessionRows.push({
+      token: "fixture",
+      userId: "u1",
+      createdAt: Date.now(),
+      authVersion: 1,
+    });
+    const request = (requestImportRestore as any)._handler;
+    const args = { token: "fixture", guildId: "g1", fileName: "backup.json" };
+    await request(importCtx, { ...args, storageId: "file1" });
+    await request(importCtx, { ...args, storageId: "file2" });
+    await clearHandler(importCtx, { guildId: "g1", kind: "import", botKey: BOT_KEY });
+    check("hoàn tất import gỡ tham chiếu file", guildRows[0].importStorageId === undefined);
+    await request(importCtx, { ...args, storageId: "file3" });
+    await (botReportImportError as any)._handler(importCtx, {
+      guildId: "g1",
+      error: "File không hợp lệ",
+      botKey: BOT_KEY,
+    });
+    check("import lỗi vẫn hiển thị lý do", guildRows[0].importError === "File không hợp lệ");
+    check("vòng đời import giữ các file chưa xác minh quyền sở hữu", deletedStorage.length === 0);
+  }
+
   {
     const { ctx, guildRows, backupRows } = makeCtx({ seed: BOT_KEY });
     guildRows.push({

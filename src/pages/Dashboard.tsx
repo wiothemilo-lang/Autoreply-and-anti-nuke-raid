@@ -328,7 +328,22 @@ export default function Dashboard() {
               </motion.div>
             </motion.div>
 
-            {managed.length === 0 ? (
+            {me.guildPermissionsStale ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-start gap-3 py-6">
+                  <h2 className="font-display text-lg font-semibold">
+                    {translate("Cần xác minh lại quyền Discord")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {translate("Hãy tải lại quyền quản lý server để tiếp tục dùng dashboard.")}
+                  </p>
+                  <Button onClick={handleRefresh} disabled={refreshing || !clientId}>
+                    <RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                    {translate("Tải lại")}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : managed.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
                   <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">

@@ -105,6 +105,13 @@
 
 ---
 
+## 2026-11-25 — Gia cố quyền dashboard và tham chiếu file
+
+- ✅ Hết hạn quyền Discord sau một giờ và làm mới qua OAuth trong phiên hiện tại.
+- ✅ Các luồng ảnh chào và import backup chỉ thay đổi tham chiếu file chưa xác minh sở hữu.
+- 🧪 90/90 suites CommonJS ở chế độ nghiêm ngặt, 35/35 suites TypeScript, sàn coverage, typecheck, lint và build đạt.
+- ▶️ Còn luồng upload có theo dõi chủ sở hữu file và phiên quản trị qua cookie cùng miền.
+
 ## 2026-11-25 — Rút gọn auto-reply theo cụm ký tự
 
 - ✅ Giữ nguyên cụm Unicode ở vị trí cắt và sửa phép kiểm tiến trình zombie trên Linux.

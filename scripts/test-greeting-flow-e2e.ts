@@ -685,12 +685,9 @@ async function applyDashboard(h: ReturnType<typeof seed>, store: any, client: an
     await welcomeMod.handleWelcome(client, store, makeMember(guild).member);
     const card = sents[0]?.payload?.files?.[0]?.attachment as Buffer | undefined;
     check("7b: thẻ PNG vẫn vẽ được với nền từ storage", Buffer.isBuffer(card));
-    check(
-      "7b: file gốc KHÔNG bị xoá sau khi bot đọc URL (chỉ dọn khi thay thế)",
-      !h.deletedStorage.includes(id1),
-    );
+    check("7b: file gốc còn nguyên sau khi bot đọc URL", !h.deletedStorage.includes(id1));
 
-    // 7c. Thay ảnh mới → ảnh CŨ bị dọn khỏi storage (không rác vĩnh viễn).
+    // 7c. Thay thế tham chiếu, giữ file vì storage chưa theo dõi quyền sở hữu.
     const id2 = h.putStorage(PNG_1PX, "image/png");
     await sleep(3);
     await (saveGreetingImage as any)._handler(h.ctx, {
@@ -699,7 +696,7 @@ async function applyDashboard(h: ReturnType<typeof seed>, store: any, client: an
       storageId: id2,
       slot: "welcomeCardBackground",
     });
-    check("7c: ảnh cũ bị xoá khỏi storage sau khi thay", h.deletedStorage.includes(id1));
+    check("7c: thay ảnh giữ lại file gốc", !h.deletedStorage.includes(id1));
     check("7c: ảnh mới còn sống", !h.deletedStorage.includes(id2));
 
     // 7d. Dùng lại CÙNG ảnh cho ô goodbye → thay ô welcome KHÔNG được xoá file
@@ -724,16 +721,19 @@ async function applyDashboard(h: ReturnType<typeof seed>, store: any, client: an
       !h.deletedStorage.includes(id2) && h.deletedStorage.length === d2,
     );
 
-    // 7e. Nút "Xoá ảnh" — xoá đúng ô, file bị dọn, ô còn lại giữ nguyên.
+    // 7e. Nút "Xoá ảnh" gỡ tham chiếu ô hiện tại.
     await (removeGreetingImage as any)._handler(h.ctx, {
       token: TOKEN,
       guildId: GID,
       slot: "goodbyeCardBackground",
     });
-    check("7e: removeGreetingImage dọn file ô goodbye", h.deletedStorage.includes(id2));
+    check(
+      "7e: gỡ tham chiếu ô goodbye và giữ file",
+      h.rows("guilds")[0].goodbyeCardBackground === undefined && !h.deletedStorage.includes(id2),
+    );
     check("7e: ô welcome KHÔNG bị đụng", h.rows("guilds")[0].welcomeCardBackground?.includes(id3));
 
-    // 7f. Upload sai loại file → bị TỪ CHỐI + file bị drop ngay.
+    // 7f. Từ chối tham chiếu file không hợp lệ, bảo toàn file storage.
     const idTxt = h.putStorage(Buffer.from("không phải ảnh"), "text/plain");
     await sleep(3);
     let threw = "";
@@ -748,11 +748,9 @@ async function applyDashboard(h: ReturnType<typeof seed>, store: any, client: an
       threw = e?.message ?? "";
     }
     check("7f: file text bị từ chối", threw.includes("ảnh"));
-    check("7f: file sai loại bị drop khỏi storage", h.deletedStorage.includes(idTxt));
+    check("7f: từ chối không đụng tới file storage", !h.deletedStorage.includes(idTxt));
 
-    // 7g. Xoá ảnh qua updateSettings (dashboard xoá URL trong ô) — file cũng
-    // phải được dọn. Bug thật 24/09: phép kiểm tra "còn dùng ở ô khác" bao gồm
-    // cả ô đang bị xoá → every() luôn false → file rác vĩnh viễn.
+    // 7g. Hai server có thể tham chiếu cùng một ảnh công khai.
     const idDel = h.putStorage(PNG_1PX, "image/png");
     await sleep(3);
     await (saveGreetingImage as any)._handler(h.ctx, {
@@ -765,6 +763,11 @@ async function applyDashboard(h: ReturnType<typeof seed>, store: any, client: an
       "7g: chuẩn bị — ảnh đã lưu vào ô welcomeEmbedImage",
       !!h.rows("guilds")[0].welcomeEmbedImage,
     );
+    h.rows("guilds").push({
+      _id: "other-guild",
+      discordId: "other",
+      welcomeEmbedImage: h.rows("guilds")[0].welcomeEmbedImage,
+    });
     const dBefore = h.deletedStorage.length;
     await (updateSettings as any)._handler(h.ctx, {
       token: TOKEN,
@@ -772,8 +775,8 @@ async function applyDashboard(h: ReturnType<typeof seed>, store: any, client: an
       welcomeEmbedImage: null, // dashboard xoá ảnh trong ô
     });
     check(
-      "7g: xoá ảnh qua updateSettings dọn file storage",
-      h.deletedStorage.includes(idDel) && h.deletedStorage.length > dBefore,
+      "7g: gỡ ảnh giữ file đang được server khác dùng",
+      h.deletedStorage.length === dBefore && h.rows("guilds")[1].welcomeEmbedImage?.endsWith(idDel),
     );
     check("7g: ô bị xoá được đặt về trống", h.rows("guilds")[0].welcomeEmbedImage === undefined);
   }

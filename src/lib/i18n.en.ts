@@ -501,6 +501,9 @@ export const EN: Record<string, string> = {
   "Chưa có người dùng nào — thêm ID phía trên để miễn trừ.":
     "No users yet — add IDs above to exempt them.",
   "Chưa có server nào": "No servers yet",
+  "Cần xác minh lại quyền Discord": "Confirm your Discord permissions again",
+  "Hãy tải lại quyền quản lý server để tiếp tục dùng dashboard.":
+    "Refresh your server management permissions to continue using the dashboard.",
   "Chưa có — bot sẽ": "None yet — the bot will",
   "Chưa học được từ khóa nào — bật research và chờ lượt chạy đầu tiên (5 phút sau khi bot online).":
     "No keywords learned yet — enable research and wait for the first run (5 minutes after the bot comes online).",

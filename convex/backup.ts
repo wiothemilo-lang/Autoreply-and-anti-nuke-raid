@@ -511,50 +511,34 @@ export const requestImportRestore = mutation({
       .query("guilds")
       .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
       .first();
-    // Xóa file đã upload nếu có lỗi bất kỳ xảy ra sau khi tải lên (tránh rác storage).
-    const cleanupUploaded = async () => {
-      try {
-        await ctx.storage.delete(storageId);
-      } catch {
-        // đã xóa / không tồn tại — bỏ qua
-      }
-    };
-    try {
-      if (!guild || !canManageGuild(user, guild)) {
-        throw new Error("Không có quyền quản lý server này");
-      }
-      if (!guild.botInGuild) throw new Error("Bot chưa có trong server này");
-      if (claimIsActive(guild.restoreClaimedAt, guild.restoreLeaseUntil)) {
-        throw new Error("Bot đang xử lý yêu cầu khôi phục trước; hãy đợi hoàn tất rồi thử lại");
-      }
-      const meta = await ctx.storage.getMetadata(storageId);
-      if (!meta) {
-        throw new Error("File không tồn tại hoặc đã bị xóa — hãy chọn lại file");
-      }
-      if (meta.size > MAX_IMPORT_FILE_BYTES) {
-        throw new Error(
-          `File quá lớn (tối đa ${MAX_IMPORT_FILE_BYTES / 1_000_000} MB — file này ${(meta.size / 1_000_000).toFixed(1)} MB). Hãy nén hoặc bỏ bớt media nặng rồi thử lại.`,
-        );
-      }
-      // Dọn file import cũ chưa xử lý (nếu có) để không rác storage.
-      if (guild.importStorageId && guild.importStorageId !== storageId) {
-        await ctx.storage.delete(guild.importStorageId).catch(() => {});
-      }
-      await ctx.db.patch(guild._id, {
-        importRestoreRequested: true,
-        importFileName: String(fileName || "backup.msc").slice(0, 120),
-        importStorageId: storageId,
-        importError: undefined,
-        importErrorAt: undefined,
-        restoreClaimedAt: undefined,
-        restoreLeaseUntil: undefined,
-        updatedAt: Date.now(),
-      });
-      return { ok: true };
-    } catch (e) {
-      await cleanupUploaded();
-      throw e;
+    if (!guild || !canManageGuild(user, guild)) {
+      throw new Error("Không có quyền quản lý server này");
     }
+    if (!guild.botInGuild) throw new Error("Bot chưa có trong server này");
+    if (claimIsActive(guild.restoreClaimedAt, guild.restoreLeaseUntil)) {
+      throw new Error("Bot đang xử lý yêu cầu khôi phục trước; hãy đợi hoàn tất rồi thử lại");
+    }
+    const meta = await ctx.storage.getMetadata(storageId);
+    if (!meta) {
+      throw new Error("File không tồn tại hoặc đã bị xóa — hãy chọn lại file");
+    }
+    if (meta.size > MAX_IMPORT_FILE_BYTES) {
+      throw new Error(
+        `File quá lớn (tối đa ${MAX_IMPORT_FILE_BYTES / 1_000_000} MB — file này ${(meta.size / 1_000_000).toFixed(1)} MB). Hãy nén hoặc bỏ bớt media nặng rồi thử lại.`,
+      );
+    }
+    // Chỉ lưu tham chiếu; storageId do dashboard gửi không chứng minh quyền sở hữu.
+    await ctx.db.patch(guild._id, {
+      importRestoreRequested: true,
+      importFileName: String(fileName || "backup.msc").slice(0, 120),
+      importStorageId: storageId,
+      importError: undefined,
+      importErrorAt: undefined,
+      restoreClaimedAt: undefined,
+      restoreLeaseUntil: undefined,
+      updatedAt: Date.now(),
+    });
+    return { ok: true };
   },
 });
 
