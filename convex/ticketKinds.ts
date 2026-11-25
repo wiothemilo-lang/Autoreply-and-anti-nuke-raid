@@ -20,7 +20,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server";
 import { canManageGuild, getUserByToken } from "./auth";
 
 /** Trần số loại mỗi server (Discord tối đa 5 nút/hàng; 10 loại = 2 hàng). */
@@ -162,14 +162,24 @@ function cleanKind(input: {
  * `guildId` → thứ tự trả về là thứ tự scan, không phải thứ tự chủ server chọn.
  * Panel hiển thị sai thứ tự thì chủ server tưởng tính năng hỏng.
  */
-async function loadKinds(ctx: QueryCtx, guildId: string, includeDisabled: boolean) {
-  const rows = await ctx.db
+function queryKinds(ctx: QueryCtx, guildId: string) {
+  return ctx.db
     .query("ticketKinds")
     .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
     .collect();
+}
+
+type KindOrder = { order?: number; createdAt: number };
+
+function compareKindOrder(a: KindOrder, b: KindOrder) {
+  return (a.order ?? 0) - (b.order ?? 0) || a.createdAt - b.createdAt;
+}
+
+export async function loadTicketKinds(ctx: QueryCtx, guildId: string, includeDisabled: boolean) {
+  const rows = await queryKinds(ctx, guildId);
   return rows
     .filter((r) => includeDisabled || r.enabled !== false)
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt - b.createdAt)
+    .sort(compareKindOrder)
     .map((r) => ({
       key: r.key,
       label: r.label,
@@ -186,7 +196,7 @@ async function loadKinds(ctx: QueryCtx, guildId: string, includeDisabled: boolea
     }));
 }
 
-async function assertManage(ctx: MutationCtx, token: string, guildId: string) {
+async function assertManage(ctx: QueryCtx, token: string, guildId: string) {
   const user = await getUserByToken(ctx, token);
   const guild = await ctx.db
     .query("guilds")
@@ -202,15 +212,8 @@ async function assertManage(ctx: MutationCtx, token: string, guildId: string) {
 export const listKinds = query({
   args: { token: v.string(), guildId: v.string() },
   handler: async (ctx, { token, guildId }) => {
-    const user = await getUserByToken(ctx, token);
-    const guild = await ctx.db
-      .query("guilds")
-      .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
-      .first();
-    if (!user || !guild || !canManageGuild(user, guild)) {
-      throw new Error("Không có quyền quản lý server này");
-    }
-    return loadKinds(ctx, guildId, true);
+    await assertManage(ctx, token, guildId);
+    return loadTicketKinds(ctx, guildId, true);
   },
 });
 
@@ -254,14 +257,9 @@ export const saveKind = mutation({
       .query("ticketKinds")
       .withIndex("by_guildId_key", (q) => q.eq("guildId", args.guildId).eq("key", clean.key))
       .first();
-    if (!existing) {
-      const total = await ctx.db
-        .query("ticketKinds")
-        .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-        .collect();
-      if (total.length >= MAX_KINDS) {
-        throw new Error(`Tối đa ${MAX_KINDS} loại ticket mỗi server`);
-      }
+    const rows = existing ? [] : await queryKinds(ctx, args.guildId);
+    if (rows.length >= MAX_KINDS) {
+      throw new Error(`Tối đa ${MAX_KINDS} loại ticket mỗi server`);
     }
     const now = Date.now();
     // Thứ tự: sửa loại đang có thì GIỮ NGUYÊN order của nó. Trước đây dùng
@@ -276,16 +274,12 @@ export const saveKind = mutation({
     } else if (existing) {
       order = existing.order ?? 0;
     } else {
-      const rows = await ctx.db
-        .query("ticketKinds")
-        .withIndex("by_guildId", (q) => q.eq("guildId", args.guildId))
-        .collect();
       order = rows.reduce((max, r) => Math.max(max, r.order ?? 0), 0) + 1;
     }
     const patch = {
       ...clean,
       order,
-      enabled: args.enabled !== false,
+      enabled: args.enabled ?? existing?.enabled ?? true,
     };
     if (existing) {
       await ctx.db.patch(existing._id, patch);
@@ -355,27 +349,14 @@ export const swapKindOrder = mutation({
   handler: async (ctx, { token, guildId, keyA, keyB }) => {
     const guild = await assertManage(ctx, token, guildId);
     if (keyA === keyB) return { ok: true };
-    const rows = await ctx.db
-      .query("ticketKinds")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .collect();
-    const a = rows.find((r) => r.key === keyA);
-    const b = rows.find((r) => r.key === keyB);
-    if (!a || !b) throw new Error("Không tìm thấy loại ticket này");
-    // Đổi chỗ GIÁ TRỊ order chứ không cộng/trừ: hai loại có thể trùng order
-    // (dữ liệu cũ, hoặc thêm nhanh 2 loại) → cộng/trừ có thể làm nghẽn hàng
-    // và thứ tự panel nhảy loạn.
-    const orderA = a.order ?? 0;
-    const orderB = b.order ?? 0;
-    if (orderA === orderB) {
-      // Trùng → đánh số lại cả cặp theo vị trí scan để tách được ngay.
-      const idxA = rows.findIndex((r) => r._id === a._id);
-      const idxB = rows.findIndex((r) => r._id === b._id);
-      await ctx.db.patch(a._id, { order: Math.min(idxA, idxB) });
-      await ctx.db.patch(b._id, { order: Math.max(idxA, idxB) });
-    } else {
-      await ctx.db.patch(a._id, { order: orderB });
-      await ctx.db.patch(b._id, { order: orderA });
+    const rows = (await queryKinds(ctx, guildId)).sort(compareKindOrder);
+    const indexA = rows.findIndex((r) => r.key === keyA);
+    const indexB = rows.findIndex((r) => r.key === keyB);
+    if (indexA < 0 || indexB < 0) throw new Error("Không tìm thấy loại ticket này");
+    [rows[indexA], rows[indexB]] = [rows[indexB], rows[indexA]];
+    // Đánh số theo danh sách đang hiển thị để dữ liệu cũ trùng order vẫn đổi đúng chỗ.
+    for (const [order, row] of rows.entries()) {
+      if (row.order !== order) await ctx.db.patch(row._id, { order });
     }
     await ctx.db.patch(guild._id, { settingsChangedAt: Date.now() });
     return { ok: true };

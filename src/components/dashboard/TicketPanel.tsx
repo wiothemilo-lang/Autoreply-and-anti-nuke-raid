@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { toastConvexError } from "../../lib/toastError";
@@ -83,6 +83,9 @@ export default function TicketPanel({ data }: { data: GuildData }) {
   // Nhãn loại tuỳ chỉnh do `TicketKindsCard` báo lên. Rỗng = card lỗi (chưa
   // deploy hàm mới) hoặc ticket cũ → rơi về `KIND_LABEL`, rồi tới mã khoá.
   const [kindLabels, setKindLabels] = useState<Record<string, string>>({});
+  const handleKindsLoaded = useCallback((list: { key: string; label: string }[]) => {
+    setKindLabels(Object.fromEntries(list.map((k) => [k.key, k.label])));
+  }, []);
   const kindLabelOf = (k: string) => kindLabels[k] ?? translate(KIND_LABEL[k] ?? k);
   // Ticket đang mở khung transcript (null = đóng). Chỉ chọn MỘT cái: transcript
   // có tới 200 tin, tải cả danh sách sẽ nhét vào RAM dashboard.
@@ -941,12 +944,7 @@ export default function TicketPanel({ data }: { data: GuildData }) {
           + số liệu, tức 1 hàm chưa deploy làm mất cả tính năng cũ. */}
       {g.ticketEnabled ? (
         <PanelErrorBoundary>
-          <TicketKindsCard
-            data={data}
-            onKindsLoaded={(list) =>
-              setKindLabels(Object.fromEntries(list.map((k) => [k.key, k.label])))
-            }
-          />
+          <TicketKindsCard data={data} onKindsLoaded={handleKindsLoaded} />
         </PanelErrorBoundary>
       ) : null}
 

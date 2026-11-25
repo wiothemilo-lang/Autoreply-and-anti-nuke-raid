@@ -2263,7 +2263,7 @@ check(
 check(
   "index.js bật metrics khi sẵn sàng và dừng (đẩy mẫu cuối) lúc thoát",
   /startMetrics\(\{ client, store \}\)/.test(botIndexSrc) &&
-    /stopMetrics\?\.\(\)/.test(botIndexSrc),
+    /await Promise\.allSettled\(\[stopMetrics\?\.\(\), client\.destroy\(\)\]\)/.test(botIndexSrc),
 );
 check(
   "schema.ts có bảng botMetrics (nơi DUY NHẤT giữ số đo phía server)",

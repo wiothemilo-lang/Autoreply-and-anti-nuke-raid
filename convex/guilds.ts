@@ -4,6 +4,7 @@ import { getUserByToken, canManageGuild, listBotGuildsForUser } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { hiddenPasswordIsSet, isBotOwnerUser } from "./hidden";
 import { clampReportMinEvents, clampReportMinIntervalMinutes } from "./reports";
+import { loadTicketKinds } from "./ticketKinds";
 import {
   effectiveVerifyMethod,
   effectiveVerifyWebEnabled,
@@ -497,29 +498,9 @@ export const getBotConfig = query({
       .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
       .order("desc")
       .take(20);
-    // Loại ticket: chỉ lấy loại ĐANG BẬT, đã sắp theo `order` chủ server chọn.
-    // Sắp tay vì index `by_guildId` chỉ có `guildId` → `order()` của Convex là
-    // thứ tự scan, không phải thứ tự hiển thị (panel nhảy loạn).
-    const kinds = (
-      await ctx.db
-        .query("ticketKinds")
-        .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-        .collect()
-    )
-      .filter((k) => k.enabled !== false)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt - b.createdAt)
-      .map((k) => ({
-        key: k.key,
-        label: k.label,
-        description: k.description ?? null,
-        emoji: k.emoji ?? null,
-        color: k.color ?? null,
-        question: k.question ?? null,
-        questionPlaceholder: k.questionPlaceholder ?? null,
-        evidenceQuestion: k.evidenceQuestion ?? null,
-        staffRoleIds: k.staffRoleIds ?? [],
-        fields: k.fields ?? [],
-      }));
+    const kinds = (await loadTicketKinds(ctx, guildId, false)).map(
+      ({ order: _order, enabled: _enabled, ...kind }) => kind,
+    );
     return {
       prefix: guild.prefix,
       // Bot đọc `guildConfig.logLang` để dịch nhãn case log; thiếu field này

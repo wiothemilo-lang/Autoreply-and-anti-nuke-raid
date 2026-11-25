@@ -1465,6 +1465,12 @@ const throws = async (fn: () => Promise<unknown>) => {
       e.ticketKinds[0].question === "Hỏi gì?",
     );
     check("tắt loại → enabled = false", e.ticketKinds[0].enabled === false);
+    await saveKindH(e.ctx, { token: "tok", guildId: "g1", key: "a", label: "Tên mới" });
+    const edited = await listKindsH(e.ctx, { token: "tok", guildId: "g1" });
+    check(
+      "sửa nội dung của loại đang tắt vẫn giữ nó ở trạng thái tắt",
+      edited[0]?.enabled === false,
+    );
     check(
       "tắt loại cũng bump settingsChangedAt",
       typeof e.guilds[0].settingsChangedAt === "number",
@@ -1477,7 +1483,7 @@ const throws = async (fn: () => Promise<unknown>) => {
     );
   }
   {
-    // Đổi thứ tự: đổi chỗ GIÁ TRỊ order, không cộng/trừ (trùng order thì nghẽn).
+    // Kiểm tra thứ tự mà dashboard thực sự đọc lại.
     const e = env();
     e.ticketKinds.push(
       { _id: "a", guildId: "g1", key: "a", label: "A", order: 5, enabled: true, createdAt: 1 },
@@ -1485,8 +1491,10 @@ const throws = async (fn: () => Promise<unknown>) => {
     );
     await swapOrderH(e.ctx, { token: "tok", guildId: "g1", keyA: "a", keyB: "b" });
     check(
-      "swap đổi chỗ order của 2 loại",
-      e.ticketKinds[0].order === 1 && e.ticketKinds[1].order === 5,
+      "swap đổi chỗ loại ticket trong danh sách",
+      (await listKindsH(e.ctx, { token: "tok", guildId: "g1" }))
+        .map((r: Row) => r.key)
+        .join(",") === "a,b",
     );
     check(
       "swap cùng key là cấu hình vô nghĩa → không lỗi, không ghi",
@@ -1505,9 +1513,14 @@ const throws = async (fn: () => Promise<unknown>) => {
     e.ticketKinds.push(
       { _id: "a", guildId: "g1", key: "a", label: "A", order: 2, enabled: true, createdAt: 1 },
       { _id: "b", guildId: "g1", key: "b", label: "B", order: 2, enabled: true, createdAt: 2 },
+      { _id: "c", guildId: "g1", key: "c", label: "C", order: 1, enabled: true, createdAt: 3 },
     );
     await swapOrderH(e.ctx, { token: "tok", guildId: "g1", keyA: "a", keyB: "b" });
-    check("order trùng vẫn tách được sau swap", e.ticketKinds[0].order !== e.ticketKinds[1].order);
+    const rows = await listKindsH(e.ctx, { token: "tok", guildId: "g1" });
+    check(
+      "swap thực sự đảo hai loại trùng order và giữ vị trí loại còn lại",
+      rows.map((r: Row) => r.key).join(",") === "c,b,a",
+    );
   }
   {
     // Xoá hẳn.

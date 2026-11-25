@@ -169,4 +169,4 @@ function formatDate(ts) {
   });
 }
 
-module.exports = { runDailyReports, runDailyReportForGuild, processReportJobs };
+module.exports = { runDailyReports, processReportJobs };

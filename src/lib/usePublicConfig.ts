@@ -8,17 +8,11 @@ import { pickValidClientId } from "./discord";
  * Trước đây mỗi component mount đều gọi lại action → mở 1 trang landing là
  * 3-4 lần gọi liên tiếp. Giờ chỉ gọi MỘT lần trong 10 phút cho cả ứng dụng.
  */
-export interface PublicConfig {
+interface PublicConfig {
   clientId: string;
   discordInvite: string;
   facebookUrl: string;
 }
-
-const FALLBACK: PublicConfig = {
-  clientId: "",
-  discordInvite: "https://discord.gg/rftv",
-  facebookUrl: "https://www.facebook.com/profile.php?id=61592820547312",
-};
 
 /**
  * Client ID nướng vào bundle lúc build chỉ là fallback khởi tạo. Backend vẫn
@@ -28,15 +22,22 @@ const FALLBACK: PublicConfig = {
 const BAKED_CLIENT_ID: string =
   (import.meta.env.VITE_DISCORD_CLIENT_ID as string | undefined) ?? "";
 
+const FALLBACK: PublicConfig = {
+  clientId: pickValidClientId(BAKED_CLIENT_ID),
+  discordInvite: "https://discord.gg/rftv",
+  facebookUrl: "https://www.facebook.com/profile.php?id=61592820547312",
+};
+
 const CACHE_TTL_MS = 10 * 60_000;
 
+type ConfigResult = { data: PublicConfig; error: boolean };
 let cache: { data: PublicConfig; at: number } | null = null;
-let inflight: Promise<PublicConfig> | null = null;
+let inflight: Promise<ConfigResult> | null = null;
 
-async function fetchConfig(
-  load: () => Promise<Partial<PublicConfig> | null>,
-): Promise<PublicConfig> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.data;
+export async function fetchPublicConfig(
+  load: () => Promise<(Partial<PublicConfig> & { rateLimited?: boolean }) | null>,
+): Promise<ConfigResult> {
+  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return { data: cache.data, error: false };
   if (!inflight) {
     inflight = load()
       .then((res) => {
@@ -47,12 +48,14 @@ async function fetchConfig(
           discordInvite: res?.discordInvite ?? FALLBACK.discordInvite,
           facebookUrl: res?.facebookUrl ?? FALLBACK.facebookUrl,
         };
+        // Phản hồi mặc định do giới hạn tần suất chỉ dùng cho lần nạp này.
+        if (res?.rateLimited) return { data: cache?.data ?? data, error: false };
         cache = { data, at: Date.now() };
-        return data;
+        return { data, error: false };
       })
       .catch(() => {
-        // Backend down: dùng fallback nhưng KHÔNG cache lỗi — lần sau thử lại.
-        return { ...FALLBACK, clientId: pickValidClientId(BAKED_CLIENT_ID) };
+        const data = cache?.data ?? FALLBACK;
+        return { data, error: !data.clientId };
       })
       .finally(() => {
         inflight = null;
@@ -77,34 +80,23 @@ export function usePublicConfig(): {
 } {
   const load = useAction(api.public.publicConfig);
   const [config, setConfig] = useState<PublicConfig | null>(
-    cache
-      ? cache.data
-      : pickValidClientId(BAKED_CLIENT_ID)
-        ? // Có Client ID nướng trong bundle: hiển thị ngay để không chờ action,
-          // nhưng effect bên dưới vẫn hỏi Convex để đồng bộ ID mới nhất.
-          { ...FALLBACK, clientId: pickValidClientId(BAKED_CLIENT_ID) }
-        : null,
+    () => cache?.data ?? (FALLBACK.clientId ? FALLBACK : null),
   );
   const [error, setError] = useState(false);
   useEffect(() => {
-    // Baked ID chỉ là giá trị khởi tạo; server config là nguồn chuẩn khi có thể.
-    if (cache) return;
     let alive = true;
-    fetchConfig(load).then((res) => {
+    fetchPublicConfig(load).then((res) => {
       if (!alive) return;
-      // Lỗi chỉ khi chưa từng fetch thành công và fallback clientId rỗng.
-      setError(!cache && res.clientId === "");
-      setConfig(res);
+      setError(res.error);
+      setConfig(res.data);
     });
     return () => {
       alive = false;
     };
   }, [load]);
   return {
-    clientId: pickValidClientId(config?.clientId, BAKED_CLIENT_ID),
-    discordInvite: config?.discordInvite ?? FALLBACK.discordInvite,
-    facebookUrl: config?.facebookUrl ?? FALLBACK.facebookUrl,
-    loading: config === null && !pickValidClientId(BAKED_CLIENT_ID),
+    ...(config ?? FALLBACK),
+    loading: config === null,
     error,
   };
 }

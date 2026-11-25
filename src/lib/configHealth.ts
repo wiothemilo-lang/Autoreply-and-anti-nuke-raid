@@ -142,10 +142,7 @@ export function healthGrade(score: number): { label: string; tone: "ok" | "warn"
  */
 export function evaluateConfigHealth(guild: GuildHealthFields): HealthReport {
   if (guild.botInGuild === false) return { score: 100, issues: [] };
-  const issues = RULES.filter((r) => r.broken(guild)).map(({ broken, ...rest }) => {
-    void broken;
-    return rest;
-  });
+  const issues = RULES.filter((r) => r.broken(guild)).map(({ broken: _broken, ...rest }) => rest);
   const lost = issues.reduce((sum, i) => sum + i.points, 0);
   return {
     score: Math.max(0, Math.min(100, 100 - lost)),

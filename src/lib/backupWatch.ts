@@ -42,6 +42,11 @@ export type JobStatus = {
 export type JobVerdict =
   { outcome: "waiting"; watch: JobWatch } | { outcome: "error" } | { outcome: "done" };
 
+/** Chỉ chờ phần thời gian còn lại nếu thiết lập timer sau lúc bấm. */
+export function jobWatchDelay(startedAt: number, timeoutMs: number, now = Date.now()): number {
+  return Math.max(0, startedAt + timeoutMs - now);
+}
+
 export function judgeJobWatch(
   watch: JobWatch,
   status: JobStatus,

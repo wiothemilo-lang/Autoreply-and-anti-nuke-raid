@@ -247,7 +247,13 @@ async function main() {
     delete process.env.METRICS;
 
     const pushes = [];
-    const fakeStore = { recordMetrics: async (snap) => pushes.push(snap) };
+    let deferFinalPush;
+    const fakeStore = {
+      recordMetrics: async (snap) => {
+        if (deferFinalPush) await deferFinalPush;
+        pushes.push(snap);
+      },
+    };
     const fakeClient = {
       guilds: {
         cache: new Map([
@@ -274,7 +280,16 @@ async function main() {
     check("startMetrics đo uptime", typeof gaugesNow.bot_uptime_seconds === "number");
 
     await new Promise((r) => setTimeout(r, 90));
-    stop();
+    const beforeStop = pushes.length;
+    let release;
+    deferFinalPush = new Promise((resolve) => (release = resolve));
+    let finalPushDone = false;
+    const stopped = Promise.resolve(stop()).then(() => (finalPushDone = true));
+    await new Promise((r) => setImmediate(r));
+    check("stop() còn chờ Convex nhận mẫu cuối", !finalPushDone);
+    release();
+    await stopped;
+    check("stop() hoàn tất sau khi gửi đúng một mẫu cuối", pushes.length === beforeStop + 1);
     const pushesAfterStop = pushes.length;
     check(
       "startMetrics đẩy snapshot lên store theo chu kỳ",

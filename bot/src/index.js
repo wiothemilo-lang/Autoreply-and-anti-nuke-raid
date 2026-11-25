@@ -33,6 +33,7 @@ const { startMetrics } = require("./metricsRuntime");
 
 /** Hàm dừng đo lường — gán trong clientReady, dùng lúc thoát (xem shutdown). */
 let stopMetrics = null;
+let stopMemGuard = null;
 const metricsModule = require("./metrics");
 
 // --- Client config: full-featured for powerful VPS ---
@@ -336,8 +337,7 @@ client.once("clientReady", async () => {
 
   // Memory monitoring — mỗi 30 phút (nhẹ nhàng) + khởi động memGuard sweeper
   // (Đợt 7: dọn các vùng bộ nhớ bị lỡ — heat nguội, guild đã rời, cache cũ).
-  const stopMemGuard = startMemGuard(10 * 60_000);
-  void stopMemGuard; // giữ tham chiếu — không dùng trong production
+  stopMemGuard = startMemGuard();
   const memMonitorInterval = setInterval(
     () => {
       const mem = process.memoryUsage();
@@ -485,18 +485,19 @@ client.login(process.env.DISCORD_TOKEN).catch((err) => {
   process.exit(1);
 });
 
-// Graceful shutdown
-// Dừng metrics TRƯỚC khi thoát: `stopMetrics()` đẩy nốt mẫu cuối lên Convex,
-// nên deploy/restart không làm mất đúng số liệu của lúc tắt — mà lúc tắt
-// thường là lúc đáng nhìn nhất (sau khi đã thấy độ trễ tăng).
-function shutdown() {
+// PM2 chờ mặc định 1,6 giây trước khi buộc dừng. Chừa thời gian cho mẫu cuối.
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const deadline = setTimeout(() => process.exit(0), 1_200);
   try {
-    stopMetrics?.();
-  } catch {
-    // không để lỗi dọn dẹp chặn thoát
+    stopMemGuard?.();
+    await Promise.allSettled([stopMetrics?.(), client.destroy()]);
+  } finally {
+    clearTimeout(deadline);
+    process.exit(0);
   }
-  client.destroy();
-  process.exit(0);
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

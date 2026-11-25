@@ -44,10 +44,6 @@ function startMetrics({ client, store } = {}) {
   metrics.startDefaultMetrics();
 
   const timers = [];
-  // Hàm DỪNG (không phải id timer) — `clearInterval` trên một hàm là NO-OP, nên
-  // nhầm hai loại này làm vòng đẩy sống mãi sau khi gọi stop(): bot đã thoát
-  // mà vẫn cứ ghi vào Convex. Đây là lý do hai mảng tách biệt.
-  const stoppers = [];
 
   // 1) Gauge vùng nhớ + quy mô server. Chỉ đọc cache trong RAM, không gọi mạng.
   const sample = () => {
@@ -111,23 +107,18 @@ function startMetrics({ client, store } = {}) {
   );
 
   // 3) Đẩy lên Convex cho dashboard. Không có store (test) → bỏ qua, không lỗi.
-  if (store && typeof store.recordMetrics === "function") {
-    stoppers.push(
-      metrics.startFlush(envMs("METRICS_PUSH_INTERVAL_MS", DEFAULT_PUSH_MS), (snapshot) =>
-        store.recordMetrics(snapshot),
-      ),
-    );
-  }
+  const push =
+    typeof store?.recordMetrics === "function" ? (snapshot) => store.recordMetrics(snapshot) : null;
+  const stopFlush =
+    push && metrics.startFlush(envMs("METRICS_PUSH_INTERVAL_MS", DEFAULT_PUSH_MS), push);
 
   for (const t of timers) t.unref?.();
 
-  return () => {
+  return async () => {
     for (const t of timers) clearInterval(t);
-    for (const stop of stoppers) stop();
+    stopFlush?.();
     // Đẩy nốt mẫu cuối: bot chết giữa chừng thì dashboard không mất hẳn số liệu.
-    if (store && typeof store.recordMetrics === "function") {
-      void metrics.flushNow((snap) => store.recordMetrics(snap));
-    }
+    if (push) await metrics.flushNow(push);
   };
 }
 
