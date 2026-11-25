@@ -105,6 +105,12 @@
 
 ---
 
+## 2026-11-25 — Chuyển bảo trì chìa khóa bot về máy chủ
+
+- ✅ Gỡ form và mutation web nhận seed. Dùng luồng bootstrap xác minh với Discord để cấp lại khóa.
+- 🧪 90/90 suites CommonJS, 35/35 suites TypeScript, sàn coverage, typecheck và lint đạt.
+- ▶️ Còn triển khai cookie `HttpOnly` qua endpoint cùng miền với dashboard.
+
 ## 2026-11-25 — Ghi nhận server sở hữu file upload dashboard
 
 - ✅ HTTP upload xác minh quyền, lưu file và ghi quyền sở hữu trước khi gắn ảnh hoặc đặt yêu cầu import.

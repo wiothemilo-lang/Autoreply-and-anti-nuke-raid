@@ -226,8 +226,8 @@ check("SiteNav ghi theme qua một hàm duy nhất", /setTheme: setThemeGlobal/.
 
 const adminSrc2 = read("src/pages/Admin.tsx");
 check(
-  "Admin giữ thông điệp lỗi thật khi đặt seed",
-  /friendlyConvexError\(e, translate\("Lỗi khi đặt seed/.test(adminSrc2),
+  "Admin hướng dẫn bảo trì khóa trên máy chạy bot",
+  adminSrc2.includes("Việc bảo trì và xoay khóa thực hiện trên máy chạy bot"),
 );
 check(
   "Admin không bật AI weekly khi chưa tải xong",

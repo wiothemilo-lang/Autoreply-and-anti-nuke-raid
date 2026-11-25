@@ -15,6 +15,11 @@ const read = (p) => fs.readFileSync(path.join(__dirname, "..", p), "utf8");
 // ===== 1. Strict botKey: không còn cửa hậu back-compat =====
 const botAuth = read("convex/botAuth.ts");
 check(
+  "trình duyệt không có form hoặc mutation đổi khóa bot",
+  !read("src/pages/Admin.tsx").includes("ownerSeed") &&
+    !read("convex/hidden.ts").includes("setBotSecrets"),
+);
+check(
   "requireBotKeyStrict từ chối khi seed chưa cấp phát (không back-compat)",
   botAuth.includes("Chìa khóa bot chưa được cấp phát"),
 );
@@ -208,7 +213,7 @@ check(
 // ===== 8. Web Admin mô tả cơ chế mới =====
 check(
   "Admin.tsx ghi rõ bot tự cấp phát chìa khóa",
-  read("src/pages/Admin.tsx").includes("tự cấp phát chìa khóa an toàn"),
+  read("src/pages/Admin.tsx").includes("tự cấp phát chìa khóa từ máy chủ"),
 );
 check("README bot tài liệu cơ chế bootstrap", read("bot/README.md").includes("bot/.bot-key"));
 

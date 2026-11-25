@@ -8,7 +8,7 @@ import {
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { getUserByToken, canManageGuild } from "./auth";
-import { computeBotKey, requireBotKeyStrict } from "./botAuth";
+import { requireBotKeyStrict } from "./botAuth";
 import { hashHiddenPassword, hashHiddenPasswordGlobal } from "./sha256";
 import { bestEntitlementForUser } from "./plans";
 
@@ -1045,48 +1045,6 @@ export const botReportPanelError = mutation({
       postErrorAt: Date.now(),
       updatedAt: Date.now(),
     });
-    return { ok: true };
-  },
-});
-
-/**
- * Đặt seed chìa khóa bot (chỉ chủ sở hữu bot).
- * Lưu SHA-256(botKey) vào botStatus.botKeySeed: từ đó MỌI function bot-side yêu
- * cầu botKey khớp — bot tính từ BOT_KEY trong .env trên VPS (botAuth.ts).
- * Chỉ lưu BĂM — không lưu seed thô, không trả về giá trị nào.
- * (Chìa khóa action — FUNC_SEED — cấu hình qua env của deployment, xem botFunc.ts.)
- */
-export const setBotSecrets = mutation({
-  args: {
-    token: v.string(),
-    guildId: v.string(),
-    ownerSeed: v.optional(v.string()),
-  },
-  handler: async (ctx, { token, ownerSeed }) => {
-    const user = await getUserByToken(ctx, token);
-    await requireBotOwner(ctx, user);
-    if (ownerSeed === undefined) return { ok: true };
-    const seed = ownerSeed.trim();
-    if (seed.length < 8 || seed.length > 200) {
-      throw new Error("Seed chìa khóa bot phải từ 8 đến 200 ký tự");
-    }
-    const status = await getBotStatus(ctx);
-    const patch: Record<string, unknown> = { botKeySeed: computeBotKey(seed) };
-    if (status) {
-      await ctx.db.patch(status._id, patch);
-    } else {
-      const now = Date.now();
-      await ctx.db.insert("botStatus", {
-        kind: "status",
-        online: false,
-        guildCount: 0,
-        memberCount: 0,
-        lastHeartbeat: now,
-        startedAt: now,
-        version: "",
-        ...patch,
-      });
-    }
     return { ok: true };
   },
 });

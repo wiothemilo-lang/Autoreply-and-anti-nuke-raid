@@ -32,7 +32,7 @@ export const isOwner = query({
  * viên nhóm (danh sách do chủ bot đặt ở `hidden.setTeamAdmins`).
  *
  * Vì sao tách khỏi `isOwner` thay vì nới luôn `isOwner`: còn những thứ CHỈ
- * chủ bot được làm (mật khẩu ẩn, tính năng ẩn, `setBotSecrets` — tức là
+ * chủ bot được làm (mật khẩu ẩn và các tính năng ẩn có quyền cao — tức là
  * OWNER_SEED = chìa khoá vạn năng của bot). Gộp hai khái niệm là mở đường
  * cho thành viên nhóm chiếm bot.
  */
