@@ -1646,8 +1646,8 @@ export const DE: Record<string, string> = {
      Logo + manuelles Plan-Vergeben (payments.grantPlan) ==== */
   Owner: "Owner",
   Admin: "Admin",
-  "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research, đối soát tiền, cấp gói). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.":
-    "Füge Personen zum Team hinzu, damit sie das GANZE Admin-Fenster nutzen (Fehlerüberwachung, Host-Zustand, KI, Threat Research, Zahlungsabgleich, Plan-Vergabe). Sie können das versteckte Passwort/den API-Sicherheitsschlüssel NICHT anfassen und selbst niemanden hinzufügen oder entfernen.",
+  "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.":
+    "Füge Personen zum Team hinzu, damit sie das GANZE Admin-Fenster nutzen (Fehlerüberwachung, Host-Zustand, KI, Threat Research). Sie können das versteckte Passwort/den API-Sicherheitsschlüssel NICHT anfassen und selbst niemanden hinzufügen oder entfernen.",
   "Chưa có ai trong team — hãy thêm thành viên bên dưới.":
     "Noch niemand im Team – füge unten Mitglieder hinzu.",
   "Cấp gói premium": "Premium-Plan vergeben",

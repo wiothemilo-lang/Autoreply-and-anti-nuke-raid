@@ -10,7 +10,6 @@ import type { Doc } from "./_generated/dataModel";
 import { getUserByToken, canManageGuild } from "./auth";
 import { requireBotKeyStrict } from "./botAuth";
 import { hashHiddenPassword, hashHiddenPasswordGlobal } from "./sha256";
-import { bestEntitlementForUser } from "./plans";
 
 async function requireGuild(ctx: QueryCtx | MutationCtx, token: string, guildId: string) {
   const user = await getUserByToken(ctx, token);
@@ -181,7 +180,6 @@ export const getTeamAdmins = query({
         globalName: row?.globalName ?? null,
         avatar: row?.avatar ?? null,
         lastLoginAt: row?.lastLoginAt ?? null,
-        plan: (await bestEntitlementForUser(ctx, row?._id))?.plan ?? null,
       });
     }
     return {
@@ -196,7 +194,6 @@ export const getTeamAdmins = query({
             globalName: ownerRow?.globalName ?? null,
             avatar: ownerRow?.avatar ?? null,
             lastLoginAt: ownerRow?.lastLoginAt ?? null,
-            plan: (await bestEntitlementForUser(ctx, ownerRow?._id))?.plan ?? null,
           }
         : null,
     };

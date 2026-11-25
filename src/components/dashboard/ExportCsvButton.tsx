@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useConvex, useQuery } from "convex/react";
+import { useConvex } from "convex/react";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { api } from "../../../convex/_generated/api";
+import { LIMITS } from "../../../convex/limits";
 import { getSessionToken } from "../../lib/discord";
 import { downloadTextFile } from "../../lib/utils";
 import { friendlyConvexError } from "../../lib/convexError";
@@ -21,25 +22,22 @@ const KIND_LABEL: Record<ExportKind, string> = {
  * Nút TẢI DỮ LIỆU RA CSV (P2–P3, 10/10/2026).
  *
  * Vì sao là một component dùng chung thay vì ba nút viết tay: trần dòng/ngày
- * phải hiển thị ĐÚNG bằng con số server sẽ cắt — cả ba chỗ dùng cùng một nhãn
- * lấy từ `plans.guildPlan` (chính bảng mà query xuất dùng để chặn), nên nút
- * không thể hứa nhiều hơn file thật.
+ * phải hiển thị ĐÚNG bằng con số server sẽ cắt — cả ba chỗ đọc CÙNG bảng
+ * `convex/limits.ts` mà query xuất dùng để chặn, nên nút không thể hứa nhiều
+ * hơn file thật.
  *
  * Vì sao gọi `convex.query` theo yêu cầu (useConvex) chứ không `useQuery`:
  * subscription cho một file CSV là đốt reads liên tục để theo dõi dữ liệu chỉ
- * cần đúng một lần khi người dùng bấm. `useQuery` chỉ dùng cho hạn mức gói
- * (nhẹ, có cache của client).
+ * cần đúng một lần khi người dùng bấm.
  */
 export default function ExportCsvButton({ guildId, kind }: { guildId: string; kind: ExportKind }) {
   const token = getSessionToken();
   const convex = useConvex();
-  const plan = useQuery(api.plans.guildPlan, token ? { token, guildId } : "skip");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const limits = plan?.limits;
-  const rows = kind === "heat" ? limits?.heatTopRows : limits?.exportRows;
-  const days = limits?.exportDays;
+  const rows = kind === "heat" ? LIMITS.heatTopRows : LIMITS.exportRows;
+  const days = LIMITS.exportDays;
   const label =
     rows && days
       ? translate("{ten} — tối đa {n} dòng · {d} ngày", {

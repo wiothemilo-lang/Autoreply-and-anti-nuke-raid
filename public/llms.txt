@@ -18,7 +18,6 @@ Trang chủ: https://protogon.freebuff.app
 - `/terms` — điều khoản sử dụng
 - `/privacy` — chính sách quyền riêng tư
 - `/data-deletion` — lưu trữ và xoá dữ liệu
-- `/donate` — ủng hộ nhà phát triển (QR ví + ZaloPay)
 - `/feedback` — gửi báo lỗi/đề xuất/góp ý, không cần đăng nhập
 
 ## Trang cần đăng nhập (không thể xem khi chưa xác thực)

@@ -19,7 +19,7 @@ import {
 } from "../backupChunks";
 import { requireBotKeyStrict } from "../botAuth";
 import { generateRestoreKey } from "../backupKeys";
-import { assertWithinLimit, planForGuild } from "../plans";
+
 import { claimIsActive, claimMatches } from "./shared";
 
 /** Chặn trên/dưới + làm tròn — người dùng gõ bừa số cũng không làm hỏng dữ liệu. */
@@ -167,10 +167,8 @@ export async function botSetBackupRetentionHandler(
     .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
     .first();
   if (!guild) return { ok: false, reason: "no_guild" };
-  // Kẹp trần cứng trước, rồi áp hạn mức GÓI — đường dashboard đã làm vậy
-  // (convex/backup.ts setRetention), nhưng đường bot thì không. Hệ quả trước
-  // đây: guild Free gõ `!backup keep 50 365` vẫn lưu, vượt ngân sách storage
-  // 0.5 GB. Throw để lệnh bot hiện đúng gợi ý nâng gói.
+  // Kẹp trần cứng dùng chung cho mọi server (convex/limits.ts): đây là ngân
+  // sách storage của hệ thống, không phải hạn mức bán gói.
   const nextCount =
     keepCount === undefined
       ? clampRetention(guild.backupKeepCount, 3, 2, 50)
@@ -179,9 +177,6 @@ export async function botSetBackupRetentionHandler(
     keepDays === undefined
       ? clampRetention(guild.backupKeepDays, 0, 0, 365)
       : clampRetention(keepDays, 0, 0, 365);
-  const { plan } = await planForGuild(ctx, guildId);
-  assertWithinLimit(plan, "backupKeepCount", nextCount);
-  assertWithinLimit(plan, "backupKeepDays", nextDays);
   await ctx.db.patch(guild._id, {
     backupKeepCount: nextCount,
     backupKeepDays: nextDays,

@@ -2,15 +2,14 @@
  * friendlyConvexError — biến lỗi Convex client hiểu được thành thông điệp
  * người dùng ĐỌC ĐƯỢC, kèm fallback đã dịch.
  *
- * Vì sao cần (bug thật 07/10/2026, trang /donate): Convex production CHE
- * message của `Error` thường thành "[Request ID: …] Server Error Called by
- * client" — DonatePage chỉ bóc được mỗi regex `Uncaught \w+:` nên khách bấm
- * "Ủng hộ" thấy nguyên khối chữ kỹ thuật Convex thay vì lý do thật. Ba đường
- * xử lý, theo thứ tự tin cậy giảm dần:
+ * Vì sao cần (bug thật 07/10/2026): Convex production CHE message của
+ * `Error` thường thành "[Request ID: …] Server Error Called by client", nên
+ * người dùng thấy nguyên khối chữ kỹ thuật thay vì lý do thật. Ba đường xử lý,
+ * theo thứ tự tin cậy giảm dần:
  *
  *   1. `err.data` của ConvexError — KÊN CHẶT: Convex vẫn forward `data` sang
- *      client dù mask message (xem convex/botAuth.ts). Backend
- *      paymentsAction ném ConvexError({ code, message }).
+ *      client dù mask message (xem convex/botAuth.ts). Backend ném
+ *      ConvexError({ code, message }) cho các lỗi nghiệp vụ.
  *   2. Message đã bóc envelope Convex (dev gửi "Uncaught Error: …") — giữ
  *      nguyên lý do tiếng Việt server ném ra.
  *   3. Không còn gì đọc được (đúng hình mask "Server Error") → `fallback`
@@ -20,7 +19,7 @@
  * scripts/test-web-ux-upgrades.ts.
  */
 
-/** Shape `data` của ConvexError do paymentsAction ném (đọc được là mừng). */
+/** Shape `data` của ConvexError do backend ném (đọc được là mừng). */
 type ConvexErrorLike = { code?: unknown; message?: unknown };
 
 /** Bóc dữ liệu JSON nhúng trong message dạng `ConvexError { "message": "…" }`. */

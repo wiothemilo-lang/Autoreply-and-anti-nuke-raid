@@ -38,7 +38,6 @@
     { "source": "/privacy", "destination": "/index.html" },
     { "source": "/data-deletion", "destination": "/index.html" },
     { "source": "/monitor", "destination": "/index.html" },
-    { "source": "/donate", "destination": "/index.html" },
     { "source": "/feedback", "destination": "/index.html" },
     { "source": "/verify/:path*", "destination": "/index.html" },
     { "source": "/admin", "destination": "/index.html" },

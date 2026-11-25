@@ -20,7 +20,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { canManageGuild, getUserByToken } from "./auth";
-import { planForGuild, planLimits } from "./plans";
+import { LIMITS } from "./limits";
 
 const DAY_MS = 86_400_000;
 /** Trần ký tự mỗi ô chữ tự do (tên, lý do, chi tiết) — chặn bản ghi rác. */
@@ -209,18 +209,11 @@ export const exportGuildCsv = query({
       .first();
     if (!guild || !canManageGuild(user, guild)) return null;
 
-    const { plan } = await planForGuild(ctx, guildId);
-    const limits = planLimits(plan);
-    // Gói không có quyền xuất (tương lai) → lỗi NÓI RÕ, không trả file rỗng.
-    if (limits.exportRows <= 0) {
-      throw new Error(`Gói ${plan} không có quyền xuất dữ liệu. Nâng gói để xuất lịch sử ra CSV.`);
-    }
-
     const now = Date.now();
-    const since = now - limits.exportDays * DAY_MS;
+    const since = now - LIMITS.exportDays * DAY_MS;
     // Bảng nhiệt cũng là dữ liệu, nhưng trần riêng (top N) vì một server có thể
     // có hàng nghìn dòng heat — xuất hết không giúp gì mà chỉ tốn I/O.
-    const cap = kind === "heat" ? limits.heatTopRows : limits.exportRows;
+    const cap = kind === "heat" ? LIMITS.heatTopRows : LIMITS.exportRows;
     const built = await buildRows(ctx, guildId, kind, since, cap, lang ?? "vi");
     // `buildRows` lấy cap+1 dòng để biết còn nữa — file chỉ được chứa cap dòng.
     const csv = toCsv(built.header, built.rows.slice(0, cap));
@@ -231,10 +224,9 @@ export const exportGuildCsv = query({
       csv,
       rows: Math.min(built.rows.length, cap),
       truncated: built.truncated,
-      plan,
-      exportRows: limits.exportRows,
-      exportDays: limits.exportDays,
-      heatTopRows: limits.heatTopRows,
+      exportRows: LIMITS.exportRows,
+      exportDays: LIMITS.exportDays,
+      heatTopRows: LIMITS.heatTopRows,
       since,
       filename: `protogon-${kind}-${guildId}-${stamp}.csv`,
     };

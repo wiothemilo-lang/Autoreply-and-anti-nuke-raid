@@ -9,7 +9,7 @@ import {
   effectiveVerifyWebEnabled,
   isIpCollectionEnabled,
 } from "./ipCollectionLock";
-import { planForGuild, planLimits } from "./plans";
+import { LIMITS } from "./limits";
 import {
   ANTI_NUKE_MODULES,
   HEAT_DEFAULTS,
@@ -167,15 +167,13 @@ export const getGuild = query({
           .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
           .collect()
       : [];
-    // TRẦN theo gói (P4): log hành động mod — Miễn phí 30 dòng (mức cũ), gói trả
-    // phí 100/200. Đây là thứ khách mua thêm khi nâng gói, và cũng là trần I/O
-    // cho payload dashboard (payload này chạy mỗi lần mở trang server).
-    const { plan: guildPlanId } = await planForGuild(ctx, guildId);
+    // TRẦN dùng chung cho log hành động mod (convex/limits.ts) — cũng là trần
+    // I/O cho payload dashboard (payload này chạy mỗi lần mở trang server).
     const modActions = await ctx.db
       .query("modActions")
       .withIndex("by_guildId_createdAt", (q) => q.eq("guildId", guildId))
       .order("desc")
-      .take(planLimits(guildPlanId).historyRows);
+      .take(LIMITS.historyRows);
     return {
       guild: {
         discordId: guild.discordId,
