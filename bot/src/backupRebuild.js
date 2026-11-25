@@ -68,20 +68,6 @@ async function createRoles(guild, backup, onProgress) {
       console.error(`[backup:role] ${r.name}:`, e.message);
     }
   }
-  // Sắp xếp lại vị trí role đúng như thứ tự trong file (best-effort — cao hơn = trên).
-  try {
-    const createdSorted = sorted.map((r) => map.get(r.id)).filter(Boolean);
-    for (let i = 0; i < createdSorted.length; i++) {
-      if (onProgress && i % 10 === 0) await onProgress();
-      try {
-        await createdSorted[i].setPosition(i);
-      } catch {
-        // thiếu quyền / giới hạn — bỏ qua role này
-      }
-    }
-  } catch (e) {
-    console.error(`[backup:role:positions] ${guild.id}:`, e.message);
-  }
   return map;
 }
 

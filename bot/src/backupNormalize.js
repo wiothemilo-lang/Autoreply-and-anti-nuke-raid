@@ -7,24 +7,10 @@
  */
 const zlib = require("zlib");
 const { ChannelType, PermissionsBitField } = require("discord.js");
-const { decompressAndDecryptBackup } = require("./backupUtils");
+const { countMessages, decompressAndDecryptBackup } = require("./backupUtils");
 
 /** Trần output khi bung nén payload .msc (chống decompression bomb). */
 const MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024;
-
-/** Đếm tổng tin nhắn có trong backup (kể cả tin nằm trong thread). */
-function countMessages(backup) {
-  return (backup.channels || []).reduce(
-    (n, c) =>
-      n +
-      (Array.isArray(c.messages) ? c.messages.length : 0) +
-      (c.threads || []).reduce(
-        (m, t) => m + (Array.isArray(t?.messages) ? t.messages.length : 0),
-        0,
-      ),
-    0,
-  );
-}
 
 /* ------------------------- Nhập file backup .msc (bot nuke) ------------------------- */
 
@@ -98,10 +84,10 @@ function normalizeMessage(m) {
   const author =
     m.author && typeof m.author === "object"
       ? str(m.author.username ?? m.author.name ?? m.author.id, "?")
-      : str(m.author ?? m.username ?? m.user ?? "?", "?");
+      : str(m.author ?? m.authorName ?? m.username ?? m.user ?? "?", "?");
   return {
     id: str(m.id ?? "", ""),
-    authorId: str(m.author?.id ?? m.userId ?? "", ""),
+    authorId: str(m.author?.id ?? m.authorId ?? m.userId ?? "", ""),
     authorName: author.slice(0, 32) || "?",
     timestamp: ts,
     content: str(m.content ?? m.text ?? m.message ?? "", "").slice(0, 2000),
@@ -111,6 +97,23 @@ function normalizeMessage(m) {
           .filter(Boolean)
           .slice(0, 3)
       : [],
+  };
+}
+
+function normalizeMessages(container) {
+  return (asArray(container.messages ?? container.messageData ?? container.msgs) ?? [])
+    .map(normalizeMessage)
+    .filter(Boolean);
+}
+
+function normalizeThread(thread) {
+  if (!thread || typeof thread !== "object" || !thread.name) return null;
+  return {
+    id: str(thread.id, ""),
+    name: str(thread.name).slice(0, 100),
+    archived: !!thread.archived,
+    autoArchiveDuration: num(thread.autoArchiveDuration ?? 1440, 1440),
+    messages: normalizeMessages(thread),
   };
 }
 
@@ -153,11 +156,7 @@ function normalizeChannel(c, index) {
         .map(normalizeOverwrite)
         .filter(Boolean)
     : [];
-  const messages = asArray(c.messages ?? c.messageData ?? c.msgs)
-    ? asArray(c.messages ?? c.messageData ?? c.msgs)
-        .map(normalizeMessage)
-        .filter(Boolean)
-    : [];
+  const threads = (asArray(c.threads) ?? []).map(normalizeThread).filter(Boolean);
   return {
     id: str(c.id ?? c.channelId ?? c.channel_id ?? `ch-${index}`, ""),
     name: name.slice(0, 100),
@@ -179,7 +178,8 @@ function normalizeChannel(c, index) {
       null,
     ),
     overwrites,
-    messages,
+    messages: normalizeMessages(c),
+    ...(threads.length ? { threads } : {}),
   };
 }
 

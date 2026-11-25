@@ -15,7 +15,7 @@
 
 const zlib = require("zlib");
 const crypto = require("crypto");
-const { computeChecksum } = require("./backupUtils");
+const { computeChecksum, countMessages } = require("./backupUtils");
 
 /** Nguồn backup hợp lệ mà bot ghi qua đường chuẩn. */
 const VALID_SOURCES = new Set(["backup", "import", "clone"]);
@@ -198,10 +198,7 @@ function verifyBackup(row) {
     channels: channels.length,
     emojis: (arr(json.emojis) ?? []).length,
     stickers: (arr(json.stickers) ?? []).length,
-    messages: channels.reduce(
-      (n, c) => n + (Array.isArray(c?.messages) ? c.messages.length : 0),
-      0,
-    ),
+    messages: countMessages(json),
   };
 
   if (row.backupChecksum) {

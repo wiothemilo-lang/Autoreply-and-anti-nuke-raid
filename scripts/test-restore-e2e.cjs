@@ -69,6 +69,7 @@ const PNG_B64 =
 
 function makeTargetGuild() {
   const rolesCreated = [];
+  const rolePositionUpdates = [];
   const channelsCreated = [];
   const messagesSent = [];
   const webhooksCreated = [];
@@ -78,7 +79,6 @@ function makeTargetGuild() {
   const mkRole = (name) => ({
     id: `new-role-${rolesCreated.length + 1}`,
     name,
-    setPosition: async () => {},
     setIcon: async () => {},
   });
 
@@ -128,6 +128,7 @@ function makeTargetGuild() {
         guild.roles.cache.set(r.id, r);
         return r;
       },
+      setPositions: async (positions) => rolePositionUpdates.push(positions),
     },
     channels: {
       cache: new Map(),
@@ -154,6 +155,7 @@ function makeTargetGuild() {
     // Dữ liệu phục vụ assertion
     _created: {
       rolesCreated,
+      rolePositionUpdates,
       channelsCreated,
       messagesSent,
       webhooksCreated,
@@ -345,9 +347,17 @@ function sourceSnapshot() {
         r.opts.name === "Admin" && r.opts.color === 0xff0000 && BigInt(r.opts.permissions) === 8n,
     ),
   );
+  const memberId = created.rolesCreated.find((r) => r.opts.name === "Member")?.role.id;
+  const adminId = created.rolesCreated.find((r) => r.opts.name === "Admin")?.role.id;
   check(
-    "role sắp xếp theo thứ tự (setPosition từng role)",
-    created.rolesCreated.every((r) => typeof r.role.setPosition === "function"),
+    "role được sắp theo thứ tự backup bằng một lần gọi Discord",
+    JSON.stringify(created.rolePositionUpdates) ===
+      JSON.stringify([
+        [
+          { role: memberId, position: 1 },
+          { role: adminId, position: 2 },
+        ],
+      ]),
   );
 
   // Kênh: danh mục + 2 kênh con; overwrite map sang ID ROLE MỚI

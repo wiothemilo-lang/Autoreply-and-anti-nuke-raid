@@ -230,7 +230,7 @@ function makeSnapshot(overrides = {}) {
       stickers: [{ id: "s1", name: "wave" }],
       channels: [
         { id: "c1", name: "general", type: 0, overwrites: [], messages: [{}, {}] },
-        { id: "c2", name: "chat", type: 0, overwrites: [], messages: [{}] },
+        { id: "c2", name: "chat", type: 0, overwrites: [], threads: [{ messages: [{}] }] },
       ],
     });
     const row = {
@@ -246,7 +246,7 @@ function makeSnapshot(overrides = {}) {
     };
     const r = audit.verifyBackup(row);
     check(
-      "verify: bản chuẩn → ok, đếm đúng 1 role/2 kênh/2 emoji/1 sticker/3 tin",
+      "verify: đếm đủ 3 tin, kể cả tin nhắn trong thread",
       r.ok &&
         r.verdict === "real" &&
         r.counts.roles === 1 &&

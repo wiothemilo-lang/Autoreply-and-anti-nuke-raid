@@ -13,8 +13,8 @@ const {
   decompressAndDecryptBackup,
   filterBackupComponents,
   computeChecksum,
+  countMessages,
 } = require("./backupUtils");
-const { countMessages } = require("./backupNormalize");
 const {
   MAX_MEMBERS_PER_BACKUP,
   MAX_REPLAY_PER_CHANNEL,
@@ -400,6 +400,16 @@ async function restoreCore(
     );
   }
   const roleMap = restoreRoles ? await createRoles(guild, backup, ensureClaim) : new Map();
+  if (roleMap.size > 1) {
+    await ensureClaim();
+    // Map giữ thứ tự tạo từ backup. Vị trí 0 dành cho @everyone.
+    const positions = Array.from(roleMap.values(), (role, i) => ({ role, position: i + 1 }));
+    try {
+      await guild.roles.setPositions(positions);
+    } catch (e) {
+      console.error(`[backup:role:positions] ${guildId}:`, e.message);
+    }
+  }
   await ensureClaim();
   // Xoá kênh cũ TRƯỚC khi tạo kênh mới: tạo trước rồi xoá sẽ đẩy mọi kênh vừa
   // dựng vào đúng tên cũ (Discord tự thêm hậu tố khi trùng), xoá sau thì phải

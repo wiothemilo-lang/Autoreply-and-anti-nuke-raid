@@ -128,9 +128,21 @@ function getEncryptionKey() {
   return process.env.BACKUP_ENCRYPT_KEY || null;
 }
 
+/** Đóng gói JSON để lưu, kèm checksum của nội dung trước khi nén/mã hóa. */
+function packBackupJson(json) {
+  const key = getEncryptionKey();
+  const payload = key ? encryptBackup(json, key) : json;
+  const backupJson = compressBackup(payload);
+  return {
+    backupJson,
+    checksum: computeChecksum(json),
+    compressed: backupJson !== payload,
+    encrypted: payload !== json,
+  };
+}
+
 /**
- * Compress + encrypt a backup JSON string for storage.
- * Returns { backupJson, compressed, checksum, encrypted }.
+ * Đóng gói snapshot và trả thêm checksum để so sánh hai bản backup.
  *
  * `precomputedSnapshotChecksum`: caller (backupCapture) đã tính checksum này để
  * so sánh incremental NGAY TRƯỚC ĐÓ — truyền vào để khỏi stringify + băm
@@ -138,18 +150,10 @@ function getEncryptionKey() {
  * 1 chuỗi tạm mỗi lượt backup). Không truyền thì tự tính như cũ.
  */
 function compressAndEncryptBackup(snapshot, precomputedSnapshotChecksum) {
-  const json = JSON.stringify(snapshot);
-  const checksum = computeChecksum(json);
-  const snapshotChecksum = precomputedSnapshotChecksum ?? computeSnapshotChecksum(snapshot);
-  const encKey = getEncryptionKey();
-  let finalJson = json;
-  let encrypted = false;
-  if (encKey) {
-    finalJson = encryptBackup(finalJson, encKey);
-    encrypted = true;
-  }
-  finalJson = compressBackup(finalJson);
-  return { backupJson: finalJson, compressed: true, checksum, snapshotChecksum, encrypted };
+  return {
+    ...packBackupJson(JSON.stringify(snapshot)),
+    snapshotChecksum: precomputedSnapshotChecksum ?? computeSnapshotChecksum(snapshot),
+  };
 }
 
 /**
@@ -162,6 +166,16 @@ function decompressAndDecryptBackup(data) {
     json = decryptBackup(json, encKey);
   }
   return json;
+}
+
+/** Đếm tin nhắn đã lưu trong kênh và thread. */
+function countMessages(backup) {
+  const count = (value) => (Array.isArray(value) ? value.length : 0);
+  const channels = Array.isArray(backup.channels) ? backup.channels : [];
+  return channels.reduce((total, channel) => {
+    const threads = Array.isArray(channel?.threads) ? channel.threads : [];
+    return total + count(channel?.messages) + threads.reduce((n, t) => n + count(t?.messages), 0);
+  }, 0);
 }
 
 // ─── Partial Restore Filter ──────────────────────────────────────────────────
@@ -215,7 +229,9 @@ module.exports = {
   encryptBackup,
   decryptBackup,
   getEncryptionKey,
+  packBackupJson,
   compressAndEncryptBackup,
   decompressAndDecryptBackup,
+  countMessages,
   filterBackupComponents,
 };
