@@ -154,6 +154,8 @@ bun install            # hoặc npm install
 > Biến phía **web/Convex** (không đặt trong bot/.env): `FUNC_SEED`, `GITHUB_TOKEN`, `DISCORD_CLIENT_SECRET`, `OAUTH_REDIRECT_URI`, `DASHBOARD_URL`, `DISCORD_INVITE`, `FACEBOOK_URL` — đặt qua Convex env (Dashboard/Keys).
 >
 > 🔐 **Cơ chế chìa khóa bot**: mọi function bot-side (heartbeat, backup, sync, hidden jobs…) yêu cầu `botKey`. Không có `BOT_KEY` trong .env → bot tự bootstrap (xác minh token bot thật với Discord) và cache key vào `bot/.bot-key` (quyền 600, đã gitignore). Kẻ ngoài không có token bot thì không cấp được key → không đọc được backup, không giả mạo được dữ liệu bot-side. File `.bot-key` bị mất → bot tự bootstrap lại (cooldown 10 phút).
+>
+> Dashboard hiển thị hướng dẫn. Việc bảo trì và cấp lại khóa diễn ra trên máy chạy bot qua bootstrap.
 
 ### Bật các Privileged Intents trong Developer Portal
 

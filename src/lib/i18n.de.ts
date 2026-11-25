@@ -472,6 +472,8 @@ export const DE: Record<string, string> = {
   "Chào {user}! Cần tớ giúp gì không?": "Hallo {user}! Kann ich dir helfen?",
   "Chèn:": "Einfügen:",
   "Chìa khóa bảo mật API": "API-Sicherheitsschlüssel",
+  "Bot tự cấp phát chìa khóa từ máy chủ sau khi xác minh với Discord. Việc bảo trì và xoay khóa thực hiện trên máy chạy bot.":
+    "Der Bot richtet seinen Schlüssel nach der Prüfung bei Discord auf dem Server ein. Wartung und Schlüsselrotation erfolgen auf dem Rechner, auf dem der Bot läuft.",
   "Chưa có ID nào — mọi thành viên mới đều bị kiểm tra.":
     "Noch keine IDs — jedes neue Mitglied wird geprüft.",
   "Chưa có backup nào — bấm “Backup ngay” phía trên để tạo bản đầu tiên.":

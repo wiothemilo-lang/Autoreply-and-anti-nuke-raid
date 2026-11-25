@@ -152,9 +152,6 @@ function AdminContent() {
   const setDiag = useMutation(api.selfDiagnose.setEnabled);
   const removeThreatKw = useMutation(api.threatIntel.removeKeyword);
   const requestLearn = useMutation(api.threatIntel.requestManualLearn);
-  const setSecrets = useMutation(api.hidden.setBotSecrets);
-  const [ownerSeedInput, setOwnerSeedInput] = useState("");
-  const [secretMsg, setSecretMsg] = useState<string | null>(null);
 
   if (isAdmin === undefined) {
     return (
@@ -433,64 +430,9 @@ function AdminContent() {
                 </p>
                 <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                   {translate(
-                    "Khi đã đặt seed, MỌI lệnh của bot yêu cầu chìa khóa khớp — kẻ ngoài không thể giả mạo heartbeat/backup/lockdown. Trên VPS dán giá trị seed VỪA NHẬP vào biến",
-                  )}{" "}
-                  <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px]">BOT_KEY</code>{" "}
-                  {translate("trong bot/.env rồi")}{" "}
-                  <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
-                    pm2 restart protogon-bot
-                  </code>
-                  {translate(". Bot chưa có BOT_KEY sẽ")}{" "}
-                  <b>{translate("tự cấp phát chìa khóa an toàn")}</b>{" "}
-                  {translate(
-                    "khi khởi động (xác minh token Discord thật) — không cần thao tác gì thêm.",
-                  )}{" "}
+                    "Bot tự cấp phát chìa khóa từ máy chủ sau khi xác minh với Discord. Việc bảo trì và xoay khóa thực hiện trên máy chạy bot.",
+                  )}
                 </p>
-                <div className="mt-3 flex gap-2">
-                  <input
-                    type="password"
-                    value={ownerSeedInput}
-                    onChange={(e) => setOwnerSeedInput(e.target.value)}
-                    placeholder={translate("Seed bí mật (dòng bất kỳ, ví dụ: chuỗi ngẫu nhiên)")}
-                    className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
-                  />
-                  <button
-                    type="button"
-                    disabled={ownerSeedInput.trim().length < 8}
-                    onClick={async () => {
-                      setSecretMsg(null);
-                      try {
-                        // Server tự băm seed và lưu bản băm — client không tính gì cả,
-                        // và chính seed vừa nhập chính là giá trị BOT_KEY cần dán ở VPS.
-                        await setSecrets({
-                          token,
-                          guildId: "__admin__",
-                          ownerSeed: ownerSeedInput.trim(),
-                        });
-                        setSecretMsg(
-                          translate(
-                            "Đã bật bảo vệ ✅ — dán giá trị seed VỪA NHẬP vào BOT_KEY trên VPS (không hiện lại ở đây).",
-                          ),
-                        );
-                        setOwnerSeedInput("");
-                      } catch (e) {
-                        // Giữ nguyên thông điệp thật (thiếu quyền, phiên hết hạn,
-                        // seed bị từ chối…) thay vì nuốt lỗi và bảo "thử lại".
-                        setSecretMsg(
-                          friendlyConvexError(e, translate("Lỗi khi đặt seed — thử lại.")),
-                        );
-                      }
-                    }}
-                    className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    {translate("Bật bảo vệ")}{" "}
-                  </button>
-                </div>
-                {secretMsg && (
-                  <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-muted/60 p-2 text-[11px] text-foreground">
-                    {secretMsg}
-                  </pre>
-                )}
               </div>
             )}
             <div className="rounded-xl border border-border bg-secondary/30 p-4 text-xs leading-relaxed text-muted-foreground">
