@@ -191,8 +191,8 @@ export function weeklyProfile(events: StatEvent[], joins: StatJoin[], now: numbe
 /**
  * Số liệu "Tình hình server" hôm nay (quản lý server — manager-gated).
  *
- * Khoảng đọc 7 ngày rồi lọc theo ngày VN ở `summarize` — cần dự phòng vì
- * index theo ngày VN không tồn tại (và thêm index chỉ để báo cáo là quá đắt).
+ * Đọc từ đầu ngày cũ nhất trên biểu đồ, theo giờ VN. Lấy thêm một dòng
+ * để nhận biết khi trần đọc làm số liệu thiếu.
  */
 export const todaySummary = query({
   args: { token: v.string(), guildId: v.string() },
@@ -207,32 +207,35 @@ export const todaySummary = query({
 
     const now = Date.now();
     const dayStart = startOfDayVietnam(now);
-    const weekAgo = now - 7 * 86_400_000;
+    const oldestDay = dayStart - 6 * 86_400_000;
+    const rowLimit = 1000;
     const [events, joins] = await Promise.all([
       ctx.db
         .query("antinukeEvents")
         .withIndex("by_guildId_createdAt", (q) =>
-          q.eq("guildId", guildId).gte("createdAt", weekAgo),
+          q.eq("guildId", guildId).gte("createdAt", oldestDay),
         )
         .order("desc")
-        .take(1000),
+        .take(rowLimit + 1),
       ctx.db
         .query("memberJoins")
-        .withIndex("by_guildId_joinedAt", (q) => q.eq("guildId", guildId).gte("joinedAt", weekAgo))
+        .withIndex("by_guildId_joinedAt", (q) =>
+          q.eq("guildId", guildId).gte("joinedAt", oldestDay),
+        )
         .order("desc")
-        .take(1000),
+        .take(rowLimit + 1),
     ]);
 
     // Field nằm thẳng trên document guild (xem convex/guilds.ts:500), không
     // phải trong `settings` — nếu sai chỗ này luôn rơi về 70 im lặng.
     const maxRisk = Number(guild.altMaxRiskScore ?? 70);
-    const statEvents = events.map((e) => ({
+    const statEvents = events.slice(0, rowLimit).map((e) => ({
       module: e.module,
       action: e.action,
       count: e.count,
       createdAt: e.createdAt,
     }));
-    const statJoins = joins.map((j) => ({
+    const statJoins = joins.slice(0, rowLimit).map((j) => ({
       createdAt: j.joinedAt,
       riskScore: j.riskScore,
       action: j.action ?? null,
@@ -242,6 +245,7 @@ export const todaySummary = query({
       ...summarize(statEvents, statJoins, dayStart, Number.isFinite(maxRisk) ? maxRisk : 70),
       /** Mốc bắt đầu ngày VN — UI hiện "tính từ HH:MM giờ VN" cho minh bạch. */
       dayStart,
+      truncated: events.length > rowLimit || joins.length > rowLimit,
       hourly: hourlyProfile(statEvents, statJoins, dayStart),
       weekly: weeklyProfile(statEvents, statJoins, now),
     };

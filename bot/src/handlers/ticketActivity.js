@@ -14,13 +14,8 @@
 /**
  * Tin nhắn có nằm trong kênh ticket không?
  *
- * KHÔNG dùng API bịa (`channel.isTicket()` — discord.js không có). Cách thật
- * duy nhất đáng tin là so với category mà chủ server đã cấu hình: đây cũng
- * chính là điều kiện bot dùng khi TẠO kênh ticket.
- *
- * `store.getConfig` có cache 90 phút nên lời gọi này gần như miễn phí — tin
- * nhắn thường thoát ngay ở bước ticket bật/tắt, chỉ kênh trong category
- * ticket mới đi tiếp.
+ * Danh mục mặc định là đường nhanh. Với kênh đã chuyển danh mục, tra ID
+ * trong cache ticket mở. Convex kiểm tra lại guild, ID và trạng thái khi ghi.
  */
 async function isTicketChannel(message, store) {
   if (!message?.guild?.id || !message.channel?.id) return false;
@@ -30,8 +25,10 @@ async function isTicketChannel(message, store) {
   } catch {
     return false;
   }
-  if (!config?.ticketEnabled || !config?.ticketCategoryId) return false;
-  return message.channel.parentId === config.ticketCategoryId;
+  if (!config?.ticketEnabled) return false;
+  if (config.ticketCategoryId && message.channel.parentId === config.ticketCategoryId) return true;
+  const openChannels = await store.getOpenTicketChannels(message.guild.id);
+  return openChannels.has(message.channel.id);
 }
 
 /**

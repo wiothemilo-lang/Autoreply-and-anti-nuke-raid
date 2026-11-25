@@ -14,11 +14,12 @@ const check = (label, ok, detail) => {
 };
 const section = (t) => console.log(`\n── ${t} ──`);
 
-function mkStore(config) {
+function mkStore(config, openChannels = []) {
   const mutations = [];
   return {
     mutations,
     getConfig: async () => config,
+    getOpenTicketChannels: async () => new Set(openChannels),
     client: {
       mutation: async (name, args) => {
         mutations.push({ name, args });
@@ -87,6 +88,15 @@ function mkMessage({ guildId = "G1", channelId = "CH1", parentId = "CAT", bot = 
   }
 
   section("noteActivity — ghi lùi đúng kênh");
+  {
+    const store = mkStore({ ticketEnabled: true, ticketCategoryId: "CAT" }, ["CH1"]);
+    const movedTicket = mkMessage({ parentId: "THU_MUC_KHAC" });
+    check(
+      "ticket đã chuyển danh mục vẫn ghi hoạt động",
+      await activity.noteActivity(movedTicket, store),
+    );
+    check("ghi đúng ID kênh đã đăng ký", store.mutations[0]?.args.channelIds[0] === "CH1");
+  }
   {
     const store = mkStore({ ticketEnabled: true, ticketCategoryId: "CAT" });
     const ok = await activity.noteActivity(mkMessage(), store);

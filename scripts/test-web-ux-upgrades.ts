@@ -805,6 +805,12 @@ console.log("── #12 mô phỏng auto-reply ──");
   );
 
   // Placeholder: web thay {user} bằng @tên (không có id Discord), {username} bằng tên.
+  const previewPrefix = "x".repeat(1898);
+  check(
+    "xem trước rút gọn ở cùng ranh giới emoji ghép với bot",
+    simulateAutoReply([rule({ response: previewPrefix + "👩‍💻!" })], msg())[0].response ===
+      previewPrefix + "…",
+  );
   check(
     "{user} → @tên và {username} → tên",
     simulateAutoReply([rule({ response: "{user} / {username}" })], msg({ username: "An" }))[0]

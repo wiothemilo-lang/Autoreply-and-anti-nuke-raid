@@ -58,6 +58,7 @@ interface Summary {
   threatsBlocked: number;
   topRiskFactors: [string, number][];
   dayStart: number;
+  truncated?: boolean;
   /** 24 ô giờ VN của hôm nay + 7 ngày VN gần nhất (A6). */
   hourly: { hour: number; joins: number; events: number; blocked: number }[];
   weekly: { dayStart: number; joins: number; blocked: number }[];
@@ -261,6 +262,11 @@ export default function StatsPage() {
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {translate("Tính từ 00:00 hôm nay theo giờ Việt Nam.")}
               </p>
+              {summary.truncated && (
+                <p role="status" className="mt-2 text-sm text-warning">
+                  {translate("Số liệu có thể thiếu vì đã đạt giới hạn tải dữ liệu.")}
+                </p>
+              )}
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <StatTile
                   icon={ShieldCheck}

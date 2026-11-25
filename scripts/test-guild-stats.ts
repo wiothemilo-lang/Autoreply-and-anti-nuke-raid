@@ -13,6 +13,7 @@ import {
   hourlyProfile,
   startOfDayVietnam,
   summarize,
+  todaySummary,
   weeklyProfile,
   type StatEvent,
   type StatJoin,
@@ -337,6 +338,47 @@ console.log("── hourlyProfile / weeklyProfile (A6) ──");
   check(
     "rỗng → 7 ngày toàn 0",
     weeklyProfile([], [], dayStart + H).every((d) => d.joins === 0 && d.blocked === 0),
+  );
+}
+
+{
+  const now = Date.now();
+  const handler = (todaySummary as any)._handler;
+  const querySummary = (joinCount: number) =>
+    handler(
+      {
+        db: {
+          get: async () => ({ discordId: "user", manageableGuildIds: ["guild"] }),
+          query: (table: string) => {
+            const rows = {
+              withIndex: () => rows,
+              order: () => rows,
+              first: async () =>
+                table === "sessions"
+                  ? { createdAt: now, authVersion: 1, userId: "user" }
+                  : { discordId: "guild" },
+              take: async (limit: number) =>
+                table === "memberJoins"
+                  ? Array.from({ length: Math.min(limit, joinCount) }, () => ({
+                      joinedAt: now,
+                      riskScore: 10,
+                      riskFactors: [],
+                    }))
+                  : [],
+            };
+            return rows;
+          },
+        },
+      },
+      { token: "fixture", guildId: "guild" },
+    );
+  const exact = await querySummary(1000);
+  const truncated = await querySummary(1001);
+  check("đúng 1000 bản ghi vẫn là thống kê đầy đủ", exact.truncated === false);
+  check("phát hiện thống kê bị giới hạn khi còn bản ghi cũ hơn", truncated.truncated === true);
+  check(
+    "bản ghi kiểm tra giới hạn không được cộng vào biểu đồ",
+    truncated.weekly[6].joins === 1000,
   );
 }
 

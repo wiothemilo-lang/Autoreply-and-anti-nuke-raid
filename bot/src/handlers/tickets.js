@@ -436,6 +436,7 @@ async function openTicket({
       ticketId,
       channelId: channel.id,
     });
+    store.invalidateOpenTicketChannels?.(guild.id);
   } catch (e) {
     console.error(`[tickets] cập nhật channelId thất bại:`, e.message);
   }

@@ -18,6 +18,8 @@
  * mô phỏng được — UI phải nói rõ điều này thay vì giả vờ chính xác.
  */
 
+import { truncateAutoReply } from "../../bot/src/autoReplyText.mjs";
+
 export interface SimRule {
   _id: string;
   name: string;
@@ -69,7 +71,7 @@ export function simulateAutoReply(rules: SimRule[], input: SimInput): SimMatch[]
         : (rule.keywords || []).some((k) => k && content.includes(k.toLowerCase()));
     if (!matched) continue;
 
-    matches.push({ rule, response: fillPreview(rule.response, username) });
+    matches.push({ rule, response: truncateAutoReply(fillPreview(rule.response, username)) });
   }
   return matches;
 }
