@@ -80,12 +80,12 @@ console.log("\n── 4. Route/nav/SEO sạch ──");
   check("llms.txt không còn /donate", !read("public/llms.txt").includes("/donate"));
 }
 
-console.log("\n── 5. Dữ liệu kế toán cũ vẫn được bảo toàn ──");
+console.log("\n── 5. Bảng kế toán cũ đã được purge ──");
 {
   const schema = read("convex/schema.ts");
-  check("schema vẫn định nghĩa bảng payments", /payments: defineTable/.test(schema));
-  check("schema vẫn định nghĩa bảng entitlements", /entitlements: defineTable/.test(schema));
-  check("schema ghi rõ chỉ lưu trữ lịch sử", /LƯU TRỮ LỊCH SỬ/.test(schema));
+  check("schema không còn bảng payments", !/payments: defineTable/.test(schema));
+  check("schema không còn bảng entitlements", !/entitlements: defineTable/.test(schema));
+  check("schema không còn ghi chú lưu trữ lịch sử", !/LƯU TRỮ LỊCH SỬ/.test(schema));
   check(
     "văn bản pháp lý không còn nhắc ZaloPay",
     !/zalopay/i.test(read("src/lib/legalContent.ts")),

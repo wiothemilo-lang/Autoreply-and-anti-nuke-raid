@@ -123,10 +123,8 @@ console.log("\n── 4. Không còn khái niệm gói/quyền lợi ──");
   }
   const schema = readSrc("convex/schema.ts");
   check(
-    "bảng payments/entitlements chỉ còn là lưu trữ lịch sử",
-    /LƯU TRỮ LỊCH SỬ/.test(schema) &&
-      /payments: defineTable/.test(schema) &&
-      /entitlements: defineTable/.test(schema),
+    "schema đã purge hẳn bảng payments/entitlements",
+    !/payments: defineTable/.test(schema) && !/entitlements: defineTable/.test(schema),
   );
 }
 

@@ -627,7 +627,7 @@ từng dòng.
 | **Trang verify công khai**                         | Chỉ metadata phiên CỦA CHÍNH MÌNH qua token 256-bit: trạng thái, tên server, hạn, quyết định. KHÔNG có `ipHash`, `ipHashShort`, `linkedUserId`, tín hiệu hay IP thô | `getSession` băm token rồi tra `by_tokenHash`; token sai/hết hạn → `null`                                               |
 | **Quản trị viên server** (Discord `Manage Server`) | Phiên, link alt, IP ban, thống kê, xoá dữ liệu — **chỉ guild mình quản lý**                                                                                         | `canManageGuild` ⇄ `manageableGuildIds` do Discord trả về lúc đăng nhập; mọi query/mutation nhận `guildId` đều kiểm lại |
 | **Bot**                                            | Phiên chờ cấp quyền, userId/guildId để thi hành, đồng bộ guild ban                                                                                                  | `requireBotKeyStrict` — botKey = HMAC của `OWNER_SEED`, chỉ tiến trình bot có                                           |
-| **Chủ sở hữu bot**                                 | Trong app: như quản trị viên server (chỉ guild họ quản lý). Ngoài app: quyền hạ tầng Convex dashboard                                                               | `isBotOwnerUser` chỉ dùng cho cửa sổ Admin (feedback/payments/status), KHÔNG mở rộng quyền đọc verify                   |
+| **Chủ sở hữu bot**                                 | Trong app: như quản trị viên server (chỉ guild họ quản lý). Ngoài app: quyền hạ tầng Convex dashboard                                                               | `isBotOwnerUser` chỉ dùng cho cửa sổ Admin (feedback/status), KHÔNG mở rộng quyền đọc verify                            |
 
 Ghi chú:
 

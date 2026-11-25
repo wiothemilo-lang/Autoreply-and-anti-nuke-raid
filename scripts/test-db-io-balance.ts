@@ -383,8 +383,8 @@ console.log("── Cổng tĩnh: đường đọc Convex không quét toàn b�
   );
   check(
     "schema có đủ index mới cho các đường nóng",
-    ["by_hiddenPasswordHash", "by_guildId_openerId_createdAt", "by_userId_status_createdAt"].every(
-      (name) => src("convex/schema.ts").includes(`.index("${name}"`),
+    ["by_hiddenPasswordHash", "by_guildId_openerId_createdAt"].every((name) =>
+      src("convex/schema.ts").includes(`.index("${name}"`),
     ),
   );
 }

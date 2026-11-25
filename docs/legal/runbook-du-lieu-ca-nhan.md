@@ -131,11 +131,10 @@ quyền) và đã ghi lại guild ID. Thứ tự bắt buộc:
    - `auditLog`, `guildWebhooks`
    - `reactionRolePanels`, `giveaways`, `autoReplies`, `antinukeModules`,
      `heatStates`, `channelLocks`, `guildChannels`, `guildRoles`, `guildEmojis`
-   - `entitlements` có `guildId` tương ứng (gói premium gắn server)
    - `guilds` (dòng cuối cùng)
-4. **Không xoá** `payments` (nghĩa vụ kế toán; chỉ chứa ID Discord, mã đơn, số
-   tiền — không có thẻ/tài khoản), `ipIntelCache` và `relaySignatures` (không có
-   guildId; tự hết hạn theo TTL).
+4. **Không xoá** `ipIntelCache` và `relaySignatures` (không có guildId; tự hết
+   hạn theo TTL). Hai bảng `payments`/`entitlements` đã được purge ngày
+   25/11/2026 sau khi chụp snapshot production — không còn dữ liệu để xoá.
 5. Kiểm tra lại: mỗi bảng trên phải trả 0 dòng với `guildId` đó; storage không
    còn transcript của guild.
 6. Ghi vào bảng theo dõi: thời điểm, người thực hiện, bảng đã xoá, số dòng, bằng
