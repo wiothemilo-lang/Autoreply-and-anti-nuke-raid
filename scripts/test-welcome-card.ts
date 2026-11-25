@@ -167,7 +167,7 @@ async function inkOf(png: Buffer) {
 
   console.log("\n── Emoji bị bỏ khỏi ẢNH (không vẽ ô tofu) ──");
   const FONT = "24px ProtogonCard";
-  const drawable = (t: string) => card._drawableTextForTest(FONT, t);
+  const drawable = card._drawableTextForTest;
   check("drawableText bỏ emoji, giữ chữ", drawable("Chào 🎉 bạn") === "Chào bạn");
   // Hồi quy thật: "V" trong Noto Sans rộng ĐÚNG BẰNG glyph khuyết (14.4px) nên
   // bản so-bề-rộng đã xoá oan chữ V. Phải giữ nguyên cả câu.
@@ -178,6 +178,10 @@ async function inkOf(png: Buffer) {
   );
   check("drawableText gộp khoảng trắng thừa", drawable("Wio    ơi") === "Wio ơi");
   check("drawableText bỏ chữ Hán (font không có glyph)", drawable("Wio 日本") === "Wio");
+  check(
+    "drawableText giữ dấu và bỏ ký tự ngoài font trong cùng tên",
+    drawable("Nguyễn 日本 🎉 Vũ") === "Nguyễn Vũ",
+  );
   const withEmoji = await card.renderCard({
     eyebrow: "CHÀO MỪNG 🎉",
     name: "Wio 🚀",
