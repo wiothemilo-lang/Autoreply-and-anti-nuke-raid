@@ -338,6 +338,16 @@ Module._load = function (request, parent) {
       replies[0].content.length === 1901 && replies[0].content.endsWith("…"),
     );
 
+    replies.length = 0;
+    configs.get("g2").autoReplies[0].response = "x".repeat(1899) + "😀!";
+    await onMessageCreate(
+      client,
+      mkMessage({ guild: { id: "g2", name: "G2", available: true }, content: "long" }),
+      store,
+      {},
+    );
+    check("cắt trước emoji nằm ngang giới hạn", replies[0].content === "x".repeat(1899) + "…");
+
     // Rule tắt / sai kênh
     clear();
     configs.set("g2", {
