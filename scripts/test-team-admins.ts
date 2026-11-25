@@ -408,8 +408,7 @@ console.log("── 5. getTeamAdmins ──");
     /Chỉ chủ sở hữu bot hoặc quản trị viên nhóm/,
   );
 
-  // Dữ liệu quyền lợi CŨ còn trong DB cũng không được biến thành nhãn gói:
-  // bản miễn phí không đọc bảng entitlements nữa.
+  // Bảng entitlements đã purge; fixture cũ vẫn không được đọc thành nhãn gói.
   const future = Date.now() + 86_400_000;
   const planCtx = makeCtx({
     teamAdmins: [ADMIN_A],
