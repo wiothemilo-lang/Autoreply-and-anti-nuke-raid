@@ -815,10 +815,9 @@ check(
   /redirect: "manual"/.test(welcomeCardHardenedSrc) &&
     /assertSafeRemoteUrl\(new URL\(location, target\)/.test(welcomeCardHardenedSrc),
 );
-const paymentsSrc = fs.readFileSync(path.join(ROOT, "convex", "paymentsAction.ts"), "utf8");
 check(
-  "paymentsAction chỉ còn tombstone, không trả order_url",
-  /export \{\};/.test(paymentsSrc) && !/order_url|safeZaloPayUrl/.test(paymentsSrc),
+  "paymentsAction.ts đã bị xoá hẳn",
+  !fs.existsSync(path.join(ROOT, "convex", "paymentsAction.ts")),
 );
 const backupWritesSrc = fs.readFileSync(
   path.join(ROOT, "convex", "bot_writes", "backup.ts"),
@@ -2665,13 +2664,12 @@ for (const rel of ["pages/FeedbackPage.tsx"]) {
   );
 }
 
-// 3) Bề mặt ủng hộ đã gỡ cùng gói trả phí — chỉ còn tombstone, không còn
-//    luồng tạo đơn/redirect ZaloPay nào để lộ hoặc gọi nhầm.
-const donateSrc = files.get("pages/DonatePage.tsx") ?? "";
+// 3) Bề mặt ủng hộ đã bị xoá hẳn cùng gói trả phí — không còn file nào để
+//    vô tình dựng lại luồng tạo đơn/redirect ZaloPay.
 check(
-  "DonatePage chỉ còn tombstone, không còn luồng ZaloPay",
-  /export \{\};/.test(donateSrc) && !/startPayment|safeZaloPayUrl/.test(donateSrc),
-  "DonatePage vẫn còn mã thanh toán",
+  "DonatePage.tsx đã bị xoá hẳn",
+  !files.has("pages/DonatePage.tsx"),
+  "DonatePage vẫn còn trong cây nguồn",
 );
 
 // ─── W. 10/11/2026 — Premium TẠM ẨN (chưa đủ điều kiện đăng ký kinh doanh) ───
@@ -2856,9 +2854,9 @@ check(
 );
 
 // ─── Y. 10/11/2026 — giới hạn theo gói đang TẮT ─────────────────────────────
-// Mọi server dùng trần cao nhất (PLAN_LIMITS_ENABLED trong convex/plans.ts), nên
-// dashboard không còn thẻ gói/hạn mức để tránh mời nâng cấp thứ không tồn tại.
-// Server vẫn là chốt cuối: test-payments.ts + test-plans-gating.ts kiểm công tắc.
+// Mọi server dùng chung trần kỹ thuật trong convex/limits.ts, nên dashboard
+// không còn thẻ gói/hạn mức để tránh mời nâng cấp thứ không tồn tại.
+// Server vẫn là chốt cuối: test-payments.ts + test-plans-gating.ts kiểm trần đó.
 
 // ─── 10/11/2026 — copy công khai phải khớp việc TẠM NGỪNG BÁN ───────────────
 // Ba bề mặt từng hứa hạn mức/giá của gói trả phí: meta SEO, trang ủng hộ và
@@ -2875,7 +2873,7 @@ check(
   !/kênh riêng hơn|private channels|eigene Kanäle|tên bot riêng|custom bot name|eigener Bot-Name|hỗ trợ ưu tiên"><|priority support|priorisierter Support/.test(
     seoMetaAll,
   ),
-  "còn copy gói cũ trong thẻ meta — không dòng nào trong plans.ts enforce",
+  "còn copy gói cũ trong thẻ meta — không dòng nào trong limits.ts enforce",
 );
 check(
   "meta SEO không còn mời mua gói Premium hay nêu giá",

@@ -68,8 +68,9 @@ function makeCtx(
     /** Guild thêm vào bảng `guilds` (để test phạm vi theo server). */
     extraGuilds?: string[];
     /**
-     * Gói của server-1 (convex/plans.ts). Mặc định Miễn phí: test CRUD thường
-     * không nhằm kiểm trần gói — trần có test riêng ở test-plans-gating.ts.
+     * Di sản thời còn gói trả phí: seed entitlement để chứng minh code CRUD
+     * không còn đọc quyền lợi gói. Trần kỹ thuật có test riêng ở
+     * test-plans-gating.ts.
      */
     plan?: string;
     now?: number;

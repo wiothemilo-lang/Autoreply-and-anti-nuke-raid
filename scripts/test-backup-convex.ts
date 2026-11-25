@@ -94,7 +94,7 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
   const userRows: Row[] = [];
   const statusRows: Row[] =
     opts.seed === null ? [] : [{ kind: "status", botKeySeed: computeBotKey(opts.seed ?? BOT_KEY) }];
-  // Quyền lợi theo GÓI của server (convex/plans.ts): rỗng = gói Miễn phí.
+  // Bảng quyền lợi là DI SẢN: không code nào còn đọc; seed chỉ để chứng minh.
   const entitlementRows: Row[] = [];
   let idCounter = 0;
   const nextId = () => `id${++idCounter}`;
@@ -1054,9 +1054,9 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     // 4) Số bậy từ dashboard/lệnh chat → bị chặn trong khoảng, không làm rỗng server.
     {
       const { ctx, guildRows, sessionRows, userRows, entitlementRows } = makeCtx({ seed: BOT_KEY });
-      // Block này kiểm CLAMP số bậy (999 → 50) — không kiểm trần theo gói, nên
-      // server được đặt gói Tiên phong (trần gói có test riêng:
-      // scripts/test-plans-gating.ts).
+      // Block này kiểm CLAMP số bậy (999 → 50). Entitlement "pioneer" là di
+      // sản — seed để chứng minh code không còn đọc quyền lợi gói; trần kỹ
+      // thuật có test riêng ở scripts/test-plans-gating.ts.
       entitlementRows.push({
         _id: "ent1",
         guildId: "g1",
@@ -1249,8 +1249,8 @@ function makeCtx(opts: { now?: number; seed?: string | null } = {}) {
     // bằng handler thật + ctx giả, nên lệch ở khâu nào cũng đỏ ngay.
     const { ctx, guildRows, backupRows, entitlementRows } = makeCtx({ seed: BOT_KEY });
     guildRows.push({ _id: "gslash", discordId: "g-slash", name: "Server" });
-    // 2 bản / 30 ngày vượt hạn mức gói Miễn phí (3 bản / 7 ngày) — server phải
-    // đang ở gói Đồng hành mới đặt được quy tắc này.
+    // 2 bản / 30 ngày giờ là quy tắc hợp lệ cho MỌI server. Entitlement
+    // "supporter" là di sản — seed để chứng minh code không còn đọc nó.
     entitlementRows.push({
       _id: "e-slash",
       guildId: "g-slash",
