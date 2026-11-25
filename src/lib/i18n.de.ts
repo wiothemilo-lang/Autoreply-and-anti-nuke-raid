@@ -479,6 +479,9 @@ export const DE: Record<string, string> = {
   "Chưa có người dùng nào — thêm ID phía trên để miễn trừ.":
     "Noch keine Nutzer — füge oben IDs hinzu, um sie auszunehmen.",
   "Chưa có server nào": "Noch keine Server",
+  "Cần xác minh lại quyền Discord": "Discord-Berechtigungen erneut bestätigen",
+  "Hãy tải lại quyền quản lý server để tiếp tục dùng dashboard.":
+    "Aktualisiere deine Serververwaltungsrechte, um das Dashboard weiter zu nutzen.",
   "Chưa có — bot sẽ": "Noch nichts — der Bot wird",
   "Chưa học được từ khóa nào — bật research và chờ lượt chạy đầu tiên (5 phút sau khi bot online).":
     "Noch keine Schlüsselwörter gelernt — Research aktivieren und den ersten Lauf abwarten (5 Minuten nach Bot-Start).",

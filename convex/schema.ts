@@ -8,6 +8,7 @@ export default defineSchema({
     globalName: v.optional(v.string()),
     avatar: v.optional(v.string()),
     manageableGuildIds: v.array(v.string()),
+    guildPermissionsCheckedAt: v.optional(v.number()),
     lastLoginAt: v.number(),
   }).index("by_discordId", ["discordId"]),
 

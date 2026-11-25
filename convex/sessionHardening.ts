@@ -29,6 +29,7 @@ async function purgeExpiredSessions(ctx: MutationCtx): Promise<void> {
 export const loginInternal = internalMutation({
   args: {
     token: v.string(),
+    permissionsCheckedAt: v.number(),
     user: v.object({
       discordId: v.string(),
       username: v.string(),
@@ -61,7 +62,9 @@ export const loginInternal = internalMutation({
         username: args.user.username,
         globalName: args.user.globalName,
         avatar: args.user.avatar,
-        manageableGuildIds: manageable,
+        ...(args.permissionsCheckedAt >= (existing.guildPermissionsCheckedAt ?? 0)
+          ? { manageableGuildIds: manageable, guildPermissionsCheckedAt: args.permissionsCheckedAt }
+          : {}),
         lastLoginAt: Date.now(),
       });
     } else {
@@ -71,6 +74,7 @@ export const loginInternal = internalMutation({
         globalName: args.user.globalName,
         avatar: args.user.avatar,
         manageableGuildIds: manageable,
+        guildPermissionsCheckedAt: args.permissionsCheckedAt,
         lastLoginAt: Date.now(),
       });
     }
@@ -107,6 +111,7 @@ export const loginInternal = internalMutation({
 export const guildsInternal = internalMutation({
   args: {
     discordId: v.string(),
+    permissionsCheckedAt: v.number(),
     guilds: v.array(
       v.object({
         id: v.string(),
@@ -116,17 +121,22 @@ export const guildsInternal = internalMutation({
       }),
     ),
   },
-  handler: async (ctx, { discordId, guilds }) => {
+  handler: async (ctx, { discordId, guilds, permissionsCheckedAt }) => {
     const user = await ctx.db
       .query("users")
       .withIndex("by_discordId", (q) => q.eq("discordId", discordId))
       .first();
     if (!user) return { ok: false };
+    // Một lần xác minh chậm có thể hoàn thành sau lần lấy quyền mới hơn.
+    if (permissionsCheckedAt < (user.guildPermissionsCheckedAt ?? 0)) return { ok: true };
 
     const manageable = guilds
       .filter((g) => (BigInt(g.permissions) & BigInt(PERM_MANAGE_GUILD)) !== 0n)
       .map((g) => g.id);
-    await ctx.db.patch(user._id, { manageableGuildIds: manageable });
+    await ctx.db.patch(user._id, {
+      manageableGuildIds: manageable,
+      guildPermissionsCheckedAt: permissionsCheckedAt,
+    });
 
     // Ghi người dùng vào managers của mọi guild họ quản lý đã có trên Convex.
     for (const guildId of manageable) {

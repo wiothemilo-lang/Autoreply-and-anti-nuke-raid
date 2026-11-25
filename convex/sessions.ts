@@ -57,6 +57,7 @@ export const me = query({
         avatar: user.avatar ?? null,
       },
       guilds,
+      guildPermissionsStale: user.guildPermissionsStale,
       botOnline: status?.online ?? false,
       botGuildCount: status?.guildCount ?? 0,
       botMemberCount: status?.memberCount ?? 0,

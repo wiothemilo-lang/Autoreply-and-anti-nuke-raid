@@ -263,14 +263,7 @@ export async function botClearBackupHandler(
     patch.importErrorAt = undefined;
     patch.restoreClaimedAt = undefined;
     patch.restoreLeaseUntil = undefined;
-    // Xóa luôn file backup đã tải lên (Convex file storage) — không để rác.
-    if (guild.importStorageId) {
-      try {
-        await ctx.storage.delete(guild.importStorageId);
-      } catch (e) {
-        console.error(`[backup:clear:storage] ${guildId}:`, e instanceof Error ? e.message : e);
-      }
-    }
+    // Gỡ tham chiếu; importStorageId đến từ dashboard và chưa có thông tin sở hữu.
   } else if (kind === "plan") {
     // Dry-run KHÔNG đụng server nên không có "xong" để đánh dấu, và tuyệt đối
     // không đụng restoreFinishedAt — nếu không dashboard tưởng đã khôi phục xong.
@@ -391,17 +384,6 @@ export async function botReportImportErrorHandler(
     restoreLeaseUntil: undefined,
     updatedAt: Date.now(),
   });
-  // Xóa file backup đã tải lên — không để rác storage (người dùng sẽ tải lại).
-  if (guild.importStorageId) {
-    try {
-      await ctx.storage.delete(guild.importStorageId);
-    } catch (e) {
-      console.error(
-        `[backup:import:error:storage] ${guildId}:`,
-        e instanceof Error ? e.message : e,
-      );
-    }
-  }
   return { ok: true };
 }
 

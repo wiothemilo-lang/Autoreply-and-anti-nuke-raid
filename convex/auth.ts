@@ -2,6 +2,7 @@ import { type QueryCtx, type MutationCtx } from "./_generated/server";
 
 /** Phiên đăng nhập hết hạn sau 30 ngày — token bị đánh cắp không dùng được vĩnh viễn. */
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const GUILD_PERMISSIONS_TTL_MS = 60 * 60 * 1000;
 
 /** Phiên đã quá hạn chưa (so với createdAt của phiên). */
 export function sessionExpired(session: { createdAt: number }): boolean {
@@ -16,7 +17,16 @@ export async function getUserByToken(ctx: QueryCtx | MutationCtx, token: string)
     .withIndex("by_token", (q) => q.eq("token", token))
     .first();
   if (!session || sessionExpired(session) || !isCurrentSession(session)) return null;
-  return await ctx.db.get(session.userId);
+  const user = await ctx.db.get(session.userId);
+  if (!user) return null;
+  // Phiên cũ đã xác minh quyền khi đăng nhập, trước khi có mốc riêng.
+  const checkedAt = user.guildPermissionsCheckedAt ?? session.createdAt;
+  const guildPermissionsStale = Date.now() - checkedAt >= GUILD_PERMISSIONS_TTL_MS;
+  return {
+    ...user,
+    manageableGuildIds: guildPermissionsStale ? [] : user.manageableGuildIds,
+    guildPermissionsStale,
+  };
 }
 
 export const CURRENT_SESSION_AUTH_VERSION = 1;

@@ -17,6 +17,7 @@ export interface MeData {
     avatar: string | null;
   };
   guilds: GuildSummary[];
+  guildPermissionsStale?: boolean;
   botOnline: boolean;
   botGuildCount: number;
   botMemberCount: number;

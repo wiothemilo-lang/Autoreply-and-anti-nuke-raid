@@ -9,11 +9,9 @@
 import { v, ConvexError } from "convex/values";
 import type { ObjectType } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
 import { clampReportMinEvents, clampReportMinIntervalMinutes } from "../reports";
 import { getUserByToken, canManageGuild } from "../auth";
 import { HEAT_DEFAULTS } from "../modules";
-import { GREETING_IMAGE_SLOTS, storageIdFromUrl } from "./greetingImages";
 import { assertWithinLimit, planForGuild } from "../plans";
 import { isIpCollectionEnabled, IP_COLLECTION_LOCK_REASON } from "../ipCollectionLock";
 import { THEME_KEYS } from "../guildConfig";
@@ -242,8 +240,7 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   if (args.autoroleDelaySec !== undefined)
     patch.autoroleDelaySec = Math.max(0, Math.min(120, Math.floor(args.autoroleDelaySec || 0)));
   if (args.autoroleIncludeBots !== undefined) patch.autoroleIncludeBots = args.autoroleIncludeBots;
-  // Thẻ ảnh v3: công tắc + nền (nền đi qua cùng validator URL như ảnh embed,
-  // và cũng được dọn file cũ ở vòng lặp GREETING_IMAGE_SLOTS phía dưới).
+  // Thẻ ảnh v3: công tắc + nền (nền dùng cùng validator URL như ảnh embed).
   if (args.welcomeCardEnabled !== undefined) patch.welcomeCardEnabled = args.welcomeCardEnabled;
   if (args.goodbyeCardEnabled !== undefined) patch.goodbyeCardEnabled = args.goodbyeCardEnabled;
   if (args.welcomeCardBackground !== undefined)
@@ -594,23 +591,6 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   if (args.verifySendPanel === true) {
     patch.verifyPanelError = undefined;
     patch.verifyPanelErrorAt = undefined;
-  }
-  // Dọn ảnh Convex của các ô ảnh vừa bị XOÁ (dashboard xoá chữ trong ô) — nếu
-  // không, mỗi lần đổi ảnh để lại một file rác vĩnh viễn trong storage.
-  for (const f of GREETING_IMAGE_SLOTS) {
-    if (!(f in patch) || patch[f]) continue;
-    // Ô đang bị xoá (f) phải loại khỏi phép kiểm tra — giá trị cũ của nó vẫn
-    // còn trong guild lúc này (patch chạy sau) nên every() bao gồm f sẽ luôn
-    // thấy file "còn dùng" → file rác vĩnh viễn (bug thật luồng 7e).
-    const otherSlots = GREETING_IMAGE_SLOTS.filter((k) => k !== f);
-    const oldId = storageIdFromUrl(guild[f]);
-    if (oldId && otherSlots.every((k) => storageIdFromUrl(guild[k]) !== oldId)) {
-      try {
-        await ctx.storage.delete(oldId as Id<"_storage">);
-      } catch {
-        // file đã bị xoá / không còn — bỏ qua
-      }
-    }
   }
   await ctx.db.patch(guild._id, patch);
   return { ok: true };

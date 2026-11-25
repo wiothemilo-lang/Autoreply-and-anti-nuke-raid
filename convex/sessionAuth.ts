@@ -211,6 +211,7 @@ export const exchangeAndLogin = action({
 
     // 2. Lấy danh tính + danh sách server NGAY TỪ DISCORD — không tin client.
     const authHeaders = { Authorization: `Bearer ${accessTokenValue}` };
+    const permissionsCheckedAt = Date.now();
     let userRes: Response;
     let guildsRes: Response;
     try {
@@ -270,6 +271,7 @@ export const exchangeAndLogin = action({
     try {
       await ctx.runMutation(internal.sessionHardening.loginInternal, {
         token,
+        permissionsCheckedAt,
         user: {
           discordId: user.id,
           username: user.username,
@@ -352,6 +354,7 @@ export const refreshGuildsServer = action({
     }
 
     const authHeaders = { Authorization: `Bearer ${exchanged.token}` };
+    const permissionsCheckedAt = Date.now();
     let identityRes: Response;
     let guildsRes: Response;
     try {
@@ -391,6 +394,7 @@ export const refreshGuildsServer = action({
     await ctx.runMutation(internal.sessionHardening.guildsInternal, {
       discordId: me.discordId,
       guilds,
+      permissionsCheckedAt,
     });
     return {
       ok: true as const,
