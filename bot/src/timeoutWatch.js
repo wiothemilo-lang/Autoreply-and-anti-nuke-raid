@@ -190,4 +190,4 @@ function attach(client, store) {
   setInterval(() => sweep(), 60_000);
 }
 
-module.exports = { track, forget, getUntil, sweep, size, attach };
+module.exports = { track, forget, sweep, size, attach };

@@ -41,7 +41,7 @@
   `SiteNav` tách `PagesPanel` + theme store; bỏ monkey-patch `globalThis.fetch`
   trong `ai.js`; gộp khối lặp giữa `handleAttributeEvent`/`handleAuditEntry` của
   `antinuke/audit.js`; tách
-  `ticketActionButton`; `AdminCard` (16 card shell), `TicketKindsCard` render loop,
+  `ticketActionButton`; `AdminCard` (16 card shell),
   `formatDateTime` 6 bản, i18n key EN/DE trùng 21+20 key, `plans.catalog()` chưa trả
   giá/rank; test: 116 bản `check()` chép tay trong `scripts/test-*`, mock discord.js/Convex ctx trùng ở
   ~10 suite; `eslint` chưa phủ `scripts/**/*.ts` (31 suite TS không được lint). Đợt 2 còn nợ dedupe: `messages.js` `finalizeAutoPunish`
@@ -104,6 +104,12 @@
 ---
 
 ---
+
+## 2026-11-25 — Rà soát bot, dashboard và Convex
+
+- ✅ Sửa vòng render và thứ tự loại ticket. Giữ loại đang tắt khi chỉnh sửa.
+- ✅ Giữ hạn cảnh báo backup, nạp lại cấu hình Discord hết hạn và chờ mẫu metrics cuối khi tắt bot.
+- 🧪 90/90 bộ CommonJS, 35/35 bộ TypeScript, coverage, lint, typecheck và format đạt.
 
 ## 2026-11-25 — Chuyển bảo trì chìa khóa bot về máy chủ
 

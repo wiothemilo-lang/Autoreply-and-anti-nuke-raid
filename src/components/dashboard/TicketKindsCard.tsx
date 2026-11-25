@@ -124,8 +124,8 @@ export default function TicketKindsCard({
   const list = kinds ?? [];
 
   useEffect(() => {
-    onKindsLoaded?.(list);
-  }, [list, onKindsLoaded]);
+    if (kinds) onKindsLoaded?.(kinds);
+  }, [kinds, onKindsLoaded]);
   const roles = data.roles;
 
   function openCreate() {

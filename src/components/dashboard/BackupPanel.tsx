@@ -1,5 +1,5 @@
 import { uploadDashboardFile } from "../../lib/dashboardUpload";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { toastConvexError } from "../../lib/toastError";
@@ -34,13 +34,22 @@ import { Switch } from "../ui/switch";
 import type { GuildData, BackupInfo } from "../../lib/types";
 import { MIN_IMPORT_BOT_VERSION } from "../../lib/constants";
 import { getSessionToken } from "../../lib/discord";
-import { judgeJobWatch, type JobWatch } from "../../lib/backupWatch";
+import { jobWatchDelay, judgeJobWatch, type JobWatch } from "../../lib/backupWatch";
 import { safeGithubUrl } from "../../lib/safeUrl";
 import { clampNumber, parseNumberInput } from "../../lib/useDraft";
 import { useUnsavedChanges } from "../../lib/useUnsavedChanges";
 
 import { dateLocale, translate } from "../../lib/i18n";
 const TOKEN = () => getSessionToken();
+
+function useJobTimeout(startedAt: number | undefined, timeoutMs: number, onTimeout: () => void) {
+  const notify = useEffectEvent(onTimeout);
+  useEffect(() => {
+    if (startedAt === undefined) return;
+    const timer = window.setTimeout(() => notify(), jobWatchDelay(startedAt, timeoutMs));
+    return () => window.clearTimeout(timer);
+  }, [startedAt, timeoutMs]);
+}
 
 /**
  * Link Gist chỉ render khi URL qua allowlist HTTPS + host GitHub.
@@ -409,42 +418,25 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     scheduleRefresh();
   }, [importWatch, importStatus]);
 
-  // Chờ quá 3 phút mà bot chưa xử lý → nhắc kiểm tra bot (không treo vô thời hạn).
-  //
-  // Deps chỉ là giá trị nguyên thuỷ: `importStatus` là object MỚI mỗi nhịp bot
-  // sync (~180s), phụ thuộc cả object sẽ dựng lại timer 3 phút đúng lúc nó sắp
-  // nổ ⇒ cảnh báo "bot chưa xử lý" không bao giờ hiện.
-  const importRequested = importStatus?.requested;
-  const importError = importStatus?.error;
   const importBotOnline = importStatus?.botOnline;
-  useEffect(() => {
-    if (!importWatch) return;
-    const timer = window.setTimeout(() => {
-      if (Date.now() - importWatch.startedAt > 180_000) {
-        // Việc đã xong trong lúc chưa kịp quan sát cờ yêu cầu bật (bot nhanh hơn
-        // nhịp cập nhật) → dọn lượt theo dõi, KHÔNG cảnh báo oan "bot chưa xử lý".
-        if (importRequested === false && !importError) {
-          setImportWatch(null);
-          return;
-        }
-        const hint =
-          importBotOnline === false
-            ? translate(
-                "Bot đang OFFLINE (không nhận được heartbeat) — hãy khởi động bot trên host rồi tải lại file.",
-              )
-            : importBotOnline === true
-              ? translate(
-                  "Bot online nhưng chưa xử lý — có thể bot đang chạy bản cũ, hãy cập nhật bot lên bản mới nhất rồi thử lại.",
-                )
-              : translate(
-                  "Không xác định được trạng thái bot — hãy kiểm tra bot có online không (tab Giám sát bot).",
-                );
-        toast.warning(translate("Bot vẫn chưa xử lý file backup"), { description: hint });
-        setImportWatch(null);
-      }
-    }, 180_000);
-    return () => window.clearTimeout(timer);
-  }, [importWatch, importRequested, importError, importBotOnline]);
+  useJobTimeout(importWatch?.startedAt, 180_000, () => {
+    setImportWatch(null);
+    // Bot có thể đã làm xong giữa hai lần cập nhật query.
+    if (importStatus?.requested === false && !importStatus.error) return;
+    const hint =
+      importBotOnline === false
+        ? translate(
+            "Bot đang OFFLINE (không nhận được heartbeat) — hãy khởi động bot trên host rồi tải lại file.",
+          )
+        : importBotOnline === true
+          ? translate(
+              "Bot online nhưng chưa xử lý — có thể bot đang chạy bản cũ, hãy cập nhật bot lên bản mới nhất rồi thử lại.",
+            )
+          : translate(
+              "Không xác định được trạng thái bot — hãy kiểm tra bot có online không (tab Giám sát bot).",
+            );
+    toast.warning(translate("Bot vẫn chưa xử lý file backup"), { description: hint });
+  });
 
   // Bot báo lỗi khôi phục / xử lý xong cờ restore → hiện ngay kết quả.
   // Quá 3 phút chưa xong → cảnh báo chẩn đoán (bot offline / bản cũ) thay vì treo.
@@ -559,47 +551,27 @@ export default function BackupPanel({ data }: { data: GuildData }) {
     refresh();
   }, [backupWatch, importStatus]);
 
-  // Chờ quá 4 phút mà bot chưa xử lý xong → cảnh báo chẩn đoán thay vì treo im lặng
-  // (tick của bot là 180s; quá lâu thường là bot offline hoặc bot chạy bản cũ).
-  useEffect(() => {
-    if (!backupWatch) return;
-    const timer = window.setTimeout(() => {
-      if (Date.now() - backupWatch.startedAt > 240_000) {
-        const hint =
-          importStatus?.botOnline === false
-            ? translate("Bot đang OFFLINE — khởi động bot trên host rồi bấm Backup ngay lại.")
-            : translate(
-                "Bot online nhưng chưa xử lý xong — server lớn kèm tin nhắn có thể mất vài phút; nếu quá lâu hãy cập nhật bot lên bản mới nhất.",
-              );
-        toast.warning(translate("Bot vẫn chưa xử lý xong yêu cầu backup"), {
-          description: hint,
-          duration: 10000,
-        });
-      }
-    }, 240_000);
-    return () => window.clearTimeout(timer);
-  }, [backupWatch, importStatus]);
-
-  // Restore chờ quá 3 phút → cảnh báo thay vì treo vô thời hạn.
-  // Cùng lý do như watchdog import: deps nguyên thuỷ, không phải cả object.
-  useEffect(() => {
-    if (!restoreWatch) return;
-    const timer = window.setTimeout(() => {
-      if (Date.now() - restoreWatch.startedAt > 180_000) {
-        const hint =
-          importBotOnline === false
-            ? translate("Bot đang OFFLINE — khởi động bot trên host rồi bấm Khôi phục lại.")
-            : translate(
-                "Bot online nhưng chưa xử lý xong — server lớn kèm tin nhắn có thể mất vài phút; nếu quá lâu hãy cập nhật bot lên bản mới nhất.",
-              );
-        toast.warning(translate("Bot vẫn chưa xử lý xong khôi phục"), {
-          description: hint,
-          duration: 10000,
-        });
-      }
-    }, 180_000);
-    return () => window.clearTimeout(timer);
-  }, [restoreWatch, importBotOnline]);
+  const slowBotHint = translate(
+    "Bot online nhưng chưa xử lý xong — server lớn kèm tin nhắn có thể mất vài phút; nếu quá lâu hãy cập nhật bot lên bản mới nhất.",
+  );
+  useJobTimeout(backupWatch?.startedAt, 240_000, () => {
+    toast.warning(translate("Bot vẫn chưa xử lý xong yêu cầu backup"), {
+      description:
+        importBotOnline === false
+          ? translate("Bot đang OFFLINE — khởi động bot trên host rồi bấm Backup ngay lại.")
+          : slowBotHint,
+      duration: 10000,
+    });
+  });
+  useJobTimeout(restoreWatch?.startedAt, 180_000, () => {
+    toast.warning(translate("Bot vẫn chưa xử lý xong khôi phục"), {
+      description:
+        importBotOnline === false
+          ? translate("Bot đang OFFLINE — khởi động bot trên host rồi bấm Khôi phục lại.")
+          : slowBotHint,
+      duration: 10000,
+    });
+  });
 
   async function createBackup() {
     // Bot OFFLINE → yêu cầu sẽ không bao giờ được xử lý (bot quét mỗi ~20-60s);
@@ -614,6 +586,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       return;
     }
     setBusy("backup");
+    const watch = { startedAt: Date.now() };
     try {
       await requestBackup({
         token: TOKEN(),
@@ -638,7 +611,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       });
       // Danh sách backup là query realtime nên tự cập nhật khi bot lưu xong; watch
       // chỉ để báo kết quả (tạo mới / không đổi / lỗi) và cảnh báo khi chờ quá lâu.
-      setBackupWatch({ startedAt: Date.now() });
+      setBackupWatch(watch);
     } catch (e) {
       toastConvexError(e, translate("Thất bại"));
     } finally {
@@ -796,6 +769,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
       return;
     }
     setBusy(backup._id);
+    const watch = { startedAt: Date.now() };
     try {
       await requestRestore({
         token: TOKEN(),
@@ -803,7 +777,7 @@ export default function BackupPanel({ data }: { data: GuildData }) {
         backupId: backup._id,
         restoreKey,
       });
-      setRestoreWatch({ startedAt: Date.now() });
+      setRestoreWatch(watch);
       toast.success(translate("Đã yêu cầu khôi phục — bot thực hiện trong khoảng 1 phút"), {
         description: translate(
           "Role, quyền role và kênh sẽ được tạo lại theo backup. Kết quả sẽ hiện ở đây.",

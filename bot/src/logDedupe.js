@@ -70,4 +70,4 @@ function __resetLogDedupeForTest() {
   recent.clear();
 }
 
-module.exports = { isDuplicateDelivery, __resetLogDedupeForTest, DUP_WINDOW_MS };
+module.exports = { isDuplicateDelivery, __resetLogDedupeForTest };

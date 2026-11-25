@@ -49,7 +49,7 @@ import {
 } from "../src/lib/mediaQuery";
 import { simulateAutoReply, type SimInput, type SimRule } from "../src/lib/autoreplySim";
 import { toBranding } from "../src/lib/useBranding";
-import { judgeJobWatch, type JobWatch } from "../src/lib/backupWatch";
+import { jobWatchDelay, judgeJobWatch, type JobWatch } from "../src/lib/backupWatch";
 import { isAuthLoopTarget, resolveAuthPageState } from "../src/lib/authRoute";
 import {
   INCIDENT_SLOW,
@@ -1041,6 +1041,14 @@ console.log("── #15 theo dõi kết quả backup/khôi phục (chống báo 
   // dõi bị khoá nên lỗi thật không bao giờ hiện. judgeJobWatch chỉ cho kết luận
   // khi có bằng chứng của CHÍNH lượt này.
   const startedAt = T;
+  check(
+    "timer backup chỉ đợi phần thời gian còn lại",
+    jobWatchDelay(startedAt, 180_000, T + 60_000) === 120_000,
+  );
+  check(
+    "timer backup đã đến hạn thì chạy ngay",
+    jobWatchDelay(startedAt, 180_000, T + 180_000) === 0,
+  );
 
   // 1) Lượt vừa bấm, số liệu còn của lượt TRƯỚC (không cờ, không lỗi, mốc xong cũ).
   const staleDone = judgeJobWatch(
@@ -1139,6 +1147,80 @@ console.log("── #15 theo dõi kết quả backup/khôi phục (chống báo 
     "lượt import khai báo KHÔNG có mốc xong (hasFinishMarker: false)",
     /hasFinishMarker: false/.test(panelSrc),
   );
+  check(
+    "timer của ba luồng backup bám mốc bắt đầu, giữ nguyên khi query hoặc cờ pending thay đổi",
+    ["import", "restore", "backup"].every((kind) =>
+      panelSrc.includes(`useJobTimeout(${kind}Watch?.startedAt,`),
+    ) && /\[startedAt, timeoutMs\]/.test(panelSrc),
+  );
+}
+
+console.log("── Loại ticket: báo nhãn từ query lên panel cha ──");
+{
+  const card = readFileSync(
+    new URL("../src/components/dashboard/TicketKindsCard.tsx", import.meta.url),
+    "utf8",
+  );
+  const panel = readFileSync(
+    new URL("../src/components/dashboard/TicketPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  check(
+    "query đang nạp không báo một danh sách rỗng mới lên component cha",
+    /if \(kinds\) onKindsLoaded\?\.\(kinds\)/.test(card) && /\[kinds, onKindsLoaded\]/.test(card),
+  );
+  check(
+    "callback nhãn giữ cùng tham chiếu khi parent render lại",
+    /handleKindsLoaded = useCallback\(/.test(panel) &&
+      /onKindsLoaded=\{handleKindsLoaded\}/.test(panel),
+  );
+}
+
+console.log("── Cấu hình công khai: hết hạn, gộp lượt nạp và lỗi tạm thời ──");
+{
+  const { fetchPublicConfig } = await import("../src/lib/usePublicConfig");
+  const now = Date.now;
+  let time = T;
+  Date.now = () => time;
+  try {
+    let loads = 0;
+    const id = "123456789012345678";
+    const load = async () => {
+      loads++;
+      return { clientId: id, discordInvite: "https://discord.gg/configured" };
+    };
+    const pair = await Promise.all([fetchPublicConfig(load), fetchPublicConfig(load)]);
+    check(
+      "hai component cùng nạp dùng chung một action",
+      loads === 1 && pair.every(({ data }) => data.clientId === id),
+    );
+    await fetchPublicConfig(load);
+    check("cache trong 10 phút không gọi lại Convex", loads === 1);
+    time += 10 * 60_000;
+    const limited = await fetchPublicConfig(async () => ({ rateLimited: true, clientId: "" }));
+    check("rate limit tạm thời giữ Client ID tốt gần nhất", limited.data.clientId === id);
+    const offline = await fetchPublicConfig(async () => {
+      throw new Error("offline");
+    });
+    check(
+      "lỗi mạng tạm thời vẫn lấy được cấu hình đã nạp",
+      !offline.error && offline.data.clientId === id,
+    );
+    const updated = await fetchPublicConfig(async () => ({
+      clientId: "876543210987654321",
+    }));
+    check(
+      "cache hết hạn nạp được Client ID đã đổi sau lỗi tạm thời",
+      updated.data.clientId === "876543210987654321",
+    );
+    const source = readFileSync(new URL("../src/lib/usePublicConfig.ts", import.meta.url), "utf8");
+    check(
+      "hook luôn qua đường nạp kiểm TTL khi mount",
+      !source.includes("if (cache) return;") && source.includes("fetchPublicConfig(load).then"),
+    );
+  } finally {
+    Date.now = now;
+  }
 }
 
 console.log("── #16 vòng lặp đăng nhập: mô phỏng điều hướng + luật của /auth ──");

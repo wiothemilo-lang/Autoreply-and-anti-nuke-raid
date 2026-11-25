@@ -719,7 +719,6 @@ module.exports = {
   createChannels,
   sanitizeEmojiName,
   recreateEmojis,
-  sanitizeStickerName,
   restoreStickers,
   replayIntoChannel,
   replayMessages,
