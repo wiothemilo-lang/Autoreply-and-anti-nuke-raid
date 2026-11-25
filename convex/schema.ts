@@ -2,6 +2,17 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  dailyGuildStats: defineTable({
+    guildId: v.string(),
+    dayStart: v.number(),
+    joins: v.number(),
+    blocked: v.number(),
+    joinsSince: v.optional(v.number()),
+    eventsSince: v.optional(v.number()),
+  })
+    .index("by_guildId_dayStart", ["guildId", "dayStart"])
+    .index("by_dayStart", ["dayStart"]),
+
   users: defineTable({
     discordId: v.string(),
     username: v.string(),

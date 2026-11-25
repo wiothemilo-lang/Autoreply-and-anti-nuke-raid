@@ -15,6 +15,7 @@ import {
   summarize,
   todaySummary,
   weeklyProfile,
+  weeklyWithDailyTotals,
   type StatEvent,
   type StatJoin,
 } from "../convex/guildStats";
@@ -339,12 +340,30 @@ console.log("── hourlyProfile / weeklyProfile (A6) ──");
     "rỗng → 7 ngày toàn 0",
     weeklyProfile([], [], dayStart + H).every((d) => d.joins === 0 && d.blocked === 0),
   );
+  const merged = weeklyWithDailyTotals(
+    [e(dayStart + H, 2), e(dayStart + 3 * H, 4)],
+    [j(dayStart + H), j(dayStart + 3 * H)],
+    [
+      {
+        dayStart,
+        joinsSince: dayStart + 2 * H,
+        eventsSince: dayStart + 2 * H,
+        joins: 1800,
+        blocked: 2400,
+      },
+    ],
+    dayStart + 10 * H,
+  );
+  check(
+    "lượt cũ trước khi deploy được cộng phần còn đọc, không đếm log mới hai lần",
+    merged[6].joins === 1801 && merged[6].blocked === 2402,
+  );
 }
 
 {
   const now = Date.now();
   const handler = (todaySummary as any)._handler;
-  const querySummary = (joinCount: number) =>
+  const querySummary = (joinCount: number, dailyTotals: object[] = []) =>
     handler(
       {
         db: {
@@ -364,7 +383,9 @@ console.log("── hourlyProfile / weeklyProfile (A6) ──");
                       riskScore: 10,
                       riskFactors: [],
                     }))
-                  : [],
+                  : table === "dailyGuildStats"
+                    ? dailyTotals.slice(0, limit)
+                    : [],
             };
             return rows;
           },
@@ -379,6 +400,18 @@ console.log("── hourlyProfile / weeklyProfile (A6) ──");
   check(
     "bản ghi kiểm tra giới hạn không được cộng vào biểu đồ",
     truncated.weekly[6].joins === 1000,
+  );
+  const totals = await querySummary(1001, [
+    {
+      dayStart: startOfDayVietnam(now),
+      joinsSince: now,
+      joins: 2400,
+      blocked: 0,
+    },
+  ]);
+  check(
+    "biểu đồ dùng tổng đã lưu kể cả khi danh sách chi tiết bị giới hạn",
+    totals.truncated === true && totals.weekly[6].joins === 2400,
   );
 }
 

@@ -166,6 +166,17 @@ for (const site of SITES) {
       { max, cap: site.cap },
     );
     check(`cuối cùng ≥ trần (không xoá quá tay): ${final}`, final >= site.cap);
+    if (site.table === "memberJoins") {
+      const joins = tables.dailyGuildStats.reduce((sum, row) => sum + row.joins, 0);
+      check("tổng theo ngày giữ đủ lượt tham gia sau khi dọn log", joins === total);
+    }
+    if (site.table === "antinukeEvents") {
+      const blocked = tables.dailyGuildStats.reduce((sum, row) => sum + row.blocked, 0);
+      check(
+        "tổng theo ngày giữ đủ lượt chặn sau khi dọn log",
+        blocked === (total * (total - 1)) / 2,
+      );
+    }
   }
 
   // 2. HỘI TỤ: tồn đọng từ bản cũ co dần về trần, mỗi lần dọn đúng 1 lô.

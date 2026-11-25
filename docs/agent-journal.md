@@ -117,6 +117,12 @@
 - ✅ Dọn file được quản lý khi hết tham chiếu hoặc import kết thúc. File cũ tiếp tục dùng được.
 - 🧪 90/90 suites CommonJS, 35/35 suites TypeScript, sàn coverage, typecheck và lint đạt.
 
+## 2026-11-25 — Tổng hợp biểu đồ 7 ngày theo giờ Việt Nam
+
+- ✅ Tích lũy lượt tham gia và lượt chặn mỗi ngày, kể cả khi log chi tiết bị dọn.
+- ✅ Cộng dữ liệu cũ còn lưu khi triển khai giữa ngày. Dọn tổng đã lưu sau 30 ngày.
+- 🧪 90/90 suites CommonJS, 35/35 suites TypeScript, sàn coverage, typecheck và lint đạt.
+
 ## 2026-11-25 — Ổn định bộ lọc ký tự thẻ chào trên Canvas 1.1.1
 
 - ✅ Dùng bảng glyph của font nhúng để kết quả giữ chữ không phụ thuộc font hệ thống.

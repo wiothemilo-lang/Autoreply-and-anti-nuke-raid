@@ -10,10 +10,11 @@
  * Nguyên tắc:
  *  - `summarize()` là HÀM THUẦN (không Convex/DB/mạng) → test được bằng dữ
  *    liệu giả, khoá đúng biên ngày VN và cách đếm.
- *  - Không đổi schema, không ghi gì: chỉ đọc antinukeEvents + memberJoins.
+ *  - Giữ tổng theo ngày khi ghi sự kiện để biểu đồ không phụ thuộc log chi tiết.
  */
 
-import { query } from "./_generated/server";
+import { query, type MutationCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
 // Regex bóc ký hiệu: dùng CHUNG với web (src/lib/riskExplain.ts) để hai nơi
@@ -188,6 +189,56 @@ export function weeklyProfile(events: StatEvent[], joins: StatJoin[], now: numbe
   return out.reverse(); // cũ nhất trước
 }
 
+export async function recordDailyGuildActivity(
+  ctx: MutationCtx,
+  guildId: string,
+  recordedAt: number,
+  activity: { joined: true } | { blocked: number },
+) {
+  const dayStart = startOfDayVietnam(recordedAt);
+  const previous = await ctx.db
+    .query("dailyGuildStats")
+    .withIndex("by_guildId_dayStart", (q) => q.eq("guildId", guildId).eq("dayStart", dayStart))
+    .first();
+  const totals = {
+    joins: (previous?.joins ?? 0) + ("joined" in activity ? 1 : 0),
+    blocked: (previous?.blocked ?? 0) + ("blocked" in activity ? activity.blocked : 0),
+    joinsSince: previous?.joinsSince ?? ("joined" in activity ? recordedAt : undefined),
+    eventsSince: previous?.eventsSince ?? ("blocked" in activity ? recordedAt : undefined),
+  };
+  if (previous) await ctx.db.patch(previous._id, totals);
+  else await ctx.db.insert("dailyGuildStats", { guildId, dayStart, ...totals });
+}
+
+export function weeklyWithDailyTotals(
+  events: StatEvent[],
+  joins: StatJoin[],
+  totals: Pick<
+    Doc<"dailyGuildStats">,
+    "dayStart" | "joins" | "blocked" | "joinsSince" | "eventsSince"
+  >[],
+  now: number,
+): DayBucket[] {
+  const byDay = new Map(totals.map((row) => [row.dayStart, row]));
+  const dayOf = (ts: number) => byDay.get(startOfDayVietnam(ts));
+  // Với ngày trước khi có bộ đếm, giữ log cũ còn đọc được. Bỏ các dòng
+  // đã được tổng hợp để tránh đếm hai lần khi deploy giữa ngày.
+  const legacyEvents = events.filter(
+    (e) => e.createdAt < (dayOf(e.createdAt)?.eventsSince ?? Infinity),
+  );
+  const legacyJoins = joins.filter(
+    (j) => j.createdAt < (dayOf(j.createdAt)?.joinsSince ?? Infinity),
+  );
+  return weeklyProfile(legacyEvents, legacyJoins, now).map((day) => {
+    const row = byDay.get(day.dayStart);
+    return {
+      ...day,
+      joins: day.joins + (row?.joins ?? 0),
+      blocked: day.blocked + (row?.blocked ?? 0),
+    };
+  });
+}
+
 /**
  * Số liệu "Tình hình server" hôm nay (quản lý server — manager-gated).
  *
@@ -209,7 +260,7 @@ export const todaySummary = query({
     const dayStart = startOfDayVietnam(now);
     const oldestDay = dayStart - 6 * 86_400_000;
     const rowLimit = 1000;
-    const [events, joins] = await Promise.all([
+    const [events, joins, dailyTotals] = await Promise.all([
       ctx.db
         .query("antinukeEvents")
         .withIndex("by_guildId_createdAt", (q) =>
@@ -224,6 +275,12 @@ export const todaySummary = query({
         )
         .order("desc")
         .take(rowLimit + 1),
+      ctx.db
+        .query("dailyGuildStats")
+        .withIndex("by_guildId_dayStart", (q) =>
+          q.eq("guildId", guildId).gte("dayStart", oldestDay).lte("dayStart", dayStart),
+        )
+        .take(7),
     ]);
 
     // Field nằm thẳng trên document guild (xem convex/guilds.ts:500), không
@@ -247,7 +304,7 @@ export const todaySummary = query({
       dayStart,
       truncated: events.length > rowLimit || joins.length > rowLimit,
       hourly: hourlyProfile(statEvents, statJoins, dayStart),
-      weekly: weeklyProfile(statEvents, statJoins, now),
+      weekly: weeklyWithDailyTotals(statEvents, statJoins, dailyTotals, now),
     };
   },
 });
