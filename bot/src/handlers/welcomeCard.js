@@ -38,6 +38,57 @@ const FONT_PATH = path.join(__dirname, "..", "..", "assets", "fonts", "NotoSans-
 let canvasMod = null;
 /** Lý do không dùng được (native thiếu / font lỗi) — trả cho web hiển thị. */
 let canvasErr = null;
+let cardCodePoints;
+
+/** Đọc bảng cmap format 4 của font Noto Sans nhúng để biết glyph thực sự có. */
+function readCardCodePoints(font) {
+  let cmapOffset;
+  for (let i = 0; i < font.readUInt16BE(4); i++) {
+    const record = 12 + i * 16;
+    if (font.toString("ascii", record, record + 4) === "cmap") {
+      cmapOffset = font.readUInt32BE(record + 8);
+      break;
+    }
+  }
+  if (cmapOffset === undefined) throw new Error("Font thẻ thiếu bảng cmap");
+
+  let cmap;
+  for (let i = 0; i < font.readUInt16BE(cmapOffset + 2); i++) {
+    const record = cmapOffset + 4 + i * 8;
+    const platform = font.readUInt16BE(record);
+    const encoding = font.readUInt16BE(record + 2);
+    if (platform !== 0 && (platform !== 3 || encoding !== 1)) continue;
+    const offset = cmapOffset + font.readUInt32BE(record + 4);
+    if (font.readUInt16BE(offset) === 4) {
+      cmap = offset;
+      break;
+    }
+  }
+  if (cmap === undefined) throw new Error("Font thẻ thiếu bảng glyph Unicode format 4");
+
+  const segmentCount = font.readUInt16BE(cmap + 6) / 2;
+  const endCodes = cmap + 14;
+  const startCodes = endCodes + 2 * segmentCount + 2;
+  const deltas = startCodes + 2 * segmentCount;
+  const rangeOffsets = deltas + 2 * segmentCount;
+  const codePoints = new Set();
+  for (let i = 0; i < segmentCount; i++) {
+    const end = font.readUInt16BE(endCodes + 2 * i);
+    const start = font.readUInt16BE(startCodes + 2 * i);
+    const delta = font.readInt16BE(deltas + 2 * i);
+    const rangeAddress = rangeOffsets + 2 * i;
+    const rangeOffset = font.readUInt16BE(rangeAddress);
+    for (let code = start; code <= end && code < 0xffff; code++) {
+      const glyph = rangeOffset
+        ? font.readUInt16BE(rangeAddress + rangeOffset + 2 * (code - start))
+        : code;
+      if ((rangeOffset === 0 || glyph !== 0) && ((glyph + delta) & 0xffff) !== 0) {
+        codePoints.add(code);
+      }
+    }
+  }
+  return codePoints;
+}
 
 /**
  * Nạp lười `@napi-rs/canvas` + font nhúng. Trả module khi dùng được, null khi không.
@@ -52,6 +103,7 @@ function loadCanvas() {
       throw new Error("@napi-rs/canvas thiếu createCanvas/loadImage");
     }
     if (!fs.existsSync(FONT_PATH)) throw new Error(`thiếu font nhúng: ${FONT_PATH}`);
+    cardCodePoints = readCardCodePoints(fs.readFileSync(FONT_PATH));
     mod.GlobalFonts.registerFromPath(FONT_PATH, FONT_FAMILY);
     if (!mod.GlobalFonts.has(FONT_FAMILY)) throw new Error("không nạp được font nhúng");
     canvasMod = mod;
@@ -193,42 +245,13 @@ function drawCover(ctx, img, x, y, w, h) {
 const PROBE_W = 48;
 const PROBE_H = 48;
 
-/**
- * Chữ ký ĐIỂM ẢNH của một ký tự (chuỗi bit thô).
- *
- * Vì sao không so BỀ RỘNG: ký tự thật có thể có đúng bề rộng bằng glyph khuyết
- * (Noto Sans: chữ "V" rộng 14.4px = notdef) → bị xoá oan khỏi ảnh dù font có
- * glyph. So điểm ảnh là cách duy nhất đúng: glyph thật khác hẳn ô khuyết.
- */
-function glyphSignature(pctx, ch) {
-  pctx.clearRect(0, 0, PROBE_W, PROBE_H);
-  pctx.fillStyle = "#000";
-  pctx.fillText(ch, 2, PROBE_H - 14);
-  const d = pctx.getImageData(0, 0, PROBE_W, PROBE_H).data;
-  let sig = "";
-  // Lấy mẫu thưa (mỗi 7 pixel) — đủ phân biệt glyph, rẻ hơn quét cả ảnh.
-  for (let i = 3; i < d.length; i += 28) sig += d[i] > 12 ? "1" : "0";
-  return sig;
-}
-
-/**
- * Bỏ ký tự font không vẽ được (emoji, chữ Hán…) — nếu không sẽ ra ô tofu.
- * Dấu cách và chữ rỗng luôn được giữ.
- */
-function drawableText(font, text) {
-  const mod = loadCanvas();
-  if (!mod) return "";
-  const probe = mod.createCanvas(PROBE_W, PROBE_H).getContext("2d");
-  probe.font = font;
-  const notdef = glyphSignature(probe, "\uE000");
+/** Chỉ giữ ký tự mà font nhúng có thể vẽ trên mọi máy. */
+function drawableText(text) {
+  if (!loadCanvas()) return "";
   const out = [];
-  for (const raw of String(text ?? "")) {
-    const ch = raw === "\n" || raw === "\t" || raw === "\r" ? " " : raw;
-    if (ch === " ") {
-      out.push(ch);
-      continue;
-    }
-    if (glyphSignature(probe, ch) !== notdef) out.push(ch);
+  for (const ch of String(text ?? "")) {
+    if (/\s/u.test(ch)) out.push(" ");
+    else if (cardCodePoints.has(ch.codePointAt(0))) out.push(ch);
   }
   return out.join("").replace(/\s+/g, " ").trim();
 }
@@ -244,7 +267,7 @@ function textWidth(font, text) {
 
 /** Cắt chữ cho vừa bề rộng, thêm "…" — không để chữ tràn ra ngoài thẻ. */
 function fitText(font, text, maxWidth) {
-  const clean = drawableText(font, text);
+  const clean = drawableText(text);
   if (textWidth(font, clean) <= maxWidth) return clean;
   let lo = 0;
   let hi = clean.length;

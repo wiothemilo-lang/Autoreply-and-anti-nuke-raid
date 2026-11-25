@@ -105,6 +105,12 @@
 
 ---
 
+## 2026-11-25 — Ổn định bộ lọc ký tự thẻ chào trên Canvas 1.1.1
+
+- ✅ Dùng bảng glyph của font nhúng để kết quả giữ chữ không phụ thuộc font hệ thống.
+- 📁 `bot/src/handlers/welcomeCard.js`, `scripts/test-welcome-card.ts`.
+- 🧪 Thẻ chào 32/32, CommonJS 90/90, TypeScript 35/35, sàn coverage, typecheck và lint đạt.
+
 ## 2026-11-25 — Gia cố quyền dashboard và tham chiếu file
 
 - ✅ Hết hạn quyền Discord sau một giờ và làm mới qua OAuth trong phiên hiện tại.
