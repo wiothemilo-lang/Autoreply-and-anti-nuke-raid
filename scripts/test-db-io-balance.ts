@@ -382,10 +382,6 @@ console.log("── Cổng tĩnh: đường đọc Convex không quét toàn b�
       src("convex/reports.ts").includes('.lte("createdAt", to ?? Number.MAX_SAFE_INTEGER)'),
   );
   check(
-    "payments dọn pending cũ bằng index (userId, status, createdAt)",
-    src("convex/payments.ts").includes('withIndex("by_userId_status_createdAt"'),
-  );
-  check(
     "schema có đủ index mới cho các đường nóng",
     ["by_hiddenPasswordHash", "by_guildId_openerId_createdAt", "by_userId_status_createdAt"].every(
       (name) => src("convex/schema.ts").includes(`.index("${name}"`),

@@ -1,36 +1,26 @@
-import { Crown, ShieldCheck, Sparkles } from "lucide-react";
+import { Crown, ShieldCheck } from "lucide-react";
 import { cn } from "../lib/utils";
-import { planDisplayName } from "../lib/constants";
 import { translate } from "../lib/i18n";
 
 /**
- * Nhãn cạnh logo người dùng: **Owner** (chủ sở hữu bot), **Admin** (quản trị
- * viên nhóm do chủ bot thêm) và nhãn **gói premium** đang hiệu lực.
+ * Nhãn cạnh logo người dùng: **Owner** (chủ sở hữu bot) và **Admin** (quản trị
+ * viên nhóm do chủ bot thêm).
  *
  * Một component dùng ở nhiều chỗ (header Dashboard, danh sách quản trị viên
- * trong cửa sổ Admin) để ba chỗ này không thể vẽ sai ý nghĩa của nhau: chủ bot
+ * trong cửa sổ Admin) để hai chỗ này không thể vẽ sai ý nghĩa của nhau: chủ bot
  * LUÔN là admin (isBotAdminUser trả true cho owner) nên chỉ hiện Owner — tránh
  * hai nhãn trùng cho cùng một người.
- *
- * `plan` nhận thẳng chuỗi gói từ server (`payments.premiumStatus` /
- * `hidden.getTeamAdmins`) — nhãn dịch lúc render theo khoá tiếng Việt, đúng
- * quy ước của repo.
  */
 export default function UserTags({
   isOwner,
   isAdmin,
-  plan,
   className,
 }: {
   isOwner?: boolean;
   isAdmin?: boolean;
-  /** "supporter" | "pioneer" — null/undefined = không có gói hiệu lực. */
-  plan?: string | null;
   className?: string;
 }) {
-  const planText = planDisplayName(plan);
-  const planLabel = planText ? translate(planText) : null;
-  if (!isOwner && !isAdmin && !planLabel) return null;
+  if (!isOwner && !isAdmin) return null;
 
   return (
     <span className={cn("flex flex-wrap items-center gap-1", className)}>
@@ -46,12 +36,6 @@ export default function UserTags({
             {translate("Admin")}
           </span>
         )
-      )}
-      {planLabel && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">
-          <Sparkles className="h-3 w-3" aria-hidden />
-          {planLabel}
-        </span>
       )}
     </span>
   );

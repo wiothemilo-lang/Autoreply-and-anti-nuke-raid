@@ -38,7 +38,6 @@ const StatsPage = lazy(() => import("./pages/StatsPage"));
 // Trang pháp lý: 3 văn bản dùng CHUNG một component (khác tham số slug) — nội
 // dung nằm ở src/lib/legalContent.ts, không nhân bản code 3 lần.
 const LegalPage = lazy(() => import("./pages/LegalPage"));
-const DonatePage = lazy(() => import("./pages/DonatePage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
 // Xác minh web kiểu Double Counter — công khai, chỉ cần token trong URL.
 const VerifyPage = lazy(() => import("./pages/VerifyPage"));
@@ -166,16 +165,12 @@ export default function App() {
           <Route path="/privacy" element={<LegalPage slug="privacy" />} />
           <Route path="/data-deletion" element={<LegalPage slug="data-deletion" />} />
           <Route path="/monitor" element={<Monitor />} />
-          {/* Ủng hộ nhà phát triển. Trang công khai: ai cũng đọc được, kể cả
-                khách chưa đăng nhập. */}
-          <Route path="/donate" element={<DonatePage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
           {/* Xác minh thành viên qua web: token trong URL là capability duy nhất,
               không cần đăng nhập. Ẩn nav (transient) để người dùng tập trung. */}
           <Route path="/verify/:token" element={<VerifyPage />} />
-          {/* /premium tạm ẩn vì chưa thể bán hợp pháp: route vẫn giữ để link cũ
-              và link quay về từ cổng thanh toán không 404, nhưng đưa thẳng về
-              trang chủ. Hosting cũng redirect 301 (vercel.json + Dockerfile.web). */}
+          {/* Di sản của thời còn gói trả phí: link cũ vẫn về trang chủ thay vì
+              404. Sản phẩm hiện miễn phí hoàn toàn — không còn trang bán. */}
           <Route path="/premium" element={<Navigate to="/" replace />} />
           {/* Trang tính năng công khai (SEO quốc tế, nội dung 3 thứ tiếng). */}
           <Route path="/features" element={<FeaturesPage />} />

@@ -6,7 +6,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
-  Banknote,
   BarChart3,
   BrainCircuit,
   Bug,
@@ -19,10 +18,8 @@ import {
   Megaphone,
   Pencil,
   Play,
-  Receipt,
   Server,
   ShieldCheck,
-  Sparkles,
   Trash2,
   UserPlus,
   X,
@@ -32,7 +29,6 @@ import type { Id } from "../../convex/_generated/dataModel";
 import RequireAuth from "../components/RequireAuth";
 import UpdateWindow from "../components/UpdateWindow";
 import { discordAvatarUrl, getSessionToken } from "../lib/discord";
-import { planDisplayName } from "../lib/constants";
 import { incidentLabel, latencyLabel, useBotMonitor } from "../lib/useBotMonitor";
 import { cn } from "../lib/utils";
 
@@ -47,7 +43,7 @@ function AdminContent() {
   const token = getSessionToken();
   // Hai vai trò KHÁC nhau, cố ý tách: `isAdmin` = vào được cửa sổ này VÀ dùng
   // được TOÀN BỘ tính năng trong nó (chủ bot hoặc quản trị viên nhóm do chủ bot
-  // thêm — 10/10/2026 mở toàn bộ cho team: danh sách, đối soát tiền, cấp gói);
+  // thêm — 10/10/2026 mở toàn bộ cho team: danh sách, thông báo, hạ tầng, AI);
   // `isOwner` = còn được đụng thứ CHỈ chủ bot làm — mật khẩu ẩn, tính năng ẩn,
   // seed chìa khoá bot và việc thêm/bớt quản trị viên (quyền tự nâng cấp quyền).
   const isOwner = useQuery(api.status.isOwner, token ? { token } : "skip");
@@ -57,38 +53,6 @@ function AdminContent() {
   const teamAdmins = useQuery(api.hidden.getTeamAdmins, isAdmin === true ? { token } : "skip");
   const saveTeamAdmins = useMutation(api.hidden.setTeamAdmins);
 
-  // Plan A — chuyển khoản thủ công: danh sách đơn chờ xác nhận + tổng doanh
-  // thu theo tháng/năm. Cả hai query đều SKIP khi người xem không phải Admin.
-  const reportedOrders = useQuery(
-    api.payments.listReportedOrders,
-    isAdmin === true ? { token } : "skip",
-  );
-  const revenue = useQuery(api.payments.revenueStats, isAdmin === true ? { token } : "skip");
-  const confirmTransfer = useMutation(api.payments.confirmTransfer);
-  const [confirming, setConfirming] = useState<string | null>(null);
-  const [transferMsg, setTransferMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  // Cấp gói premium thủ công — cùng cổng requireBotAdmin với mọi tính năng ở
-  // đây; server kẹp 1..365 ngày + luật thứ bậc gói, UI không tự quyết quyền lợi.
-  const grantPlan = useMutation(api.payments.grantPlan);
-  const grantForAdmin = async (args: {
-    discordId: string;
-    guildId?: string;
-    plan: "supporter" | "pioneer";
-    days: number;
-  }): Promise<{ ok: boolean; error?: string; text?: string }> => {
-    try {
-      const res = await grantPlan({ token, ...args });
-      return {
-        ok: true,
-        text: translate("Đã cấp gói {goi} — hạn tới {ngay}.", {
-          goi: res.plan === "pioneer" ? translate("Tiên phong") : translate("Đồng hành"),
-          ngay: new Date(res.expiresAt).toLocaleDateString(dateLocale()),
-        }),
-      };
-    } catch (e) {
-      return { ok: false, error: friendlyConvexError(e, translate("Lỗi kết nối")) };
-    }
-  };
   // Thông báo cập nhật + nhãn "bản cập nhật hiện tại" — feed CÔNG KHÔNG (cùng
   // query mà UpdateNotice dùng cho mọi khách) để admin sửa đúng bài người dùng
   // đang thấy; danh sách đầy đủ (kể cả bài đã ẩn) lấy qua adminList.
@@ -385,34 +349,6 @@ function AdminContent() {
                 }
               }}
             />
-            {isAdmin === true && (
-              <>
-                <TransferOrdersCard
-                  orders={reportedOrders}
-                  confirming={confirming}
-                  msg={transferMsg}
-                  onConfirm={async (appTransId) => {
-                    setTransferMsg(null);
-                    setConfirming(appTransId);
-                    try {
-                      await confirmTransfer({ token, appTransId });
-                      setTransferMsg({
-                        kind: "ok",
-                        text: translate("Đã nhận tiền và kích hoạt gói."),
-                      });
-                    } catch (e) {
-                      setTransferMsg({
-                        kind: "err",
-                        text: friendlyConvexError(e, translate("Lỗi kết nối")),
-                      });
-                    }
-                    setConfirming(null);
-                  }}
-                />
-                <RevenueCard revenue={revenue} />
-              </>
-            )}
-            {isAdmin === true && <PremiumGrantCard onGrant={grantForAdmin} />}
             {isAdmin === true && (
               <AnnounceCard
                 notices={notices}
@@ -1357,12 +1293,10 @@ type TeamAdminMember = {
   globalName: string | null;
   avatar: string | null;
   lastLoginAt: number | null;
-  /** Gói premium đang hiệu lực ("supporter" | "pioneer") — null nếu chưa có. */
-  plan: string | null;
 };
 
 /**
- * Một hàng người dùng: logo + TÊN + ID và TAG vai trò/gói NGAY BÊN CẠNH logo.
+ * Một hàng người dùng: logo + TÊN + ID và TAG vai trò NGAY BÊN CẠNH logo.
  * Dùng cho cả dòng CHỦ SỞ HỮU (tag Owner) lẫn thành viên team (tag Admin) để
  * hai chỗ không thể vẽ khác nhau. Nút xoá chỉ hiện khi người xem là chủ bot —
  * thành viên team xem read-only (`hidden.setTeamAdmins` vẫn owner-only).
@@ -1386,12 +1320,7 @@ function teamMemberRow(
           {(name ?? "?").slice(0, 1).toUpperCase()}
         </span>
       )}
-      <UserTags
-        isOwner={role === "owner"}
-        isAdmin={role === "admin"}
-        plan={m.plan}
-        className="shrink-0"
-      />
+      <UserTags isOwner={role === "owner"} isAdmin={role === "admin"} className="shrink-0" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">
           {name ?? translate("Chưa từng đăng nhập web")}{" "}
@@ -1465,7 +1394,7 @@ function TeamAdminsCard({
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
         {translate(
-          "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research, đối soát tiền, cấp gói). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.",
+          "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.",
         )}{" "}
       </p>
 
@@ -1552,136 +1481,6 @@ function TeamAdminsCard({
           {msg.text}
         </p>
       )}
-    </div>
-  );
-}
-
-/* ── Cấp gói premium thủ công (không qua đơn thanh toán) ───────────── */
-
-/**
- * Thẻ cấp quyền lợi TRỰC TIẾP cho một người: khách bồi thường, đối tác, tài
- * khoản thử, hoặc tiền đã về mà đơn ZaloPay lỗi. Trước đây đường duy nhất ghi
- * entitlement là markPaidInternal (đơn đã trả tiền) nên muốn cấp là phải giả
- * tạo đơn — đúng cái sai mà payments.grantPlan sinh ra để chấm dứt.
- *
- * UI chỉ điền thông tin; server chốt lại (requireBotAdmin + kẹp 1..365 ngày +
- * không hạ gói) nên bấm nhầm không tạo được quyền lợi vượt mức.
- */
-function PremiumGrantCard({
-  onGrant,
-}: {
-  onGrant: (args: {
-    discordId: string;
-    guildId?: string;
-    plan: "supporter" | "pioneer";
-    days: number;
-  }) => Promise<{ ok: boolean; error?: string; text?: string }>;
-}) {
-  const [discordId, setDiscordId] = useState("");
-  const [guildId, setGuildId] = useState("");
-  const [plan, setPlan] = useState<"supporter" | "pioneer">("supporter");
-  const [days, setDays] = useState("30");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-
-  const run = async () => {
-    const who = discordId.trim();
-    if (busy || !who) return;
-    // Trước đây `Number(days) || 30`: xoá trống / gõ 0 / gõ chữ đều ÂM THẦM
-    // cấp 30 ngày. Giờ từ chối thẳng thay vì đoán ý người dùng.
-    const dayCount = Number(days.trim());
-    if (!Number.isInteger(dayCount) || dayCount < 1 || dayCount > 365) {
-      setMsg({
-        kind: "err",
-        text: translate("Số ngày phải là số nguyên từ 1 đến 365."),
-      });
-      return;
-    }
-    setBusy(true);
-    setMsg(null);
-    const res = await onGrant({
-      discordId: who,
-      ...(guildId.trim() ? { guildId: guildId.trim() } : {}),
-      plan,
-      days: dayCount,
-    });
-    setBusy(false);
-    if (res.ok) {
-      setMsg({ kind: "ok", text: res.text ?? translate("Đã cấp gói.") });
-      setDiscordId("");
-      setGuildId("");
-    } else {
-      setMsg({ kind: "err", text: res.error ?? translate("Lỗi kết nối") });
-    }
-  };
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
-        <Sparkles className="h-4 w-4" /> {translate("Cấp gói premium")}{" "}
-      </p>
-      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-        {translate(
-          "Cộng quyền lợi cho một người mà KHÔNG qua đơn thanh toán (bồi thường, đối tác, tài khoản thử). Nhập Discord ID người được cấp; nhập thêm Server ID nếu quyền lợi phải áp đúng cho server đó.",
-        )}{" "}
-      </p>
-
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <input
-          value={discordId}
-          onChange={(e) => setDiscordId(e.target.value)}
-          inputMode="numeric"
-          placeholder={translate("Discord ID người được cấp (15-21 chữ số)")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
-        />
-        <input
-          value={guildId}
-          onChange={(e) => setGuildId(e.target.value)}
-          inputMode="numeric"
-          placeholder={translate("Server ID (tùy chọn — 15-21 chữ số)")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
-        />
-        <select
-          value={plan}
-          onChange={(e) => setPlan(e.target.value as "supporter" | "pioneer")}
-          aria-label={translate("Gói cấp")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
-        >
-          <option value="supporter">{translate("Đồng hành")}</option>
-          <option value="pioneer">{translate("Tiên phong")}</option>
-        </select>
-        <input
-          value={days}
-          onChange={(e) => setDays(e.target.value)}
-          inputMode="numeric"
-          placeholder={translate("Số ngày (1–365)")}
-          aria-label={translate("Số ngày (1–365)")}
-          className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/40"
-        />
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={busy || discordId.trim().length === 0}
-          onClick={() => void run()}
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {translate("Cấp gói")}{" "}
-        </button>
-        {msg && (
-          <p
-            role="status"
-            className={cn(
-              "text-xs font-medium",
-              msg.kind === "ok" ? "text-foreground" : "text-danger",
-            )}
-          >
-            {msg.text}
-          </p>
-        )}
-      </div>
     </div>
   );
 }
@@ -2092,223 +1891,6 @@ function AnnounceCard({
             </li>
           ))}
         </ul>
-      )}
-    </div>
-  );
-}
-
-/* ── Plan A — chuyển khoản ngân hàng ──────────────────────────────────── */
-
-interface ReportedOrderRow {
-  appTransId: string;
-  kind: "donate" | "premium";
-  plan: string;
-  amount: number;
-  discordId: string;
-  createdAt: number;
-  reportedAt?: number;
-}
-
-interface RevenueStatsData {
-  total: number;
-  count: number;
-  donateTotal: number;
-  premiumTotal: number;
-  months: { key: string; total: number; count: number }[];
-  years: { year: number; total: number; count: number }[];
-}
-
-/**
- * 1234567 → "1.234.567 ₫". Đi qua `dateLocale()` chứ không khoá cứng locale:
- * UI đổi ngôn ngữ là số cũng đổi định dạng nhóm nghìn — test-i18n chặn hardcode.
- */
-const fmtVnd = (n: number) => `${n.toLocaleString(dateLocale())} ₫`;
-
-/**
- * Đơn khách ĐÃ chuyển khoản nhưng CHƯA báo — chủ sở hữu bấm xác nhận để
- * kích hoạt gói ngay (thường là xử lý thủ công trong lúc Nạp chưa kịp
- * hiện trạng thái). Mỗi dòng có nút bận riêng, không khoá cả bảng.
- */
-function TransferOrdersCard({
-  orders,
-  confirming,
-  msg,
-  onConfirm,
-}: {
-  orders: ReportedOrderRow[] | undefined;
-  confirming: string | null;
-  msg: { kind: "ok" | "err"; text: string } | null;
-  onConfirm: (appTransId: string) => Promise<void>;
-}) {
-  const list = orders ?? [];
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
-        <Receipt className="h-4 w-4" /> {translate("Đơn chuyển khoản chờ xác nhận")}
-        {list.length > 0 && (
-          <span className="ml-auto rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-bold text-warning">
-            {list.length}
-          </span>
-        )}
-      </p>
-      {list.length === 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {translate("Hiện không có đơn nào chờ xác nhận.")}
-        </p>
-      ) : (
-        <ul className="mt-2 space-y-2">
-          {" "}
-          {list.map((o) => {
-            // Cam kết công khai với khách là kích hoạt CHẬM NHẤT 24 giờ. Đơn đã
-            // báo quá 12 giờ chưa xác nhận được tô đỏ để không tự phá cam kết đó.
-            const slow = Date.now() - (o.reportedAt ?? o.createdAt) > 12 * 3600_000;
-            return (
-              <li
-                key={o.appTransId}
-                className={cn(
-                  "rounded-lg border bg-background/50 p-2.5",
-                  slow ? "border-danger/60 bg-danger/5" : "border-border",
-                )}
-              >
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                  <code className="font-mono text-[11px] font-bold">#{o.appTransId}</code>
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase">
-                    {o.kind === "premium" ? translate("Mua premium") : translate("Ủng hộ")}
-                  </span>
-                  {o.kind === "premium" && (
-                    <span className="text-muted-foreground">
-                      {translate("Gói")}{" "}
-                      {planDisplayName(o.plan) ? translate(planDisplayName(o.plan)!) : o.plan}
-                    </span>
-                  )}
-                  <span className="font-bold">{fmtVnd(o.amount)}</span>
-                  <span className="ml-auto text-muted-foreground">
-                    {`ID ${o.discordId} · `}
-                    {translate("báo lúc")}{" "}
-                    {new Date(o.reportedAt ?? o.createdAt).toLocaleString(dateLocale())}
-                  </span>
-                  {slow && (
-                    <span className="rounded bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger">
-                      {translate("Quá 12 giờ chưa xác nhận")}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  // Bận theo TỪNG DÒNG đúng như chú thích đầu component: xác
-                  // nhận đơn này KHÔNG khoá nút các đơn còn lại (server xử lý
-                  // từng appTransId độc lập). Chỉ nút của dòng ĐANG xác nhận bị
-                  // khoá để không bấm nhây gửi 2 lần.
-                  disabled={confirming === o.appTransId}
-                  onClick={() => void onConfirm(o.appTransId)}
-                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {confirming === o.appTransId && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  {translate("Đã nhận tiền → kích hoạt")}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {msg && (
-        <p
-          className={cn(
-            "mt-2 text-[11px] font-medium",
-            msg.kind === "ok" ? "text-foreground" : "text-danger",
-          )}
-        >
-          {msg.text}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * Tổng doanh thu cho chủ sở hữu: tổng + tách mua premium / ủng hộ, kèm bảng
- * theo tháng (12 dòng gần nhất, cuộn) và theo năm — dùng để báo cáo doanh
- * thu mà không phải xuất spreadsheet tay.
- */
-function RevenueCard({ revenue }: { revenue: RevenueStatsData | undefined }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="flex items-center gap-1.5 font-display text-sm font-bold">
-        <Banknote className="h-4 w-4" /> {translate("Tổng doanh thu theo tháng / năm")}
-      </p>
-      {!revenue ? (
-        <p className="mt-2 text-xs text-muted-foreground">{translate("Đang tải…")}</p>
-      ) : (
-        <>
-          <p className="mt-2 text-xs text-muted-foreground">
-            <b className="font-display text-base text-foreground">{fmtVnd(revenue.total)}</b>
-            {" — "}
-            {translate("tổng cộng")}
-            {` (${revenue.count} ${translate("giao dịch")})`}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {translate("Mua premium")}:{" "}
-            <b className="text-foreground">{fmtVnd(revenue.premiumTotal)}</b>
-            {" · "}
-            {translate("Ủng hộ")}: <b className="text-foreground">{fmtVnd(revenue.donateTotal)}</b>
-          </p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div>
-              <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                {translate("Theo tháng")}
-              </p>
-              <div className="max-h-44 overflow-y-auto rounded-lg border border-border">
-                <table className="w-full text-[11px]">
-                  <thead className="sticky top-0 bg-muted text-muted-foreground">
-                    <tr>
-                      <th className="px-2 py-1 text-left font-bold">{translate("Tháng")}</th>
-                      <th className="px-2 py-1 text-right font-bold">{translate("Số GD")}</th>
-                      <th className="px-2 py-1 text-right font-bold">{translate("Doanh thu")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {revenue.months.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-2 text-center text-muted-foreground">
-                          {translate("Chưa có giao dịch.")}
-                        </td>
-                      </tr>
-                    )}
-                    {revenue.months.map((m) => (
-                      <tr key={m.key} className="border-t border-border">
-                        <td className="px-2 py-1 font-mono">{m.key}</td>
-                        <td className="px-2 py-1 text-right">{m.count}</td>
-                        <td className="px-2 py-1 text-right font-bold">{fmtVnd(m.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div>
-              <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                {translate("Theo năm")}
-              </p>
-              <ul className="space-y-1 text-[11px]">
-                {revenue.years.length === 0 && (
-                  <li className="text-muted-foreground">{translate("Chưa có giao dịch.")}</li>
-                )}
-                {revenue.years.map((y) => (
-                  <li
-                    key={y.year}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background/50 px-2 py-1.5"
-                  >
-                    <span className="font-bold">{y.year}</span>
-                    <span className="text-muted-foreground">
-                      {y.count} {translate("giao dịch")}
-                    </span>
-                    <span className="font-bold">{fmtVnd(y.total)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </>
       )}
     </div>
   );

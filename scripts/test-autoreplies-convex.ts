@@ -308,9 +308,8 @@ const CH = "123456789012345678"; // 18 chữ số — hợp lệ
     );
   }
   {
-    // Trần CỨNG 50 rule chỉ chạm được ở gói cao nhất (trần theo gói có test
-    // riêng ở test-plans-gating.ts) — nên fixture đặt server ở gói Tiên phong.
-    const { ctx, autoReplies } = makeCtx({ plan: "pioneer" });
+    // Trần CỨNG 50 rule áp cho MỌI server — không còn khái niệm gói.
+    const { ctx, autoReplies } = makeCtx({});
     for (let i = 0; i < 49; i++) {
       await addH(ctx, { ...BASE, name: `rule${i}` });
     }
@@ -318,9 +317,9 @@ const CH = "123456789012345678"; // 18 chữ số — hợp lệ
     const r = await addH(ctx, { ...BASE, name: "rule49" });
     check("thêm rule thứ 50 → OK", r.ok === true && autoReplies.length === 50);
     await expectThrow(
-      "vượt 50 rule → chặn (trần cứng trùng trần gói cao nhất, kèm lối nâng/hạ)",
+      "vượt 50 rule → chặn kèm hướng dẫn giảm",
       () => addH(ctx, { ...BASE, name: "rule50" }),
-      /Gói Tiên phong cho tối đa 50 rule auto reply/,
+      /Tối đa 50 rule auto reply/,
     );
   }
 

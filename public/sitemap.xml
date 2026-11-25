@@ -29,14 +29,6 @@
   </url>
   <!-- Monitor: trang công khai, dữ liệu realtime theo heartbeat bot.
        Canonical của cả /status. -->
-  <!-- Ủng hộ nhà phát triển: trang công khai, đích đến tự nhiên của người
-       đã dùng bot và muốn giúp. Không có lastmod vì không có lịch sử sửa
-       nội dung đáng tin (xem giải thích đầu file). -->
-  <url>
-    <loc>https://protogon.freebuff.app/donate</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
   <!-- Góp ý: trang công khai, không cần đăng nhập — đích đến của người gặp
        lỗi nhưng không muốn vào Discord để kể lại. -->
   <url>

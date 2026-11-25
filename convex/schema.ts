@@ -1723,11 +1723,13 @@ export default defineSchema({
     .index("by_guildId_key", ["guildId", "key"]),
 
   /**
-   * Đơn thanh toán ZaloPay — ủng hộ dev (/donate) + gói Premium (/premium).
-   * Một dòng = một đơn tạo tại ZaloPay. Trạng thái CHỈ đổi ở server:
-   * pending → paid (callback MAC key2 hoặc query status xác thực), failed
-   * (API create lỗi), expired (quá hạn thanh toán mà chưa nộp tiền).
-   * amount do SERVER chốt theo plan — không bao giờ nhận số tiền từ client.
+   * LƯU TRỮ LỊCH SỬ — KHÔNG CÒN ĐƯỢC GHI/ĐỌC (từ 11/2026).
+   *
+   * Protogon đã miễn phí hoàn toàn: không còn đơn hàng mới, không còn cổng
+   * ZaloPay, không còn quyền lợi bán. Bảng được GIỮ NGUYÊN trong schema để một
+   * lần deploy Convex không âm thầm xoá dữ liệu kế toán cũ; không module nào
+   * trong repo đọc/ghi bảng này nữa. Xoá hẳn phải là một bước purge có chủ đích
+   * (sao lưu + quyết định của người vận hành), không phải tác dụng phụ của deploy.
    */
   payments: defineTable({
     /** Người mua — đơn cần đăng nhập (chống spam tạo đơn rác tại ZaloPay). */
@@ -1789,10 +1791,11 @@ export default defineSchema({
     .index("by_status_createdAt", ["status", "createdAt"]),
 
   /**
-   * Quyền lợi Premium theo người dùng — suy ra từ payments đã paid.
-   * 1 người 1 dòng (upsert khi mua/gia hạn). Hạn dùng LƯỜI: quá expiresAt
-   * là hết hạn ngay khi đọc — không có cron dọn (cron Convex trong repo này
-   * chỉ được đụng cờ trên guilds, xem scripts/check-cron-boundary.cjs).
+   * LƯU TRỮ LỊCH SỬ — KHÔNG CÒN ĐƯỢC GHI/ĐỌC (từ 11/2026).
+   *
+   * Quyền lợi gói trả phí đã bị gỡ khỏi sản phẩm; mọi server dùng chung hạn
+   * mức kỹ thuật trong convex/limits.ts. Giữ bảng để bảo toàn dữ liệu cũ,
+   * không phải để cấp quyền lại — đừng thêm hàm đọc bảng này.
    */
   entitlements: defineTable({
     userId: v.id("users"),

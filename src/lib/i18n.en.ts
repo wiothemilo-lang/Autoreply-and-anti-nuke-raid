@@ -1651,7 +1651,7 @@ export const EN: Record<string, string> = {
     "Lost access to the original server (nuked out of your roles, kicked, or the server was deleted)? Paste a backup's restore key here to rebuild that server's structure in the current one.",
   "Không tìm thấy bản backup nào với mã này — kiểm tra lại mã, hoặc dùng bản backup mới nhất.":
     "No backup matches this key — double-check it, or use the most recent backup.",
-  /* ==== Thanh toán ZaloPay (06/10/2026) ==== /donate + /premium + banner PaymentReturn. */
+  /* ==== Chuỗi thanh toán cũ (06/10/2026) — UI đã gỡ, giữ bản dịch để tra cứu. ==== */
   "Đang mở ZaloPay…": "Opening ZaloPay…",
   "Ủng hộ {so}": "Donate {so}",
   "Ủng hộ số tiền này": "Donate this amount",
@@ -1718,8 +1718,8 @@ export const EN: Record<string, string> = {
      gói premium thủ công (payments.grantPlan) ==== */
   Owner: "Owner",
   Admin: "Admin",
-  "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research, đối soát tiền, cấp gói). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.":
-    "Add people to the team so they can use the WHOLE Admin window (error monitoring, host health, AI, threat research, payment reconciliation, plan grants). They can NOT touch the hidden password/API security key and cannot add or remove people themselves.",
+  "Thêm thành viên vào team để họ dùng TOÀN BỘ cửa sổ Admin (theo dõi lỗi, sức khoẻ máy chủ, AI, threat research). Họ KHÔNG đụng được mật khẩu ẩn/chìa khoá bảo mật API và không tự thêm hay bớt người.":
+    "Add people to the team so they can use the WHOLE Admin window (error monitoring, host health, AI, threat research). They can NOT touch the hidden password/API security key and cannot add or remove people themselves.",
   "Chưa có ai trong team — hãy thêm thành viên bên dưới.":
     "No one in the team yet — add members below.",
   "Cấp gói premium": "Grant premium plan",

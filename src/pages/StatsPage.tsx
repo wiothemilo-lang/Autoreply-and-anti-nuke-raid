@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
+import { LIMITS } from "../../convex/limits";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent } from "../components/ui/card";
 import {
@@ -164,15 +165,9 @@ export default function StatsPage() {
   // tick nên một tab /stats bỏ quên trong tab ẩn vẫn ngốn lượt đọc Convex.
   const visible = usePageVisible();
 
-  // TRẦN theo gói (P4): `heatTopRows` = 10 (Miễn phí) / 30 / 50. Hỏi đúng bằng
-  // hạn mức của gói đang áp cho server này — server cũng cắt đúng trần đó.
-  const plan = useQuery(
-    api.plans.guildPlan,
-    visible && token && guildId
-      ? ({ token, guildId } as { token: string; guildId: string })
-      : "skip",
-  ) as { limits: { heatTopRows: number } } | null | undefined;
-  const topN = plan?.limits?.heatTopRows ?? 10;
+  // TRẦN dùng chung cho mọi server (convex/limits.ts) — server cũng cắt đúng
+  // trần đó, nên bảng xếp hạng không thể đòi nhiều hơn dữ liệu nhận được.
+  const topN = LIMITS.heatTopRows;
 
   // Tab ẩn → huỷ subscription bảng xếp hạng + tổng hôm nay. Bot ghi heat mỗi
   // tick nên một tab /stats bỏ quên trong tab ẩn vẫn ngốn lượt đọc Convex.

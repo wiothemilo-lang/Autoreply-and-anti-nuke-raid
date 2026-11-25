@@ -55,20 +55,10 @@ const COPY: Record<Lang, Copy> = {
       description:
         "Theo dõi trạng thái, độ trễ và số liệu vận hành của bot Protogon theo thời gian thực.",
     },
-    donate: {
-      title: "Ủng hộ nhà phát triển — Protogon",
-      description:
-        "Giúp duy trì Protogon — bot Discord do nhóm RFTV vận hành. Gói Miễn phí dùng được cho mọi server; quyền góp trang trải máy chủ và thời gian bảo trì, không mở khoá tính năng.",
-    },
     feedback: {
       title: "Góp ý — Protogon",
       description:
         "Gửi báo lỗi, đề xuất tính năng hoặc góp ý cho bot Protogon — không cần tài khoản Discord, góp ý đi thẳng tới người làm bot.",
-    },
-    premium: {
-      title: "Gói Premium tạm ngừng bán — Protogon",
-      description:
-        "Gói Premium của Protogon hiện tạm ngừng bán vì chưa đủ điều kiện pháp lý để giao dịch. Gói Miễn phí vẫn dùng được cho mọi server.",
     },
     verify: {
       title: "Xác minh thành viên — Protogon",
@@ -123,20 +113,10 @@ const COPY: Record<Lang, Copy> = {
       title: "Bot monitor — Protogon",
       description: "Live Protogon bot status, latency, and operational metrics.",
     },
-    donate: {
-      title: "Support the developer — Protogon",
-      description:
-        "Help keep Protogon running — a Discord bot operated by the RFTV team. The free plan still works for every server; contributions cover servers and maintenance time and unlock no features.",
-    },
     feedback: {
       title: "Feedback — Protogon",
       description:
         "Report a bug, suggest a feature, or send general feedback about the Protogon bot — no Discord account needed, it goes straight to the developer.",
-    },
-    premium: {
-      title: "Premium plans temporarily unavailable — Protogon",
-      description:
-        "Protogon Premium plans are temporarily not for sale because selling is not legally possible yet. The free plan remains available for every server.",
     },
     verify: {
       title: "Member verification — Protogon",
@@ -192,20 +172,10 @@ const COPY: Record<Lang, Copy> = {
       title: "Bot-Monitor — Protogon",
       description: "Live-Status, Latenz und Betriebsdaten des Protogon-Bots.",
     },
-    donate: {
-      title: "Entwickler unterstützen — Protogon",
-      description:
-        "Hilf mit, Protogon am Laufen zu halten — ein Discord-Bot, betrieben vom RFTV-Team. Der kostenlose Tarif bleibt für jeden Server nutzbar; Spenden decken Server und Wartungszeit und schalten keine Funktionen frei.",
-    },
     feedback: {
       title: "Feedback — Protogon",
       description:
         "Fehler melden, Funktionen vorschlagen oder allgemeines Feedback zum Protogon-Bot senden — ohne Discord-Konto, direkt an den Entwickler.",
-    },
-    premium: {
-      title: "Premium-Tarife vorübergehend nicht erhältlich — Protogon",
-      description:
-        "Die Premium-Tarife von Protogon sind vorübergehend nicht käuflich, da ein Verkauf derzeit rechtlich nicht möglich ist. Der kostenlose Tarif bleibt für jeden Server verfügbar.",
     },
     verify: {
       title: "Mitgliederverifizierung — Protogon",

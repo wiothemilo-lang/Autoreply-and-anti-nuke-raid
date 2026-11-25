@@ -155,7 +155,6 @@ const VI: LegalDoc[] = [
         ],
         bullets: [
           "Tài khoản dashboard: ID Discord, tên người dùng, tên hiển thị, ảnh đại diện, danh sách server bạn có quyền quản lý, thời điểm đăng nhập gần nhất và phiên đăng nhập.",
-          "Thanh toán (khi bạn ủng hộ hoặc mua gói): ID Discord, loại gói, số tiền, mã đơn ZaloPay, trạng thái và thời điểm, phiên bản điều khoản đã đồng ý. Không lưu số thẻ hay số tài khoản ngân hàng — ZaloPay xử lý.",
           "Góp ý: nội dung bạn gửi, email nếu bạn tự nguyện nhập, ngôn ngữ và trang gửi.",
           "Server: ID, tên, biểu tượng, số lượng thành viên, prefix, cấu hình từng module, kênh và role dùng cho log, whitelist, webhook đã tạo.",
           "Hoạt động của bot: hành động hình phạt kèm lý do và người thực hiện, điểm nhiệt và số lần cảnh báo, sự kiện chống nuke/raid, lượt vào server khi bật Join Gate (ID, tên, ảnh đại diện, tuổi tài khoản, điểm rủi ro và lý do, hành động xử lý).",
@@ -203,7 +202,6 @@ const VI: LegalDoc[] = [
         bullets: [
           "Phiên đăng nhập dashboard: hết hiệu lực sau 30 ngày; đăng xuất xoá ngay; phiên quá hạn bị dọn tự động.",
           "Góp ý: tối đa 365 ngày kể từ khi gửi.",
-          "Thanh toán/đối soát: giữ theo thời hạn kế toán luật định (tối đa 10 năm) rồi xoá; chỉ gồm dữ liệu đơn hàng, không có thông tin thẻ hay tài khoản ngân hàng.",
           "Phiên xác minh web: hết hạn sau 10 phút; xoá 7 ngày sau khi hết hạn.",
           "Tín hiệu xác minh (hash IP/thiết bị/cookie/UA): tối đa 730 ngày kể từ lần cuối xuất hiện.",
           "Liên kết tài khoản phụ: tối đa 180 ngày kể từ tín hiệu cuối.",
@@ -326,7 +324,6 @@ const VI: LegalDoc[] = [
         bullets: [
           "Phiên đăng nhập dashboard: hết hiệu lực sau 30 ngày; đăng xuất xoá ngay; phiên quá hạn bị dọn tự động.",
           "Góp ý: tối đa 365 ngày kể từ khi gửi.",
-          "Thanh toán/đối soát: giữ theo thời hạn kế toán luật định (tối đa 10 năm) rồi xoá; chỉ gồm dữ liệu đơn hàng, không có thông tin thẻ hay tài khoản ngân hàng.",
           "Phiên xác minh web: hết hạn sau 10 phút; xoá 7 ngày sau khi hết hạn.",
           "Tín hiệu xác minh (hash IP/thiết bị/cookie/UA): tối đa 730 ngày kể từ lần cuối xuất hiện.",
           "Liên kết tài khoản phụ: tối đa 180 ngày kể từ tín hiệu cuối.",
@@ -517,7 +514,6 @@ const EN: LegalDoc[] = [
         ],
         bullets: [
           "Dashboard account: Discord ID, username, display name, avatar, the list of servers you can manage, last sign-in time, and your dashboard session.",
-          "Payments (when you donate or buy a plan): Discord ID, plan, amount, ZaloPay order code, status and timestamps, and the terms version you accepted. We do not store card or bank account numbers — ZaloPay handles them.",
           "Feedback: the message you send, an email if you voluntarily provide one, your language, and the page you sent it from.",
           "Server: ID, name, icon, member count, prefix, per-module configuration, channels and roles used for logging, whitelist entries, and created webhooks.",
           "Bot activity: punishment records with reason and moderator, heat score and warning count, anti-nuke/raid events, and join records when Join Gate is enabled (ID, username, avatar, account age, risk score and reasons, action taken).",
@@ -565,7 +561,6 @@ const EN: LegalDoc[] = [
         bullets: [
           "Dashboard session: valid for at most 30 days; signing out deletes it immediately, and expired sessions are cleaned up automatically.",
           "Feedback: at most 365 days from submission.",
-          "Payments/reconciliation: kept for the statutory accounting period (up to 10 years), then deleted; order data only, with no card or bank account details.",
           "Web verification session: expires after 10 minutes; deleted 7 days after expiry.",
           "Verification signals (IP/device/cookie/UA hashes): at most 730 days from the last sighting.",
           "Alt-account links: at most 180 days from the last signal.",
@@ -688,7 +683,6 @@ const EN: LegalDoc[] = [
         bullets: [
           "Dashboard session: valid for at most 30 days; signing out deletes it immediately, and expired sessions are cleaned up automatically.",
           "Feedback: at most 365 days from submission.",
-          "Payments/reconciliation: kept for the statutory accounting period (up to 10 years), then deleted; order data only, with no card or bank account details.",
           "Web verification session: expires after 10 minutes; deleted 7 days after expiry.",
           "Verification signals (IP/device/cookie/UA hashes): at most 730 days from the last sighting.",
           "Alt-account links: at most 180 days from the last signal.",
@@ -881,7 +875,6 @@ const DE: LegalDoc[] = [
         ],
         bullets: [
           "Dashboard-Konto: Discord-ID, Benutzername, Anzeigename, Avatar, Liste der verwaltbaren Server, letzte Anmeldung und deine Dashboard-Sitzung.",
-          "Zahlungen (bei Spende oder Paketkauf): Discord-ID, Paket, Betrag, ZaloPay-Bestellcode, Status und Zeitstempel sowie die akzeptierte Fassung der Bedingungen. Karten- oder Bankkontodaten speichern wir nicht — ZaloPay verarbeitet sie.",
           "Feedback: deine Nachricht, eine E-Mail-Adresse, wenn du sie freiwillig angibst, deine Sprache und die Seite, von der du sie gesendet hast.",
           "Server: ID, Name, Icon, Mitgliederzahl, Präfix, Konfiguration je Modul, für Logs genutzte Kanäle und Rollen, Whitelist-Einträge und erstellte Webhooks.",
           "Bot-Aktivität: Strafen mit Grund und Moderator, Hitzewert und Verwarnungen, Anti-Nuke-/Raid-Ereignisse sowie Beitrittsdaten bei aktivem Join Gate (ID, Name, Avatar, Kontoalter, Risikowert und Gründe, ergriffene Maßnahme).",
@@ -929,7 +922,6 @@ const DE: LegalDoc[] = [
         bullets: [
           "Dashboard-Sitzung: höchstens 30 Tage gültig; Abmelden löscht sie sofort, abgelaufene Sitzungen werden automatisch bereinigt.",
           "Feedback: höchstens 365 Tage ab Absendung.",
-          "Zahlungen/Abgleich: Aufbewahrung nach der gesetzlichen Buchhaltungsfrist (bis zu 10 Jahre), danach Löschung; nur Bestelldaten, keine Karten- oder Bankkontodaten.",
           "Web-Verifizierungssitzung: läuft nach 10 Minuten ab; wird 7 Tage nach Ablauf gelöscht.",
           "Verifizierungssignale (IP-/Geräte-/Cookie-/UA-Hashes): höchstens 730 Tage seit der letzten Sichtung.",
           "Alt-Konto-Verknüpfungen: höchstens 180 Tage seit dem letzten Signal.",
@@ -1052,7 +1044,6 @@ const DE: LegalDoc[] = [
         bullets: [
           "Dashboard-Sitzung: höchstens 30 Tage gültig; Abmelden löscht sie sofort, abgelaufene Sitzungen werden automatisch bereinigt.",
           "Feedback: höchstens 365 Tage ab Absendung.",
-          "Zahlungen/Abgleich: Aufbewahrung nach der gesetzlichen Buchhaltungsfrist (bis zu 10 Jahre), danach Löschung; nur Bestelldaten, keine Karten- oder Bankkontodaten.",
           "Web-Verifizierungssitzung: läuft nach 10 Minuten ab; wird 7 Tage nach Ablauf gelöscht.",
           "Verifizierungssignale (IP-/Geräte-/Cookie-/UA-Hashes): höchstens 730 Tage seit der letzten Sichtung.",
           "Alt-Konto-Verknüpfungen: höchstens 180 Tage seit dem letzten Signal.",

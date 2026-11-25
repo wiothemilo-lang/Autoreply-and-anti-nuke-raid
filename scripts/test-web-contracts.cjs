@@ -817,8 +817,8 @@ check(
 );
 const paymentsSrc = fs.readFileSync(path.join(ROOT, "convex", "paymentsAction.ts"), "utf8");
 check(
-  "paymentsAction: order_url phải HTTPS + host zalopay.vn trước khi trả client",
-  /safeZaloPayUrl\(data\.order_url\)/.test(paymentsSrc) && /ZALOPAY_HOST_RE/.test(paymentsSrc),
+  "paymentsAction chỉ còn tombstone, không trả order_url",
+  /export \{\};/.test(paymentsSrc) && !/order_url|safeZaloPayUrl/.test(paymentsSrc),
 );
 const backupWritesSrc = fs.readFileSync(
   path.join(ROOT, "convex", "bot_writes", "backup.ts"),
@@ -828,18 +828,13 @@ check(
   "botSetBackupGithub: chỉ lưu URL HTTPS thuộc GitHub (chặn javascript: trong href)",
   /allowedHosts\.has\(parsed\.hostname\.toLowerCase\(\)\)/.test(backupWritesSrc),
 );
-const donateHardenedSrc = fs.readFileSync(
-  path.join(ROOT, "src", "pages", "DonatePage.tsx"),
-  "utf8",
-);
 const backupPanelHardenedSrc = fs.readFileSync(
   path.join(ROOT, "src", "components", "dashboard", "BackupPanel.tsx"),
   "utf8",
 );
 check(
-  "UI kiểm lại allowlist trước khi redirect/mở link (lớp hai)",
-  /safeZaloPayUrl\(r\.paymentUrl\)/.test(donateHardenedSrc) &&
-    /safeGithubUrl\(url\)/.test(backupPanelHardenedSrc),
+  "UI kiểm lại allowlist trước khi mở link GitHub (lớp hai)",
+  /safeGithubUrl\(url\)/.test(backupPanelHardenedSrc),
 );
 const convexUrlSrc = fs.readFileSync(path.join(ROOT, "src", "lib", "convexUrl.ts"), "utf8");
 check(
@@ -1367,6 +1362,7 @@ check(
 const SKIP_LINK_PAGES = fs
   .readdirSync(path.join(ROOT, "src", "pages"))
   .filter((f) => f.endsWith(".tsx"))
+  .filter((f) => (files.get(`pages/${f}`) ?? "").includes("export default"))
   .sort();
 for (const page of SKIP_LINK_PAGES) {
   const src = files.get(`pages/${page}`) ?? "";
@@ -2641,28 +2637,6 @@ check(
   missingAssets.join(", "),
 );
 
-// Trang /donate: khối QR ví cá nhân là kênh duy nhất người CHƯA đăng nhập dùng
-// được (ZaloPay checkout bắt buộc đăng nhập). Mất khối hoặc mất ảnh = mất đường
-// ủng hộ đó mà không có gì báo, nên khoá cả hai phía: ảnh được render trong
-// DonatePage kèm nhãn đã qua translate(), và file JPEG thật trên đĩa.
-const donateSrc = files.get("pages/DonatePage.tsx") ?? "";
-check(
-  "trang /donate render mã QR ví cá nhân (/payment.jpg) trong khối đã dịch",
-  donateSrc.includes('src="/payment.jpg"') &&
-    donateSrc.includes('translate("Ủng hộ trực tiếp bằng mã QR")'),
-  "ảnh /payment.jpg hoặc khối QR đã bị gỡ khỏi DonatePage.tsx",
-);
-check(
-  "public/payment.jpg là ảnh JPEG thật (không rỗng, không hỏng)",
-  (() => {
-    const p = path.join(ROOT, "public", "payment.jpg");
-    if (!fs.existsSync(p)) return false;
-    const buf = fs.readFileSync(p);
-    return buf.length > 1000 && buf[0] === 0xff && buf[1] === 0xd8;
-  })(),
-  "thiếu file hoặc không phải ảnh JPEG",
-);
-
 // ─── V. Lỗi 07/10/2026: avatar upload + lỗi thanh toán + luồng ZaloPay ─────
 // 1) Avatar: file thô KHÔNG được lên Convex storage — BrandingPanel phải đi
 //    qua normalizeAvatarFile (co ≤512px, chặn file không decode được). Bug:
@@ -2684,25 +2658,20 @@ check(
   uncaughtLeftovers.length === 0,
   uncaughtLeftovers.join(", "),
 );
-for (const rel of ["pages/DonatePage.tsx", "pages/FeedbackPage.tsx"]) {
+for (const rel of ["pages/FeedbackPage.tsx"]) {
   check(
     `${rel} hiện lỗi qua friendlyConvexError (fallback đã dịch)`,
     (files.get(rel) ?? "").includes("friendlyConvexError("),
   );
 }
 
-// 3) Luồng ZaloPay yêu cầu đăng nhập, QR tĩnh thì công khai CÓ NGHĨA — khoá
-//    ranh giới bảo mật này: QR là ảnh tĩnh gửi tiền thẳng vào ví chủ, không qua
-//    server; còn tạo đơn ZaloPay (gọi API, rate-limit tại ZaloPay) phải qua phiên.
+// 3) Bề mặt ủng hộ đã gỡ cùng gói trả phí — chỉ còn tombstone, không còn
+//    luồng tạo đơn/redirect ZaloPay nào để lộ hoặc gọi nhầm.
+const donateSrc = files.get("pages/DonatePage.tsx") ?? "";
 check(
-  "tạo đơn ZaloPay trên /donate bắt buộc có token phiên (chưa đăng nhập → /auth)",
-  donateSrc.includes("if (!token)") && donateSrc.includes("/auth?returnTo="),
-  "DonatePage cho phép gọi startPayment không cần đăng nhập",
-);
-check(
-  "khối QR công khai vẫn còn chú thích 'không cần đăng nhập' + tên chủ ví (cân bằng minh bạch)",
-  donateSrc.includes("Không cần đăng nhập, không qua cổng thanh toán"),
-  "chuỗi minh bạch khối QR bị xoá — khách không biết tiền đi đâu",
+  "DonatePage chỉ còn tombstone, không còn luồng ZaloPay",
+  /export \{\};/.test(donateSrc) && !/startPayment|safeZaloPayUrl/.test(donateSrc),
+  "DonatePage vẫn còn mã thanh toán",
 );
 
 // ─── W. 10/11/2026 — Premium TẠM ẨN (chưa đủ điều kiện đăng ký kinh doanh) ───
@@ -2757,19 +2726,6 @@ check(
 // ─── X. Admin: đơn chờ xác nhận + tổng doanh thu + quản trị viên nhóm ───────
 const adminSrc = files.get("pages/Admin.tsx") ?? "";
 check(
-  "Admin có hàng chờ đơn CK + tổng doanh thu theo tháng/năm",
-  adminSrc.includes("api.payments.listReportedOrders") &&
-    adminSrc.includes("api.payments.revenueStats") &&
-    adminSrc.includes('translate("Theo tháng")') &&
-    adminSrc.includes('translate("Theo năm")'),
-  "Admin thiếu bảng doanh thu / hàng chờ đơn",
-);
-check(
-  "xác nhận tiền đi qua confirmTransfer (backend mới ghi entitlement)",
-  adminSrc.includes("api.payments.confirmTransfer"),
-  "Admin tự kích hoạt gói thay vì xác nhận qua backend",
-);
-check(
   "đơn chờ + doanh thu + danh sách team chỉ truy vấn khi ĐỦ QUYỀN Admin (skip nếu không)",
   (adminSrc.match(/isAdmin === true \? \{ token \} : "skip"/g) ?? []).length >= 3,
   "có query doanh thu/đơn chờ/danh sách chạy cả khi không phải chủ bot hoặc quản trị viên nhóm",
@@ -2798,16 +2754,11 @@ check(
 // và i18n. Gate này khoá phần UI — lỡ ai gỡ thẻ Cấp gói hoặc đổi cổng query
 // về owner-only là test đỏ ngay, đúng như mong đợi của chủ bot.
 const userTagsSrc = files.get("components/UserTags.tsx") ?? "";
-const planLabelsSrc = files.get("lib/constants.ts") ?? "";
 check(
-  "UserTags có tag Owner + Admin + nhãn gói, và được gắn ở Dashboard (cạnh logo) lẫn Admin (danh sách team)",
+  "UserTags có tag Owner + Admin và được gắn ở Dashboard (cạnh logo) lẫn Admin (danh sách team)",
   userTagsSrc.includes('translate("Owner")') &&
     userTagsSrc.includes('translate("Admin")') &&
-    // Nhãn gói dịch qua planDisplayName() — một nguồn duy nhất cho cả UserTags
-    // lẫn trang Admin (trước đây mỗi nơi tự map nên Admin in enum thô).
-    userTagsSrc.includes("planDisplayName(") &&
-    planLabelsSrc.includes('"Đồng hành"') &&
-    planLabelsSrc.includes('"Tiên phong"') &&
+    !userTagsSrc.includes("planDisplayName(") &&
     adminSrc.includes("<UserTags") &&
     dashboardSrc.includes("<UserTags"),
   "thiếu component tag hoặc chưa gắn vào trang",
@@ -2818,26 +2769,9 @@ check(
   "một người có thể bị gắn hai tag vai trò cùng lúc",
 );
 check(
-  "Dashboard nạp đủ 3 nguồn tag: isOwner + isAdmin + premiumStatus",
-  dashboardSrc.includes("api.status.isOwner") &&
-    dashboardSrc.includes("api.status.isAdmin") &&
-    dashboardSrc.includes("api.payments.premiumStatus") &&
-    dashboardSrc.includes("premium?.active"),
-  "người dùng không thấy tag vai trò/gói cạnh logo",
-);
-check(
-  "Admin có thẻ Cấp gói premium nối vào payments.grantPlan (cổng isAdmin)",
-  adminSrc.includes("api.payments.grantPlan") &&
-    adminSrc.includes("<PremiumGrantCard") &&
-    adminSrc.includes("{isAdmin === true && <PremiumGrantCard"),
-  "thiếu UI cấp gói hoặc không nối backend / sai cổng quyền",
-);
-check(
-  "Cấp gói gửi đủ đối số server cần (discordId + plan + days, guildId tùy chọn)",
-  adminSrc.includes('plan: "supporter" | "pioneer"') &&
-    adminSrc.includes("days:") &&
-    adminSrc.includes("discordId: who"),
-  "UI cấp gói gửi thiếu trường — server từ chối hoặc cấp nhầm",
+  "Dashboard nạp đủ 2 nguồn tag vai trò: isOwner + isAdmin",
+  dashboardSrc.includes("api.status.isOwner") && dashboardSrc.includes("api.status.isAdmin"),
+  "người dùng không thấy tag vai trò cạnh logo",
 );
 check(
   "cổng quyền của Admin thống nhất: mọi query/mutation Admin đều đứng sau isAdmin",
@@ -2907,11 +2841,6 @@ check(
 // bị ĐẢO chiều so với chú thích: nút của đơn ĐANG xác nhận vẫn bấm được (gửi
 // 2 lần) còn mọi đơn khác bị khoá. Cổng cũ khớp đúng chuỗi sai nên vẫn xanh.
 // Luật đúng: chỉ nút của dòng đang xác nhận bị khoá.
-check(
-  "nút xác nhận đơn chuyển khoản bận theo TỪNG DÒNG — không khoá cả bảng",
-  adminSrc.includes("disabled={confirming === o.appTransId}"),
-  "phải khoá ĐÚNG nút của đơn đang xác nhận, không khoá các đơn khác",
-);
 
 // ─── X5. 09/11/2026 — thẻ lỗi panel chỉ được nói câu lỗi MỘT lần ────────────
 // Bug thật: PanelErrorBoundary render cùng câu "Có lỗi xảy ra khi kết nối với
@@ -2930,17 +2859,11 @@ check(
 // Mọi server dùng trần cao nhất (PLAN_LIMITS_ENABLED trong convex/plans.ts), nên
 // dashboard không còn thẻ gói/hạn mức để tránh mời nâng cấp thứ không tồn tại.
 // Server vẫn là chốt cuối: test-payments.ts + test-plans-gating.ts kiểm công tắc.
-check(
-  "Admin tô đỏ đơn đã báo quá 12 giờ chưa xác nhận (giữ cam kết 24h cho đơn cũ)",
-  adminSrc.includes("Quá 12 giờ chưa xác nhận") && adminSrc.includes("12 * 3600_000"),
-  "đơn tồn không cảnh báo — cam kết 24h dễ vỡ",
-);
 
 // ─── 10/11/2026 — copy công khai phải khớp việc TẠM NGỪNG BÁN ───────────────
 // Ba bề mặt từng hứa hạn mức/giá của gói trả phí: meta SEO, trang ủng hộ và
 // Điều khoản. Khi chưa bán được, chúng phải nói đúng sự thật — nếu không,
 // khách vẫn bị mời mua một thứ không tồn tại.
-const donateCopySrc = files.get("pages/DonatePage.tsx") ?? "";
 const legalTruthSrc = files.get("lib/legalContent.ts") ?? "";
 const seoMetaAll = [
   seo,
@@ -2955,16 +2878,9 @@ check(
   "còn copy gói cũ trong thẻ meta — không dòng nào trong plans.ts enforce",
 );
 check(
-  "meta SEO nói Premium TẠM NGỪNG BÁN (không mời nâng cấp, không nêu giá)",
-  /tạm ngừng bán/.test(seo) &&
-    /temporarily not for sale/.test(seo) &&
-    /vorübergehend nicht/.test(seo),
-  "meta vẫn mời mua gói trong khi server chặn mọi đơn Premium",
-);
-check(
-  "trang ủng hộ không còn nút/lối vào gói Premium",
-  !/to="\/premium"/.test(donateCopySrc) && !/Xem gói Premium/.test(donateCopySrc),
-  "nút 'Xem gói Premium' vẫn còn trên /donate",
+  "meta SEO không còn mời mua gói Premium hay nêu giá",
+  !/premium/i.test(seo) && !/tạm ngừng bán/.test(seo),
+  "meta vẫn nhắc gói trả phí trong khi sản phẩm miễn phí hoàn toàn",
 );
 check(
   "Điều khoản nói rõ mọi tính năng đang miễn phí, không phát sinh giao dịch mua bán",
@@ -3171,7 +3087,6 @@ const motionPages = [
   "pages/AuthPage.tsx",
   "pages/Dashboard.tsx",
   "pages/GuildPage.tsx",
-  "pages/DonatePage.tsx",
   "pages/FeaturesPage.tsx",
   "pages/FeedbackPage.tsx",
 ];
@@ -3264,14 +3179,10 @@ check(
 );
 
 check(
-  "ảnh QR + cá voi có bản WebP và <picture> giữ fallback gốc",
+  "ảnh cá voi có bản WebP và <picture> giữ fallback gốc",
   fs.existsSync(path.join(ROOT, "public", "brand-whale.webp")) &&
-    fs.existsSync(path.join(ROOT, "public", "payment.webp")) &&
     /<source type="image\/webp" srcSet="\/brand-whale\.webp" \/>/.test(landing) &&
-    /src="\/brand-whale\.png"/.test(landing) &&
-    /<source type="image\/webp" srcSet="\/payment\.webp" \/>/.test(
-      files.get("pages/DonatePage.tsx") ?? "",
-    ),
+    /src="\/brand-whale\.png"/.test(landing),
 );
 
 // ─── Đợt 4 (10/11/2026): gộp ô số, gọt adapter Switch, báo lỗi Convex ──────

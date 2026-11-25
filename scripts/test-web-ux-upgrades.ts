@@ -29,7 +29,7 @@ import {
 import { ensureDictionary, lookupTranslation, translate } from "../src/lib/i18n";
 import { safeRedirectPath } from "../src/lib/discord";
 import { friendlyConvexError } from "../src/lib/convexError";
-import { safeGithubUrl, safeZaloPayUrl } from "../src/lib/safeUrl";
+import { safeGithubUrl } from "../src/lib/safeUrl";
 import { AVATAR_MAX_DIM, planAvatarResize } from "../src/lib/avatarImage";
 import { CHUNK_RELOAD_COOLDOWN_MS, installStaleChunkRecovery } from "../src/lib/staleChunk";
 import { hiddenUnlockKey } from "../src/lib/hiddenUnlock";
@@ -1466,7 +1466,10 @@ console.log("── #11 bộ chọn trang ở header: vai trò + nhãn ──");
   );
   check(
     "lọc theo vai trò KHÔNG đụng dữ liệu gốc (navPaths vẫn đủ mọi trang)",
-    navPaths().includes("/admin") && navPaths().length >= 8,
+    ["/features", "/monitor", "/feedback", "/dashboard", "/admin"].every((p) =>
+      navPaths().includes(p),
+    ) && !navPaths().includes("/donate"),
+    navPaths(),
   );
 
   check(
@@ -1548,8 +1551,8 @@ console.log("── #17 friendlyConvexError ──");
     friendlyConvexError(new Error("Server Error"), fb) === fb,
   );
 
-  // Trang /donate còn lại cũng phải dùng helper (không còn regex cũ).
-  for (const rel of ["pages/DonatePage.tsx", "pages/FeedbackPage.tsx"]) {
+  // Trang góp ý cũng phải dùng helper (không còn regex cũ).
+  for (const rel of ["pages/FeedbackPage.tsx"]) {
     const src = readFileSync(new URL(`../src/${rel}`, import.meta.url), "utf8");
     check(
       `${rel} bóc lỗi qua friendlyConvexError (không còn regex Uncaught riêng lẻ)`,
@@ -1568,21 +1571,6 @@ check("hiddenUnlockKey ổn định và không phụ thuộc server", () => {
 });
 
 // ── Allowlist URL mở từ dữ liệu server (chống javascript:/host lạ) ──────────
-check("ZaloPay: https + host *.zalopay.vn được nhận", () => {
-  return (
-    safeZaloPayUrl("https://sbgateway.zalopay.vn/v2/create?x=1") !== null &&
-    safeZaloPayUrl("https://zalopay.vn/thanh-toan") !== null
-  );
-});
-check("ZaloPay: http/javascript/host giả bị từ chối", () => {
-  return (
-    safeZaloPayUrl("http://gateway.zalopay.vn/x") === null &&
-    safeZaloPayUrl("javascript:alert(1)") === null &&
-    safeZaloPayUrl("https://gateway.zalopay.vn.evil.com/x") === null &&
-    safeZaloPayUrl("https://evil.com/?next=zalopay.vn") === null &&
-    safeZaloPayUrl("https://user:pass@gateway.zalopay.vn/x") === null
-  );
-});
 check("GitHub: chỉ https + host gist/github chính chủ", () => {
   return (
     safeGithubUrl("https://gist.github.com/user/abc123") !== null &&

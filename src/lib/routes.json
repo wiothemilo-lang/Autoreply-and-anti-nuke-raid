@@ -56,26 +56,15 @@
       "note": "legal page - Discord bot verification requires a stable public URL"
     },
     {
-      "path": "/donate",
-      "match": "exact",
-      "seoKind": "donate",
-      "visibility": "public",
-      "index": true,
-      "sitemap": true,
-      "spaFallback": true,
-      "redirect": null,
-      "note": "support the solo developer - no payment rail yet, contact via Discord"
-    },
-    {
       "path": "/premium",
       "match": "exact",
-      "seoKind": "premium",
+      "seoKind": "home",
       "visibility": "public",
       "index": false,
       "sitemap": false,
       "spaFallback": false,
       "redirect": "/",
-      "note": "temporarily hidden: selling is not legally possible yet - permanent redirect to home, never indexed, never in sitemap"
+      "note": "legacy alias from the paid era - permanent redirect to home, never indexed, never in sitemap"
     },
     {
       "path": "/feedback",

@@ -1,7 +1,6 @@
 import {
   Activity,
   BarChart3,
-  Heart,
   Home,
   LayoutDashboard,
   Lock,
@@ -66,10 +65,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: "/stats", icon: BarChart3, label: "Thống kê" },
       { to: "/admin", icon: Lock, label: "Cửa sổ Admin", adminOnly: true },
     ],
-  },
-  {
-    title: "Ủng hộ",
-    items: [{ to: "/donate", icon: Heart, label: "Ủng hộ nhà phát triển" }],
   },
 ];
 

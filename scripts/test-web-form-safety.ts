@@ -93,18 +93,8 @@ check(
   /setAutoDays\(clampNumber\(now\.autoDays > 0 \? now\.autoDays : 7, 2, 30\)\)/.test(backup),
 );
 
-console.log("Nguồn: Admin — nút xác nhận + số ngày cấp gói");
+console.log("Nguồn: Admin — thẻ quản trị còn lại");
 const admin = read("src/pages/Admin.tsx");
-check(
-  "nút đơn đang xác nhận bị khoá đúng chiều",
-  /disabled=\{confirming === o\.appTransId\}/.test(admin),
-);
-check(
-  "không còn chiều ngược",
-  !/disabled=\{confirming !== null && confirming !== o\.appTransId\}/.test(admin),
-);
-check("không còn `days: Number(days) || 30`", !/days: Number\(days\) \|\| 30/.test(admin));
-check("từ chối số ngày ngoài 1..365", /dayCount < 1 \|\| dayCount > 365/.test(admin));
 
 console.log("Nguồn: GuildPage — onboarding phải đi qua goToSection");
 const guildPage = read("src/pages/GuildPage.tsx");
@@ -179,8 +169,6 @@ for (const file of [
 ]) {
   check(`${file} dùng moduleMeta`, /moduleMeta\(/.test(read(file)));
 }
-check("constants có planDisplayName", /export function planDisplayName/.test(constants));
-check("Admin không in enum gói thô", !/\{translate\("Gói"\)\} \{o\.plan\}/.test(admin));
 
 console.log("Nguồn: các lỗi im lặng còn lại");
 const backupSrc = read("src/components/dashboard/BackupPanel.tsx");
@@ -212,10 +200,6 @@ check(
 check(
   "VerifyPage có đồng hồ hết hạn",
   /setInterval\(\(\) => setNow\(Date\.now\(\)\)/.test(read("src/pages/VerifyPage.tsx")),
-);
-check(
-  "PaymentReturn chỉ xoá param order",
-  /next\.delete\("order"\)/.test(read("src/components/PaymentReturn.tsx")),
 );
 
 // ===== Lô 3: lỗi mức thấp còn lại =====

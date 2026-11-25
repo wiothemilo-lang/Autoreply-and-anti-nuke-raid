@@ -1,6 +1,13 @@
-# Tích hợp ZaloPay — thanh toán /donate + Premium (tạm ẩn)
+# [LƯU TRỮ] Tích hợp ZaloPay — đã gỡ 11/2026
 
-> **10/11/2026 — BÁN GÓI ĐANG TẮT.** `SALES_ENABLED = false` trong
+> **TOÀN BỘ NHÁNH TRẢ PHÍ ĐÃ BỊ GỠ.** Protogon miễn phí hoàn toàn cho cộng đồng.
+> `convex/payments.ts`, `convex/paymentsAction.ts`, `convex/plans.ts`,
+> `src/pages/DonatePage.tsx`, `src/components/PaymentReturn.tsx` chỉ còn tombstone;
+> route `/donate`, IPN `/zalopay/callback` và mọi call `api.payments.*` đã xoá.
+> Tài liệu này giữ lại để tra cứu lịch sử/đối soát đơn cũ — KHÔNG dùng để bật lại
+> khi chưa có quyết định mới của chủ dự án.
+>
+> 10/11/2026 — BÁN GÓI ĐANG TẮT. `SALES_ENABLED = false` trong
 > `convex/plans.ts`: `createTransferIntent` và `startPayment` từ chối mọi đơn
 > Premium MỚI; `/premium` redirect vĩnh viễn về `/` (Vercel 308, nginx 301); dashboard không còn thẻ gói.
 > Đơn cũ vẫn xác nhận/gia hạn được. Bật lại chỉ cần đổi cờ thành `true`.

@@ -386,8 +386,10 @@ console.log("── 5. getTeamAdmins ──");
     data.owner,
   );
   check(
-    "mỗi hồ sơ có trường plan (gói premium) — null khi chưa mua",
-    data.owner?.plan === null && data.members.every((m) => m.plan === null),
+    "hồ sơ team KHÔNG còn trường plan (bản miễn phí)",
+    data.owner !== null &&
+      !("plan" in (data.owner as any)) &&
+      data.members.every((m) => !("plan" in (m as any))),
     { owner: data.owner, members: data.members },
   );
   // 10/10/2026 — thành viên team có TOÀN BỘ trong Admin panel nên ĐỌC được danh
@@ -406,8 +408,8 @@ console.log("── 5. getTeamAdmins ──");
     /Chỉ chủ sở hữu bot hoặc quản trị viên nhóm/,
   );
 
-  // Nhãn GÓI gắn đúng người: chỉ dòng đang hiệu lực, gói cao thắng, dòng có
-  // plan rác bị loại (asPlanId → free) — dữ liệu bẩn không hiện thành nhãn.
+  // Dữ liệu quyền lợi CŨ còn trong DB cũng không được biến thành nhãn gói:
+  // bản miễn phí không đọc bảng entitlements nữa.
   const future = Date.now() + 86_400_000;
   const planCtx = makeCtx({
     teamAdmins: [ADMIN_A],
@@ -440,8 +442,10 @@ console.log("── 5. getTeamAdmins ──");
   });
   const planView = await getTeamAdminsH(planCtx.ctx, { token: "tok_owner" });
   check(
-    "member có đơn còn hạn → nhãn gói đúng; dòng hết hạn/rác → không nhãn",
-    planView.members[0].plan === "supporter" && planView.owner?.plan === null,
+    "quyền lợi cũ không tạo nhãn gói",
+    planView.members.length > 0 &&
+      !("plan" in (planView.members[0] as any)) &&
+      !("plan" in (planView.owner as any)),
     { members: planView.members, owner: planView.owner },
   );
 }

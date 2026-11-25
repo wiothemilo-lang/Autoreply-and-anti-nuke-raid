@@ -1292,13 +1292,13 @@ browserTest("G. Chuyển route không nháy màn chờ toàn màn hình (React g
       const t0 = Date.now();
       const i = setInterval(() => {
         const a = [...document.querySelectorAll("a")].find(
-          (x) => x.getAttribute("href") === "/donate",
+          (x) => x.getAttribute("href") === "/feedback",
         );
         if (a) { clearInterval(i); a.click(); r("ok"); }
-        else if (Date.now() - t0 > 8000) { clearInterval(i); r("không thấy link /donate"); }
+        else if (Date.now() - t0 > 8000) { clearInterval(i); r("không thấy link /feedback"); }
       }, 50);
     })`);
-  t.assert.strictEqual(clicked, "ok", "bộ chọn trang phải có link tới /donate");
+  t.assert.strictEqual(clicked, "ok", "bộ chọn trang phải có link tới /feedback");
 
   // Lấy mẫu liên tục suốt lúc chuyển: đếm frame có loader toàn màn hình.
   const samples = await page.evaluate(`(async () => {
@@ -1308,7 +1308,7 @@ browserTest("G. Chuyển route không nháy màn chờ toàn màn hình (React g
         if (document.querySelector('[data-testid="route-loader"]')) out.loaderFrames++;
         if (document.body.textContent.includes("Hệ thống chống raid") ||
             document.querySelector("h1")) out.oldPageStillThere++;
-        if (location.pathname === "/donate" && i > 6) break;
+        if (location.pathname === "/feedback" && i > 6) break;
         await new Promise((r) => setTimeout(r, 40));
       }
       out.path = location.pathname;
@@ -1316,7 +1316,7 @@ browserTest("G. Chuyển route không nháy màn chờ toàn màn hình (React g
     })()`);
 
   t.diagnostic(`mẫu lúc chuyển trang: ${JSON.stringify(samples)}`);
-  t.assert.strictEqual(samples.path, "/donate", "phải tới được /donate");
+  t.assert.strictEqual(samples.path, "/feedback", "phải tới được /feedback");
   // React Router 7 bọc cập nhật trong startTransition → React GIữ trang cũ
   // thay vì nháy fallback. Đây là hành vi ĐÚNG: nháy màn chờ toàn màn hình
   // ở mỗi lần bấm link chính là cảm giác "load 2 lần" người dùng phàn nàn.
@@ -1340,7 +1340,7 @@ browserTest("G. Chuyển route không nháy màn chờ toàn màn hình (React g
       const t0 = Date.now();
       const i = setInterval(() => {
         if (!document.querySelector('[data-testid="route-loader"]') &&
-            location.pathname === "/donate") { clearInterval(i); r(1); }
+            location.pathname === "/feedback") { clearInterval(i); r(1); }
         else if (Date.now() - t0 > 30000) { clearInterval(i); r(0); }
       }, 50);
     })`);
@@ -1348,11 +1348,11 @@ browserTest("G. Chuyển route không nháy màn chờ toàn màn hình (React g
   const after = await page.evaluate(`(() => ({
       boot: document.querySelectorAll("#boot").length,
       loader: document.querySelectorAll('[data-testid="route-loader"]').length,
-      hasDonate: /Ủng hộ nhà phát triển|Support the developer/.test(document.body.textContent),
+      hasFeedback: /Góp ý|Feedback/.test(document.body.textContent),
     }))()`);
   t.assert.strictEqual(after.boot, 0, "#boot không được xuất hiện lại lần nữa");
   t.assert.strictEqual(after.loader, 0, "không còn màn chờ vẹn khi trang đã tải xong");
-  t.assert.ok(after.hasDonate, "trang /donate phải render ra nội dung thật");
+  t.assert.ok(after.hasFeedback, "trang /feedback phải render ra nội dung thật");
 });
 
 // ─── H. Từ điển i18n nạp LƯỜI ────────────────────────────────────────────────
@@ -1603,7 +1603,7 @@ async function assertPagesListOpens(t, page, label, testid = "pages-menu") {
       const panel = document.querySelector('[data-testid="pages-menu-panel"]');
       if (!panel) return false;
       const hrefs = [...panel.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-      return ["/donate", "/feedback", "/monitor"].every((p) => hrefs.includes(p));
+      return ["/feedback", "/monitor"].every((p) => hrefs.includes(p));
     })()`,
     8000,
   );
