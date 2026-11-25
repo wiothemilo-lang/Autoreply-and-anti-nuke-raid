@@ -338,15 +338,24 @@ Module._load = function (request, parent) {
       replies[0].content.length === 1901 && replies[0].content.endsWith("…"),
     );
 
-    replies.length = 0;
-    configs.get("g2").autoReplies[0].response = "x".repeat(1899) + "😀!";
-    await onMessageCreate(
-      client,
-      mkMessage({ guild: { id: "g2", name: "G2", available: true }, content: "long" }),
-      store,
-      {},
-    );
-    check("cắt trước emoji nằm ngang giới hạn", replies[0].content === "x".repeat(1899) + "…");
+    const truncationCases = [
+      ["emoji đơn lẻ bị cắt", 1899, "😀", false],
+      ["emoji ghép bị cắt", 1898, "👩‍💻", false],
+      ["dấu tiếng Việt tách rời bị cắt", 1899, "a\u0301", false],
+      ["emoji nguyên cụm vừa đúng giới hạn", 1895, "👩‍💻", true],
+    ];
+    for (const [label, prefixLength, grapheme, fits] of truncationCases) {
+      const prefix = "x".repeat(prefixLength);
+      replies.length = 0;
+      configs.get("g2").autoReplies[0].response = prefix + grapheme + "!";
+      await onMessageCreate(
+        client,
+        mkMessage({ guild: { id: "g2", name: "G2", available: true }, content: "long" }),
+        store,
+        {},
+      );
+      check(label, replies[0]?.content === prefix + (fits ? grapheme : "") + "…");
+    }
 
     // Rule tắt / sai kênh
     clear();

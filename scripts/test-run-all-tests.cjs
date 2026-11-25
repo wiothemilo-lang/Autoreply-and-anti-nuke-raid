@@ -43,6 +43,26 @@ const run = (args, env = {}) =>
   });
 const out = (r) => `${r.stdout}\n${r.stderr}`;
 
+function isProcessRunning(pid) {
+  try {
+    process.kill(pid, 0);
+  } catch (err) {
+    if (err.code === "ESRCH") return false;
+    throw err;
+  }
+
+  if (process.platform !== "linux" || !fs.existsSync("/proc/self/stat")) return true;
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    // PID vẫn tồn tại cho đến khi tiến trình cha thu hồi zombie.
+    const state = stat[stat.lastIndexOf(")") + 2];
+    return state !== "Z" && state !== "X";
+  } catch (err) {
+    if (err.code === "ENOENT" || err.code === "ESRCH") return false;
+    throw err;
+  }
+}
+
 const PASS = `console.log("Kết quả: 3 pass, 0 fail");`;
 
 // ── 1. Tất cả xanh ──
@@ -238,14 +258,7 @@ if (process.platform !== "win32") {
     gpid > 0,
     pidText || "thiếu file pid",
   );
-  let alive = gpid > 0;
-  if (alive) {
-    try {
-      process.kill(gpid, 0);
-    } catch {
-      alive = false;
-    }
-  }
+  const alive = gpid > 0 && isProcessRunning(gpid);
   check(
     "tiến trình CON của suite quá hạn đã bị giết (không mồ côi)",
     alive === false,
