@@ -8,7 +8,7 @@
  */
 const { normalizeBackupFile } = require("./backupNormalize");
 const { restoreCore } = require("./backupRestore");
-const { computeChecksum } = require("./backupUtils");
+const { packBackupJson } = require("./backupUtils");
 
 /**
  * Làm gọn bản backup lưu lại trong guildBackups: bỏ blob base64 nặng (media
@@ -18,25 +18,31 @@ const { computeChecksum } = require("./backupUtils");
  * tới 8 MB có thể nhét nhiều base64).
  */
 function slimBackupForStore(backup) {
-  const clone = JSON.parse(JSON.stringify(backup));
-  const slimMessages = (list) => {
-    for (const m of list || []) {
-      if (Array.isArray(m.attachments)) {
-        m.attachments = m.attachments
-          .map((a) => (typeof a === "string" && a.startsWith("data:") ? null : a))
-          .filter(Boolean);
-      }
-    }
+  const slimMessages = (messages) =>
+    messages?.map((m) =>
+      Array.isArray(m.attachments)
+        ? {
+            ...m,
+            attachments: m.attachments.filter(
+              (a) => a && !(typeof a === "string" && a.startsWith("data:")),
+            ),
+          }
+        : m,
+    );
+  const withoutRaw = ({ raw: _raw, ...media }) => media;
+  return {
+    ...backup,
+    channels: backup.channels?.map((ch) => ({
+      ...ch,
+      messages: slimMessages(ch.messages),
+      threads: ch.threads?.map((thread) => ({
+        ...thread,
+        messages: slimMessages(thread.messages),
+      })),
+    })),
+    emojis: backup.emojis?.map(withoutRaw),
+    stickers: backup.stickers?.map(withoutRaw),
   };
-  for (const ch of clone.channels || []) {
-    slimMessages(ch.messages);
-    // Thread mang theo tin nhắn riêng — sót chỗ này là media base64 nằm lọt
-    // vào bản lưu trên cloud (và phình JSON vượt trần 1 MB của Convex).
-    for (const t of ch.threads || []) slimMessages(t.messages);
-  }
-  for (const e of clone.emojis || []) delete e.raw;
-  for (const s of clone.stickers || []) delete s.raw;
-  return clone;
 }
 
 /** Khôi phục từ file backup .msc/.json tải lên (bot nuke khác). */
@@ -51,14 +57,16 @@ async function runImportRestore(client, store, guildId, fileContent, fileName, {
   // Lưu bản đã chuẩn hóa (đã làm gọn blob base64) vào guildBackups để xem lại /
   // không mất dữ liệu — không nhét media nặng vào document (giới hạn 1 MB).
   try {
-    // Lưu kèm checksum của bản đã gọn: lần khôi phục sau (từ cloud) sẽ xác minh
-    // được toàn vẹn — file import gốc không có checksum để so.
-    const storedJson = JSON.stringify(slimBackupForStore(backup));
+    const { backupJson, checksum, compressed, encrypted } = packBackupJson(
+      JSON.stringify(slimBackupForStore(backup)),
+    );
     const stored = await store.client.mutation("bot_writes:botStoreBackup", {
       guildId,
       guildName: backup.guildName,
-      backupJson: storedJson,
-      backupChecksum: computeChecksum(storedJson),
+      backupJson,
+      backupChecksum: checksum,
+      backupCompressed: compressed || undefined,
+      backupEncrypted: encrypted || undefined,
       roleCount: backup.roles.length,
       channelCount: backup.channels.length,
       emojiCount: backup.emojis?.length ?? 0,

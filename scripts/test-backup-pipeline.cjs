@@ -1667,21 +1667,48 @@ const check = (label, ok) => {
           return { ok: true };
         },
       },
-      getConfig: async () => null,
+      getConfig: async () => ({ restoreChannelsEnabled: false }),
     };
+    const messages = Array.from({ length: 460 }, (_, i) => ({
+      id: String(i),
+      content: "Tiếng Việt 🌸 ".repeat(125),
+    }));
+    const threadMessage = {
+      authorId: "123456789012345678",
+      authorName: "Linh",
+      content: "Tin nhắn trong thread",
+    };
+    const channels = [
+      { name: "chat", messages, threads: [{ name: "thảo luận", messages: [threadMessage] }] },
+    ];
+    const file = JSON.stringify({ roles: [{ name: "A" }], channels });
     await backup.runImportRestore(
       { guilds: { cache: new Map([[TGT, tg]]) } },
       st,
       TGT,
-      JSON.stringify({ roles: [{ name: "A" }], channels: [] }),
+      file,
       "Server Của Tôi.msc",
     );
+    const saved = muts.find((m) => m.name === "bot_writes:botStoreBackup")?.args;
     check(
       "import: lấy tên server từ tên file (bỏ đuôi .msc)",
-      muts.some(
-        (m) => m.name === "bot_writes:botStoreBackup" && m.args?.guildName === "Server Của Tôi",
-      ),
-      JSON.stringify(muts[0]?.args?.guildName),
+      saved?.guildName === "Server Của Tôi",
+    );
+    const savedJson = utils.decompressAndDecryptBackup(saved.backupJson);
+    check(
+      "import: nén JSON Unicode vượt 1 MB trước khi lưu, checksum vẫn khớp",
+      Buffer.byteLength(file) > 1_000_000 &&
+        saved.backupJson.length < 700_000 &&
+        saved.backupCompressed === true &&
+        saved.backupChecksum === utils.computeChecksum(savedJson),
+    );
+    const archivedThread = JSON.parse(savedJson).channels[0].threads?.[0];
+    check(
+      "import: giữ thread và tên tác giả của tin nhắn trong thread",
+      archivedThread?.name === "thảo luận" &&
+        archivedThread.messages[0]?.authorId === threadMessage.authorId &&
+        archivedThread.messages[0]?.authorName === threadMessage.authorName &&
+        saved.messageCount === messages.length + 1,
     );
   }
   // ══════════ 15. DRY-RUN: kế hoạch khôi phục KHÔNG đụng server ══════════
