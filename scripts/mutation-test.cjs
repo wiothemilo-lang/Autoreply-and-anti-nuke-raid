@@ -306,23 +306,23 @@ function assertManageWithConfig(mod) {
 
 /** Danh sách mutant: [file, from, to, assertFn, mô tả]. */
 const MUTANTS = [
-  // usernameSimilarity (altDetection.js)
+  // usernameSimilarity (altScan.js)
   [
-    "bot/src/altDetection.js",
-    "if (a.length < 5 || b.length < 5) return 0;",
-    "if (a.length < 5 || b.length < 5) return 0;\n  return 100;",
+    "bot/src/altScan.js",
+    "if (minLen < 5) return 0;",
+    "// mutant: bỏ guard tên ngắn",
     "sim-guard-vô-hiệu",
     assertSimilarity,
   ],
   [
-    "bot/src/altDetection.js",
+    "bot/src/altScan.js",
     "if (a === b) return 100;",
     "if (a === b) return 50;",
     "sim-trùng-hoàn-toàn=50",
     assertSimilarity,
   ],
   [
-    "bot/src/altDetection.js",
+    "bot/src/altScan.js",
     "if (a === b) return 100;",
     "if (a === b) return 100; return 99;",
     "sim-mọi-cặp=99",
