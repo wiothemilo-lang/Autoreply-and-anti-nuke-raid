@@ -174,6 +174,23 @@ const vpn = { isVpn: true };
   const r = run({ intel: vpn, vpnMode: "ban", links: [bannedLink] });
   check("ưu tiên ban evasion hơn VPN", r.reasons.includes("linked_banned_account"));
 }
+{
+  const rWl = run({ intel: vpn, vpnMode: "ban", userWhitelisted: true });
+  check(
+    "VPN mode ban + whitelist → allow, không phạt",
+    rWl.decision === "allow" && rWl.punish === null && rWl.reasons.includes("whitelist_exempt"),
+    rWl,
+  );
+  const rPriv = run({ intel: vpn, vpnMode: "kick", privileged: true });
+  check(
+    "VPN mode kick + privileged (owner/admin) → allow + flag, không phạt",
+    rPriv.decision === "allow" &&
+      rPriv.punish === null &&
+      rPriv.flagged &&
+      rPriv.reasons.includes("privileged_exempt"),
+    rPriv,
+  );
+}
 
 // ── Nhãn audit ───────────────────────────────────────────────────────────────
 check(

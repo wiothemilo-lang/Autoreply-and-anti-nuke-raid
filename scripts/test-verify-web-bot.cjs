@@ -728,18 +728,26 @@ function makeStore(config = {}, handlers = {}) {
   }
   {
     const store = makeStore();
+    const fetchOpts = [];
     const guild = {
       id: "g1",
       bans: {
-        fetch: async () =>
-          new Map([
+        fetch: async (opts) => {
+          fetchOpts.push(opts);
+          return new Map([
             ["800000000000000001", {}],
             ["800000000000000002", {}],
-          ]),
+          ]);
+        },
       },
     };
     const count = await vw.resyncGuildBans(store, guild);
     check("trả số ban đã đồng bộ", count === 2, count);
+    check(
+      "resyncGuildBans không bao giờ truyền limit > 1000 (trần Discord API)",
+      fetchOpts.length === 1 && fetchOpts[0].limit <= 1000,
+      fetchOpts,
+    );
     check(
       "gọi verifyBans:botReplaceGuildBans với đủ userIds",
       store.calls[0]?.[0] === "verifyBans:botReplaceGuildBans" &&

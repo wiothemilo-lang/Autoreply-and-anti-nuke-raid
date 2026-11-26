@@ -23,7 +23,13 @@ import {
 import { complete as completeAction } from "../convex/verifyActions";
 import { authorize as preflightAuthorize } from "../convex/verifyPreflightData";
 import { ipapiLooksValid } from "../convex/verifyPreflight";
-import { createIpBan, ipBanSummary, listIpBans } from "../convex/verifyBans";
+import {
+  botReplaceGuildBans,
+  botSyncGuildBan,
+  createIpBan,
+  ipBanSummary,
+  listIpBans,
+} from "../convex/verifyBans";
 import { effectiveVerifyMethod, effectiveVerifyWebEnabled } from "../convex/ipCollectionLock";
 import { computeBotKey } from "../convex/botAuth";
 import {
@@ -124,15 +130,15 @@ function makeCtx(guildOverrides: Row = {}) {
             (r) =>
               Object.entries(eqs).every(([f, v]) => r[f] === v) &&
               ranges.every(([op, f, v]) =>
-                // Convex KHÔNG đưa document thiếu field vào index, nên một
-                // range trên field optional không bao giờ khớp hàng undefined.
-                r[f] === undefined
-                  ? false
-                  : op === "lt"
-                    ? convexCmp(r[f], v) < 0
-                    : op === "lte"
-                      ? convexCmp(r[f], v) <= 0
-                      : convexCmp(r[f], v) > 0,
+                // Hành vi THẬT của index Convex: `undefined` vẫn nằm trong index và
+                // xếp TRƯỚC mọi số/chuỗi (`undefined < null < number < string`).
+                // Trước đây mock lọc bỏ `undefined` nên che khuất bug botRunRetention
+                // xoá nhầm các ticket đang mở (closedAt === undefined).
+                op === "lt"
+                  ? convexCmp(r[f], v) < 0
+                  : op === "lte"
+                    ? convexCmp(r[f], v) <= 0
+                    : convexCmp(r[f], v) > 0,
               ) &&
               filters.every(([f, v]) => r[f] === v),
           );
@@ -1134,6 +1140,122 @@ async function runFinalize(ctx: any, token: string, signals: Row, extra: Row = {
     (globalThis as { __PROTOGON_IP_COLLECTION_TEST__?: boolean }).__PROTOGON_IP_COLLECTION_TEST__ =
       true;
     check("khoá → botCreateSession ném lỗi có lý do", locked);
+  }
+
+  // ═══ 17. Chặn tái diễn: retention giữ ticket mở, IPv6 single-IP không ban /64,
+  //         verifySignals tách theo guild, botReplaceGuildBans không nhân đôi dòng ═══
+  console.log("\n── chặn tái diễn: retention / IPv6 scope / cross-guild / reban ──");
+  {
+    const { ctx, tables } = makeCtx();
+    const DAY = 24 * 3600_000;
+    const now = Date.now();
+    tables.tickets = [
+      { _id: "t-open", guildId: GUILD, status: "open", createdAt: now - 1000 },
+      {
+        _id: "t-old-closed",
+        guildId: GUILD,
+        status: "closed",
+        createdAt: now - 200 * DAY,
+        closedAt: now - 190 * DAY,
+      },
+    ];
+    await retentionH(ctx, { botKey: BOT_KEY });
+    check(
+      "botRunRetention: KHÔNG xoá ticket đang mở (closedAt === undefined)",
+      tables.tickets.some((t: Row) => t._id === "t-open"),
+      tables.tickets,
+    );
+    check(
+      "botRunRetention: vẫn xoá ticket đã đóng > 180 ngày",
+      !tables.tickets.some((t: Row) => t._id === "t-old-closed"),
+      tables.tickets,
+    );
+  }
+  {
+    // IPv6 single-IP ban (scope: "ip") KHÔNG được ban người khác cùng dải /64.
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    login(tables);
+    const s1 = await newSession(ctx, USER_A);
+    const ip1 = hashVerifyToken("ipv6-a");
+    const ip2 = hashVerifyToken("ipv6-b");
+    const prefix = hashVerifyToken("ipv6-prefix-64");
+    await runFinalize(ctx, s1.token, { ipHash: ip1, ipPrefixHash: prefix });
+    const sessionRow = tables.verifySessions[0];
+    await createBanH(ctx, {
+      token: DASH_TOKEN,
+      guildId: GUILD,
+      sessionId: sessionRow._id,
+      scope: "ip",
+      days: 7,
+    });
+    const s2 = await newSession(ctx, USER_B);
+    const res2 = await runFinalize(ctx, s2.token, { ipHash: ip2, ipPrefixHash: prefix });
+    check(
+      "IPv6 ban 1 IP (scope='ip') KHÔNG ban người khác cùng /64",
+      res2.decision === "allow",
+      res2,
+    );
+  }
+  {
+    // Cross-guild verifySignals: User A verify ở Guild 1 rồi Guild 2, bị ban ở Guild 2;
+    // User B (cùng fingerprint/cookie, khác IP) verify ở Guild 2 vẫn phải bắt được ban evasion.
+    const syncBanH = (botSyncGuildBan as any)._handler;
+    const { ctx, tables } = makeCtx({ verifyWebEnabled: true });
+    const G2 = "999999999999999992";
+    tables.guilds.push({
+      _id: "g2",
+      discordId: G2,
+      name: "Guild 2",
+      verifyEnabled: true,
+      verifyMethod: "web",
+      verifyWebEnabled: true,
+      altPunish: "kick",
+    });
+    const fp = hashVerifyToken("shared-device-fp");
+    const ck = hashVerifyToken("shared-device-ck");
+    const sG1 = await newSession(ctx, USER_A);
+    await runFinalize(ctx, sG1.token, {
+      ipHash: hashVerifyToken("ip-g1"),
+      fingerprintHash: fp,
+      cookieHash: ck,
+    });
+    const sG2A = await createH(ctx, { guildId: G2, userId: USER_A, botKey: BOT_KEY });
+    await runFinalize(ctx, sG2A.token, {
+      ipHash: hashVerifyToken("ip-g2-a"),
+      fingerprintHash: fp,
+      cookieHash: ck,
+    });
+    await syncBanH(ctx, { guildId: G2, userId: USER_A, active: true, botKey: BOT_KEY });
+
+    const sG2B = await createH(ctx, { guildId: G2, userId: USER_B, botKey: BOT_KEY });
+    const resB = await runFinalize(ctx, sG2B.token, {
+      ipHash: hashVerifyToken("ip-g2-b-different"),
+      fingerprintHash: fp,
+      cookieHash: ck,
+    });
+    check(
+      "verifySignals tách theo guild → bắt được ban evasion ở Guild 2 sau khi đã verify ở Guild 1",
+      resB.decision === "deny" && resB.reason === "linked_banned_account",
+      resB,
+    );
+  }
+  {
+    // botReplaceGuildBans: user từng unban (active=false) rồi ban lại → patch dòng cũ,
+    // không chèn dòng trùng làm `.first()` đọc nhầm active=false.
+    const syncBanH = (botSyncGuildBan as any)._handler;
+    const replaceBansH = (botReplaceGuildBans as any)._handler;
+    const { ctx, tables } = makeCtx();
+    await syncBanH(ctx, { guildId: GUILD, userId: USER_A, active: true, botKey: BOT_KEY });
+    await syncBanH(ctx, { guildId: GUILD, userId: USER_A, active: false, botKey: BOT_KEY });
+    await replaceBansH(ctx, { guildId: GUILD, userIds: [USER_A], botKey: BOT_KEY });
+    const matching = tables.guildBans.filter(
+      (r: Row) => r.guildId === GUILD && r.userId === USER_A,
+    );
+    check(
+      "botReplaceGuildBans tái kích hoạt dòng cũ thay vì nhân đôi dòng",
+      matching.length === 1 && matching[0].active === true,
+      matching,
+    );
   }
 
   console.log(`\n${pass}/${pass + fail} assertion xanh`);

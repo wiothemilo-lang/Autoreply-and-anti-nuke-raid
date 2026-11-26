@@ -23,6 +23,19 @@ const {
 /** Chờ giữa 2 tin phục hồi (ms) — dưới giới hạn rate limit webhook (~30/phút). */
 const REPLAY_DELAY_MS = 1_100;
 
+/**
+ * Tải ảnh icon/banner/splash an toàn về Buffer trước khi truyền cho discord.js.
+ *
+ * Vì sao KHÔNG truyền thẳng chuỗi cho `setIcon/setBanner/setSplash`: DataResolver
+ * của discord.js tự fetch URL không qua chống SSRF và đọc file cục bộ trên VPS
+ * nếu chuỗi không phải http(s) (vd `/etc/passwd`, `.env`, `http://169.254.169.254`).
+ */
+async function resolveSafeImageBuffer(raw) {
+  if (!raw) return null;
+  const resolved = await resolveAttachment(String(raw), 0);
+  return resolved?.attachment ?? null;
+}
+
 /** Role theo đúng thứ tự vị trí trong backup (ổn định với role thiếu position). */
 function sortedRoles(backup) {
   return (backup.roles || [])
@@ -55,10 +68,11 @@ async function createRoles(guild, backup, onProgress) {
       };
       if (r.unicodeEmoji) opts.unicodeEmoji = String(r.unicodeEmoji).slice(0, 2);
       const created = await guild.roles.create(opts);
-      // Icon là URL CDN — set SAU khi tạo role để lỗi icon không làm mất cả role.
+      // Icon phải đi qua resolveAttachment (chặn SSRF + chặn đọc file cục bộ).
       if (r.icon) {
         try {
-          await created.setIcon(String(r.icon));
+          const iconBuf = await resolveSafeImageBuffer(r.icon);
+          if (iconBuf) await created.setIcon(iconBuf);
         } catch (e) {
           console.error(`[backup:role:icon] ${r.name}:`, e.message);
         }
@@ -177,10 +191,8 @@ async function createChannels(guild, backup, roleMap, onProgress) {
         opts.defaultAutoArchiveDuration = ch.defaultAutoArchiveDuration;
       }
     }
-    if (ch.type === ChannelType.GuildCategory && Number.isFinite(ch.defaultSortOrder)) {
-      opts.defaultSortOrder = ch.defaultSortOrder;
-    }
     if (ch.type === ChannelType.GuildForum) {
+      if (Number.isFinite(ch.defaultSortOrder)) opts.defaultSortOrder = ch.defaultSortOrder;
       if (Number.isFinite(ch.defaultForumLayout)) opts.defaultForumLayout = ch.defaultForumLayout;
       if (Array.isArray(ch.availableTags) && ch.availableTags.length > 0) {
         opts.availableTags = ch.availableTags
@@ -511,9 +523,12 @@ async function applyGuildMeta(guild, meta, channelMap) {
   }
   if (await apply("description", "setDescription", meta.description ?? null))
     done.description = true;
-  if (await apply("icon", "setIcon", meta.iconUrl ?? null)) done.icon = true;
-  if (await apply("banner", "setBanner", meta.bannerUrl ?? null)) done.banner = true;
-  if (await apply("splash", "setSplash", meta.splashUrl ?? null)) done.splash = true;
+  const iconBuf = await resolveSafeImageBuffer(meta.iconUrl);
+  if (iconBuf && (await apply("icon", "setIcon", iconBuf))) done.icon = true;
+  const bannerBuf = await resolveSafeImageBuffer(meta.bannerUrl);
+  if (bannerBuf && (await apply("banner", "setBanner", bannerBuf))) done.banner = true;
+  const splashBuf = await resolveSafeImageBuffer(meta.splashUrl);
+  if (splashBuf && (await apply("splash", "setSplash", splashBuf))) done.splash = true;
 
   // Thiết lập an toàn/thông báo của server. Kênh hệ thống/AFK lưu bằng id CŨ →
   // phải tra qua channelMap (id đã tạo lại) trước khi gán.

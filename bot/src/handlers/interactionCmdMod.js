@@ -87,8 +87,17 @@ async function lock(client, store, interaction) {
     minutes = parsed.minutes;
   }
 
+  // /lock all & /lock unlock-all lặp qua toàn bộ kênh (Discord + Convex) nên
+  // dễ vượt trần 3 giây của Discord → deferReply trước khi chạy vòng lặp.
+  const isBulk = sub === "all" || sub === "unlock-all";
+  const reply = (payload) =>
+    interaction.deferred ? interaction.editReply(payload) : interaction.reply(payload);
+
   // ── Mở khoá ──
   if (sub === "remove" || sub === "unlock-all") {
+    if (isBulk && typeof interaction.deferReply === "function") {
+      await interaction.deferReply({ ephemeral: true });
+    }
     const existing =
       (await store.client
         .query("channelLocks:botChannelLocks", { guildId: guild.id, botKey })
@@ -107,7 +116,7 @@ async function lock(client, store, interaction) {
       }
     }
     if (wanted.size === 0) {
-      return interaction.reply({
+      return reply({
         content: `Kênh này không do Protogon khoá — mình KHÔNG tự mở quyền để tránh xoá nhầm cấu hình của bạn. Hãy mở trực tiếp trong Discord.`,
         ephemeral: true,
       });
@@ -121,7 +130,7 @@ async function lock(client, store, interaction) {
       botKey,
     });
     if (out.failed.length) {
-      return interaction.reply({
+      return reply({
         content: `⚠️ Mở được ${out.restored.length} kênh nhưng có lỗi: ${out.failed.join(" | ").slice(0, 800)}`,
         ephemeral: true,
       });
@@ -137,7 +146,7 @@ async function lock(client, store, interaction) {
         actor: who,
       }),
     );
-    return interaction.reply({
+    return reply({
       content:
         `🔓 Đã mở khoá ${out.restored.length} kênh.` +
         (out.missing.length ? ` ${out.missing.length} kênh không còn tồn tại (đã dọn).` : ""),
@@ -146,6 +155,9 @@ async function lock(client, store, interaction) {
   }
 
   // ── Khoá ──
+  if (isBulk && typeof interaction.deferReply === "function") {
+    await interaction.deferReply({ ephemeral: true });
+  }
   const existing =
     (await store.client
       .query("channelLocks:botChannelLocks", { guildId: guild.id, botKey })
@@ -166,7 +178,7 @@ async function lock(client, store, interaction) {
       : channelLock.collectChatChannels(guild);
 
   if (targets.length === 0) {
-    return interaction.reply({
+    return reply({
       content:
         sub === "add"
           ? "❌ Không khoá được kênh này (danh mục, thread, hoặc kênh bot không có quyền sửa)."
@@ -219,7 +231,7 @@ async function lock(client, store, interaction) {
   }
 
   if (done.length === 0) {
-    return interaction.reply({
+    return reply({
       content:
         (skipped.length ? `Các kênh này đã bị khoá rồi: ${skipped.join(", ")}. ` : "") +
         (failed.length ? `Lỗi: ${failed.join(" | ").slice(0, 800)}` : ""),
@@ -243,7 +255,7 @@ async function lock(client, store, interaction) {
   const notes = [];
   if (skipped.length) notes.push(`${skipped.length} kênh đã khoá sẵn (bỏ qua).`);
   if (failed.length) notes.push(`${failed.length} kênh lỗi: ${failed.join(" | ").slice(0, 600)}`);
-  return interaction.reply({
+  return reply({
     content:
       `🔒 Đã khoá ${done.length} kênh` +
       ` (${channelLock.formatLockDuration(minutes)}, ${target.everyone ? "@everyone" : channelLock.roleLabel(guild, target.roleId)}).` +

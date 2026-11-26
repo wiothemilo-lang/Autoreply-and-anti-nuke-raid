@@ -62,7 +62,7 @@ const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
   },
   {
     label: "Màu sắc",
-    emojis: ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "⚫", "⚪", "🟤", "🔺", "🔻", "🔵"],
+    emojis: ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "⚫", "⚪", "🟤", "🔺", "🔻", "🔶"],
   },
   {
     label: "Động vật",
@@ -499,7 +499,7 @@ export default function ReactionRolesPanel({ data }: { data: GuildData }) {
               </div>
               <div className="grid gap-1.5">
                 <Label>{translate("Kênh gửi tin nhắn")}</Label>
-                <Select value={channelId} onValueChange={setChannelId}>
+                <Select value={channelId} onValueChange={setChannelId} disabled={!!editingPanel}>
                   <SelectTrigger>
                     <SelectValue placeholder={translate("Chọn kênh…")} />
                   </SelectTrigger>

@@ -192,13 +192,13 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   // Welcome/Goodbye: message cắt 1000 ký tự + nullable cho phép xoá nội dung.
   if (args.welcomeEnabled !== undefined) patch.welcomeEnabled = args.welcomeEnabled;
   if (args.welcomeChannelId !== undefined)
-    patch.welcomeChannelId = args.welcomeChannelId ?? undefined;
+    patch.welcomeChannelId = args.welcomeChannelId?.trim() || undefined;
   if (args.welcomeMessage !== undefined)
     patch.welcomeMessage = args.welcomeMessage ? args.welcomeMessage.slice(0, 1000) : undefined;
   if (args.welcomeUseEmbed !== undefined) patch.welcomeUseEmbed = args.welcomeUseEmbed;
   if (args.goodbyeEnabled !== undefined) patch.goodbyeEnabled = args.goodbyeEnabled;
   if (args.goodbyeChannelId !== undefined)
-    patch.goodbyeChannelId = args.goodbyeChannelId ?? undefined;
+    patch.goodbyeChannelId = args.goodbyeChannelId?.trim() || undefined;
   if (args.goodbyeMessage !== undefined)
     patch.goodbyeMessage = args.goodbyeMessage ? args.goodbyeMessage.slice(0, 1000) : undefined;
   if (args.goodbyeUseEmbed !== undefined) patch.goodbyeUseEmbed = args.goodbyeUseEmbed;
@@ -476,34 +476,50 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
   }
   if (args.heatEnabled !== undefined) patch.heatEnabled = args.heatEnabled;
   if (args.heatDecayPerMin !== undefined) {
+    if (!Number.isFinite(args.heatDecayPerMin)) throw new Error("Giá trị giảm nhiệt không hợp lệ");
     patch.heatDecayPerMin = Math.max(0, Math.min(60, Math.floor(args.heatDecayPerMin)));
   }
-  if (args.heatWarnAt !== undefined) {
-    const w = Math.max(1, Math.min(99, Math.floor(args.heatWarnAt)));
-    const t = args.heatTimeoutAt ?? guild.heatTimeoutAt ?? HEAT_DEFAULTS.timeoutAt;
-    if (w >= t) throw new Error("Ngưỡng cảnh báo phải nhỏ hơn ngưỡng tạm khóa");
-    patch.heatWarnAt = w;
-  }
-  if (
+  const heatThresholdsTouched =
+    args.heatWarnAt !== undefined ||
     args.heatTimeoutAt !== undefined ||
     args.heatKickAt !== undefined ||
-    args.heatBanAt !== undefined
-  ) {
-    const t = args.heatTimeoutAt ?? guild.heatTimeoutAt ?? HEAT_DEFAULTS.timeoutAt;
-    const k = args.heatKickAt ?? guild.heatKickAt ?? HEAT_DEFAULTS.kickAt;
-    const b = args.heatBanAt ?? guild.heatBanAt ?? HEAT_DEFAULTS.banAt;
-    const tC = Math.max(1, Math.min(100, t));
-    const kC = Math.max(1, Math.min(100, k));
-    const bC = Math.max(1, Math.min(100, b));
+    args.heatBanAt !== undefined;
+  if (heatThresholdsTouched) {
+    const rawW = args.heatWarnAt ?? guild.heatWarnAt ?? HEAT_DEFAULTS.warnAt;
+    const rawT = args.heatTimeoutAt ?? guild.heatTimeoutAt ?? HEAT_DEFAULTS.timeoutAt;
+    const rawK = args.heatKickAt ?? guild.heatKickAt ?? HEAT_DEFAULTS.kickAt;
+    const rawB = args.heatBanAt ?? guild.heatBanAt ?? HEAT_DEFAULTS.banAt;
+    if (
+      !Number.isFinite(rawW) ||
+      !Number.isFinite(rawT) ||
+      !Number.isFinite(rawK) ||
+      !Number.isFinite(rawB)
+    ) {
+      throw new Error("Ngưỡng nhiệt không hợp lệ");
+    }
+    const wC = Math.max(1, Math.min(99, Math.floor(rawW)));
+    const tC = Math.max(1, Math.min(100, Math.floor(rawT)));
+    const kC = Math.max(1, Math.min(100, Math.floor(rawK)));
+    const bC = Math.max(1, Math.min(100, Math.floor(rawB)));
+    if (wC >= tC) throw new Error("Ngưỡng cảnh báo phải nhỏ hơn ngưỡng tạm khóa");
     if (!(tC < kC && kC < bC)) {
       throw new Error("Ngưỡng nhiệt phải tăng dần: tạm khóa < kick < ban");
     }
-    patch.heatTimeoutAt = tC;
-    patch.heatKickAt = kC;
-    patch.heatBanAt = bC;
+    if (args.heatWarnAt !== undefined) patch.heatWarnAt = wC;
+    if (
+      args.heatTimeoutAt !== undefined ||
+      args.heatKickAt !== undefined ||
+      args.heatBanAt !== undefined
+    ) {
+      patch.heatTimeoutAt = tC;
+      patch.heatKickAt = kC;
+      patch.heatBanAt = bC;
+    }
   }
   if (args.joinGateEnabled !== undefined) patch.joinGateEnabled = args.joinGateEnabled;
   if (args.joinGateMinAgeDays !== undefined) {
+    if (!Number.isFinite(args.joinGateMinAgeDays))
+      throw new Error("Tuổi tài khoản tối thiểu không hợp lệ");
     patch.joinGateMinAgeDays = Math.max(0, Math.min(3650, Math.floor(args.joinGateMinAgeDays)));
   }
   if (args.joinGateRequireAvatar !== undefined)
@@ -519,15 +535,21 @@ export async function updateSettingsHandler(ctx: MutationCtx, args: UpdateSettin
     patch.joinGateWhitelist = [...new Set(ids)];
   }
   if (args.heatRepeatMultiplier !== undefined) {
+    if (!Number.isFinite(args.heatRepeatMultiplier))
+      throw new Error("Hệ số nhân tái phạm không hợp lệ");
     patch.heatRepeatMultiplier = Math.max(1, Math.min(10, Math.floor(args.heatRepeatMultiplier)));
   }
   if (args.heatRepeatWindowMin !== undefined) {
+    if (!Number.isFinite(args.heatRepeatWindowMin)) throw new Error("Cửa sổ tái phạm không hợp lệ");
     patch.heatRepeatWindowMin = Math.max(1, Math.min(1440, Math.floor(args.heatRepeatWindowMin)));
   }
   if (args.warnStrikeLimit !== undefined) {
+    if (!Number.isFinite(args.warnStrikeLimit)) throw new Error("Số warn tăng cấp không hợp lệ");
     patch.warnStrikeLimit = Math.max(0, Math.min(20, Math.floor(args.warnStrikeLimit)));
   }
   if (args.warnStrikeWindowMin !== undefined) {
+    if (!Number.isFinite(args.warnStrikeWindowMin))
+      throw new Error("Cửa sổ warn tăng cấp không hợp lệ");
     patch.warnStrikeWindowMin = Math.max(1, Math.min(1440, Math.floor(args.warnStrikeWindowMin)));
   }
   if (args.warnStrikePunish !== undefined) patch.warnStrikePunish = args.warnStrikePunish;

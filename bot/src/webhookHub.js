@@ -89,7 +89,8 @@ function buildPayload(whInfo, embed, meta = {}) {
   // ({server} {time} {action} {reason} {user} {mod}) và không placeholder nào
   // cố tình ping. Chủ server muốn ping thì dùng webhook riêng, không dùng
   // khu vực log hình phạt.
-  payload.allowed_mentions = { parse: [] };
+  // discord.js WebhookClient.send đọc camelCase `allowedMentions` (bỏ qua snake_case).
+  payload.allowedMentions = { parse: [] };
   if (whInfo.color !== null && whInfo.color !== undefined) {
     payload.embeds = [new EmbedBuilder(embed.data).setColor(whInfo.color)];
   }

@@ -105,11 +105,35 @@ async function ticketOpenSubmitModal(client, store, interaction) {
 
 /**
  * Tra guild cho interaction đến từ DM (nút/modal khiếu nại sau khi bị ban).
- * DM không có `interaction.guild`, nên phải đi qua cache/fetch.
+ *
+ * DM KHÔNG có `interaction.guild`/`guildId`, nên id server được nhúng vào
+ * customId (`ticket_open_dm:<guildId>` / `ticket_appeal_dm:<guildId>`). Nút cũ
+ * không mang id (gửi trước bản vá) → không tra được, báo "không tìm thấy server".
  */
 async function resolveDmGuild(client, interaction) {
   if (interaction.guild) return interaction.guild;
-  return client.guilds.fetch(interaction.channel?.guildId || interaction.guildId).catch(() => null);
+  const fromId = String(interaction.customId ?? "").split(":")[1];
+  const gid = /^\d{15,21}$/.test(fromId ?? "") ? fromId : interaction.guildId;
+  if (!gid) return null;
+  return client.guilds.cache?.get?.(gid) ?? (await client.guilds.fetch(gid).catch(() => null));
+}
+
+/**
+ * Người bấm nút DM có còn đang bị ban ở server đó không?
+ *
+ * customId do client gửi lên nên không tin tuyệt đối: không kiểm thì ai cũng mở
+ * được ticket khiếu nại ở server bất kỳ có bot. Chỉ từ chối khi Discord báo RÕ
+ * "Unknown Ban" (10026); lỗi khác (thiếu quyền, mạng) thì cho qua để không chặn
+ * oan người đang thật sự bị ban.
+ */
+async function isStillBanned(guild, userId) {
+  if (typeof guild?.bans?.fetch !== "function") return true;
+  try {
+    await guild.bans.fetch({ user: userId, force: true });
+    return true;
+  } catch (e) {
+    return e?.code !== 10026;
+  }
 }
 
 /**
@@ -132,7 +156,10 @@ async function ticketOpenDmButton(client, store, interaction) {
   if (!config?.ticketEnabled) {
     return interaction.reply({ content: T.errDisabled, ephemeral: true });
   }
-  return interaction.showModal(tickets.appealModal(T));
+  if (!(await isStillBanned(guild, interaction.user.id))) {
+    return interaction.reply({ content: T.errNotBanned, ephemeral: true });
+  }
+  return interaction.showModal(tickets.appealModal(T, guild.id));
 }
 
 /** TICKET — modal khiếu nại: ghi bản ghi + mở kênh staff-only. */
@@ -146,6 +173,9 @@ async function ticketAppealModal(client, store, interaction) {
   const T = lang.ticketText(tickets.langFor(interaction, guild));
   if (!body || !body.trim()) {
     return interaction.reply({ content: T.aiEmpty, ephemeral: true });
+  }
+  if (!(await isStillBanned(guild, interaction.user.id))) {
+    return interaction.reply({ content: T.errNotBanned, ephemeral: true });
   }
   await interaction.deferReply({ ephemeral: true });
 
@@ -272,10 +302,9 @@ async function ticketActionButton(client, store, interaction) {
   ) {
     let row;
     try {
-      row = await client.query("tickets:botTicketById", {
+      row = await store.client.query("tickets:botTicketById", {
         guildId: guild.id,
         ticketId: parsed.ticketId,
-        botKey: process.env.PROTOGON_BOT_KEY || undefined,
       });
     } catch (e) {
       console.error(`[tickets] đọc bản ghi thất bại:`, e.message);
@@ -420,10 +449,9 @@ async function ticketCloseReasonModal(client, store, interaction) {
   }
   let row;
   try {
-    row = await client.query("tickets:botTicketById", {
+    row = await store.client.query("tickets:botTicketById", {
       guildId: guild.id,
       ticketId,
-      botKey: process.env.PROTOGON_BOT_KEY || undefined,
     });
   } catch (e) {
     console.error(`[tickets] đọc bản ghi thất bại:`, e.message);
@@ -441,6 +469,8 @@ async function ticketCloseReasonModal(client, store, interaction) {
     closedByName: interaction.user.username,
     reason,
     graceHours: config?.ticketCloseGraceHours,
+    // Thu quyền riêng của người mở — thiếu thì họ vẫn đọc/ghi kênh đã đóng.
+    openerId: row.openerId,
     T,
   });
   return interaction.editReply({

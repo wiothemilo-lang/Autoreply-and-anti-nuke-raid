@@ -114,13 +114,9 @@ async function computeLinks(
   for (const signal of signals) {
     const rows = await ctx.db
       .query("verifySignals")
-      .withIndex("by_kind_valueHash", (q) =>
-        q.eq("kind", signal.kind).eq("valueHash", signal.valueHash),
+      .withIndex("by_guildId_kind_valueHash", (q) =>
+        q.eq("guildId", guildId).eq("kind", signal.kind).eq("valueHash", signal.valueHash),
       )
-      // Chỉ so trong CÙNG guild: fingerprint/cookie/UA hash là global, nếu
-      // không lọc thì admin guild A thấy linkedUserId của người chỉ từng ở
-      // guild B — rò rỉ danh tính xuyên server ngoài phạm vi quản lý.
-      .filter((q) => q.eq(q.field("guildId"), guildId))
       .take(40);
     for (const row of rows) {
       if (row.userId === userId) continue;
@@ -163,8 +159,12 @@ async function recordSignals(
   for (const signal of signals) {
     const existing = await ctx.db
       .query("verifySignals")
-      .withIndex("by_kind_valueHash_userId", (q) =>
-        q.eq("kind", signal.kind).eq("valueHash", signal.valueHash).eq("userId", userId),
+      .withIndex("by_guildId_kind_valueHash_userId", (q) =>
+        q
+          .eq("guildId", guildId)
+          .eq("kind", signal.kind)
+          .eq("valueHash", signal.valueHash)
+          .eq("userId", userId),
       )
       .first();
     if (existing) {
@@ -497,24 +497,27 @@ export const finalize = internalMutation({
     const links = await computeLinks(ctx, session.guildId, session.userId, signals);
 
     // IP ban: khớp chính xác, hoặc khớp prefix /64 (chỉ khi admin bật scope prefix).
+    const now = Date.now();
     let ipBanned = false;
     if (isHex64(args.ipHash)) {
-      const exact = await ctx.db
+      const exactRows = await ctx.db
         .query("ipBans")
         .withIndex("by_guildId_ipHash", (q) =>
           q.eq("guildId", session.guildId).eq("ipHash", args.ipHash),
         )
-        .first();
-      ipBanned = Boolean(exact && exact.active && exact.expiresAt > Date.now());
+        .take(20);
+      ipBanned = exactRows.some((exact) => exact.active && exact.expiresAt > now);
     }
     if (!ipBanned && args.ipPrefixHash) {
-      const prefix = await ctx.db
+      const prefixRows = await ctx.db
         .query("ipBans")
         .withIndex("by_guildId_ipPrefixHash", (q) =>
           q.eq("guildId", session.guildId).eq("ipPrefixHash", args.ipPrefixHash),
         )
-        .first();
-      ipBanned = Boolean(prefix && prefix.active && prefix.expiresAt > Date.now());
+        .take(50);
+      ipBanned = prefixRows.some(
+        (prefix) => prefix.scope === "prefix" && prefix.active && prefix.expiresAt > now,
+      );
     }
 
     const userWhitelisted =
@@ -1101,11 +1104,14 @@ export const botRunRetention = mutation({
     // cảm nhất trong hệ thống. Xoá file trong storage TRƯỚC, chỉ xoá hàng DB
     // khi file đã xoá xong — lỗi storage thì giữ hàng lại để lượt sau thử lại,
     // tránh để lại blob mồ côi không còn đường dọn.
+    // Chặn dưới gt("closedAt", 0): trong index Convex, undefined < mọi số —
+    // thiếu chặn dưới sẽ kéo các ticket ĐANG MỞ (closedAt === undefined) và xoá nhầm.
     const oldTickets = await ctx.db
       .query("tickets")
-      .withIndex("by_closedAt", (q) => q.lt("closedAt", now - 180 * DAY))
+      .withIndex("by_closedAt", (q) => q.gt("closedAt", 0).lt("closedAt", now - 180 * DAY))
       .take(50);
     for (const row of oldTickets) {
+      if (typeof row.closedAt !== "number") continue;
       if (row.transcriptStorageId) {
         try {
           await ctx.storage.delete(row.transcriptStorageId);

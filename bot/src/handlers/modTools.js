@@ -169,7 +169,7 @@ async function sendBanNoticeDm(guild, user, reason, guildConfig) {
     const T = lang.ticketText(L);
     await user.send({
       embeds: [tickets.banNoticeEmbed({ guild, reason, T })],
-      components: [tickets.dmButtonRow(T)],
+      components: [tickets.dmButtonRow(T, guild.id)],
     });
     return true;
   } catch {

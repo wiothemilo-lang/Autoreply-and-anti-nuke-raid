@@ -98,6 +98,37 @@ function hostOf(url) {
  * Tải + parse feed URLhaus "recent" (CSV: firstseen,url,id + header #).
  * Giữ tối đa URLHAUS_MAX_DOMAINS domain độc → filters.js so khớp link.
  */
+/**
+ * Hợp nhất URLhaus + OpenPhish vào Set dùng chung và đẩy sang filters.js ngay.
+ * Giữ 2 nguồn tách riêng để lượt refresh URLhaus không xoá mất domain OpenPhish
+ * và ngược lại, OpenPhish nạp xong là filters.js nhận được ngay.
+ */
+let urlhausFeedDomains = new Set();
+let openphishFeedDomains = new Set();
+
+function syncThreatDomainsToFilters() {
+  const merged = new Set([...urlhausFeedDomains, ...openphishFeedDomains]);
+  urlhausDomains = merged;
+  try {
+    const filters = require("./handlers/filters");
+    if (typeof filters._setUrlhausDomainsForTest === "function") {
+      filters._setUrlhausDomainsForTest([...merged]);
+    }
+  } catch {
+    // filters chưa load — refreshThreatIntel tiếp theo sẽ nhận qua botGetIntel
+  }
+}
+
+/** Tách URL từ một dòng CSV URLhaus (cột thật ở vị trí [2] và có dấu ngoặc kép). */
+function extractUrlFromCsvLine(line) {
+  const cols = line.split(",");
+  for (const raw of cols) {
+    const cell = raw.trim().replace(/^"|"$/g, "");
+    if (/^https?:\/\//i.test(cell)) return cell;
+  }
+  return null;
+}
+
 async function refreshUrlhaus(store) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 15_000);
@@ -111,23 +142,15 @@ async function refreshUrlhaus(store) {
     const lines = text.split("\n").filter((l) => l && !l.startsWith("#"));
     const domains = new Set();
     for (const line of lines.slice(-URLHAUS_LINES)) {
-      const url = line.split(",")[1];
-      const host = hostOf(url?.trim());
+      const url = extractUrlFromCsvLine(line);
+      const host = hostOf(url);
       if (host) domains.add(host);
       if (domains.size >= URLHAUS_MAX_DOMAINS) break;
     }
     if (domains.size === 0) return false;
-    urlhausDomains = domains;
+    urlhausFeedDomains = domains;
     engineStats.urlhausDomains = domains.size;
-    // Đẩy sang filters (nạp ngay, không đợi refresh 10 phút).
-    try {
-      const filters = require("./handlers/filters");
-      if (typeof filters._setUrlhausDomainsForTest === "function") {
-        filters._setUrlhausDomainsForTest([...domains]);
-      }
-    } catch {
-      // filters chưa load — refreshThreatIntel tiếp theo sẽ nhận qua botGetIntel
-    }
+    syncThreatDomainsToFilters();
     // Ghi meta lên Convex (1 mutation/giờ — rẻ).
     await store?.client
       ?.mutation("threatIntel:botSetResearchMeta", { urlhausDomains: domains.size })
@@ -165,9 +188,9 @@ async function refreshOpenPhish(_store) {
     const text = (await res.text()).slice(0, 600_000);
     const hosts = hostsFromFeed(text);
     if (hosts.size === 0) return false;
-    // Hợp nhất: OpenPhish cộng vào Set URLhaus (đã có sẵn là Set dùng chung).
-    for (const h of hosts) urlhausDomains.add(h);
+    openphishFeedDomains = hosts;
     engineStats.openphishDomains = hosts.size;
+    syncThreatDomainsToFilters();
     return true;
   } catch {
     return false;

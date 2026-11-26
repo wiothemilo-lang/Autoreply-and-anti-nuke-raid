@@ -23,7 +23,7 @@ export type HealthLevel = "critical" | "warning";
 
 /** Khoá panel đích — PHẢI khớp `NAV_ITEMS` của `GuildPage` (có test chặn). */
 export type HealthTarget =
-  "antinuke" | "webhooks" | "automod" | "joingate" | "altdetect" | "verify" | "backup";
+  "antinuke" | "settings" | "webhooks" | "automod" | "joingate" | "altdetect" | "verify" | "backup";
 
 export interface HealthIssue {
   /** Khoá ổn định để test khẳng định (đừng đổi vì đổi câu chữ). */
@@ -84,7 +84,7 @@ const RULES: {
     points: 25,
     label: "Chưa chọn kênh nhận log",
     hint: "Mọi cảnh báo nuke, hình phạt và kết quả backup đều cần kênh log — không có kênh log thì bot xử lý xong mà bạn không thấy gì.",
-    target: "webhooks",
+    target: "settings",
     // Cả hai kênh đều rỗng mới tính là thiếu: bot ghi log chính và log mod
     // là hai chỗ khác nhau, chỉ cần có một chỗ là đủ thấy.
     broken: (g) => !g.logChannelId && !g.modLogChannelId,

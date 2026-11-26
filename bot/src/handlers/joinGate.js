@@ -208,7 +208,7 @@ module.exports = async function joinGate(client, member, store) {
       guildId: member.guild.id,
       userId: member.id,
       username: member.user.username,
-      avatar: member.user.avatar,
+      avatar: member.user.avatar ?? undefined,
       createdAt: member.user.createdTimestamp,
       flags: member.user.flags?.bitfield,
       riskScore: analysis.riskScore,
@@ -216,8 +216,8 @@ module.exports = async function joinGate(client, member, store) {
       strongSignals: analysis.strongSignals?.length ?? 0,
       action: analysis.action,
       isVPN: analysis.isVPN,
-      ipCountry: analysis.ipCountry,
-      ipOrg: analysis.ipOrg,
+      ipCountry: analysis.ipCountry ?? undefined,
+      ipOrg: analysis.ipOrg ?? undefined,
     });
   } catch (err) {
     console.error(`[altDetect:record] ${member.guild.id}:`, err.message);

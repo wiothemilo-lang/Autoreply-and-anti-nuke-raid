@@ -81,15 +81,19 @@ module.exports = {
 
   function makeStore(config) {
     const calls = [];
+    // `botTicketSummary` là query Convex → phải đi qua store.client (proxy gắn
+    // botKey), KHÔNG phải discord Client. Test đặt số ticket mở ở đây.
+    const summary = { value: null };
     return {
       _mutations: calls,
+      _summary: summary,
       getConfig: async () => config,
       client: {
         mutation: async (name, args) => {
           calls.push({ name, args });
           return { ok: true };
         },
-        query: async () => null,
+        query: async (name) => (name === "tickets:botTicketSummary" ? summary.value : null),
       },
     };
   }
@@ -98,7 +102,6 @@ module.exports = {
     channelOk = true,
     sendThrows = false,
     hasGuild = true,
-    summary = { openCount: 0 },
     dmFails = false,
   } = {}) {
     const sent = [];
@@ -153,7 +156,6 @@ module.exports = {
       channels: {
         fetch: async () => (channelOk ? channel : null),
       },
-      query: async (name) => (name === "tickets:botTicketSummary" ? summary : null),
       users: {
         fetch: async () => ({
           send: async (p) => {
@@ -567,7 +569,8 @@ module.exports = {
       ticketPanelChannelId: "ch-panel",
       ticketPanelMessageId: "m-old",
     });
-    const client = makeClient({ summary: { openCount: 7 } });
+    store._summary.value = { openCount: 7 };
+    const client = makeClient();
     client.seedAlive(["m-old"]);
     await tickets.sendOpenPanel(client, store, { guildId: "g1", channelId: "ch-panel" });
     // THỨ TỰ là thứ cần chặn: xoá bản cũ trước, rồi tin mới gửi hỏng ⇒ server
@@ -674,7 +677,8 @@ module.exports = {
       ticketPanelChannelId: "ch-panel",
       ticketOpenPanelText: "Đang có {open} ticket chờ.",
     });
-    const client = makeClient({ summary: { openCount: 4 } });
+    store._summary.value = { openCount: 4 };
+    const client = makeClient();
     await tickets.sendOpenPanel(client, store, { guildId: "g1", channelId: "ch-panel" });
     check(
       "dán panel: {open} lấy số ticket đang mở từ botTicketSummary",
@@ -822,8 +826,10 @@ module.exports = {
   // phản ánh state; giờ bỏ key vì draft tự đồng bộ. Luật mới: KHÔNG dùng
   // defaultValue cho các ô này (đó chính là bug revert dữ liệu admin khác).
   check(
-    "ô chọn màu dùng value controlled (không defaultValue)",
-    /value=\{validColor\(panelColor\) \? panelColor : "#5865f2"\}/.test(panelSrc),
+    "ô chọn màu dùng value controlled có dấu # (không defaultValue)",
+    /type="color"[\s\S]{0,350}value=\{[\s\S]{0,160}`#\$\{hex\}`[\s\S]{0,40}"#5865f2"/.test(
+      panelSrc,
+    ) && !/type="color"[\s\S]{0,200}defaultValue=/.test(panelSrc),
   );
   check("ô hex dùng value={panelColor}", /maxLength=\{7\}\s*value=\{panelColor\}/.test(panelSrc));
 

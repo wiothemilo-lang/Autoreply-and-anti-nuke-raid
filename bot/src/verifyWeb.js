@@ -397,8 +397,28 @@ async function syncGuildBan(store, guildId, userId, active, reason) {
  */
 async function resyncGuildBans(store, guild) {
   try {
-    const bans = await guild.bans.fetch({ limit: 5000, cache: false });
-    const ids = [...bans.keys()];
+    // Discord API giới hạn `limit` của GET /guilds/{id}/bans trong khoảng 1..1000
+    // (truyền 5000 bị từ chối HTTP 400). Phân trang bằng `after` tối đa 5000 ban.
+    const seen = new Set();
+    let after;
+    while (seen.size < 5000) {
+      const batch = await guild.bans.fetch({
+        limit: 1000,
+        cache: false,
+        ...(after ? { after } : {}),
+      });
+      if (!batch || batch.size === 0) break;
+      const beforeSize = seen.size;
+      let lastId;
+      for (const id of batch.keys()) {
+        seen.add(id);
+        lastId = id;
+        if (seen.size >= 5000) break;
+      }
+      if (batch.size < 1000 || seen.size === beforeSize || !lastId) break;
+      after = lastId;
+    }
+    const ids = [...seen];
     await store.client.mutation("verifyBans:botReplaceGuildBans", {
       guildId: guild.id,
       userIds: ids,

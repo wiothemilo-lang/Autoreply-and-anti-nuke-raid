@@ -49,16 +49,20 @@ function onboardingSteps(data: GuildData): Step[] {
       target: "welcome",
       status: g.welcomeEnabled && g.welcomeChannelId ? "done" : "todo",
     },
-    {
-      key: "autoreply",
-      icon: AtSign,
-      label: translate("Tạo rule auto reply đầu tiên"),
-      hint: translate(
-        'Thử khối "Thử rule" ngay trong panel để xem bot sẽ trả lời gì trước khi lưu.',
-      ),
-      target: "hidden",
-      status: data.autoReplies.some((r) => r.enabled) ? "done" : "todo",
-    },
+    ...(g.isBotOwner
+      ? [
+          {
+            key: "autoreply",
+            icon: AtSign,
+            label: translate("Tạo rule auto reply đầu tiên"),
+            hint: translate(
+              'Thử khối "Thử rule" ngay trong panel để xem bot sẽ trả lời gì trước khi lưu.',
+            ),
+            target: "hidden" as const,
+            status: data.autoReplies.some((r) => r.enabled) ? ("done" as const) : ("todo" as const),
+          },
+        ]
+      : []),
     {
       key: "joingate",
       icon: DoorOpen,

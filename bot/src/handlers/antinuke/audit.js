@@ -29,28 +29,66 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
   const nukeRollback = createNukeRollback({ store });
 
   /**
-   * S4+S3 hook chung: ghi ngân sách phá hoại (cách ly khi vượt hạn mức tích lũy
-   * trên cả module) và lên lịch rollback cấu trúc từ snapshot. Gọi SAU khi xử
-   * phạt xong 1 vụ (fire-and-forget, không chặn pipeline).
+   * S4 — ghi ngân sách phá hoại tích lũy TRƯỚC nhánh kiểm ngưỡng từng module.
+   *
+   * Nếu chỉ ghi sau khi một module đã vượt ngưỡng riêng thì kẻ phá hoại rỉ rả
+   * (1–2 hành động/module, tất cả dưới ngưỡng từng module) không bao giờ chạm
+   * ngân sách tích lũy. Gọi sớm cho mọi executor không miễn trừ trong BUDGET_MODULES.
+   */
+  async function recordVandalBudget(guild, executor, executorMember, module) {
+    try {
+      if (!BUDGET_MODULES.has(module) || !executor?.id) return;
+      const count = vandalBudget.note(guild.id, executor.id);
+      if (count <= vandalBudget.BUDGET_LIMIT) return;
+      const member = executorMember ?? (await guild.members.fetch(executor.id).catch(() => null));
+      if (!member) return;
+      const iso = await vandalBudget.maybeIsolate(guild, member, count);
+      if (iso.isolated) {
+        console.log(`[vandalBudget] ${guild.id}: cách ly ${executor.id} (ngân sách ${count})`);
+      }
+    } catch (e) {
+      console.error(`[antinuke:vandalBudget:${module}]`, e.message);
+    }
+  }
+
+  /**
+   * S3 hook chung: lên lịch rollback cấu trúc từ snapshot. Gọi SAU khi xử phạt
+   * xong 1 vụ (fire-and-forget, không chặn pipeline).
    */
   async function afterPunishHooks(guild, executor, module) {
     try {
-      if (BUDGET_MODULES.has(module) && executor?.id) {
-        const count = vandalBudget.note(guild.id, executor.id);
-        const member = await guild.members.fetch(executor.id).catch(() => null);
-        if (member) {
-          const iso = await vandalBudget.maybeIsolate(guild, member, count);
-          if (iso.isolated) {
-            console.log(`[vandalBudget] ${guild.id}: cách ly ${executor.id} (ngân sách ${count})`);
-          }
-        }
-      }
       if (ROLLBACK_MODULES.has(module)) {
         nukeRollback.scheduleRollback(guild, module, executor?.id);
       }
     } catch (e) {
       console.error(`[antinuke:hooks:${module}]`, e.message);
     }
+  }
+
+  /**
+   * BÁO CÁO KHẨN cho các module nuke cấu trúc (massBan/massKick/xóa kênh-role…).
+   * Dùng CHUNG cho cả `handleAttributeEvent` lẫn `handleAuditEntry` — trước đây
+   * chỉ nằm ở `handleAuditEntry` nên 7 module phá hoại nặng nhất không bao giờ
+   * DM chủ server hay gửi cảnh báo raid khẩn.
+   */
+  function notifyImmediateNuke(guild, module, count, moduleCfg, executor) {
+    if (!IMMEDIATE_BOT_NUKE.has(module)) return;
+    const alertSummary =
+      MODULE_LABELS[module] + " — " + count + " lượt trong " + moduleCfg.windowSeconds + "s";
+    // DM owner: kênh log kẻ nuke có quyền xoá được — DM thì không. Vụ nuke
+    // lớn phải đánh thức chủ server kể cả khi kẻ phá đã dọn log.
+    void alertOwner(client, store, {
+      guild,
+      module,
+      summary: alertSummary,
+      executorId: executor.id,
+      executorName: executor.username,
+    });
+    emergencyRaidAlert(client, store, guild, {
+      summary: alertSummary,
+      reason: "[Protogon AntiNuke] " + MODULE_LABELS[module],
+      lockdownActive: isLocked(guild.id),
+    }).catch(() => {});
   }
   const { recordEvent, record, markHandled, wasHandled, auditLookup } = state;
   // Báo owner khi thủ phạm bị miễn (owner/whitelist/admin) — helper dùng chung
@@ -187,6 +225,9 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     }
 
     const count = record(guild.id, module, moduleCfg);
+    // S4: cộng ngân sách phá hoại tích lũy ngay cả khi hành động chưa chạm ngưỡng
+    // riêng của module này (bắt kẻ phá hoại rỉ rả qua nhiều module).
+    if (executor) await recordVandalBudget(guild, executor, executorMember, module);
     // Bot gây hại: hạ ngưỡng xuống 1 — bot nuke bị xử lý NGAY ở lần đầu,
     // không chờ đủ ngưỡng như người dùng (audit vẫn cho biết thủ phạm là bot).
     // Bot tin cậy (xác minh / đã ở lại server >= 7 ngày — Carl-bot, Dyno, Wick…)
@@ -288,6 +329,8 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     });
     await sendLog(guild, config, embed);
 
+    notifyImmediateNuke(guild, module, count, moduleCfg, executor);
+
     // Gửi embed case log kiểu Carl-bot tới kênh log moderation
     if (punishChosen) {
       try {
@@ -364,6 +407,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     }
 
     const count = record(guild.id, module, moduleCfg);
+    if (executor) await recordVandalBudget(guild, executor, executorMember, module);
     // Bot gây hại: hạ ngưỡng xuống 1 — bot nuke bị xử lý NGAY ở lần đầu,
     // không chờ đủ ngưỡng như người dùng (audit vẫn cho biết thủ phạm là bot).
     // Bot gây hại (vừa được thêm vào server): xử lý NGAY ở lần đầu.
@@ -462,25 +506,7 @@ module.exports = function createAntiNukeLayer({ client, store, heat, state, core
     });
     await sendLog(guild, config, embed);
 
-    // BÁO CÁO KHẨN cho các module nuke cấu trúc (ban/kick/xóa kênh hàng loạt…).
-    if (IMMEDIATE_BOT_NUKE.has(module)) {
-      const alertSummary =
-        MODULE_LABELS[module] + " — " + count + " lượt trong " + moduleCfg.windowSeconds + "s";
-      // DM owner: kênh log kẻ nuke có quyền xoá được — DM thì không. Vụ nuke
-      // lớn phải đánh thức chủ server kể cả khi kẻ phá đã dọn log.
-      void alertOwner(client, store, {
-        guild,
-        module,
-        summary: alertSummary,
-        executorId: executor.id,
-        executorName: executor.username,
-      });
-      emergencyRaidAlert(client, store, guild, {
-        summary: alertSummary,
-        reason: "[Protogon AntiNuke] " + MODULE_LABELS[module],
-        lockdownActive: isLocked(guild.id),
-      }).catch(() => {});
-    }
+    notifyImmediateNuke(guild, module, count, moduleCfg, executor);
 
     // Gửi embed case log kiểu Carl-bot tới kênh log moderation
     if (punishType) {

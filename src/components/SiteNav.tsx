@@ -28,8 +28,12 @@ let themeValue: ThemeMode | null = null;
 
 function readTheme(): ThemeMode {
   if (typeof window === "undefined") return "light";
-  const saved = window.localStorage.getItem(THEME_KEY);
-  if (saved === "dark" || saved === "light") return saved;
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY);
+    if (saved === "dark" || saved === "light") return saved;
+  } catch {
+    // Trình duyệt ẩn danh / sandbox chặn localStorage → lùi về prefers-color-scheme.
+  }
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -150,7 +154,11 @@ function usePagesMenu(instanceId: string) {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    window.localStorage.setItem(THEME_KEY, theme);
+    try {
+      window.localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // storage bị chặn — bỏ qua
+    }
   }, [theme]);
 
   const toggle = useCallback(() => {

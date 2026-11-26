@@ -572,19 +572,19 @@ async function scanMessage(client, message, store, heat) {
       const fresh = arr.filter((t) => t >= cutoff);
       if (fresh.length < (mentionCfg.threshold || 10)) {
         mentionBuckets.set(key, fresh);
-        return;
+      } else {
+        mentionBuckets.delete(key);
+        return punishFlow(
+          client,
+          message,
+          mentionCfg,
+          config,
+          heat,
+          `[Protogon] Spam mention: ${fresh.length} tin mention trong ${mentionCfg.windowSeconds || 10}s`,
+          `<@${message.author.id}> đã gửi **${fresh.length} tin có mention** trong **${mentionCfg.windowSeconds || 10} giây** (ngưỡng ${mentionCfg.threshold || 10})`,
+          fresh.length,
+        );
       }
-      mentionBuckets.delete(key);
-      return punishFlow(
-        client,
-        message,
-        mentionCfg,
-        config,
-        heat,
-        `[Protogon] Spam mention: ${fresh.length} tin mention trong ${mentionCfg.windowSeconds || 10}s`,
-        `<@${message.author.id}> đã gửi **${fresh.length} tin có mention** trong **${mentionCfg.windowSeconds || 10} giây** (ngưỡng ${mentionCfg.threshold || 10})`,
-        fresh.length,
-      );
     }
   }
 

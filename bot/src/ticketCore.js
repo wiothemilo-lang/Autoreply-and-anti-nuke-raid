@@ -675,7 +675,7 @@ function fillPanelText(template, values, T = {}) {
   };
   return escapeMentions(src)
     .slice(0, PANEL_MAX)
-    .replace(/\{(\w+)\}/g, (m, key) => (key in safe ? safe[key] : m));
+    .replace(/\{(\w+)\}/g, (m, key) => (Object.hasOwn(safe, key) ? safe[key] : m));
 }
 
 /**

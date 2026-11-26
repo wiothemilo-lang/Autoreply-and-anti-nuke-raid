@@ -165,7 +165,7 @@ function createPrivilegedAlert({ client, store, state }) {
         module,
         summary: MODULE_LABELS[module] + " — " + count + " lượt (nhóm miễn trừ)",
         executorId: executor.id,
-        executorName: executor.username,
+        executorName: executor.username ?? executor.user?.username,
         privileged: true,
         // Cooldown RIÊNG: tín hiệu "người có quyền" không được nuốt mất DM
         // "server đang bị raid" (và ngược lại).

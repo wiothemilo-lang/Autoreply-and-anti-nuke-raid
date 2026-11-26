@@ -52,14 +52,14 @@ export default function BotLogo({
   fallbackClassName?: string;
 }) {
   const branding = useBranding();
-  const [failed, setFailed] = useState(false);
   const src = branding?.botAvatarUrl ?? branding?.haimiyaAvatarUrl ?? null;
-  if (src && !failed) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (src && failedSrc !== src) {
     return (
       <img
         src={src}
         alt="Protogon"
-        onError={() => setFailed(true)}
+        onError={() => setFailedSrc(src)}
         className={cn("rounded-full object-cover", className)}
         draggable={false}
       />

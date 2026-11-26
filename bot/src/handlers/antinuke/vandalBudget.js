@@ -119,31 +119,79 @@ module.exports = function createVandalBudget() {
     try {
       const role = await ensureIsolateRole(guild);
       await member.roles.add(role.id, "[Protogon] Vượt ngân sách phá hoại tích lũy");
+      // Trong Discord quyền role là phép OR cộng dồn: chỉ gắn thêm role rỗng
+      // KHÔNG tước quyền phá hoại nào. Tước các role nguy hiểm có thể gỡ (lưu
+      // lại để trả khi hết hạn) + timeout best-effort để chặn tay ngay lập tức.
+      const removedRoles = [];
+      const dangerousBits = [
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.ManageRoles,
+        PermissionFlagsBits.BanMembers,
+        PermissionFlagsBits.KickMembers,
+        PermissionFlagsBits.ManageWebhooks,
+        PermissionFlagsBits.ManageGuild,
+        PermissionFlagsBits.ModerateMembers,
+      ].filter((b) => b !== undefined);
+      const botHighest = guild.members?.me?.roles?.highest?.position ?? Infinity;
+      const memberRoles = member.roles?.cache;
+      if (memberRoles && typeof member.roles?.remove === "function") {
+        for (const r of memberRoles.values?.() ?? []) {
+          if (!r?.id || r.id === guild.id || r.id === role.id || r.managed) continue;
+          if (typeof r.position === "number" && r.position >= botHighest) continue;
+          const isDangerous = dangerousBits.some((b) => r.permissions?.has?.(b));
+          if (!isDangerous) continue;
+          try {
+            await member.roles.remove(r.id, "[Protogon] Tạm thu quyền trong thời gian cách ly");
+            removedRoles.push(r.id);
+          } catch {
+            // role cao hơn hoặc thiếu quyền — bỏ qua role này
+          }
+        }
+      }
+      if (typeof member.timeout === "function") {
+        try {
+          await member.timeout(ISOLATE_MS, "[Protogon] Vượt ngân sách phá hoại tích lũy");
+        } catch {
+          // không timeout được (bot / quyền cao hơn) — vẫn giữ lớp thu role
+        }
+      }
       const until = Date.now() + ISOLATE_MS;
-      if (entry) entry.isolated = { until, roleId: role.id };
+      if (entry) entry.isolated = { until, roleId: role.id, removedRoles };
       // Tự gỡ khi hết hạn (unref — không giữ process sống chỉ để gỡ role).
       setTimeout(() => {
         releaseOne(guild, member.id).catch(() => {});
       }, ISOLATE_MS).unref?.();
-      return { ...result, isolated: true, roleId: role.id, until };
+      return { ...result, isolated: true, roleId: role.id, removedRoles, until };
     } catch (e) {
       return { ...result, isolated: false, reason: `không cách ly được: ${e?.message || e}` };
     }
   }
 
-  /** Gỡ role cách ly cho 1 member (best-effort). */
+  /** Gỡ role cách ly + hoàn trả các role đã tạm thu cho 1 member (best-effort). */
   async function releaseOne(guild, userId) {
     const key = `${guild.id}:${userId}`;
     const entry = budget.get(key);
     const roleId = entry?.isolated?.roleId ?? roleCache.get(guild.id);
-    if (roleId) {
+    const removedRoles = entry?.isolated?.removedRoles ?? [];
+    if (roleId || removedRoles.length > 0) {
       const member = await guild.members.fetch(userId).catch(() => null);
-      try {
-        if (member && typeof member.roles?.remove === "function") {
-          await member.roles.remove(roleId, "[Protogon] Hết thời gian cách ly");
+      if (member) {
+        if (roleId && typeof member.roles?.remove === "function") {
+          try {
+            await member.roles.remove(roleId, "[Protogon] Hết thời gian cách ly");
+          } catch {
+            // thiếu quyền / member rời server — bỏ qua
+          }
         }
-      } catch {
-        // thiếu quyền / member rời server — bỏ qua
+        if (removedRoles.length > 0 && typeof member.roles?.add === "function") {
+          for (const rid of removedRoles) {
+            try {
+              await member.roles.add(rid, "[Protogon] Hoàn trả role sau thời gian cách ly");
+            } catch {
+              // role đã bị xoá hoặc thiếu quyền — bỏ qua
+            }
+          }
+        }
       }
     }
     if (entry) entry.isolated = undefined;

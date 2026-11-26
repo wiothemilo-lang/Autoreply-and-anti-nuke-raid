@@ -82,13 +82,21 @@ function BarRow({
   ariaLabel: string;
 }) {
   const max = Math.max(1, ...values);
+  // labels thường chỉ có 2 nhãn đầu-cuối (vd ["00h", "23h"]); ghép đúng phần tử
+  // đầu/cuối thay vì values[1] khi số nhãn ít hơn số cột.
+  const titleText =
+    labels.length === values.length
+      ? labels.map((l, i) => `${l}: ${values[i]}`).join(" · ")
+      : labels.length >= 2 && values.length >= 2
+        ? `${labels[0]}: ${values[0]} · ${labels[labels.length - 1]}: ${values[values.length - 1]}`
+        : labels.map((l, i) => `${l}: ${values[i] ?? 0}`).join(" · ");
   return (
     <div>
       <div
         className="flex h-24 items-end gap-[2px]"
         role="img"
         aria-label={ariaLabel}
-        title={labels.map((l, i) => `${l}: ${values[i]}`).join(" · ")}
+        title={titleText}
       >
         {values.map((v, i) => (
           <div

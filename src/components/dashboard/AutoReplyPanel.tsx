@@ -156,7 +156,7 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
     }
   }
 
-  async function toggleRule(rule: AutoReply, enabled: boolean) {
+  async function toggleRule(rule: AutoReply, enabled: boolean): Promise<boolean> {
     try {
       await updateRule({ token: TOKEN(), id: rule._id, enabled });
       // Ghép chuỗi kiểu "Rule X {đã bật}" không dịch được sang EN/DE — mỗi
@@ -164,8 +164,10 @@ export default function AutoReplyPanel({ data }: { data: GuildData }) {
       toast.success(
         translate(enabled ? 'Đã bật rule "{p0}"' : 'Đã tắt rule "{p0}"', { p0: rule.name }),
       );
+      return true;
     } catch (e) {
       toastConvexError(e, translate("Thất bại"));
+      return false;
     }
   }
 

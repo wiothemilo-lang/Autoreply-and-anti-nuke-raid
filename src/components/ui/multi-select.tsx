@@ -49,10 +49,12 @@ export function MultiSelect({
   const listboxId = React.useId();
 
   React.useEffect(() => {
+    if (!open) return;
     function outside(e: Event) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
+        // Không gọi triggerRef.current.focus() khi click ra ngoài — làm vậy sẽ
+        // cướp focus của input/nút mà người dùng vừa bấm và kéo cuộn trang về đây.
         setOpen(false);
-        triggerRef.current?.focus();
       }
     }
     document.addEventListener("mousedown", outside);
@@ -61,7 +63,7 @@ export function MultiSelect({
       document.removeEventListener("mousedown", outside);
       document.removeEventListener("touchstart", outside);
     };
-  }, []);
+  }, [open]);
 
   React.useEffect(() => {
     if (open) {

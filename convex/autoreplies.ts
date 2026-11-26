@@ -1,6 +1,7 @@
 import { mutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserByToken, canManageGuild } from "./auth";
+import { requireBotOwner } from "./hidden";
 import { assertWithinLimit } from "./limits";
 
 async function assertManage(ctx: MutationCtx, token: string, guildId: string) {
@@ -10,6 +11,7 @@ async function assertManage(ctx: MutationCtx, token: string, guildId: string) {
     .withIndex("by_discordId", (q) => q.eq("discordId", guildId))
     .first();
   if (!canManageGuild(user, guild)) throw new Error("Không có quyền quản lý server này");
+  await requireBotOwner(ctx, user);
   return guild!;
 }
 

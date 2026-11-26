@@ -305,8 +305,8 @@ function makeBatchItem(overrides = {}) {
       everyonePermissions: ((1n << 10n) & ((1n << 10n) | (1n << 11n))).toString(),
       guildMeta: {
         name: "Server Gốc",
-        bannerUrl: "https://cdn/banner.png",
-        splashUrl: "https://cdn/splash.png",
+        bannerUrl: "data:image/png;base64,iVBORw0KGgo=",
+        splashUrl: "data:image/png;base64,iVBORw0KGgo=",
         verificationLevel: 2,
         explicitContentFilter: 1,
         defaultMessageNotifications: 1,

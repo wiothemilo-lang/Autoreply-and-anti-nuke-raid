@@ -198,7 +198,7 @@ export default function Monitor() {
     backendPing,
   } = useBotMonitor(30000);
 
-  const lat = latency ?? avg;
+  const lat = latency ?? (backendPing.state === "down" ? null : avg);
   const rate = lat !== null ? latencyLabel(lat) : null;
 
   // Trạng thái 3 thành phần hệ thống (web/backend/bot) — tính 1 lần ở đây rồi

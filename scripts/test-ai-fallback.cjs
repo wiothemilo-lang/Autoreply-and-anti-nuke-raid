@@ -253,8 +253,62 @@ ai.classifyViolation({
     console.log(
       ok ? "PASS case5: prompt có few-shot + benign checklist + mẫu scam đã học" : "FAIL case5",
     );
-    globalThis.fetch = realFetch;
-    process.exit(ok ? 0 : 1);
+    if (!ok) {
+      globalThis.fetch = realFetch;
+      process.exit(1);
+    }
+
+    // Case 6: chạy đồng thời 2 lời gọi AI — TUYỆT ĐỐI KHÔNG mutate globalThis.fetch
+    // (bản cũ ghi đè globalThis.fetch làm rò chuỗi wrapper vĩnh viễn khi A xong trước B).
+    let fetchMutated = false;
+    let callIdx = 0;
+    const sentinelFetch = async () => {
+      if (globalThis.fetch !== sentinelFetch) fetchMutated = true;
+      const myIdx = ++callIdx;
+      await new Promise((res) => setTimeout(res, myIdx === 1 ? 15 : 40));
+      if (globalThis.fetch !== sentinelFetch) fetchMutated = true;
+      return mkRes(200, {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                classification: "benign",
+                confidence: 0.9,
+                reason: "ok",
+                suggestPunish: null,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
+      });
+    };
+    globalThis.fetch = sentinelFetch;
+    return Promise.all([
+      ai.classifyViolation({
+        module: "spam",
+        count: 2,
+        windowSeconds: 10,
+        threshold: 5,
+        sampleMessages: ["a"],
+      }),
+      ai.classifyViolation({
+        module: "spam",
+        count: 2,
+        windowSeconds: 10,
+        threshold: 5,
+        sampleMessages: ["b"],
+      }),
+    ]).then(() => {
+      const ok6 = !fetchMutated && globalThis.fetch === sentinelFetch;
+      console.log(
+        ok6
+          ? "PASS case6: chạy song song không ghi đè globalThis.fetch"
+          : "FAIL case6: globalThis.fetch bị ghi đè",
+      );
+      globalThis.fetch = realFetch;
+      process.exit(ok6 ? 0 : 1);
+    });
   })
   .catch((e) => {
     console.error("ERROR:", e);

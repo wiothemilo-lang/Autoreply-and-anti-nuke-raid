@@ -186,6 +186,24 @@ export function decideVerify(input: VerifyPolicyInput): VerifyPolicyResult {
   if (vpnHit && input.vpnMode !== "off") {
     const base = vpnCodes.slice();
     if (input.sharedIp) base.push("shared_ip");
+    if (input.userWhitelisted) {
+      return {
+        decision: "allow",
+        punish: null,
+        riskScore: 0,
+        reasons: ["whitelist_exempt", ...base],
+        flagged: false,
+      };
+    }
+    if (input.privileged) {
+      return {
+        decision: "allow",
+        punish: null,
+        riskScore: 25,
+        reasons: ["privileged_exempt", ...base],
+        flagged: true,
+      };
+    }
     if (input.vpnMode === "warn") {
       return {
         decision: "allow",

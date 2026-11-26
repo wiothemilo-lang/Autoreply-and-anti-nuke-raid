@@ -285,10 +285,16 @@ module.exports = {
     const g = mkGuild("g-clean");
     configs.set("g-clean", { altDetectionEnabled: true, altMaxRiskScore: 70 });
     client.guilds.cache.set("g-clean", g);
-    await joinGate(client, g.addMember(mkMember("good-1", "thanhlaphe", { avatar: "gav" })), store);
+    await joinGate(client, g.addMember(mkMember("good-1", "thanhlaphe", { avatar: null })), store);
+    const recMut = calls.mutations.find((mm) => mm.name === "altDetection:recordJoin");
+    check("hồ sơ sạch → recordJoin được ghi (lịch sử phục vụ rejoin-evasion)", !!recMut);
     check(
-      "hồ sơ sạch → recordJoin được ghi (lịch sử phục vụ rejoin-evasion)",
-      calls.mutations.some((mm) => mm.name === "altDetection:recordJoin"),
+      "recordJoin không bao giờ gửi null cho các field v.optional(v.string())",
+      recMut &&
+        recMut.args.avatar === undefined &&
+        recMut.args.ipCountry === undefined &&
+        recMut.args.ipOrg === undefined,
+      JSON.stringify(recMut?.args),
     );
     check(
       "hồ sơ sạch → không phạt",

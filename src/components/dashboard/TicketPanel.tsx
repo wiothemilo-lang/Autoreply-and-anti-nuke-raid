@@ -128,12 +128,14 @@ export default function TicketPanel({ data }: { data: GuildData }) {
     ? (data.roles.find((r) => r.roleId === g.ticketStaffRoleId)?.name ?? "?")
     : null;
 
-  async function patch(p: Record<string, unknown>, msg?: string) {
+  async function patch(p: Record<string, unknown>, msg?: string): Promise<boolean> {
     try {
       await updateSettings({ token: TOKEN(), guildId: g.discordId, ...p });
       if (msg) toast.success(msg);
+      return true;
     } catch (e) {
       toastConvexError(e, translate("Lưu thất bại"));
+      return false;
     }
   }
 
@@ -547,7 +549,10 @@ export default function TicketPanel({ data }: { data: GuildData }) {
                       type="color"
                       aria-label={translate("Chọn màu panel")}
                       className="h-9 w-9 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-1"
-                      value={validColor(panelColor) ? panelColor : "#5865f2"}
+                      value={(() => {
+                        const hex = panelColor.trim().replace(/^#/, "");
+                        return validColor(hex) ? `#${hex}` : "#5865f2";
+                      })()}
                       onChange={(e) => setPanelColor(e.target.value)}
                       onBlur={() => saveColor(panelColor)}
                     />

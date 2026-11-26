@@ -468,6 +468,33 @@ const store = {
       if (realFilters) require.cache[filtersPath] = realFilters;
       else delete require.cache[filtersPath];
     }
+
+    // ---- 18. URLhaus CSV chuẩn (cột 3 có dấu ngoặc kép) + OpenPhish không bị xoá mất ----
+    {
+      const keepFetch = globalThis.fetch;
+      globalThis.fetch = async (url) => {
+        if (String(url).includes("openphish")) {
+          return { ok: true, status: 200, text: async () => "http://phish-only.bad/login\n" };
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            '"101","2026-09-01 00:00:00 UTC","http://quoted-urlhaus.bad/mal.exe","online"\n',
+        };
+      };
+      const okOp = await engine.refreshOpenPhish(store);
+      const okUh = await engine.refreshUrlhaus(store);
+      check(
+        "URLhaus CSV chuẩn (cột 3 có ngoặc kép) nạp đúng host",
+        okUh === true && engine.isUrlhausDomain("quoted-urlhaus.bad"),
+      );
+      check(
+        "OpenPhish không bị refreshUrlhaus ghi đè xoá mất",
+        okOp === true && engine.isUrlhausDomain("phish-only.bad"),
+      );
+      globalThis.fetch = keepFetch;
+    }
   }
 
   console.log(`\nKết quả threat engine: ${pass} PASS, ${fail} FAIL`);
