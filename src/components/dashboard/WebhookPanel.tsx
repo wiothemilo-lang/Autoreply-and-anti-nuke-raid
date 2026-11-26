@@ -235,11 +235,12 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
 
   /* --- Send --- */
   async function handleSend() {
-    if (!webhookUrl.trim()) {
+    const trimmedUrl = webhookUrl.trim();
+    if (!trimmedUrl) {
       toast.error(translate("Nhập Discord Webhook URL"));
       return;
     }
-    if (!isValidWebhookUrl(webhookUrl)) {
+    if (!isValidWebhookUrl(trimmedUrl)) {
       toast.error(
         translate(
           "URL webhook không hợp lệ — phải đúng định dạng discord.com/api/webhooks/{id}/{token}",
@@ -255,7 +256,6 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
       const embedPayload: Record<string, unknown> = {};
       if (embed.title) embedPayload.title = embed.title;
       if (embed.description) embedPayload.description = embed.description;
-      if (embed.color) embedPayload.color = hexToDecimal(embed.color);
       if (embed.authorName) {
         const author: Record<string, string> = { name: embed.authorName };
         if (embed.authorIconUrl && isValidUrl(embed.authorIconUrl))
@@ -282,11 +282,14 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
       }
       if (embed.timestamp) embedPayload.timestamp = new Date().toISOString();
 
+      // Chỉ gắn `color` khi thực sự có nội dung embed — tránh đính embed rỗng
+      // `{ color: 1118481 }` vào tin nhắn văn bản thường.
       const hasEmbed = Object.keys(embedPayload).length > 0;
+      if (hasEmbed && embed.color) embedPayload.color = hexToDecimal(embed.color);
 
       await sendEmbed({
         token,
-        webhookUrl: webhookUrl.trim(),
+        webhookUrl: trimmedUrl,
         content: content.trim() || undefined,
         username: username.trim() || undefined,
         avatarUrl: avatarUrl.trim() || undefined,
@@ -353,8 +356,10 @@ export default function WebhookPanel({ data }: { data: GuildData }) {
                   toast.success(
                     translate(v ? "Đã bật webhook mặc định" : "Đã tắt webhook mặc định"),
                   );
+                  return true;
                 } catch (e: unknown) {
                   toastConvexError(e, translate("Lưu thất bại"));
+                  return false;
                 }
               }}
             />

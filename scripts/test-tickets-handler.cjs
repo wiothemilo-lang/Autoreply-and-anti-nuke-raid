@@ -497,6 +497,55 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
     const row = tickets.dmButtonRow(T);
     check("nút DM có 1 nút", row.components.length === 1);
     check("customId nút DM đúng", row.components[0].customId === "ticket_open_dm");
+    const withGuild = tickets.dmButtonRow(T, "123456789012345678");
+    check(
+      "nút DM nhúng id server vào customId (DM không có interaction.guild)",
+      withGuild.components[0].customId === "ticket_open_dm:123456789012345678",
+      withGuild.components[0].customId,
+    );
+    const mg = tickets.appealModal(T, "123456789012345678");
+    check(
+      "modal khiếu nại nhúng id server vào customId",
+      mg.customId === "ticket_appeal_dm:123456789012345678",
+      mg.customId,
+    );
+  }
+  {
+    // Discord: nhãn ô nhập + tiêu đề modal tối đa 45 ký tự — builder THẬT ném lỗi khi
+    // vượt (mock thì không), nên khoá độ dài ở chính dữ liệu dịch cho cả 3 ngôn ngữ.
+    const lang = require("../bot/src/handlers/lang");
+    const longOnes = [];
+    for (const L of ["vi", "en", "de"]) {
+      const TT = lang.ticketText(L);
+      for (const [k, v] of Object.entries(TT)) {
+        if (typeof v === "string" && /(Label|Title)$/.test(k) && [...v].length > 45) {
+          longOnes.push(L + "." + k + "=" + [...v].length);
+        }
+      }
+      check(
+        "có errNotBanned (" + L + ")",
+        typeof TT.errNotBanned === "string" && !!TT.errNotBanned,
+      );
+    }
+    check(
+      "mọi nhãn/tiêu đề modal ≤ 45 ký tự ở vi/en/de",
+      longOnes.length === 0,
+      longOnes.join(", "),
+    );
+    const longT = { ...T, modalAppealLabel: "x".repeat(80), modalEvidenceLabel: "y".repeat(80) };
+    const lm = tickets.appealModal(longT);
+    check(
+      "nhãn quá dài bị cắt còn 45 ký tự thay vì làm builder ném lỗi",
+      lm.components[0].label.length === 45 && lm.components[1].label.length === 45,
+    );
+    // Loại khiếu nại không có placeholder → KHÔNG được gọi setPlaceholder(undefined).
+    let threw = "";
+    try {
+      tickets.openModal(T, "appeal");
+    } catch (e) {
+      threw = e.message;
+    }
+    check("openModal(appeal) không ném khi thiếu placeholder", threw === "", threw);
   }
   {
     const m = tickets.appealModal(T);
@@ -594,11 +643,9 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
         },
       },
     };
+    // KHÔNG có `query` trên discord Client (không tồn tại trên bản thật). Đọc
+    // Convex phải đi qua store.client — mock đúng thực tế để bắt lỗi gọi nhầm.
     const client = {
-      query: async (name, args) => {
-        calls.queries.push({ name, args });
-        return state;
-      },
       users: {
         fetch: async () => ({
           send: async (payload) => {
@@ -611,6 +658,10 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
     const store = {
       getConfig: async () => config,
       client: {
+        query: async (name, args) => {
+          calls.queries.push({ name, args });
+          return state;
+        },
         mutation: async (name, args) => {
           calls.mutations.push({ name, args });
           if (name === "bot_writes:botOpenTicket" && openFails) {
@@ -1057,14 +1108,28 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
       String(env.calls.createdList.length),
     );
     check(
-      "lần đầu tạo category (type 4) đặt trong category cha",
-      env.calls.createdList[0]?.type === 4 && env.calls.createdList[0]?.parent?.id === "CAT",
+      "lần đầu tạo category (type 4) KHÔNG lồng parent (Discord cấm category trong category)",
+      env.calls.createdList[0]?.type === 4 && env.calls.createdList[0]?.parent === undefined,
       JSON.stringify(env.calls.createdList[0]),
     );
     check(
       "kênh tin nằm trong category CON, không phải category cha",
       env.calls.createdList[1]?.type === 0 && env.calls.createdList[1]?.parent?.id === "CH-NEW",
       JSON.stringify(env.calls.createdList[1]),
+    );
+  }
+  {
+    // Category con đã tồn tại trong cache → tái sử dụng, KHÔNG tạo bản trùng.
+    const env = openEnv({ config: { ...goodConfig, ticketCategoryPerKind: true } });
+    const existingSub = { id: "SUB-CAT", type: 4, name: "tk-ho-tro-chung" };
+    env.guild.channels.cache.set("SUB-CAT", existingSub);
+    env.guild.channels.cache.find = (fn) => [...env.guild.channels.cache.values()].find(fn);
+    const r = await run(env);
+    check("category con đã có → vẫn mở được ticket", r.ok === true, JSON.stringify(r));
+    check(
+      "category con đã có → tái sử dụng, không tạo category trùng",
+      env.calls.createdList.length === 1 && env.calls.createdList[0]?.parent?.id === "SUB-CAT",
+      JSON.stringify(env.calls.createdList),
     );
   }
   {
@@ -1241,12 +1306,20 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
   console.log("\n── saveTranscript ──");
   {
     const mutations = [];
+    const fetchCalls = [];
+    const origFetch = global.fetch;
+    global.fetch = async (url, opts) => {
+      fetchCalls.push({ url, method: opts?.method });
+      return { ok: true, status: 200, json: async () => ({ storageId: "SID" }) };
+    };
+    const msgFetchOpts = [];
     const channel = {
       id: "CH",
       name: "ticket-1",
       messages: {
-        fetch: async () =>
-          new Map([
+        fetch: async (opts) => {
+          msgFetchOpts.push(opts);
+          return new Map([
             [
               "m2",
               {
@@ -1269,16 +1342,19 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
                 embeds: [],
               },
             ],
-          ]),
+          ]);
+        },
       },
     };
     const store = {
       client: {
         mutation: async (n, a) => {
           mutations.push({ n, a });
+          if (n === "bot_writes:botGenerateTicketTranscriptUploadUrl") {
+            return "https://upload.convex.test/t1";
+          }
           return {};
         },
-        storage: { store: async () => "SID" },
       },
     };
     const okSave = await tickets.saveTranscript({
@@ -1287,11 +1363,86 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
       channel,
       ticketId: "T1",
     });
+    global.fetch = origFetch;
     check("lưu transcript thành công", okSave === true);
     check(
-      "gửi storageId lên Convex",
-      mutations[0]?.a?.storageId === "SID",
-      JSON.stringify(mutations),
+      "messages.fetch không bao giờ truyền limit > 100 (trần Discord API)",
+      msgFetchOpts.length === 1 && msgFetchOpts[0].limit <= 100,
+      JSON.stringify(msgFetchOpts),
+    );
+    check(
+      "upload POST tới URL do Convex cấp rồi gửi storageId",
+      fetchCalls[0]?.url === "https://upload.convex.test/t1" &&
+        fetchCalls[0]?.method === "POST" &&
+        mutations.some(
+          (m) => m.n === "bot_writes:botSaveTicketTranscript" && m.a?.storageId === "SID",
+        ),
+      JSON.stringify({ fetchCalls, mutations }),
+    );
+  }
+  {
+    // Phân trang > 100 tin nhắn: đợt 1 trả 100 tin, đợt 2 gọi với before = tin cũ nhất.
+    const origFetch = global.fetch;
+    let uploadedBody = null;
+    global.fetch = async (_url, opts) => {
+      uploadedBody = JSON.parse(opts.body);
+      return { ok: true, status: 200, json: async () => ({ storageId: "SID-PAGED" }) };
+    };
+    const pages = [];
+    const channel = {
+      id: "CH",
+      name: "ticket-paged",
+      messages: {
+        fetch: async (opts) => {
+          pages.push(opts);
+          const m = new Map();
+          if (!opts.before) {
+            for (let i = 150; i >= 51; i--) {
+              m.set(`m${i}`, {
+                id: `m${i}`,
+                createdTimestamp: i,
+                author: { username: "u" },
+                content: "x",
+              });
+            }
+          } else {
+            for (let i = 50; i >= 1; i--) {
+              m.set(`m${i}`, {
+                id: `m${i}`,
+                createdTimestamp: i,
+                author: { username: "u" },
+                content: "x",
+              });
+            }
+          }
+          return m;
+        },
+      },
+    };
+    const store = {
+      client: {
+        mutation: async (n) =>
+          n === "bot_writes:botGenerateTicketTranscriptUploadUrl"
+            ? "https://upload.convex.test/paged"
+            : {},
+      },
+    };
+    const okPaged = await tickets.saveTranscript({
+      store,
+      guild: { id: "G", name: "Guild" },
+      channel,
+      ticketId: "T2",
+      maxMessages: 200,
+    });
+    global.fetch = origFetch;
+    check(
+      "phân trang 150 tin thành 2 đợt ≤ 100 với mốc before đúng",
+      okPaged === true &&
+        pages.length === 2 &&
+        pages[0].limit === 100 &&
+        pages[1].before === "m51" &&
+        uploadedBody?.messageCount === 150,
+      JSON.stringify({ pages, count: uploadedBody?.messageCount }),
     );
   }
   {
@@ -1305,7 +1456,7 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
         },
       },
     };
-    const store = { client: { mutation: async () => ({}), storage: { store: async () => "SID" } } };
+    const store = { client: { mutation: async () => "https://upload.convex.test/x" } };
     const r = await tickets.saveTranscript({
       store,
       guild: { id: "G", name: "G" },
@@ -1315,7 +1466,9 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
     check("đọc tin nhắn lỗi → KHÔNG lưu (giữ kênh)", r === false);
   }
   {
-    // Storage lỗi → KHÔNG lưu.
+    // Storage upload lỗi HTTP → KHÔNG lưu.
+    const origFetch = global.fetch;
+    global.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
     const channel = {
       id: "CH",
       name: "x",
@@ -1323,12 +1476,10 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
     };
     const store = {
       client: {
-        mutation: async () => ({}),
-        storage: {
-          store: async () => {
-            throw new Error("storage full");
-          },
-        },
+        mutation: async (n) =>
+          n === "bot_writes:botGenerateTicketTranscriptUploadUrl"
+            ? "https://upload.convex.test/fail"
+            : {},
       },
     };
     const r = await tickets.saveTranscript({
@@ -1337,6 +1488,7 @@ function makeGuild({ createThrows = null, overwritesFail = new Set() } = {}) {
       channel,
       ticketId: "T1",
     });
+    global.fetch = origFetch;
     check("storage lỗi → KHÔNG lưu", r === false);
   }
 

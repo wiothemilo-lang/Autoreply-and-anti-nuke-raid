@@ -101,12 +101,14 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
   // Không để timer của panel cũ ghi đè cấu hình guild mới sau khi điều hướng.
   useEffect(() => flushAll, [flushAll]);
 
-  async function patch(p: Record<string, unknown>, msg?: string) {
+  async function patch(p: Record<string, unknown>, msg?: string): Promise<boolean> {
     try {
       await updateSettings({ token: TOKEN(), guildId: g.discordId, ...p });
       if (msg) toast.success(msg);
+      return true;
     } catch (e: unknown) {
       toastConvexError(e, translate("Lưu thất bại"));
+      return false;
     }
   }
 
@@ -350,7 +352,7 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={localColor}
+                      value={/^#[0-9a-fA-F]{6}$/.test(localColor) ? localColor : "#111111"}
                       onChange={(e) => {
                         setLocalColor(e.target.value);
                         flushField("verifyWelcomeColor", e.target.value);
@@ -363,7 +365,9 @@ export default function VerifyPanel({ data }: { data: GuildData }) {
                       onChange={(e) => {
                         const v = e.target.value;
                         setLocalColor(v);
-                        if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                        if (v.trim() === "") {
+                          flushField("verifyWelcomeColor", null);
+                        } else if (/^#[0-9a-fA-F]{6}$/.test(v)) {
                           flushField("verifyWelcomeColor", v);
                         }
                       }}

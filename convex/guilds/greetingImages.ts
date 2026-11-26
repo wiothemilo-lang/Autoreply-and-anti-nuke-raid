@@ -90,7 +90,11 @@ export async function saveGreetingImageHandler(
   if (!guild || !canManageGuild(user, guild)) throw new Error("Không có quyền quản lý server này");
   const meta = await ctx.storage.getMetadata(storageId);
   if (!meta) throw new Error("Ảnh không tồn tại hoặc đã bị xoá — hãy chọn lại ảnh");
-  if (!String(meta.contentType ?? "").startsWith("image/")) {
+  if (
+    !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
+      String(meta.contentType ?? "").toLowerCase(),
+    )
+  ) {
     throw new Error("Chỉ nhận file ảnh (PNG, JPG, GIF, WEBP).");
   }
   if (meta.size > MAX_DASHBOARD_UPLOAD_BYTES) {

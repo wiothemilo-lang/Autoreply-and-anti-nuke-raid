@@ -123,13 +123,14 @@ export const createIpBan = mutation({
       .withIndex("by_guildId_ipHash", (q) => q.eq("guildId", args.guildId).eq("ipHash", hash))
       .first();
     const actor = user.discordId ?? String(user._id);
+    const storedPrefixHash = scope === "prefix" ? prefixHash : undefined;
     if (existing) {
       await ctx.db.patch(existing._id, {
         active: true,
         expiresAt: Math.max(existing.expiresAt, expiresAt),
         reason: args.reason?.trim().slice(0, 300) || existing.reason,
         scope,
-        ipPrefixHash: prefixHash ?? existing.ipPrefixHash,
+        ipPrefixHash: storedPrefixHash,
       });
       return { ok: true, id: existing._id, expiresAt: Math.max(existing.expiresAt, expiresAt) };
     }
@@ -137,7 +138,7 @@ export const createIpBan = mutation({
     const id = await ctx.db.insert("ipBans", {
       guildId: args.guildId,
       ipHash: hash,
-      ipPrefixHash: prefixHash,
+      ipPrefixHash: storedPrefixHash,
       scope,
       reason: (args.reason?.trim() || "Ban IP từ dashboard").slice(0, 300),
       createdBy: actor,
@@ -260,14 +261,27 @@ export const botReplaceGuildBans = mutation({
       updated++;
     }
     for (const userId of activeSet) {
-      await ctx.db.insert("guildBans", {
-        guildId: args.guildId,
-        userId,
-        active: true,
-        bannedAt: now,
-        syncedAt: now,
-        source: "sync",
-      });
+      const existing = await ctx.db
+        .query("guildBans")
+        .withIndex("by_guildId_userId", (q) => q.eq("guildId", args.guildId).eq("userId", userId))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          active: true,
+          bannedAt: now,
+          syncedAt: now,
+          source: "sync",
+        });
+      } else {
+        await ctx.db.insert("guildBans", {
+          guildId: args.guildId,
+          userId,
+          active: true,
+          bannedAt: now,
+          syncedAt: now,
+          source: "sync",
+        });
+      }
       updated++;
     }
     return { ok: true, updated };

@@ -533,11 +533,7 @@ function applyHeatThresholds(
   // `current` — nếu không, file mang cả 4 ngưỡng sẽ tự mâu thuẫn với chính nó.
   const decided = patch.heatTimeoutAt;
   const decidedNum = typeof decided === "number" ? decided : undefined;
-  const timeout = clamp(
-    read("heatTimeoutAt") ?? decidedNum ?? current.heatTimeoutAt ?? HEAT_DEFAULTS.timeoutAt,
-    1,
-    100,
-  );
+  const timeout = clamp(decidedNum ?? current.heatTimeoutAt ?? HEAT_DEFAULTS.timeoutAt, 1, 100);
   const w = clamp(warn, 1, 99);
   if (w >= timeout) invalid.push("heatWarnAt");
   else {

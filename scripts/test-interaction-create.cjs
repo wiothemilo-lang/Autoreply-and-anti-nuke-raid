@@ -2562,9 +2562,14 @@ Module._load = function (request, parent) {
       JSON.stringify(saved.map((m) => m.args.channelId)),
     );
     check(
+      "/lock all: gọi deferReply trước vòng lặp (chống quá hạn 3s trên server nhiều kênh)",
+      replies[0]?.deferred === true,
+      JSON.stringify(replies),
+    );
+    check(
       "/lock all: báo số kênh đã bỏ qua",
-      /bỏ qua/.test(replies[0]?.content || ""),
-      replies[0]?.content,
+      /bỏ qua/.test(replies[replies.length - 1]?.content || ""),
+      replies[replies.length - 1]?.content,
     );
   }
   {

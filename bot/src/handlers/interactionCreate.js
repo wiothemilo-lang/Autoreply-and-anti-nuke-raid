@@ -40,7 +40,10 @@ module.exports = async function onInteractionCreate(client, interaction, store, 
     if (interaction.customId.startsWith("ticket_open:")) {
       return ticketFlow.ticketOpenButton(client, store, interaction);
     }
-    if (interaction.customId === "ticket_open_dm") {
+    if (
+      interaction.customId === "ticket_open_dm" ||
+      interaction.customId.startsWith("ticket_open_dm:")
+    ) {
       return ticketFlow.ticketOpenDmButton(client, store, interaction);
     }
     if (interaction.customId.startsWith("ticket_")) {
@@ -54,7 +57,11 @@ module.exports = async function onInteractionCreate(client, interaction, store, 
     return ticketFlow.ticketOpenSubmitModal(client, store, interaction);
   }
   // ─── TICKET: modal khiếu nại (sau nút trong DM) ───
-  if (interaction.isModalSubmit() && interaction.customId === "ticket_appeal_dm") {
+  if (
+    interaction.isModalSubmit() &&
+    (interaction.customId === "ticket_appeal_dm" ||
+      interaction.customId.startsWith("ticket_appeal_dm:"))
+  ) {
     return ticketFlow.ticketAppealModal(client, store, interaction);
   }
   // ─── TICKET: modal ghi chú AI (nút trong kênh ticket) ───

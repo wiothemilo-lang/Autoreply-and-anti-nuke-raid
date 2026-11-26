@@ -703,15 +703,21 @@ export const setRestoreOptions = mutation({
     if (typeof restoreClearChannels === "boolean")
       patch.restoreClearChannelsEnabled = restoreClearChannels;
     await ctx.db.patch(guild._id, patch);
+    // Trả giá trị HIỆU LỰC sau khi patch (không phải snapshot trước patch).
+    const eff = (key: string, fallback: boolean) =>
+      typeof patch[key] === "boolean" ? (patch[key] as boolean) : fallback;
     return {
       ok: true,
-      restoreRoles: guild.restoreRolesEnabled ?? true,
-      restoreChannels: guild.restoreChannelsEnabled ?? true,
-      restoreMessages: guild.restoreMessagesEnabled ?? true,
-      restoreEmojis: guild.restoreEmojisEnabled ?? true,
-      restoreMeta: guild.restoreMetaEnabled ?? true,
-      restoreExtras: guild.restoreExtrasEnabled ?? false,
-      restoreClearChannels: guild.restoreClearChannelsEnabled ?? false,
+      restoreRoles: eff("restoreRolesEnabled", guild.restoreRolesEnabled ?? true),
+      restoreChannels: eff("restoreChannelsEnabled", guild.restoreChannelsEnabled ?? true),
+      restoreMessages: eff("restoreMessagesEnabled", guild.restoreMessagesEnabled ?? true),
+      restoreEmojis: eff("restoreEmojisEnabled", guild.restoreEmojisEnabled ?? true),
+      restoreMeta: eff("restoreMetaEnabled", guild.restoreMetaEnabled ?? true),
+      restoreExtras: eff("restoreExtrasEnabled", guild.restoreExtrasEnabled ?? false),
+      restoreClearChannels: eff(
+        "restoreClearChannelsEnabled",
+        guild.restoreClearChannelsEnabled ?? false,
+      ),
     };
   },
 });

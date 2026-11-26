@@ -195,7 +195,12 @@ export default function VerifyPage() {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (session === undefined) return;
+    if (session === null) {
+      setPhase("error");
+      setMessage(codeMessage("not_found"));
+      return;
+    }
     if (session.status === "verified") {
       // Convex cập nhật reactive: bot cấp role xong → trang tự chuyển từ
       // "đang cấp" sang "đã cấp". Chỉ grantState="applied" mới là thành công thật.
@@ -214,6 +219,11 @@ export default function VerifyPage() {
     }
     if (session.status === "denied") {
       setPhase("blocked");
+      return;
+    }
+    if (session.status === "expired") {
+      setPhase("error");
+      setMessage(codeMessage("expired"));
       return;
     }
     if (session.status === "pending") {

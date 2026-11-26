@@ -123,16 +123,19 @@ function mkWorld() {
         if (name === "bot_writes:botSaveTicketTranscript" && store.failSave) {
           throw new Error("storage chết");
         }
+        if (name === "bot_writes:botGenerateTicketTranscriptUploadUrl") {
+          return "https://upload.test/transcript";
+        }
         return {};
       },
-      storage: {
-        store: async () => {
-          log.push("storage.store");
-          if (store.failSave) throw new Error("storage chết");
-          return "STORAGE1";
-        },
-      },
     },
+  };
+  // ConvexHttpClient không có `.storage`: upload thật là POST lên URL do mutation cấp.
+  // Mock fetch toàn cục để ghi nhận `storage.store` đúng thứ tự trong log.
+  global.fetch = async () => {
+    log.push("storage.store");
+    if (store.failSave) throw new Error("storage chết");
+    return { ok: true, json: async () => ({ storageId: "STORAGE1" }) };
   };
   store.failSave = false;
   const client = { guilds: { cache: new Map([["G1", guild]]) } };

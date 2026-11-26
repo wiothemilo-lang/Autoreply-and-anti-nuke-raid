@@ -63,9 +63,61 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
   // Chống spam báo cáo khẩn (raid/nuke) — 2 knob ghi ngay bằng nút Lưu riêng.
   const [reportMinIntervalMin, setReportMinIntervalMin] = useState(data.guild.reportMinIntervalMin);
   const [reportMinEvents, setReportMinEvents] = useState(data.guild.reportMinEvents);
+  const [intervalDraft, setIntervalDraft] = useState(String(data.guild.reportMinIntervalMin));
+  const [eventsDraft, setEventsDraft] = useState(String(data.guild.reportMinEvents));
   const [theme, setTheme] = useState(data.guild.theme || DEFAULT_THEME);
   const [themeSaving, setThemeSaving] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Đồng bộ lại state cục bộ khi cấu hình server thay đổi (vd sau khi import JSON
+  // hoặc sửa từ tab khác) — chỉ ghi đè field mà giá trị server vừa đổi để không
+  // xoá nháp người dùng đang gõ ở field khác.
+  const lastServer = useRef({
+    prefix: data.guild.prefix,
+    logChannelId: data.guild.logChannelId ?? "none",
+    logLang: data.guild.logLang ?? "vi",
+    modLogChannelId: data.guild.modLogChannelId ?? "none",
+    modRolesKey: JSON.stringify(data.guild.modRoles),
+    adminRolesKey: JSON.stringify(data.guild.adminRoles),
+    reportMinIntervalMin: data.guild.reportMinIntervalMin,
+    reportMinEvents: data.guild.reportMinEvents,
+    theme: data.guild.theme || DEFAULT_THEME,
+  });
+  useEffect(() => {
+    const prev = lastServer.current;
+    const nextLogCh = data.guild.logChannelId ?? "none";
+    const nextLogLang = data.guild.logLang ?? "vi";
+    const nextModLogCh = data.guild.modLogChannelId ?? "none";
+    const nextModRolesKey = JSON.stringify(data.guild.modRoles);
+    const nextAdminRolesKey = JSON.stringify(data.guild.adminRoles);
+    const nextTheme = data.guild.theme || DEFAULT_THEME;
+    if (prev.prefix !== data.guild.prefix) setPrefix(data.guild.prefix);
+    if (prev.logChannelId !== nextLogCh) setLogChannelId(nextLogCh);
+    if (prev.logLang !== nextLogLang) setLogLang(nextLogLang);
+    if (prev.modLogChannelId !== nextModLogCh) setModLogChannelId(nextModLogCh);
+    if (prev.modRolesKey !== nextModRolesKey) setModRoles(data.guild.modRoles);
+    if (prev.adminRolesKey !== nextAdminRolesKey) setAdminRoles(data.guild.adminRoles);
+    if (prev.reportMinIntervalMin !== data.guild.reportMinIntervalMin) {
+      setReportMinIntervalMin(data.guild.reportMinIntervalMin);
+      setIntervalDraft(String(data.guild.reportMinIntervalMin));
+    }
+    if (prev.reportMinEvents !== data.guild.reportMinEvents) {
+      setReportMinEvents(data.guild.reportMinEvents);
+      setEventsDraft(String(data.guild.reportMinEvents));
+    }
+    if (prev.theme !== nextTheme) setTheme(nextTheme);
+    lastServer.current = {
+      prefix: data.guild.prefix,
+      logChannelId: nextLogCh,
+      logLang: nextLogLang,
+      modLogChannelId: nextModLogCh,
+      modRolesKey: nextModRolesKey,
+      adminRolesKey: nextAdminRolesKey,
+      reportMinIntervalMin: data.guild.reportMinIntervalMin,
+      reportMinEvents: data.guild.reportMinEvents,
+      theme: nextTheme,
+    };
+  }, [data.guild]);
 
   // Webhook config
   const webhookData = useQuery(api.webhooks.getGuildWebhooks, {
@@ -436,12 +488,23 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                       type="number"
                       min={1}
                       max={360}
-                      value={reportMinIntervalMin}
-                      onChange={(e) =>
-                        setReportMinIntervalMin(
-                          Math.max(1, Math.min(360, parseInt(e.target.value || "15", 10) || 15)),
-                        )
-                      }
+                      value={intervalDraft}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setIntervalDraft(raw);
+                        const n = parseInt(raw, 10);
+                        if (Number.isFinite(n)) {
+                          setReportMinIntervalMin(Math.max(1, Math.min(360, n)));
+                        }
+                      }}
+                      onBlur={() => {
+                        const n = parseInt(intervalDraft, 10);
+                        const clamped = Number.isFinite(n)
+                          ? Math.max(1, Math.min(360, n))
+                          : reportMinIntervalMin;
+                        setReportMinIntervalMin(clamped);
+                        setIntervalDraft(String(clamped));
+                      }}
                       className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-hidden focus:border-primary/60"
                     />
                   </label>
@@ -451,12 +514,23 @@ export default function SettingsPanel({ data }: { data: GuildData }) {
                       type="number"
                       min={1}
                       max={50}
-                      value={reportMinEvents}
-                      onChange={(e) =>
-                        setReportMinEvents(
-                          Math.max(1, Math.min(50, parseInt(e.target.value || "1", 10) || 1)),
-                        )
-                      }
+                      value={eventsDraft}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setEventsDraft(raw);
+                        const n = parseInt(raw, 10);
+                        if (Number.isFinite(n)) {
+                          setReportMinEvents(Math.max(1, Math.min(50, n)));
+                        }
+                      }}
+                      onBlur={() => {
+                        const n = parseInt(eventsDraft, 10);
+                        const clamped = Number.isFinite(n)
+                          ? Math.max(1, Math.min(50, n))
+                          : reportMinEvents;
+                        setReportMinEvents(clamped);
+                        setEventsDraft(String(clamped));
+                      }}
                       className="h-9 w-20 rounded-lg border border-border bg-card px-2 text-center font-mono text-sm text-foreground outline-hidden focus:border-primary/60"
                     />
                   </label>

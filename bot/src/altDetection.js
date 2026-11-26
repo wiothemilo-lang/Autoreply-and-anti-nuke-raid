@@ -445,8 +445,8 @@ async function analyzeNewMember(member, config, store) {
 
   // Layer 10: VPN — REMOVED behavioral heuristic (feedback loop)
   let isVPN = false;
-  let ipCountry = null;
-  let ipOrg = null;
+  let ipCountry = undefined;
+  let ipOrg = undefined;
 
   // === STRONG SIGNALS (bằng chứng độc lập) ===
   // Mỗi nhóm là một DẠNG bằng chứng khác nhau. Nhiều bằng chứng độc lập = độ

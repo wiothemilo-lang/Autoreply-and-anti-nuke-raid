@@ -842,7 +842,7 @@ const check = (label, ok) => {
         mentionable: true,
         permissions: "0",
         position: 0,
-        icon: "https://cdn/role.png",
+        icon: PNG_URI,
         unicodeEmoji: "🐶",
       },
       { id: "rx", name: "", position: 1 },
@@ -2566,7 +2566,7 @@ const check = (label, ok) => {
       TGT,
       JSON.stringify({
         ...richBackup,
-        guildMeta: { name: "Tên Mới", description: "mô tả mới", iconUrl: "https://cdn/i.png" },
+        guildMeta: { name: "Tên Mới", description: "mô tả mới", iconUrl: PNG_URI },
       }),
     );
     check(
@@ -2576,6 +2576,42 @@ const check = (label, ok) => {
         r.metaApplied.icon &&
         tg._log.meta.length === 3,
       JSON.stringify(tg._log.meta),
+    );
+    // Bảo mật SSRF + LFI: URL metadata / loopback / đường dẫn file cục bộ TUYỆT ĐỐI
+    // không bao giờ được truyền thẳng vào setIcon/setBanner/setSplash (DataResolver).
+    const ssrfTg = makeTarget();
+    let ssrfIconCalled = false;
+    ssrfTg.roles.create = async (opts) => {
+      return {
+        id: "r-ssrf",
+        name: opts.name,
+        setIcon: async () => {
+          ssrfIconCalled = true;
+        },
+      };
+    };
+    const ssrfRes = await backup.runRestore(
+      { guilds: { cache: new Map([[TGT, ssrfTg]]) } },
+      st,
+      TGT,
+      JSON.stringify({
+        ...richBackup,
+        roles: [{ id: "r-bad", name: "Bad", permissions: "0", position: 0, icon: "/etc/passwd" }],
+        guildMeta: {
+          name: "An Toàn",
+          iconUrl: "http://169.254.169.254/latest/meta-data/",
+          bannerUrl: "http://127.0.0.1:8787/secret",
+          splashUrl: ".env",
+        },
+      }),
+    );
+    check(
+      "bảo mật restore: chặn SSRF (169.254/127.0.0.1) và đọc file cục bộ (/etc/passwd, .env)",
+      !ssrfIconCalled &&
+        !ssrfRes.metaApplied.icon &&
+        !ssrfRes.metaApplied.banner &&
+        !ssrfRes.metaApplied.splash,
+      JSON.stringify({ ssrfIconCalled, metaApplied: ssrfRes.metaApplied }),
     );
   }
   {

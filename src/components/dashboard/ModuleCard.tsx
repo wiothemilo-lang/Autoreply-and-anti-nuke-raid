@@ -126,10 +126,14 @@ export function ModuleNumber({
       onChange={(e) => setV(e.target.value)}
       onBlur={() => {
         setFocused(false);
+        // Ô trống: Number("") === 0 sẽ tự ghi 0 (tắt decay/warn strike) nếu không chặn.
+        if (v.trim() === "") return;
         const n = Number(v);
         // Ngoài miền → không commit; effect trên tự đồng bộ lại giá trị server.
         if (Number.isNaN(n) || n < min || (max !== undefined && n > max)) return;
-        onCommit(Math.round(n));
+        const rounded = Math.round(n);
+        if (rounded === value) return;
+        onCommit(rounded);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();

@@ -170,10 +170,15 @@ export default function Dashboard() {
   if (!me) return null;
 
   async function handleLogout() {
-    await logout({ token });
-    clearSessionToken();
-    clearLegacyDiscordAccess();
-    navigate("/");
+    try {
+      await logout({ token });
+    } catch {
+      // Mất mạng / backend lỗi vẫn phải dọn phiên cục bộ để người dùng thoát được.
+    } finally {
+      clearSessionToken();
+      clearLegacyDiscordAccess();
+      navigate("/");
+    }
   }
 
   async function handleRefresh() {

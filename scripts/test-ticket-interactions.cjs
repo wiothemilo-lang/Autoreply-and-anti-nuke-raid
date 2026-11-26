@@ -54,6 +54,7 @@ module.exports = {
 // Bảng chuỗi ticket giả — chỉ cần đủ các khoá interactionCreate.js dùng.
 const T = {
   errDisabled: "TICKET_DISABLED",
+  errNotBanned: "ERR_NOT_BANNED",
   errNoStaff: "ERR_NO_STAFF",
   errBotAccount: "ERR_BOT_ACCOUNT",
   myTicket: "MY_TICKET {ch} {link}",
@@ -272,6 +273,12 @@ Module._load = function (request, parent) {
           if (ctl.stateThrows) throw new Error("Convex down");
           return ctl.myTicketState;
         }
+        // Đọc bản ghi ticket PHẢI đi qua store.client (proxy tự gắn botKey) — không
+        // phải discord Client. Bản cũ gọi nhầm client.query nên mọi nút ticket hỏng.
+        if (name === "tickets:botTicketById") {
+          if (ctl.queryThrows) throw new Error("Convex down");
+          return ctl.ticketRow;
+        }
         return null;
       },
     },
@@ -288,11 +295,8 @@ Module._load = function (request, parent) {
       cache: new Map([["g1", guild]]),
       fetch: async () => (ctl.guildFetchOk ? guild : null),
     },
-    query: async (name) => {
-      ctl.calls.push({ fn: "clientQuery", name });
-      if (ctl.queryThrows) throw new Error("Convex down");
-      return ctl.ticketRow;
-    },
+    // KHÔNG có `query`: discord Client thật không có hàm này. Code gọi nhầm sẽ
+    // ném TypeError ngay trong test thay vì lọt lên production.
   };
 
   function reset() {
@@ -398,6 +402,47 @@ Module._load = function (request, parent) {
     check(
       "ticket_open_dm: bật → mở modal khiếu nại",
       shownModals.length === 1 && shownModals[0].kind === "appeal",
+    );
+  }
+
+  // Id server nhúng trong customId: DM không có interaction.guild/guildId.
+  {
+    reset();
+    configs.set("g1", { ticketEnabled: true, ticketStaffRoleId: "r-staff" });
+    await run({ isButton: true, customId: "ticket_open_dm:123456789012345678", noGuild: true });
+    check(
+      "ticket_open_dm:<guildId>: tra được server từ customId → mở modal",
+      shownModals.length === 1 && shownModals[0].kind === "appeal",
+    );
+  }
+  {
+    reset();
+    configs.set("g1", { ticketEnabled: true, ticketStaffRoleId: "r-staff" });
+    guild.bans = {
+      fetch: async () => {
+        throw Object.assign(new Error("Unknown Ban"), { code: 10026 });
+      },
+    };
+    await run({ isButton: true, customId: "ticket_open_dm:123456789012345678", noGuild: true });
+    delete guild.bans;
+    check(
+      "ticket_open_dm: người bấm KHÔNG bị ban ở server đó → từ chối, không mở modal",
+      shownModals.length === 0 && lastReply() === T.errNotBanned,
+    );
+  }
+  {
+    reset();
+    configs.set("g1", { ticketEnabled: true, ticketStaffRoleId: "r-staff" });
+    guild.bans = {
+      fetch: async () => {
+        throw Object.assign(new Error("Missing Permissions"), { code: 50013 });
+      },
+    };
+    await run({ isButton: true, customId: "ticket_open_dm:123456789012345678", noGuild: true });
+    delete guild.bans;
+    check(
+      "ticket_open_dm: lỗi quyền khi dò ban (không phải Unknown Ban) → không chặn oan",
+      shownModals.length === 1,
     );
   }
 
@@ -746,6 +791,11 @@ Module._load = function (request, parent) {
     check(
       "modal đóng lý do: truyền lý do đã trim + graceHours",
       call && call.args.reason === "Đã giải quyết" && call.args.graceHours === 12,
+    );
+    check(
+      "modal đóng lý do: truyền openerId để thu quyền người mở (không còn đọc/ghi kênh đã đóng)",
+      call && call.args.openerId === "u-opener",
+      JSON.stringify(call?.args?.openerId),
     );
     check("modal đóng lý do: báo đã đóng kèm lý do", lastReply() === "CLOSED_REASON_Đã giải quyết");
   }

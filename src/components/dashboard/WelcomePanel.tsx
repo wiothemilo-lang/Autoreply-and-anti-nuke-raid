@@ -538,7 +538,7 @@ function GreetingCard({
 }: {
   kind: Kind;
   data: GuildData;
-  onSave: (patch: Record<string, unknown>, msg: string) => Promise<void>;
+  onSave: (patch: Record<string, unknown>, msg: string) => Promise<boolean>;
 }) {
   const g = data.guild;
   const isWelcome = kind === "welcome";
@@ -554,7 +554,7 @@ function GreetingCard({
   const cardEnabled = isWelcome ? g.welcomeCardEnabled : g.goodbyeCardEnabled;
   const cardBackground = isWelcome ? g.welcomeCardBackground : g.goodbyeCardBackground;
 
-  const [channel, setChannel] = useState(channelId ?? "none");
+  const [channel, setChannel] = useState(channelId || "none");
   const [msg, setMsg] = useState(message ?? "");
   const [randomMsg, setRandomMsg] = useState(random ?? "");
   const [title, setTitle] = useState(embedTitle ?? "");
@@ -580,7 +580,7 @@ function GreetingCard({
   }>({});
   useEffect(() => {
     const prev = lastServer.current;
-    if (prev.channelId !== channelId) setChannel(channelId ?? "none");
+    if (prev.channelId !== channelId) setChannel(channelId || "none");
     if (prev.message !== message) setMsg(message ?? "");
     if (prev.random !== random) setRandomMsg(random ?? "");
     if (prev.title !== embedTitle) setTitle(embedTitle ?? "");
@@ -594,7 +594,7 @@ function GreetingCard({
    */
   useUnsavedChanges(
     `welcome-embed-${kind}`,
-    channel !== (channelId ?? "none") ||
+    channel !== (channelId || "none") ||
       msg !== (message ?? "") ||
       randomMsg !== (random ?? "") ||
       title !== (embedTitle ?? "") ||
@@ -643,12 +643,12 @@ function GreetingCard({
             onCheckedChange={(v) => {
               // Bật mà chưa có kênh gửi = bot im lặng mãi (không có chỗ nào để gửi).
               // Chặn ngay tại đây kèm lý do rõ ràng thay vì lưu xong để người dùng
-              // tưởng tính năng hỏng.
+              // tưởng tính năng hỏng. Trả `false` để Switch tự gạt nút về vị trí cũ.
               if (v && channel === "none") {
                 toast.error(translate("Chọn kênh gửi trước khi bật tính năng này."));
-                return;
+                return false;
               }
-              void onSave({ [`${kind}Enabled`]: v }, translate(v ? "Đã bật" : "Đã tắt"));
+              return onSave({ [`${kind}Enabled`]: v }, translate(v ? "Đã bật" : "Đã tắt"));
             }}
           />
         </div>
@@ -968,7 +968,7 @@ function DmCard({
   onSave,
 }: {
   data: GuildData;
-  onSave: (patch: Record<string, unknown>, msg: string) => Promise<void>;
+  onSave: (patch: Record<string, unknown>, msg: string) => Promise<boolean>;
 }) {
   const g = data.guild;
   const [msg, setMsg] = useState(g.welcomeDmMessage ?? "");
@@ -1036,7 +1036,7 @@ function AutoroleCard({
   onSave,
 }: {
   data: GuildData;
-  onSave: (patch: Record<string, unknown>, msg: string) => Promise<void>;
+  onSave: (patch: Record<string, unknown>, msg: string) => Promise<boolean>;
 }) {
   const g = data.guild;
   const roleId = g.autoroleRoleId ?? "none";
@@ -1143,12 +1143,14 @@ export default function WelcomePanel({ data }: { data: GuildData }) {
     g.autoroleEnabled,
   ].filter(Boolean).length;
 
-  async function onSave(patch: Record<string, unknown>, msg: string) {
+  async function onSave(patch: Record<string, unknown>, msg: string): Promise<boolean> {
     try {
       await updateSettings({ token: TOKEN(), guildId: g.discordId, ...patch });
       toast.success(msg);
+      return true;
     } catch (e) {
       toastConvexError(e, translate("Lưu thất bại"));
+      return false;
     }
   }
 

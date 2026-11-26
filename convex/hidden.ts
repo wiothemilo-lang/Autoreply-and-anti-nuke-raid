@@ -627,7 +627,12 @@ async function legacyHiddenPasswordGuilds(ctx: QueryCtx | MutationCtx) {
  * Không: index Convex được duyệt trước khi query chạy, nên luôn đủ.
  */
 async function legacyHiddenPasswordExists(ctx: QueryCtx | MutationCtx): Promise<boolean> {
-  const row = await ctx.db.query("guilds").withIndex("by_hiddenPasswordHash").first();
+  // Trong index Convex, undefined đứng trước mọi chuỗi — phải chặn gt("") để
+  // không trả về hàng thiếu hiddenPasswordHash rồi kết luận sai là "không có".
+  const row = await ctx.db
+    .query("guilds")
+    .withIndex("by_hiddenPasswordHash", (q) => q.gt("hiddenPasswordHash", ""))
+    .first();
   return !!row?.hiddenPasswordHash;
 }
 

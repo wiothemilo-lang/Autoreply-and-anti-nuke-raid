@@ -260,7 +260,8 @@ module.exports = function createAntiNukeLayer({
         }
       }
       // Embed case kiểu Carl-bot cho phạt tự động (responsible moderator = tên bot).
-      if (!isBenign) {
+      // Module chỉ xoá/dọn tin nhắn không phạt thành viên → chosen là null, bỏ qua.
+      if (!isBenign && chosen) {
         try {
           await sendCaseLog({
             guild: message.guild,
@@ -433,7 +434,7 @@ module.exports = function createAntiNukeLayer({
       }
     }
     // Embed case kiểu Carl-bot cho phạt tự động (responsible moderator = tên bot).
-    if (!isBenign) {
+    if (!isBenign && chosen) {
       try {
         await sendCaseLog({
           guild: message.guild,

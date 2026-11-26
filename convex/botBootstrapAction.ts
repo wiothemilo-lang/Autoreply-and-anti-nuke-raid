@@ -150,10 +150,10 @@ export const requestBotKey = action({
     if (!bot) {
       return { ok: false as const, error: "Token bot không hợp lệ (Discord từ chối)" };
     }
-    knownGoodToken = { hash: tokenHash, at: Date.now() };
     const status = await ctx.runQuery(internal.botAuth.getBotKeyStatusInternal);
     const applicationError = assertExpectedBotApplication(bot, status.botApplicationId);
     if (applicationError) return { ok: false as const, error: applicationError };
+    knownGoodToken = { hash: tokenHash, at: Date.now() };
     // Bot thật còn sống (heartbeat mới) → không cho xoay seed ngoài luồng.
     // Đặt TRƯỚC markBootstrapAttempt để lượt bị chặn không đốt cooldown 10 phút
     // của lần self-heal hợp lệ kế tiếp.

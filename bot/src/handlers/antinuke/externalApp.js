@@ -447,8 +447,14 @@ module.exports = function createAntiNukeLayer({ client, store, state, core, ai, 
 
     // Whitelist known logging bots (Carl-bot, MEE6, Dyno...) — tạo webhook hợp pháp
     // để ghi log, KHÔNG phải external app raid.
-    const webhookName = (message.author?.username || "").toLowerCase();
-    if (webhookName && KNOWN_LOGGING_BOTS.some((b) => webhookName.includes(b))) return;
+    // Chỉ khớp CHÍNH XÁC tên (không dùng `.includes()`) và KHÔNG miễn trừ khi
+    // nội dung chứa dấu hiệu raid (@everyone/@here/link mời Discord) — kẻ raid
+    // có thể tự đặt username webhook bất kỳ theo từng request.
+    const webhookName = (message.author?.username || "").trim().toLowerCase();
+    const hasRaidPayload = /(@everyone|@here|discord\.gg\/|discord\.com\/invite\/)/i.test(
+      message.content || "",
+    );
+    if (webhookName && !hasRaidPayload && KNOWN_LOGGING_BOTS.includes(webhookName)) return;
 
     const config = await store.getConfig(message.guild.id);
     if (!config || !config.antinukeEnabled) return;

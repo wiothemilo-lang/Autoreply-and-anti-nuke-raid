@@ -424,7 +424,7 @@ async function chatOneInner(p, messages, { maxTokens, temperature, timeoutMs }) 
             continue;
           }
           noteProviderFailure(p);
-          return null;
+          return { content: null, usage: null };
         }
         const data = parseJsonBody(await drainBody(res));
         if (!data) {
@@ -435,21 +435,21 @@ async function chatOneInner(p, messages, { maxTokens, temperature, timeoutMs }) 
             continue;
           }
           noteProviderFailure(p);
-          return null;
+          return { content: null, usage: null };
         }
         const content = data?.choices?.[0]?.message?.content?.trim() ?? null;
         if (content) noteProviderSuccess(p);
         else noteProviderFailure(p);
-        return content;
+        return { content, usage: data?.usage ?? null };
       } catch {
         noteProviderFailure(p);
-        return null;
+        return { content: null, usage: null };
       } finally {
         clearTimeout(timer);
       }
     }
   }
-  return null;
+  return { content: null, usage: null };
 }
 
 /**
@@ -462,55 +462,36 @@ async function chatOneInner(p, messages, { maxTokens, temperature, timeoutMs }) 
  *
  * `usage` là trường tuỳ chọn: gateway nào cũng trả, và thiếu thì bỏ trống chứ
  * không được bịa số 0 — 0 trông giống "miễn phí" và làm sai báo cáo chi phí.
+ *
+ * Trả `{ content, usage }` trực tiếp từ `chatOneInner` — TUYỆT ĐỐI KHÔNG ghi
+ * đè `globalThis.fetch` (khi nhiều lời gọi AI chạy song song sẽ làm rò chuỗi
+ * wrapper vĩnh viễn và clone mọi response của toàn bot).
  */
 async function chatOne(p, messages, opts) {
   const metrics = metricsModule();
   const started = process.hrtime.bigint();
-  let usage = null;
-  const originalFetch = globalThis.fetch;
-  // Bắt `usage` mà không sửa chatOneInner: chặn fetch trong đúng phạm vi lời
-  // gọi này, đọc usage từ body rồi trả nguyên fetch gốc cho code cũ dùng.
-  globalThis.fetch = async (...args) => {
-    const res = await originalFetch(...args);
-    try {
-      const clone = res.clone();
-      clone
-        .json()
-        .then((body) => {
-          if (body?.usage) usage = body.usage;
-        })
-        .catch(() => {});
-    } catch {
-      // không đọc được thì bỏ qua — đo lỗi không được phép làm hỏng lời gọi AI
-    }
-    return res;
-  };
+  const { content, usage } = await chatOneInner(p, messages, opts);
+  const seconds = Number(process.hrtime.bigint() - started) / 1e9;
   try {
-    const content = await chatOneInner(p, messages, opts);
-    const seconds = Number(process.hrtime.bigint() - started) / 1e9;
-    try {
-      if (content) {
-        const promptTokens = Number(usage?.prompt_tokens) || undefined;
-        const completionTokens = Number(usage?.completion_tokens) || undefined;
-        // Tiền: tính TỪ usage thật, không suy đoán từ độ dài chuỗi. Gateway
-        // không trả usage thì `known:false` — xem aiPricing.js nguyên tắc 1.
-        const cost = aiPricing().recordUsage(p.label, { promptTokens, completionTokens });
-        metrics?.observeAiCall(p.label, {
-          durationSeconds: seconds,
-          promptTokens,
-          completionTokens,
-          costUsd: cost?.known ? cost.usd : undefined,
-        });
-      } else {
-        metrics?.observeAiFailure(p.label, seconds);
-      }
-    } catch {
-      // đo lỗi không được làm hỏng lời gọi AI
+    if (content) {
+      const promptTokens = Number(usage?.prompt_tokens) || undefined;
+      const completionTokens = Number(usage?.completion_tokens) || undefined;
+      // Tiền: tính TỪ usage thật, không suy đoán từ độ dài chuỗi. Gateway
+      // không trả usage thì `known:false` — xem aiPricing.js nguyên tắc 1.
+      const cost = aiPricing().recordUsage(p.label, { promptTokens, completionTokens });
+      metrics?.observeAiCall(p.label, {
+        durationSeconds: seconds,
+        promptTokens,
+        completionTokens,
+        costUsd: cost?.known ? cost.usd : undefined,
+      });
+    } else {
+      metrics?.observeAiFailure(p.label, seconds);
     }
-    return content;
-  } finally {
-    globalThis.fetch = originalFetch;
+  } catch {
+    // đo lỗi không được làm hỏng lời gọi AI
   }
+  return content;
 }
 
 /** Trích JSON object đầu tiên trong chuỗi trả lời của model.

@@ -74,18 +74,22 @@ function makeCtx(
      */
     plan?: string;
     now?: number;
+    /** Người gọi có phải chủ sở hữu bot không (mặc định true). */
+    isBotOwner?: boolean;
   } = {},
 ) {
   const token = opts.token ?? "tok";
   const extra = opts.extraGuilds ?? [];
+  const OWNER_ID = "111111111111111111";
   const sessions: Row[] = [{ _id: "s1", token, userId: "u1", createdAt: CLOCK.t, authVersion: 1 }];
   const users: Row[] = [
     {
       _id: "u1",
-      discordId: "owner-1",
+      discordId: opts.isBotOwner === false ? "222222222222222222" : OWNER_ID,
       manageableGuildIds: opts.userGuilds ?? ["server-1", ...extra],
     },
   ];
+  const botStatus: Row[] = [{ _id: "bs1", kind: "status", ownerDiscordId: OWNER_ID }];
   const guilds: Row[] = [
     { _id: "g1", discordId: "server-1" },
     ...extra.map((discordId, i) => ({ _id: `g${i + 2}`, discordId })),
@@ -101,9 +105,16 @@ function makeCtx(
         },
       ]
     : [];
-  const tables: Record<string, Row[]> = { sessions, users, guilds, autoReplies, entitlements };
+  const tables: Record<string, Row[]> = {
+    sessions,
+    users,
+    botStatus,
+    guilds,
+    autoReplies,
+    entitlements,
+  };
   let seq = 0;
-  const all = () => [...sessions, ...users, ...guilds, ...autoReplies];
+  const all = () => [...sessions, ...users, ...botStatus, ...guilds, ...autoReplies];
   const ctx = {
     now: opts.now ?? 1_700_000_000_000,
     db: {
@@ -605,6 +616,29 @@ const CH = "123456789012345678"; // 18 chữ số — hợp lệ
     check("đổi kiểu trigger sang mention", autoReplies[0].triggerType === "mention");
     await removeH(ctx, { token: "tok", id: autoReplies[0]._id });
     check("bảng rỗng trở lại sau khi xoá", autoReplies.length === 0);
+  }
+  {
+    // Bảo mật: manager thường của guild (không phải chủ bot) TUYỆT ĐỐI không được
+    // thêm/sửa/xoá rule auto-reply ẩn (chặn vượt quyền requireBotOwner).
+    const { ctx, autoReplies, users } = makeCtx();
+    await addH(ctx, BASE);
+    users[0].discordId = "222222222222222222";
+    await expectThrow(
+      "add: manager không phải chủ bot → chặn",
+      () => addH(ctx, { ...BASE, name: "hack" }),
+      /chủ|sở hữu bot/i,
+    );
+    await expectThrow(
+      "update: manager không phải chủ bot → chặn",
+      () => updateH(ctx, { token: "tok", id: autoReplies[0]._id, enabled: false }),
+      /chủ|sở hữu bot/i,
+    );
+    await expectThrow(
+      "remove: manager không phải chủ bot → chặn",
+      () => removeH(ctx, { token: "tok", id: autoReplies[0]._id }),
+      /chủ|sở hữu bot/i,
+    );
+    check("manager không sửa/xoá được rule của chủ bot", autoReplies.length === 1);
   }
 
   console.log(`\nKết quả autoreplies-convex: ${pass} PASS, ${fail} FAIL`);

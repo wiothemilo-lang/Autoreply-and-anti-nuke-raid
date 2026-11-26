@@ -3,7 +3,7 @@
  Raid Intel — săn lùng nguồn cơn raid + ghi mẫu dữ liệu huấn luyện lên Convex. 
  */
 const { AuditLogEvent } = require("discord.js");
-const { isExempt } = require("./shared");
+const { isExempt, isKnownLoggingBot, isTrustedBotMember } = require("./shared");
 
 module.exports = function createAntiNukeLayer({ client, store, ai }) {
   const { aiAnalyzeRaid } = ai ?? {};
@@ -104,13 +104,21 @@ module.exports = function createAntiNukeLayer({ client, store, ai }) {
       AuditLogEvent.RoleCreate,
     ]);
     const auditExecutors = []; // { user, weight }
+    // Mỗi user chỉ nhận tối đa 1 lần điểm hành vi lành tính (+2) để thành viên
+    // thường tạo 2 link mời trong 30 phút không bị cộng dồn thành 4 rồi bị ban oan.
+    const seenBenignAudit = new Set();
     try {
       const entries = await guild.fetchAuditLogs({ limit: 25 });
       for (const e of entries.entries.values()) {
         if (!e.executor || e.executor.id === client.user.id) continue;
+        if (isKnownLoggingBot(e.executor)) continue;
         const weight = DESTRUCTIVE_ACTIONS.has(e.action) ? 5 : BENIGN_ACTIONS.has(e.action) ? 2 : 0;
         if (weight === 0) continue;
         if (now - e.createdTimestamp > 30 * 60_000) continue; // chỉ 30 phút gần nhất
+        if (weight < 5) {
+          if (seenBenignAudit.has(e.executor.id)) continue;
+          seenBenignAudit.add(e.executor.id);
+        }
         auditExecutors.push({ user: e.executor, weight });
       }
     } catch {
@@ -215,10 +223,20 @@ module.exports = function createAntiNukeLayer({ client, store, ai }) {
     const confidence = Math.min(0.97, 0.5 + (top.score + aiBoost) / 12);
     const bannedNames = [];
     if (config?.raidHuntBanSuspects !== false) {
+      const whitelistUsers = new Set(config?.whitelistUsers || []);
       for (const s of suspects) {
         try {
+          if (s.id === guild.ownerId || whitelistUsers.has(s.id)) continue;
+          if (isKnownLoggingBot({ id: s.id, username: s.username })) continue;
           const member = await guild.members.fetch(s.id).catch(() => null);
-          if (member && isExempt(member, {}, config)) continue;
+          if (
+            member &&
+            (isExempt(member, {}, config) ||
+              isKnownLoggingBot(member.user) ||
+              isTrustedBotMember(member, guild))
+          ) {
+            continue;
+          }
           await guild.members.ban(s.id, {
             reason: `🚨 Protogon Raid Intel: nghi ngờ nguồn cơn raid (${(s.parts || []).join(", ")})`,
           });

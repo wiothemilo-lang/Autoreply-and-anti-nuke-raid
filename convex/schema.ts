@@ -135,7 +135,10 @@ export default defineSchema({
         emojiCount: v.number(),
         stickerCount: v.number(),
         threadCount: v.optional(v.number()),
+        memberCount: v.optional(v.number()),
+        memberRoleAssignments: v.optional(v.number()),
         banCount: v.optional(v.number()),
+        metaFieldCount: v.optional(v.number()),
         /** Số mục cấu hình (admin/mod/whitelist/kênh log) sẽ được áp lại. */
         settingsCount: v.number(),
         /** Cảnh báo tiếng Việt — bot so sánh backup với quyền và server hiện tại. */
@@ -1389,6 +1392,8 @@ export default defineSchema({
   })
     .index("by_kind_valueHash", ["kind", "valueHash"])
     .index("by_kind_valueHash_userId", ["kind", "valueHash", "userId"])
+    .index("by_guildId_kind_valueHash", ["guildId", "kind", "valueHash"])
+    .index("by_guildId_kind_valueHash_userId", ["guildId", "kind", "valueHash", "userId"])
     .index("by_guildId_userId", ["guildId", "userId"])
     .index("by_lastSeenAt", ["lastSeenAt"]),
 

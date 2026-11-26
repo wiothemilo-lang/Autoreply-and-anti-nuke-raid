@@ -220,10 +220,9 @@ async function openTicket({
   const kindKey = core.normalizeKind(kind, kinds);
   const staffIds = core.staffRoleIdsForKind(kinds, kindKey, staffRoleIds(config));
   const categoryId = config?.ticketCategoryId;
-  const state = await client.query("tickets:botTicketState", {
+  const state = await store.client.query("tickets:botTicketState", {
     guildId: guild.id,
     userId: user.id,
-    botKey: process.env.PROTOGON_BOT_KEY || undefined,
   });
 
   const decision = core.decideOpen({
@@ -277,18 +276,26 @@ async function openTicket({
   // Lỗi tạo category → dùng luôn category cha thay vì hỏng cả lượt mở
   // ticket: người dùng đã bấm nút rồi, mất ticket tệ hơn là kênh nằm chỗ
   // kém đẹp.
+  // Discord KHÔNG cho lồng category trong category (HTTP 400 nếu có `parent`),
+  // nên category theo loại nằm CẠNH category cha. Tái sử dụng category cùng tên
+  // đã có thay vì tạo thêm một bản mỗi lần có người mở ticket.
   let category = rootCategory;
   if (config?.ticketCategoryPerKind === true) {
     try {
+      const catName = core.sanitizeChannelName(
+        `tk-${(kinds.find((k) => k.key === kindKey)?.label ?? kindKey).toLowerCase()}`,
+      );
+      const existing = guild.channels.cache.find?.(
+        (c) => c.type === ChannelType.GuildCategory && c.name === catName,
+      );
       category =
+        existing ??
         (await guild.channels.create({
-          name: core.sanitizeChannelName(
-            `tk-${(kinds.find((k) => k.key === kindKey)?.label ?? kindKey).toLowerCase()}`,
-          ),
+          name: catName,
           type: ChannelType.GuildCategory,
-          parent: rootCategory,
           reason: `Phân loại ticket ${kindKey}`,
-        })) ?? rootCategory;
+        })) ??
+        rootCategory;
     } catch (e) {
       console.error(`[tickets] tạo category con thất bại ${guild.id}:`, e.message);
       category = rootCategory;
@@ -584,31 +591,34 @@ function banNoticeEmbed({ guild, reason, T }) {
     .setTimestamp();
 }
 
-/** Nút "Mở khiếu nại" trong DM. */
-function dmButtonRow(T) {
+/** Discord giới hạn nhãn ô nhập + tiêu đề modal ở 45 ký tự — quá là builder NÉM lỗi. */
+const fit45 = (s) => [...String(s ?? "")].slice(0, 45).join("");
+
+/** Nút "Mở khiếu nại" trong DM. `guildId` nhúng vào customId: DM không có `interaction.guild`. */
+function dmButtonRow(T, guildId) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId("ticket_open_dm")
-      .setLabel(T.modalTitle)
+      .setCustomId(guildId ? `ticket_open_dm:${guildId}` : "ticket_open_dm")
+      .setLabel(fit45(T.modalTitle))
       .setStyle(ButtonStyle.Primary),
   );
 }
 
 /** Modal hỏi nội dung khiếu nại (điểm vào A). */
-function appealModal(T) {
+function appealModal(T, guildId) {
   return new ModalBuilder()
-    .setCustomId("ticket_appeal_dm")
-    .setTitle(T.modalTitle)
+    .setCustomId(guildId ? `ticket_appeal_dm:${guildId}` : "ticket_appeal_dm")
+    .setTitle(fit45(T.modalTitle))
     .addComponents(
       new TextInputBuilder()
         .setCustomId("ticket_body")
-        .setLabel(T.modalAppealLabel)
+        .setLabel(fit45(T.modalAppealLabel))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true)
         .setMaxLength(core.BODY_MAX),
       new TextInputBuilder()
         .setCustomId("ticket_evidence")
-        .setLabel(T.modalEvidenceLabel)
+        .setLabel(fit45(T.modalEvidenceLabel))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setMaxLength(core.EVIDENCE_MAX),
@@ -729,33 +739,38 @@ function openModal(T, kind, kinds = null) {
   const rows = [
     new TextInputBuilder()
       .setCustomId("ticket_body")
-      .setLabel(spec.bodyLabel)
-      .setPlaceholder(spec.bodyPlaceholder)
+      .setLabel(fit45(spec.bodyLabel))
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(true)
       .setMaxLength(core.BODY_MAX),
     new TextInputBuilder()
       .setCustomId("ticket_evidence")
-      .setLabel(spec.evidenceLabel)
-      .setPlaceholder(spec.evidencePlaceholder)
+      .setLabel(fit45(spec.evidenceLabel))
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(false)
       .setMaxLength(core.EVIDENCE_MAX),
   ];
+  // Placeholder có thể `undefined` (loại khiếu nại không có gợi ý): builder NÉM
+  // lỗi khi nhận undefined nên chỉ gọi khi có giá trị.
+  if (spec.bodyPlaceholder) rows[0].setPlaceholder(spec.bodyPlaceholder);
+  if (spec.evidencePlaceholder) rows[1].setPlaceholder(spec.evidencePlaceholder);
   // Ô bổ sung do chủ server thêm. `long` → ô nhiều dòng; ô ngắn cắt 300 ký tự
   // (trần thực tế của ô Short trên Discord là 4000 nhưng ô 1 dòng hiển thị
   // vừa đủ, nhập dài không ai đọc nổi).
   for (const f of spec.extraFields) {
     const b = new TextInputBuilder()
       .setCustomId(f.customId)
-      .setLabel(f.label)
+      .setLabel(fit45(f.label))
       .setStyle(f.long ? TextInputStyle.Paragraph : TextInputStyle.Short);
     if (f.placeholder) b.setPlaceholder(f.placeholder);
     b.setRequired(f.required);
     b.setMaxLength(f.long ? core.BODY_MAX : core.EXTRA_VALUE_MAX);
     rows.push(b);
   }
-  return new ModalBuilder().setCustomId(spec.customId).setTitle(spec.title).addComponents(rows);
+  return new ModalBuilder()
+    .setCustomId(spec.customId)
+    .setTitle(fit45(spec.title))
+    .addComponents(rows);
 }
 
 /**
@@ -804,9 +819,8 @@ async function sendOpenPanel(client, store, item) {
   // luôn tính năng (chủ server thích thấy "đang có 3 ticket chờ" trên panel).
   let openCount = 0;
   try {
-    const state = await client.query("tickets:botTicketSummary", {
+    const state = await store.client.query("tickets:botTicketSummary", {
       guildId: guild.id,
-      botKey: process.env.PROTOGON_BOT_KEY || undefined,
     });
     openCount = Number(state?.openCount ?? 0) || 0;
   } catch {
@@ -967,12 +981,12 @@ function panelRows(T, ticketId) {
 function closeReasonModal(T, ticketId) {
   return new ModalBuilder()
     .setCustomId("ticket_close_reason_submit:" + ticketId)
-    .setTitle(T.reasonModalTitle)
+    .setTitle(fit45(T.reasonModalTitle))
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId("ticket_close_reason_body")
-          .setLabel(T.reasonModalLabel)
+          .setLabel(fit45(T.reasonModalLabel))
           .setStyle(TextInputStyle.Paragraph)
           .setPlaceholder(T.reasonModalPlaceholder)
           .setRequired(true)
@@ -985,6 +999,9 @@ function closeReasonModal(T, ticketId) {
  * Đóng ticket kèm lý do — dùng chung cho nút bấm tay và cho tự đóng.
  *
  * Không tự reply: hai đường gọi khác kiểu interaction (bấm tay vs job nền).
+ * `openerId` PHẢI truyền xuống: closeTicketChannel dùng nó để thu quyền riêng
+ * của người mở (overwrite ALLOW cấp lúc mở thắng @everyone deny) — thiếu thì
+ * người mở vẫn đọc/ghi được kênh đã đóng.
  */
 async function closeTicketWithReason({
   guild,
@@ -996,9 +1013,10 @@ async function closeTicketWithReason({
   reason,
   unbanned,
   graceHours,
+  openerId = null,
   T,
 }) {
-  await closeTicketChannel({ guild, channel, openerId: null });
+  await closeTicketChannel({ guild, channel, openerId });
   let closed = false;
   try {
     await store.client.mutation("bot_writes:botCloseTicket", {
@@ -1055,15 +1073,42 @@ function closedEmbed(T, { title = T.closedTitle, reason, note = T.closeNote, fie
   return embed;
 }
 
+/**
+ * Đọc tối đa `max` tin gần nhất của kênh, PHÂN TRANG theo 100 tin/lượt.
+ *
+ * Discord từ chối `limit > 100` bằng HTTP 400 (50035) — trước đây một lời gọi
+ * `limit: 200` luôn hỏng nên transcript KHÔNG BAO GIỜ lưu được và kênh ticket
+ * đã đóng không bao giờ được dọn. Dừng khi hết tin, khi đủ `max`, hoặc khi một
+ * lượt không đem thêm tin mới (chống lặp vô hạn nếu `before` không tiến).
+ */
+async function fetchTranscriptMessages(channel, max) {
+  const cap = Math.max(1, Math.min(Number(max) || 200, 1000));
+  const byId = new Map();
+  let before;
+  while (byId.size < cap) {
+    const pageSize = Math.min(100, cap - byId.size);
+    const batch = await channel.messages.fetch({ limit: pageSize, ...(before ? { before } : {}) });
+    const arr = [...batch.values()];
+    const sizeBefore = byId.size;
+    for (const m of arr) byId.set(m.id, m);
+    if (arr.length < pageSize || byId.size === sizeBefore) break;
+    // Discord trả mới → cũ; tin CŨ NHẤT của lượt này là mốc `before` cho lượt sau.
+    before = arr.reduce((a, b) =>
+      (a.createdTimestamp || 0) <= (b.createdTimestamp || 0) ? a : b,
+    ).id;
+  }
+  return [...byId.values()];
+}
+
 async function saveTranscript({ store, guild, channel, ticketId, maxMessages }) {
   let messages;
   try {
-    messages = await channel.messages.fetch({ limit: maxMessages || 200 });
+    messages = await fetchTranscriptMessages(channel, maxMessages || 200);
   } catch (e) {
     console.error(`[tickets] đọc transcript thất bại ${guild.id}:`, e.message);
     return false;
   }
-  const list = [...messages.values()]
+  const list = messages
     .sort((a, b) => (a.createdTimestamp || 0) - (b.createdTimestamp || 0))
     .map((m) => ({
       id: m.id,
@@ -1085,9 +1130,23 @@ async function saveTranscript({ store, guild, channel, ticketId, maxMessages }) 
     messages: list,
   };
   try {
-    const storageId = await store.client.storage.store(
-      new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
+    // `ConvexHttpClient` KHÔNG có `.storage` (đó là API trong hàm server). Đường
+    // đúng: xin URL upload qua mutation (có botKey) rồi POST thẳng nội dung lên.
+    const uploadUrl = await store.client.mutation(
+      "bot_writes:botGenerateTicketTranscriptUploadUrl",
+      {},
     );
+    if (typeof uploadUrl !== "string" || !uploadUrl) throw new Error("không có URL upload");
+    const res = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload, null, 2),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) throw new Error(`upload HTTP ${res.status}`);
+    const uploaded = await res.json();
+    const storageId = uploaded?.storageId;
+    if (typeof storageId !== "string" || !storageId) throw new Error("upload không trả storageId");
     await store.client.mutation("bot_writes:botSaveTicketTranscript", {
       guildId: guild.id,
       ticketId,

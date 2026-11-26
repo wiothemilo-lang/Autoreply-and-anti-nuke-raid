@@ -96,15 +96,24 @@ function makeCtx() {
       // (hiddenPasswordIsSet quét index by_hiddenPasswordHash để trả O(1)).
       withIndex: (_name: string, bound?: (q: any) => any) => {
         const capture: Record<string, unknown> = {};
+        const gts: Array<[string, unknown]> = [];
         const q = {
           eq: (field: string, value: unknown) => {
             capture[field] = value;
             return q;
           },
+          gt: (field: string, value: unknown) => {
+            gts.push([field, value]);
+            return q;
+          },
         };
         if (bound) bound(q);
-        const list = (rows[table] ?? []).filter((r) =>
-          Object.entries(capture).every(([field, value]) => r[field] === value),
+        const list = (rows[table] ?? []).filter(
+          (r) =>
+            Object.entries(capture).every(([field, value]) => r[field] === value) &&
+            gts.every(
+              ([field, value]) => r[field] !== undefined && (r[field] as any) > (value as any),
+            ),
         );
         return {
           first: async () => list[0] ?? null,

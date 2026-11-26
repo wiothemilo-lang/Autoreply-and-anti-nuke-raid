@@ -390,8 +390,8 @@ function fakeEmbed(color = 0xff0000) {
     const payload = whClients[whClients.length - 1].sent[0];
     const ZWSP = String.fromCharCode(0x200b);
     check(
-      "payload kèm allowed_mentions rỗng (chặn ping tuyệt đối)",
-      JSON.stringify(payload.allowed_mentions) === JSON.stringify({ parse: [] }),
+      "payload kèm allowedMentions rỗng (chặn ping tuyệt đối trong discord.js)",
+      JSON.stringify(payload.allowedMentions) === JSON.stringify({ parse: [] }),
     );
     check(
       "lý do trong content được escape (không còn <@&…> nguyên vẹn)",

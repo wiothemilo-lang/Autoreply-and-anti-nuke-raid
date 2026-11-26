@@ -137,10 +137,12 @@ export const botReportSignature = mutation({
       .collect();
     if (recent.length >= RATE_LIMIT) return { ok: false, reason: "rate-limited" };
 
-    // Dedupe: cùng (kind, value) còn hạn → tăng weight.
+    // Dedupe: cùng (kind, value) còn hạn → tăng weight. Lấy dòng MỚI NHẤT: dòng
+    // cũ đã hết hạn nhưng chưa được dọn không được che dòng còn hiệu lực.
     const existing = await ctx.db
       .query("relaySignatures")
       .withIndex("by_kind_value", (q) => q.eq("kind", sig.kind).eq("value", sig.value))
+      .order("desc")
       .first();
     if (existing && now - existing.createdAt < TTL_MS) {
       const sourceHashes =

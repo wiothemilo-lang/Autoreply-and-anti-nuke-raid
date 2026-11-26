@@ -344,8 +344,9 @@ console.log("── Cổng tĩnh: đường đọc Convex không quét toàn b�
 
   const hidden = src("convex/hidden.ts");
   check(
-    "hiddenPasswordIsSet tra index by_hiddenPasswordHash thay vì quét guild",
-    hidden.includes('withIndex("by_hiddenPasswordHash")') &&
+    "hiddenPasswordIsSet tra index by_hiddenPasswordHash (có chặn dưới gt) thay vì quét guild",
+    hidden.includes('withIndex("by_hiddenPasswordHash",') &&
+      hidden.includes('gt("hiddenPasswordHash", "")') &&
       !block(hidden, "export async function hiddenPasswordIsSet", "\n}").includes(
         "legacyHiddenPasswordGuilds(",
       ),

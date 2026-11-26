@@ -103,6 +103,8 @@ import {
   botTouchTicketsHandler,
   botSaveTicketTranscriptArgs,
   botSaveTicketTranscriptHandler,
+  botGenerateTicketTranscriptUploadUrlArgs,
+  botGenerateTicketTranscriptUploadUrlHandler,
 } from "./bot_writes/tickets";
 import { botRecordModActionArgs, botRecordModActionHandler } from "./bot_writes/modActions";
 import { botRecordMetricsArgs, botRecordMetricsHandler } from "./bot_writes/metrics";
@@ -303,6 +305,11 @@ export const botTouchTickets = mutation({
 export const botSaveTicketTranscript = mutation({
   args: botSaveTicketTranscriptArgs,
   handler: botSaveTicketTranscriptHandler,
+});
+
+export const botGenerateTicketTranscriptUploadUrl = mutation({
+  args: botGenerateTicketTranscriptUploadUrlArgs,
+  handler: botGenerateTicketTranscriptUploadUrlHandler,
 });
 
 /** Case mod — thân hàm ở `bot_writes/modActions.ts` (đợt #5). */

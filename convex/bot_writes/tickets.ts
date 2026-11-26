@@ -309,6 +309,28 @@ export async function botTouchTicketsHandler(ctx: MutationCtx, args: BotTouchTic
 }
 
 /**
+ * Bot xin URL upload cho transcript ticket.
+ *
+ * Vì sao cần: bot chạy ngoài Convex qua `ConvexHttpClient`, không có `ctx.storage`.
+ * Chỉ bot có botKey mới xin được URL (URL hết hạn nhanh, một lần dùng) nên không
+ * mở thêm đường upload công khai.
+ */
+export const botGenerateTicketTranscriptUploadUrlArgs = {
+  botKey: v.optional(v.string()),
+};
+export type BotGenerateTicketTranscriptUploadUrlArgs = ObjectType<
+  typeof botGenerateTicketTranscriptUploadUrlArgs
+>;
+
+export async function botGenerateTicketTranscriptUploadUrlHandler(
+  ctx: MutationCtx,
+  args: BotGenerateTicketTranscriptUploadUrlArgs,
+) {
+  await requireBotKeyStrict(ctx, args.botKey);
+  return await ctx.storage.generateUploadUrl();
+}
+
+/**
  * Lưu transcript vào storage + đánh dấu đã lưu — BẮT BUỘC trước khi xoá kênh.
  *
  * Vì sao tách 2 bước: xoá kênh Discord là không hoàn tác được. Nếu gộp "lưu +

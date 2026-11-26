@@ -1,7 +1,6 @@
 import { Component, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { useRouteError } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
-import BotLogo from "./BotLogo";
 import { Button } from "./ui/button";
 import { finishBootOverlay } from "../lib/bootOverlay";
 
@@ -13,13 +12,21 @@ import { translate } from "../lib/i18n";
  *   · `RouteErrorBoundary` — lỗi do router bắt (lazy chunk 404 sau deploy,
  *     loader/render của route ném).
  * Tách phần NHÌN ra một chỗ để hai lớp không lệch giao diện.
+ *
+ * Dùng ảnh tĩnh thay vì `<BotLogo />`: `BotLogo` gọi `useQuery(getBotBranding)`
+ * nên khi Convex đang lỗi nó sẽ ném lỗi ngay bên trong ErrorScreen → trắng trang.
  */
 function ErrorScreen() {
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
       <div className="relative flex max-w-lg flex-col items-center">
         <span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary p-2 shadow-sm">
-          <BotLogo className="h-full w-full" />
+          <img
+            src="/logo-mark.png"
+            alt=""
+            aria-hidden="true"
+            className="h-full w-full object-contain"
+          />
         </span>
 
         <h1 className="mt-7 font-display text-2xl font-bold tracking-tight md:text-3xl">

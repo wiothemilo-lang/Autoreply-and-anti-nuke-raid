@@ -200,7 +200,12 @@ export const updateDefaultWebhook = mutation({
         .filter(Boolean)
         .slice(0, 30);
     }
-    if (color !== undefined) patch.color = color;
+    if (color !== undefined) {
+      patch.color =
+        color === null || !Number.isFinite(color)
+          ? undefined
+          : Math.max(0, Math.min(0xffffff, Math.floor(color)));
+    }
     if (contentTemplate !== undefined) {
       patch.contentTemplate = contentTemplate ? contentTemplate.slice(0, 2000) : undefined;
     }

@@ -103,9 +103,15 @@ export default function GuildIncidents() {
   const [pending, setPending] = useState<string | null>(null);
   /** Khoá sự cố đang mở chi tiết (drill-down). `null` = không mở cái nào. */
   const [expanded, setExpanded] = useState<string | null>(null);
+  // So sánh "14 ngày gần nhất vs 14 ngày trước đó" cần đủ 28 ngày dữ liệu
+  // (mặc định query chỉ lấy 14 ngày khiến kỳ trước luôn = 0). Làm tròn theo giờ
+  // để tham số query ổn định giữa các lần render.
+  const [since28d] = useState(
+    () => Math.floor(Date.now() / 3_600_000) * 3_600_000 - 28 * 24 * 60 * 60_000,
+  );
 
   const guild = useQuery(api.guilds.getGuild, { token, guildId }) as GuildData | null | undefined;
-  const incidents = useQuery(api.incidents.listForGuild, { token, guildId });
+  const incidents = useQuery(api.incidents.listForGuild, { token, guildId, since: since28d });
   const setResolved = useMutation(api.incidents.setResolved);
 
   if (guild === undefined) {
