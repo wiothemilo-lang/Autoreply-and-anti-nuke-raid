@@ -14,6 +14,7 @@
  */
 
 const { sendLog } = require("./util");
+const { usernameSimilarity, scanGuildForAltsAsync, createPeriodicAltScan } = require("./altScan");
 
 const DAY_MS = 86_400_000;
 
@@ -53,101 +54,6 @@ async function cachedBannedUsernames(guild) {
 /** Xoá cache ban của 1 guild (gọi từ guildBanAdd/Remove). */
 function invalidateBanCache(guildId) {
   if (guildId) bansCache.delete(String(guildId));
-}
-
-// ——— Utility: simple username similarity (Levenshtein-like) ———
-function levenshtein(a, b) {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  const matrix = Array.from({ length: a.length + 1 }, (_, i) => {
-    const row = Array(b.length + 1);
-    row[0] = i;
-    return row;
-  });
-  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost,
-      );
-    }
-  }
-  return matrix[a.length][b.length];
-}
-
-/**
- * Tính điểm tương đồng giữa 2 username (0-100).
- * Kết hợp Levenshtein distance + prefix/suffix matching.
- */
-function usernameSimilarity(u1, u2) {
-  const a = u1.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const b = u2.toLowerCase().replace(/[^a-z0-9]/g, "");
-  // REQUIRE minimum 5 chars to avoid false positives on short/common names —
-  // đặt TRƯỚC check trùng hoàn toàn: trước đây "mai"/"mai" (tên phổ biến 3-4
-  // ký tự) vẫn trả 100 và bộ quét alt (không có guard riêng) ghép oan
-  // 2 người lạ trùng tên ngắn.
-  if (a.length < 5 || b.length < 5) return 0;
-  if (a === b) return 100;
-
-  // SKIP Discord default names like "User123456"
-  if (/^user\d+$/i.test(a) || /^user\d+$/i.test(b)) return 0;
-
-  const maxLen = Math.max(a.length, b.length);
-  const dist = levenshtein(a, b);
-  const baseScore = Math.round((1 - dist / maxLen) * 100);
-
-  // Bonus: shared prefix — REDUCED from +3 to +1 per char
-  let prefixBonus = 0;
-  const prefixLen = Math.min(a.length, b.length);
-  for (let i = 0; i < prefixLen && i < 6; i++) {
-    if (a[i] === b[i]) prefixBonus += 1;
-    else break;
-  }
-
-  // Number suffix match — only if BOTH have numbers AND core name is long enough
-  const numSuffixA = a.match(/(\d+)$/);
-  const numSuffixB = b.match(/(\d+)$/);
-  if (numSuffixA && numSuffixB) {
-    const coreA = a.slice(0, a.length - numSuffixA[1].length);
-    const coreB = b.slice(0, b.length - numSuffixB[1].length);
-    // Require core name to be 5+ chars AND same
-    if (coreA === coreB && coreA.length >= 5) return Math.min(100, baseScore + prefixBonus + 10);
-  }
-
-  // Chống false positive tên thật kiểu VN: tiền tố dài ("nguyenvan", "phamthi")
-  // cực phổ biến giữa người lạ. Quy tắc:
-  //  - Tiền tố >= 6 ký tự → KHÔNG cộng prefix bonus (base score đã phản ánh độ
-  //    giống; bonus là đếm trùng lặp).
-  //  - Thêm nữa, nếu 2 tên chỉ chênh nhau 1-3 ký tự CUỐI ("nguyenvana" /
-  //    "nguyenvanb", "phamthianh"/"phamthibinh") → hạ xuống 80: đủ theo dõi
-  //    (+10) nhưng KHÔNG đủ thành bằng chứng mạnh (cần >= 85).
-  //  - Riêng hậu tố SỐ ("linh12345"/"linh12346") vẫn giữ điểm cao — đó là
-  //    pattern alt thật (tên + số tăng dần).
-  const sharedPrefixLen = (() => {
-    let n = 0;
-    const cap = Math.min(a.length, b.length, 12);
-    while (n < cap && a[n] === b[n]) n++;
-    return n;
-  })();
-  const suffixA = a.slice(sharedPrefixLen);
-  const suffixB = b.slice(sharedPrefixLen);
-  // Ngưỡng 5: tên thật VN như "khanh", "thanh", "hoang" (5 ký tự) rất phổ biến
-  // làm tiền tố trùng giữa người lạ ("khanhvy"/"khanhly").
-  const longPrefix = sharedPrefixLen >= 5;
-  if (longPrefix) {
-    const shortSuffixDiff =
-      suffixA.length > 0 && suffixA.length <= 3 && suffixB.length > 0 && suffixB.length <= 3;
-    const bothDigitSuffix = /^\d+$/.test(suffixA) && /^\d+$/.test(suffixB);
-    if (shortSuffixDiff && !bothDigitSuffix) {
-      return Math.min(80, baseScore);
-    }
-    return Math.min(100, baseScore);
-  }
-  return Math.min(100, baseScore + prefixBonus);
 }
 
 // ——— Utility: detect generated/throwaway username patterns ———
@@ -678,159 +584,6 @@ function trackJoinForBurst(guildId, userId, riskScore) {
   return { burstDetected: false, count, avgRisk: Math.round(avgRisk) };
 }
 
-// ============================================================
-// UPGRADE C: Auto-scan Existing Members
-// ============================================================
-
-/**
- * Scan all cached members in a guild for potential alt links.
- * Returns [{ userId1, userId2, similarity, reason }].
- */
-/**
- * So sánh 1 cặp thành viên, đẩy các cặp khớp vào `results`.
- * Tách riêng để bản đồ bộ (sync) và bản lùi (async) dùng CHUNG một quy tắc —
- * hai bản lệch nhau là bản "cho bot chạy nhanh" âm thầm bỏ sót cặp alt.
- */
-function compareAltPair(a, b, threshold, results) {
-  // Check username similarity
-  const sim = usernameSimilarity(a.user.username, b.user.username);
-  if (sim >= threshold) {
-    results.push({
-      userId1: a.id,
-      userId2: b.id,
-      username1: a.user.username,
-      username2: b.user.username,
-      similarity: sim,
-      reason: `username_similarity_${sim}%`,
-    });
-  }
-
-  // Check display name similarity
-  if (a.nickname && b.nickname) {
-    const nickSim = usernameSimilarity(a.nickname, b.nickname);
-    if (nickSim >= threshold && nickSim > sim) {
-      results.push({
-        userId1: a.id,
-        userId2: b.id,
-        username1: a.nickname,
-        username2: b.nickname,
-        similarity: nickSim,
-        reason: `displayname_similarity_${nickSim}%`,
-      });
-    }
-  }
-
-  // Check cross username-displayname
-  if (a.nickname) {
-    const crossSim = usernameSimilarity(a.nickname, b.user.username);
-    if (crossSim >= threshold) {
-      results.push({
-        userId1: a.id,
-        userId2: b.id,
-        username1: a.nickname,
-        username2: b.user.username,
-        similarity: crossSim,
-        reason: `cross_name_similarity_${crossSim}%`,
-      });
-    }
-  }
-  if (b.nickname) {
-    const crossSim = usernameSimilarity(a.user.username, b.nickname);
-    if (crossSim >= threshold) {
-      results.push({
-        userId1: a.id,
-        userId2: b.id,
-        username1: a.user.username,
-        username2: b.nickname,
-        similarity: crossSim,
-        reason: `cross_name_similarity_${crossSim}%`,
-      });
-    }
-  }
-}
-
-/** Gộp link voice-IP, khử trùng lặp, sắp xếp theo độ tương đồng giảm dần. */
-function finalizeAltLinks(results) {
-  // Deduplicate and sort by similarity
-  const seen = new Set();
-  const unique = [];
-  for (const r of results) {
-    const key = [r.userId1, r.userId2].sort().join(":");
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(r);
-    }
-  }
-  return unique.sort((a, b) => b.similarity - a.similarity);
-}
-
-/**
- * TRẦN quét mỗi lượt. Đo thật (tên khác nhau ngẫu nhiên, 3 lần so khớp/cặp):
- * 1000 thành viên ~1,0s · 2000 ~4,5s · 3000 ~12,9s · 5000 ~36s — và đó là
- * thời gian bot ĐỨNG HÌNH, không nhận message, không phản ứng anti-nuke.
- */
-const ALT_SCAN_MAX_MEMBERS = 2000;
-/** Deadline mỗi guild — trên VPS yếu hơn máy đo thì cap này mới là chốt chặn. */
-const ALT_SCAN_DEADLINE_MS = 20_000;
-/** Số cặp xử lý giữa 2 lần nhường event loop. */
-const ALT_SCAN_CHUNK = 2000;
-
-/**
- * Quét alt MÀ KHÔNG CHẶN BOT: nhường event loop định kỳ, chặn trần quy mô và
- * deadline. Bản sync cũ (chạy tuần tự trong vòng lặp mọi guild) đã xoá hẳn —
- * vài guild vài nghìn thành viên là bot đứng hình hàng chục giây, đúng lúc có
- * raid thì anti-nuke cũng không chạy.
- *
- * Trả `{ links, scanned, truncated, total, hitDeadline }` để gọi rõ với người
- * đọc log, không âm thầm bỏ sót cặp.
- */
-async function scanGuildForAltsAsync(
-  guild,
-  config,
-  { maxMembers = ALT_SCAN_MAX_MEMBERS, deadlineMs = ALT_SCAN_DEADLINE_MS } = {},
-) {
-  const threshold = config?.altSimilarityThreshold ?? 70;
-  const all = Array.from(guild.members.cache.values()).filter((m) => !m.user.bot);
-  const total = all.length;
-  const members = total > maxMembers ? all.slice(0, maxMembers) : all;
-  const results = [];
-  const deadline = Date.now() + deadlineMs;
-  let hitDeadline = false;
-  let sinceYield = 0;
-  // Số thành viên đã quét trọn — khai báo ngoài vòng lặp để `return` báo cáo
-  // được con số thật khi chạm deadline (dừng giữa chừng).
-  let i = 0;
-
-  for (; i < members.length && !hitDeadline; i++) {
-    for (let j = i + 1; j < members.length; j++) {
-      compareAltPair(members[i], members[j], threshold, results);
-      // Nhường event loop: tin nhắn/gateway vẫn xử lý được giữa lúc quét.
-      if (++sinceYield >= ALT_SCAN_CHUNK) {
-        sinceYield = 0;
-        await new Promise((r) => setImmediate(r));
-        if (Date.now() > deadline) {
-          hitDeadline = true;
-          break;
-        }
-      }
-    }
-  }
-  return {
-    links: finalizeAltLinks(results),
-    // Số thành viên THỰC SỰ đã quét. Trước đây dòng này là
-    // `hitDeadline ? members.length : members.length` — hai nhánh giống hệt,
-    // nên khi chạm deadline bot vẫn log "quét 2000/2000" dù chỉ mới đi tới
-    // thành viên thứ 400. Chủ server đọc log tưởng đã quét trọn server và
-    // không biết cặp nào còn bị bỏ sót (điều mà cả comment bên trên hứa là
-    // không im lặng bỏ sót). `i` là chỉ số thành viên đang xét lúc vòng lặp
-    // dừng → đã quét trọn các thành viên 0..i-1.
-    scanned: hitDeadline ? i : members.length,
-    total,
-    truncated: total > maxMembers || hitDeadline,
-    hitDeadline,
-  };
-}
-
 /**
  * Dọn dữ liệu của guild bot đã rời (memGuard gọi định kỳ): burstTracker giữ
  * { joins: [...] } mãi cho guild đã kick bot.
@@ -934,6 +687,7 @@ module.exports = {
   // Upgrade D: Burst Detection
   trackJoinForBurst,
   scanGuildForAltsAsync,
+  createPeriodicAltScan,
   // Đợt 7: dọn guild đã rời (memGuard)
   sweepStaleGuilds,
   // Cache ban list: guildBanAdd/Remove gọi để bản mới có hiệu lực ngay

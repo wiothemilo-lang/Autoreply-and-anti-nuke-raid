@@ -150,6 +150,7 @@ bun install            # hoặc npm install
 | `OPENAI_API_KEY`               | ❌          | Fallback trả phí (cấu hình cuối cùng trong chuỗi AI, `OPENAI_MODEL` override model)                                                                                                                                                                               |
 | `BACKUP_ENCRYPT_KEY`           | ❌          | Mã hóa file backup đối xứng (đặt thì backup/restore được mã hóa)                                                                                                                                                                                                  |
 | `AUTO_REGISTER_COMMANDS`       | ❌          | `true` (mặc định) để tự đăng ký slash commands khi bot khởi động                                                                                                                                                                                                  |
+| `ALT_SCAN_WORKER`              | ❌          | Đặt `1` để thử worker cho lượt quét tài khoản phụ định kỳ. Log `[altScan]` ghi chế độ, thời gian quét và số thành viên.                                                                                                                                           |
 
 > Biến phía **web/Convex** (không đặt trong bot/.env): `FUNC_SEED`, `GITHUB_TOKEN`, `DISCORD_CLIENT_SECRET`, `OAUTH_REDIRECT_URI`, `DASHBOARD_URL`, `DISCORD_INVITE`, `FACEBOOK_URL` — đặt qua Convex env (Dashboard/Keys).
 >

@@ -105,6 +105,12 @@
 
 ---
 
+## 2026-11-26 — Thử worker cho lượt quét tài khoản phụ định kỳ
+
+- ✅ Cờ `ALT_SCAN_WORKER=1` bật worker cho lịch quét. Giữ trần 2.000 thành viên, hạn 20 giây và đường dự phòng cùng bộ chấm điểm.
+- 🧪 90/90 bộ CommonJS, 35/35 bộ TypeScript và sàn coverage đạt. Lượt mô phỏng đã quét 2.000 thành viên bằng worker, trả 49 cặp.
+- ▶️ Còn đo trên host chạy PM2 khi có truy cập VPS.
+
 ## 2026-11-25 — Rà soát bot, dashboard và Convex
 
 - ✅ Sửa vòng render và thứ tự loại ticket. Giữ loại đang tắt khi chỉnh sửa.

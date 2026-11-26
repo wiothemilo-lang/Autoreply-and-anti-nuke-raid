@@ -26,7 +26,7 @@ const guildSync = require("./handlers/guildSync");
 const onMessageCreate = require("./handlers/messageCreate");
 const onInteractionCreate = require("./handlers/interactionCreate");
 const joinGate = require("./handlers/joinGate");
-const { scanGuildForAltsAsync, sweepStaleGuilds } = require("./altDetection");
+const { createPeriodicAltScan, sweepStaleGuilds } = require("./altDetection");
 const webhookHub = require("./webhookHub");
 const { registerSweeper, startMemGuard } = require("./memGuard");
 const { startMetrics } = require("./metricsRuntime");
@@ -439,44 +439,10 @@ client.on("guildDelete", (guild) => {
 
 // --- Upgrade C: Periodic Auto-scan Members ---
 const ALT_SCAN_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours
-const altScanInterval = setInterval(() => {
-  void (async () => {
-    for (const [, guild] of client.guilds.cache) {
-      try {
-        const config = await store.getConfig(guild.id);
-        if (!config?.altDetectionEnabled) continue;
-        // Ensure members are cached
-        if (guild.memberCount > guild.members.cache.size) {
-          await guild.members.fetch({ limit: 1000 }).catch(() => {});
-        }
-        // Bản async: nhường event loop giữa lúc quét + trần quy mô/deadline.
-        // Bản sync chặn bot hàng chục giây trên server lớn — đúng lúc có raid
-        // thì anti-nuke cũng đứng hình theo.
-        const scan = await scanGuildForAltsAsync(guild, config);
-        const links = scan.links;
-        if (links.length > 0) {
-          console.log(`[altScan] ${guild.name}: found ${links.length} potential alt pairs`);
-          // Log the top 3 to console
-          for (const link of links.slice(0, 3)) {
-            console.log(
-              `  - ${link.username1} <-> ${link.username2} (${link.similarity}% via ${link.reason})`,
-            );
-          }
-        }
-        if (scan.truncated) {
-          // KHÔNG im lặng khi bỏ sót: chủ server cần biết quét chưa trọn.
-          console.log(
-            `[altScan] ${guild.name}: quét ${scan.scanned}/${scan.total} thành viên` +
-              (scan.hitDeadline ? " (chạm deadline)" : " (chạm trần quy mô)") +
-              " — cặp ngoài phạm vi phải đợi vòng sau",
-          );
-        }
-      } catch (e) {
-        console.error(`[altScan] ${guild.id}:`, e.message);
-      }
-    }
-  })().catch(() => {});
-}, ALT_SCAN_INTERVAL);
+const runAltScan = createPeriodicAltScan(client, store, {
+  useWorker: process.env.ALT_SCAN_WORKER === "1",
+});
+const altScanInterval = setInterval(runAltScan, ALT_SCAN_INTERVAL);
 altScanInterval.unref();
 
 // --- Login ---

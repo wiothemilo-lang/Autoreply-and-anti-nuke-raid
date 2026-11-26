@@ -165,6 +165,129 @@ module.exports = {
     !scanResults.links.some((r) => r.userId1 === "a3" || r.userId2 === "a3"),
   );
 
+  {
+    const { EventEmitter } = require("node:events");
+    const config = { altDetectionEnabled: true, altSimilarityThreshold: 70 };
+    const members = [
+      ["linh12345", "nickname"],
+      ["Linh12346", "nguyenvana"],
+      ["nguyenvana", "TÊN RIÊNG"],
+      ["nguyenvanb", "nickname"],
+      ["User123456", "nguyenvanb"],
+      ["K12345", null],
+      ["k12345", null],
+    ].map(([username, nickname], i) => ({
+      id: String(i),
+      nickname,
+      user: { username, bot: i === 6 },
+    }));
+    const guild = mkGuild("g-worker", members);
+    const reference = await alt.scanGuildForAltsAsync(guild, config);
+    const worker = await alt.scanGuildForAltsAsync(guild, config, { useWorker: true });
+    check(
+      "worker trả cùng cặp, điểm và thứ tự, bỏ qua tài khoản bot",
+      worker.engine === "worker" &&
+        JSON.stringify(worker.links) === JSON.stringify(reference.links) &&
+        worker.total === 6 &&
+        worker.scanned === 6,
+    );
+    const capped = await alt.scanGuildForAltsAsync(guild, config, {
+      useWorker: true,
+      maxMembers: 4,
+      linkLimit: 1,
+    });
+    const referenceCapped = await alt.scanGuildForAltsAsync(guild, config, { maxMembers: 4 });
+    check(
+      "worker giữ số cặp đầy đủ khi chỉ trả cặp đứng đầu và áp dụng trần thành viên",
+      capped.truncated &&
+        capped.total === 6 &&
+        capped.scanned === 4 &&
+        capped.linkCount === referenceCapped.links.length &&
+        JSON.stringify(capped.links) === JSON.stringify(referenceCapped.links.slice(0, 1)),
+    );
+    const warnings = [];
+    const logger = { warn: (...args) => warnings.push(args.join(" ")) };
+    const fallback = await alt.scanGuildForAltsAsync(guild, config, {
+      useWorker: true,
+      logger,
+      createWorker() {
+        throw new Error("worker không khởi động được");
+      },
+    });
+    check(
+      "worker không khởi động thì dùng đường dự phòng cùng kết quả",
+      fallback.engine === "fallback" &&
+        JSON.stringify(fallback.links) === JSON.stringify(reference.links),
+    );
+
+    let stopped = 0;
+    const crashed = await alt.scanGuildForAltsAsync(guild, config, {
+      useWorker: true,
+      logger,
+      createWorker(job) {
+        const failed = new EventEmitter();
+        failed.terminate = async () => stopped++;
+        check(
+          "worker chỉ nhận ID, username và nickname của thành viên",
+          job.members.every((member) => Object.keys(member).join(",") === "id,username,nickname"),
+        );
+        queueMicrotask(() => failed.emit("exit", 1));
+        return failed;
+      },
+    });
+    check(
+      "worker thoát sớm được dọn và chỉ dùng đường dự phòng một lần",
+      stopped === 1 &&
+        warnings.length === 2 &&
+        crashed.engine === "fallback" &&
+        JSON.stringify(crashed.links) === JSON.stringify(reference.links),
+    );
+
+    stopped = 0;
+    const timeout = await alt.scanGuildForAltsAsync(guild, config, {
+      useWorker: true,
+      deadlineMs: 25,
+      createWorker() {
+        const silent = new EventEmitter();
+        silent.terminate = async () => stopped++;
+        return silent;
+      },
+    });
+    check(
+      "worker treo bị dừng đúng một lần và không quét lại khi hết hạn",
+      stopped === 1 &&
+        timeout.engine === "worker" &&
+        timeout.hitDeadline &&
+        timeout.truncated &&
+        timeout.scanned === 0 &&
+        timeout.links.length === 0,
+    );
+
+    let release;
+    let scanCalls = 0;
+    const pending = new Promise((resolve) => {
+      release = resolve;
+    });
+    const run = alt.createPeriodicAltScan(
+      { guilds: { cache: new Map([[guild.id, guild]]) } },
+      { getConfig: async () => config },
+      {
+        scan: async () => {
+          scanCalls++;
+          await pending;
+          return { ...reference, linkCount: reference.links.length };
+        },
+        logger: { log() {}, error() {} },
+      },
+    );
+    const first = run();
+    await run();
+    release();
+    await first;
+    await run();
+    check("lịch bỏ qua lượt trùng và nhận lượt mới sau khi lượt trước xong", scanCalls === 2);
+  }
+
   // ══════════ 6. analyzeNewMember — alt chắc chắn (2+ strong signals) ══════════
   // Điểm: age<1d (+30) + sim 100 (+25) − positive (avatar 5 + tên thường 5 = 10) = 45.
   // maxRisk 40 → đủ phạt; strong signals = [age<3d, name_sim_85+] = 2 → kick thẳng.
@@ -493,8 +616,9 @@ module.exports = {
     );
     check(
       "index.js gọi bản quét async (không chặn event loop)",
-      /scanGuildForAltsAsync\(guild, config\)/.test(idxSrc) &&
-        !/await scanGuildForAlts\(|= scanGuildForAlts\(/.test(idxSrc),
+      /createPeriodicAltScan\(client, store,/.test(idxSrc) &&
+        /process\.env\.ALT_SCAN_WORKER === "1"/.test(idxSrc) &&
+        /setInterval\(runAltScan, ALT_SCAN_INTERVAL\)/.test(idxSrc),
     );
   }
 
